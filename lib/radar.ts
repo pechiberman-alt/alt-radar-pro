@@ -1,6 +1,6 @@
 export type MarketAsset = {
   symbol: string; price: number; change1h: number | null; change4h: number | null;
-  change24h: number; volume: number; quoteVolume: number; high: number; low: number;
+  change24h: number; volume: number; quoteVolume: number; high: number | null; low: number | null;
 };
 
 export type NewsEvent = {
@@ -59,8 +59,9 @@ export function scoreAssets(market: MarketAsset[], riskScore: number | null, kil
   const btc = market.find(a => a.symbol === "BTCUSDT");
   const eth = market.find(a => a.symbol === "ETHUSDT");
   return market.filter(a => !["BTCUSDT", "ETHUSDT"].includes(a.symbol)).map(a => {
-    const range = Math.max(a.high - a.low, a.price * .001);
-    const position = (a.price - a.low) / range;
+    const hasRange = a.high !== null && a.low !== null && a.high > a.low;
+    const range = hasRange ? Math.max(a.high! - a.low!, a.price * .001) : null;
+    const position = hasRange && range ? (a.price - a.low!) / range : .5;
     const relVolume = Math.min(5, a.quoteVolume / 250_000_000);
     const momentum = ((a.change1h ?? 0) * .35) + ((a.change4h ?? 0) * .35) + a.change24h * .3;
     const extended = a.change24h > 14 || (a.change1h ?? 0) > 6 || position > .97;
@@ -69,7 +70,7 @@ export function scoreAssets(market: MarketAsset[], riskScore: number | null, kil
       { label: "Momentum alignment", points: (a.change1h ?? 0) > 0 && (a.change4h ?? 0) > 0 ? 16 : 5 },
       { label: "Relative strength BTC", points: btc && a.change24h > btc.change24h ? 14 : 2 },
       { label: "Relative strength ETH", points: eth && a.change24h > eth.change24h ? 10 : 2 },
-      { label: "Breakout proximity", points: position > .78 && position < .97 ? 15 : 6 },
+      { label: "Breakout proximity", points: hasRange ? (position > .78 && position < .97 ? 15 : 6) : 0 },
       { label: "Volume participation", points: relVolume > 1 ? 14 : relVolume > .4 ? 9 : 3 },
       { label: "Multi-TF trend", points: (a.change1h ?? 0) > 0 && (a.change4h ?? 0) > 0 && a.change24h > 0 ? 12 : 4 },
     ];

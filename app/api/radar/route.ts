@@ -12,7 +12,7 @@ async function firstAvailable(path: string, revalidate: number) {
   let lastStatus = 0;
   for (const base of BINANCE_ENDPOINTS) {
     try {
-      const response = await fetch(`${base}${path}`, { next: { revalidate }, headers: { "User-Agent": "ALT-RADAR-PRO/1.0", Accept: "application/json" } });
+      const response = await fetch(`${base}${path}`, { next: { revalidate }, signal: AbortSignal.timeout(3200), headers: { "User-Agent": "ALT-RADAR-PRO/1.0", Accept: "application/json" } });
       lastStatus = response.status;
       if (response.ok) return { response, source: base.includes("vision") ? "Binance Data API" : "Binance Spot" };
     } catch { /* try the next public endpoint */ }
@@ -46,19 +46,30 @@ export async function GET() {
       const ks = km.get(r.symbol); const price = Number(r.lastPrice); const h1 = Array.isArray(ks) && ks.length > 1 ? ((price / Number(ks[ks.length - 2][4])) - 1) * 100 : null; const h4 = Array.isArray(ks) && ks.length > 4 ? ((price / Number(ks[0][1])) - 1) * 100 : null;
       return { symbol: r.symbol, price, change1h: h1, change4h: h4, change24h: Number(r.priceChangePercent), volume: Number(r.volume), quoteVolume: Number(r.quoteVolume), high: Number(r.highPrice), low: Number(r.lowPrice) };
     }); sources.push(tickersResult.source);
-  } catch { errors.push("Binance market data unavailable"); }
+  } catch {
+    try {
+      const r = await fetch("https://api.coinlore.net/api/tickers/?start=0&limit=100", { next: { revalidate: 45 }, signal: AbortSignal.timeout(5000), headers: { Accept: "application/json" } });
+      if (!r.ok) throw new Error();
+      const j = await r.json() as { data?: { symbol: string; price_usd: string; percent_change_1h: string; percent_change_24h: string; volume24: number; volume24_native?: number }[] };
+      const wanted = new Set(WATCH.map(symbol => symbol.replace("USDT", "")));
+      market = (j.data ?? []).filter(row => wanted.has(row.symbol)).map(row => ({ symbol: `${row.symbol}USDT`, price: Number(row.price_usd), change1h: Number(row.percent_change_1h), change4h: null, change24h: Number(row.percent_change_24h), volume: Number(row.volume24_native ?? 0), quoteVolume: Number(row.volume24), high: null, low: null }));
+      if (!market.length) throw new Error();
+      sources.push("CoinLore Market");
+      errors.push("Binance no disponible; usando respaldo CoinLore");
+    } catch { errors.push("Datos de mercado no disponibles"); }
+  }
   try {
-    const r = await fetch("https://api.coingecko.com/api/v3/global", { next: { revalidate: 120 }, headers: { "User-Agent": "ALT-RADAR-PRO/1.0", Accept: "application/json" } });
+    const r = await fetch("https://api.coingecko.com/api/v3/global", { next: { revalidate: 120 }, signal: AbortSignal.timeout(4000), headers: { "User-Agent": "ALT-RADAR-PRO/1.0", Accept: "application/json" } });
     if (!r.ok) throw new Error(); const j = await r.json(); btcDom = Number(j.data.market_cap_percentage.btc); domChange = Number(j.data.market_cap_change_percentage_24h_usd); sources.push("CoinGecko Global");
   } catch {
     try {
-      const r = await fetch("https://api.coinlore.net/api/global/", { next: { revalidate: 120 }, headers: { Accept: "application/json" } });
+      const r = await fetch("https://api.coinlore.net/api/global/", { next: { revalidate: 120 }, signal: AbortSignal.timeout(5000), headers: { Accept: "application/json" } });
       if (!r.ok) throw new Error(); const [j] = await r.json() as [{ btc_d?: string; mcap_change?: string }]; btcDom = Number(j.btc_d); domChange = Number(j.mcap_change); sources.push("CoinLore Global");
     } catch { errors.push("BTC dominance unavailable"); }
   }
   try {
     const q = encodeURIComponent("(war OR sanctions OR tariffs OR missile OR Iran OR Israel OR Ukraine OR Taiwan OR OPEC OR Federal Reserve OR crypto regulation)");
-    const r = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=40&format=json&sort=datedesc`, { next: { revalidate: 120 } }); if (!r.ok) throw new Error(); const j = await r.json() as { articles?: { title: string; url: string; domain: string; seendate: string }[] };
+    const r = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=40&format=json&sort=datedesc`, { next: { revalidate: 120 }, signal: AbortSignal.timeout(4500) }); if (!r.ok) throw new Error(); const j = await r.json() as { articles?: { title: string; url: string; domain: string; seendate: string }[] };
     const seen = new Set<string>(); news = (j.articles ?? []).filter(a => keywords.test(a.title)).map(a => ({ ...classify(a.title, a.domain, a.seendate), url: a.url })).filter(e => { const k = e.title.toLowerCase().replace(/[^a-z0-9 ]/g, "").split(" ").slice(0, 7).join(" "); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 12); sources.push("GDELT News Index");
   } catch { errors.push("Global news feed unavailable"); }
   const payload: RadarPayload = { timestamp: new Date().toISOString(), sources, market, dominance: { btc: btcDom, change24h: domChange }, news, errors };
