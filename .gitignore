@@ -42,3 +42,4 @@ yarn-error.log*
 .sites-dev*.log
 .gh-auth-*.log
 .cf-auth-*.log
+.codex-remote-attachments/
