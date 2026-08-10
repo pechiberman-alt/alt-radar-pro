@@ -25,17 +25,17 @@ export type ScoredAsset = MarketAsset & {
 const clamp = (n: number, min = 0, max = 100) => Math.max(min, Math.min(max, n));
 
 export function globalRisk(events: NewsEvent[]) {
-  if (!events.length) return { score: null, level: "DATA UNAVAILABLE", killSwitch: false } as const;
+  if (!events.length) return { score: null, level: "DATOS NO DISPONIBLES", killSwitch: false } as const;
   const sorted = [...events].sort((a, b) => b.risk - a.risk);
   const score = Math.round(clamp(sorted[0].risk * .72 + (sorted[1]?.risk ?? 0) * .18 + Math.min(events.length, 10)));
-  return { score, level: score > 80 ? "EXTREME" : score > 60 ? "HIGH" : score > 40 ? "ELEVATED" : score > 20 ? "NORMAL" : "LOW", killSwitch: score > 80 };
+  return { score, level: score > 80 ? "EXTREMO" : score > 60 ? "ALTO" : score > 40 ? "ELEVADO" : score > 20 ? "NORMAL" : "BAJO", killSwitch: score > 80 };
 }
 
 export function altseasonScore(market: MarketAsset[], btcDominance: number | null, riskScore: number | null) {
   const btc = market.find(a => a.symbol === "BTCUSDT");
   const eth = market.find(a => a.symbol === "ETHUSDT");
   const alts = market.filter(a => !["BTCUSDT", "ETHUSDT"].includes(a.symbol));
-  if (!btc || !eth || !alts.length) return { raw: null, adjustment: 0, final: null, state: "DATA UNAVAILABLE", factors: [] };
+  if (!btc || !eth || !alts.length) return { raw: null, adjustment: 0, final: null, state: "DATOS NO DISPONIBLES", factors: [] };
   const breadth = alts.filter(a => a.change24h > btc.change24h).length / alts.length;
   const positive = alts.filter(a => a.change24h > 0).length / alts.length;
   const ethOut = eth.change24h - btc.change24h;
@@ -51,7 +51,7 @@ export function altseasonScore(market: MarketAsset[], btcDominance: number | nul
   const raw = Math.round(clamp(factors.reduce((s, f) => s + f.points, 0)));
   const adjustment = riskScore === null ? 0 : riskScore > 80 ? -22 : riskScore > 60 ? -12 : riskScore > 40 ? -5 : 0;
   const final = clamp(raw + adjustment);
-  const state = final >= 76 ? "ALTSEASON CONFIRMED" : final >= 61 ? "STRONG ROTATION" : final >= 41 ? "PRE-ALTSEASON" : final >= 21 ? "NEUTRAL" : "BITCOIN SEASON";
+  const state = final >= 76 ? "ALTSEASON CONFIRMADA" : final >= 61 ? "ROTACIÓN FUERTE" : final >= 41 ? "PRE-ALTSEASON" : final >= 21 ? "NEUTRAL" : "TEMPORADA BITCOIN";
   return { raw, adjustment, final, state, factors };
 }
 

@@ -6,6 +6,19 @@ export const dynamic = "force-dynamic";
 const WATCH = ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","ADAUSDT","DOGEUSDT","AVAXUSDT","LINKUSDT","SUIUSDT","DOTUSDT","NEARUSDT","ARBUSDT","OPUSDT","APTUSDT","INJUSDT","SEIUSDT","LTCUSDT","UNIUSDT","ATOMUSDT"];
 const stable = /^(USDC|USDP|FDUSD|TUSD|DAI|BUSD|EUR|USD1)/;
 const keywords = /(war|missile|drone|attack|ceasefire|sanction|tariff|iran|israel|ukraine|russia|taiwan|china|nato|oil|opec|hormuz|suez|fed |federal reserve|ecb|boj|pboc|sec |crypto regulation|bank crisis|cyberattack)/i;
+const BINANCE_ENDPOINTS = ["https://data-api.binance.vision", "https://api.binance.com"];
+
+async function firstAvailable(path: string, revalidate: number) {
+  let lastStatus = 0;
+  for (const base of BINANCE_ENDPOINTS) {
+    try {
+      const response = await fetch(`${base}${path}`, { next: { revalidate }, headers: { "User-Agent": "ALT-RADAR-PRO/1.0", Accept: "application/json" } });
+      lastStatus = response.status;
+      if (response.ok) return { response, source: base.includes("vision") ? "Binance Data API" : "Binance Spot" };
+    } catch { /* try the next public endpoint */ }
+  }
+  throw new Error(`Binance unavailable (${lastStatus})`);
+}
 
 function classify(title: string, source: string, publishedAt: string): NewsEvent {
   const t = title.toLowerCase();
@@ -22,20 +35,27 @@ function classify(title: string, source: string, publishedAt: string): NewsEvent
 export async function GET() {
   const errors: string[] = []; const sources: string[] = []; let market: MarketAsset[] = []; let btcDom: number | null = null; let domChange: number | null = null; let news: NewsEvent[] = [];
   try {
-    const [tickersRes, klines] = await Promise.all([
-      fetch("https://api.binance.com/api/v3/ticker/24hr", { next: { revalidate: 20 } }),
-      Promise.all(WATCH.map(async symbol => { try { const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=5`, { next: { revalidate: 55 } }); return [symbol, r.ok ? await r.json() : null] as const; } catch { return [symbol, null] as const; } }))
+    const [tickersResult, klines] = await Promise.all([
+      firstAvailable("/api/v3/ticker/24hr", 20),
+      Promise.all(WATCH.map(async symbol => { try { const { response } = await firstAvailable(`/api/v3/klines?symbol=${symbol}&interval=1h&limit=5`, 55); return [symbol, await response.json()] as const; } catch { return [symbol, null] as const; } }))
     ]);
+    const tickersRes = tickersResult.response;
     if (!tickersRes.ok) throw new Error("Binance HTTP error");
     const rows = await tickersRes.json() as Record<string,string>[]; const km = new Map(klines);
     market = rows.filter(r => WATCH.includes(r.symbol) && !stable.test(r.symbol)).map(r => {
       const ks = km.get(r.symbol); const price = Number(r.lastPrice); const h1 = Array.isArray(ks) && ks.length > 1 ? ((price / Number(ks[ks.length - 2][4])) - 1) * 100 : null; const h4 = Array.isArray(ks) && ks.length > 4 ? ((price / Number(ks[0][1])) - 1) * 100 : null;
       return { symbol: r.symbol, price, change1h: h1, change4h: h4, change24h: Number(r.priceChangePercent), volume: Number(r.volume), quoteVolume: Number(r.quoteVolume), high: Number(r.highPrice), low: Number(r.lowPrice) };
-    }); sources.push("Binance Spot");
+    }); sources.push(tickersResult.source);
   } catch { errors.push("Binance market data unavailable"); }
   try {
-    const r = await fetch("https://api.coingecko.com/api/v3/global", { next: { revalidate: 120 } }); if (!r.ok) throw new Error(); const j = await r.json(); btcDom = Number(j.data.market_cap_percentage.btc); domChange = Number(j.data.market_cap_change_percentage_24h_usd); sources.push("CoinGecko Global");
-  } catch { errors.push("BTC dominance unavailable"); }
+    const r = await fetch("https://api.coingecko.com/api/v3/global", { next: { revalidate: 120 }, headers: { "User-Agent": "ALT-RADAR-PRO/1.0", Accept: "application/json" } });
+    if (!r.ok) throw new Error(); const j = await r.json(); btcDom = Number(j.data.market_cap_percentage.btc); domChange = Number(j.data.market_cap_change_percentage_24h_usd); sources.push("CoinGecko Global");
+  } catch {
+    try {
+      const r = await fetch("https://api.coinlore.net/api/global/", { next: { revalidate: 120 }, headers: { Accept: "application/json" } });
+      if (!r.ok) throw new Error(); const [j] = await r.json() as [{ btc_d?: string; mcap_change?: string }]; btcDom = Number(j.btc_d); domChange = Number(j.mcap_change); sources.push("CoinLore Global");
+    } catch { errors.push("BTC dominance unavailable"); }
+  }
   try {
     const q = encodeURIComponent("(war OR sanctions OR tariffs OR missile OR Iran OR Israel OR Ukraine OR Taiwan OR OPEC OR Federal Reserve OR crypto regulation)");
     const r = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=40&format=json&sort=datedesc`, { next: { revalidate: 120 } }); if (!r.ok) throw new Error(); const j = await r.json() as { articles?: { title: string; url: string; domain: string; seendate: string }[] };
