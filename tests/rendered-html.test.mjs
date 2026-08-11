@@ -79,3 +79,23 @@ test("wires real performance metrics and redundant global intelligence", async (
   assert.match(news, /clusterEvents/);
   assert.match(radarRoute, /loadGlobalNews/);
 });
+
+test("wires the zero-token market brain, real timeframes and auditable learning", async () => {
+  const [engine, route, panel, schema] = await Promise.all([
+    readFile(new URL("../lib/market-brain.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/brain/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/market-brain.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(engine, /\["5m", "15m", "1h", "4h", "1d"\]/);
+  assert.match(engine, /theoreticalLiquidationZones/);
+  assert.match(route, /Binance Futures public API/);
+  assert.match(route, /walk-forward/i);
+  assert.match(route, /ON CONFLICT\(id\) DO NOTHING/);
+  assert.match(panel, /0 TOKENS/);
+  assert.match(panel, /DATA INSUFICIENTE/);
+  assert.match(panel, /forceOrder/);
+  assert.match(schema, /brainObservations/);
+  assert.match(schema, /directionalReturn/);
+});

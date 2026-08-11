@@ -59,3 +59,35 @@ export const automationState = sqliteTable("automation_state", {
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const brainObservations = sqliteTable(
+  "brain_observations",
+  {
+    id: text("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    timeframe: text("timeframe").notNull(),
+    horizonMinutes: integer("horizon_minutes").notNull(),
+    direction: text("direction", { enum: ["BULLISH", "BEARISH"] }).notNull(),
+    rawConfidence: integer("raw_confidence").notNull(),
+    calibratedConfidence: integer("calibrated_confidence").notNull(),
+    entryPrice: real("entry_price").notNull(),
+    features: text("features").notNull().default("{}"),
+    detectedAt: text("detected_at").notNull(),
+    targetAt: text("target_at").notNull(),
+    outcomePrice: real("outcome_price"),
+    directionalReturn: real("directional_return"),
+    success: integer("success"),
+    evaluatedAt: text("evaluated_at"),
+  },
+  (table) => [
+    index("brain_observations_symbol_timeframe_idx").on(
+      table.symbol,
+      table.timeframe,
+      table.detectedAt,
+    ),
+    index("brain_observations_evaluation_idx").on(
+      table.timeframe,
+      table.evaluatedAt,
+    ),
+  ],
+);

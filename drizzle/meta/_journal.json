@@ -8,6 +8,13 @@
       "when": 1786442088843,
       "tag": "0000_wild_nitro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786483527852,
+      "tag": "0001_vengeful_husk",
+      "breakpoints": true
     }
   ]
 }

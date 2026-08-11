@@ -4,6 +4,7 @@ import "./globals.css";
 import "./open-heatmap.css";
 import "./premium.css";
 import "./bookmap-pro.css";
+import "./market-brain.css";
 import PwaRegister from "./pwa-register";
 
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });

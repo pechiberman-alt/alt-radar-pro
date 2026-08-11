@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import MarketBrain from "./market-brain";
 
 type Level = [number, number];
 type Trade = {
@@ -1410,6 +1411,18 @@ export default function LiveBookmap({
           Binance {venue === "futures" ? "Futures" : "Spot"} WebSocket · profundidad 100 ms · trades reales · sin órdenes simuladas
         </small>
       </div>
+
+      <MarketBrain
+        symbol={symbol}
+        venue={venue}
+        currentPrice={metrics.bid && metrics.ask ? (metrics.bid + metrics.ask) / 2 : 0}
+        winner={winner}
+        delta={delta}
+        imbalance={metrics.imbalance}
+        cvd={cvd}
+        altseason={altseason}
+        liveLiquidations={liquidations}
+      />
     </section>
   );
 }
