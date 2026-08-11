@@ -34,7 +34,7 @@ export function globalRisk(events: NewsEvent[]) {
 export function altseasonScore(market: MarketAsset[], btcDominance: number | null, riskScore: number | null) {
   const btc = market.find(a => a.symbol === "BTCUSDT");
   const eth = market.find(a => a.symbol === "ETHUSDT");
-  const alts = market.filter(a => !["BTCUSDT", "ETHUSDT"].includes(a.symbol));
+  const alts = market.filter(a => !["BTCUSDT", "ETHUSDT"].includes(a.symbol) && a.quoteVolume >= 5_000_000);
   if (!btc || !eth || !alts.length) return { raw: null, adjustment: 0, final: null, state: "DATOS NO DISPONIBLES", factors: [] };
   const breadth = alts.filter(a => a.change24h > btc.change24h).length / alts.length;
   const positive = alts.filter(a => a.change24h > 0).length / alts.length;
@@ -77,7 +77,7 @@ export function scoreAssets(market: MarketAsset[], riskScore: number | null, kil
     const penalties = [
       ...(extended ? [{ label: "Move already extended", points: -18 }] : []),
       ...(riskScore !== null && riskScore > 60 ? [{ label: "Geopolitical risk", points: riskScore > 80 ? -22 : -10 }] : []),
-      ...(a.quoteVolume < 50_000_000 ? [{ label: "Insufficient liquidity", points: -14 }] : []),
+      ...(a.quoteVolume < 10_000_000 ? [{ label: "Insufficient liquidity", points: -14 }] : []),
     ];
     const score = Math.round(clamp(reasons.reduce((s, r) => s + r.points, 0) + penalties.reduce((s, p) => s + p.points, 0)));
     const confirmations = reasons.filter(r => r.points >= 10).length;
