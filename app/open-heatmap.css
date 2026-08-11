@@ -1,6 +1,38 @@
 /* Open Heatmap responsive overrides, loaded after the dashboard stylesheet. */
 .live-bookmap .flow-metrics { grid-template-columns: repeat(6, 1fr); }
 .live-bookmap .heatmap-controls { flex-wrap: wrap; }
+.decision-board { display: grid; grid-template-columns: 1.45fr .8fr .8fr; gap: 8px; padding: 0 22px 14px; }
+.decision-board article { min-height: 132px; border: 1px solid var(--line); background: linear-gradient(145deg,#0c1612,#080e0c); border-radius: 5px; padding: 13px; }
+.decision-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.decision-title span,.altseason-live>div>span,.confluence-card>span { color: var(--muted); font: 7px var(--font-mono); letter-spacing: .8px; }
+.decision-title b { font: 9px var(--font-mono); color: #dce8e1; }
+.battle-card.compradores .decision-title b { color: var(--green); }
+.battle-card.vendedores .decision-title b { color: var(--red); }
+.battle-numbers { display: grid; grid-template-columns: 68px 1fr 68px; gap: 10px; align-items: center; margin-top: 18px; }
+.battle-numbers strong { font: 18px var(--font-mono); }
+.battle-numbers strong:last-child { text-align: right; }
+.battle-numbers small { display: block; margin-top: 2px; font: 6px var(--font-mono); color: var(--muted); }
+.battle-track { height: 11px; display: flex; position: relative; overflow: visible; border-radius: 8px; background: #17231e; box-shadow: inset 0 0 0 1px #2b3933; }
+.battle-track span { height: 100%; background: linear-gradient(90deg,#a92534,var(--red)); border-radius: 8px 0 0 8px; }
+.battle-track b { height: 100%; margin-left: auto; background: linear-gradient(90deg,var(--green2),var(--green)); border-radius: 0 8px 8px 0; }
+.battle-track i { position: absolute; top: -4px; width: 2px; height: 19px; background: #f1f6f3; box-shadow: 0 0 8px #fff; z-index: 2; }
+.battle-reasons { display: flex; align-items: center; gap: 6px; margin-top: 15px; flex-wrap: wrap; }
+.battle-reasons span,.battle-reasons em { padding: 4px 6px; border: 1px solid #25362e; color: #97a69e; font: 6px var(--font-mono); font-style: normal; }
+.battle-reasons em { margin-left: auto; color: #dce8e1; }
+.altseason-live { display: flex; align-items: center; gap: 12px; }
+.alt-live-ring { --alt-live: 0deg; width: 72px; height: 72px; flex: 0 0 72px; border-radius: 50%; background: conic-gradient(var(--green) var(--alt-live),#1b2922 0); display: grid; place-content: center; text-align: center; box-shadow: inset 0 0 0 9px #0b1310; }
+.alt-live-ring b { font: 20px var(--font-mono); z-index: 1; }
+.alt-live-ring small { color: var(--muted); font: 6px var(--font-mono); z-index: 1; }
+.altseason-live h3,.confluence-card h3 { margin: 7px 0; font-size: 12px; }
+.altseason-live p { display: flex; gap: 4px; margin: 0; flex-wrap: wrap; }
+.altseason-live p i { padding: 4px; border: 1px solid var(--line); color: var(--muted); font: 6px var(--font-mono); font-style: normal; }
+.confluence-card h3 { color: var(--amber); }
+.confluence-card.confluencia-alcista { border-color: #1a744e; box-shadow: inset 0 2px var(--green); }
+.confluence-card.confluencia-alcista h3 { color: var(--green); }
+.confluence-card.presión-vendedora { border-color: #71343a; box-shadow: inset 0 2px var(--red); }
+.confluence-card.presión-vendedora h3 { color: var(--red); }
+.confluence-card p { color: #8d9b94; font-size: 8px; line-height: 1.4; }
+.confluence-card small { color: var(--muted); font: 6px var(--font-mono); }
 .footprint,.liquidation-tape { border-top: 1px solid #304239; background: #060d0b; }
 .footprint header,.liquidation-tape header { padding: 9px 10px; color: #9aac9f; font: 7px var(--font-mono); letter-spacing: .8px; border-bottom: 1px solid var(--line); }
 .footprint>div { display: grid; grid-template-columns: 1fr 78px 1fr; gap: 5px; padding: 6px 10px; border-bottom: 1px solid #12201b; font: 7px var(--font-mono); text-align: right; }
@@ -13,6 +45,8 @@
 .liquidation-tape .long b { color: var(--red); }
 .liquidation-tape .short b { color: var(--green); }
 @media (max-width: 900px) {
+  .decision-board { grid-template-columns: 1fr 1fr; }
+  .battle-card { grid-column: 1/3; }
   .market-sidebar {
     height: auto;
     max-height: 360px;
@@ -27,6 +61,10 @@
 }
 
 @media (max-width: 700px) {
+  .decision-board { grid-template-columns: 1fr; padding: 0 14px 12px; }
+  .battle-card { grid-column: auto; }
+  .battle-numbers { grid-template-columns: 62px 1fr 62px; }
+  .battle-reasons em { margin-left: 0; }
   .market-sidebar { display: block; max-height: 260px; }
   .market-sidebar .depth-ladder { display: none; }
   .time-sales { border-left: 0; }
