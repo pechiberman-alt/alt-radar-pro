@@ -32,6 +32,8 @@ type MarketBrainProps = {
   cvd: number;
   altseason: AltseasonContext;
   liveLiquidations: LiveLiquidation[];
+  timeframe: BrainTimeframe;
+  onTimeframeChange: (timeframe: BrainTimeframe) => void;
 };
 
 type ChatEntry = { id: string; question: string; answer: string; at: string };
@@ -194,7 +196,7 @@ function buildAnswer(
 }
 
 export default function MarketBrain(props: MarketBrainProps) {
-  const [timeframe, setTimeframe] = useState<BrainTimeframe>("4h");
+  const timeframe = props.timeframe;
   const [brain, setBrain] = useState<MarketBrainPayload | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
@@ -307,7 +309,7 @@ export default function MarketBrain(props: MarketBrainProps) {
           <button
             key={frame}
             className={frame === timeframe ? "active" : ""}
-            onClick={() => setTimeframe(frame)}
+            onClick={() => props.onTimeframeChange(frame)}
           >
             {frameLabel[frame]}
           </button>
@@ -381,7 +383,7 @@ export default function MarketBrain(props: MarketBrainProps) {
               {BRAIN_TIMEFRAMES.map((frame) => {
                 const item = brain?.analyses[frame] ?? null;
                 return (
-                  <button key={frame} className={`${item?.bias.toLowerCase() ?? "unavailable"} ${frame === timeframe ? "selected" : ""}`} onClick={() => setTimeframe(frame)}>
+                  <button key={frame} className={`${item?.bias.toLowerCase() ?? "unavailable"} ${frame === timeframe ? "selected" : ""}`} onClick={() => props.onTimeframeChange(frame)}>
                     <span>{frameLabel[frame]}</span>
                     <strong>{item?.score ?? "—"}<small>/100</small></strong>
                     <b>{item ? biasText(item.bias) : "DATA UNAVAILABLE"}</b>

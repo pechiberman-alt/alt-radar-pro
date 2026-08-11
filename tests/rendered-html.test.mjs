@@ -99,3 +99,22 @@ test("wires the zero-token market brain, real timeframes and auditable learning"
   assert.match(schema, /brainObservations/);
   assert.match(schema, /directionalReturn/);
 });
+
+test("adds real Bookmap timeframes and horizon performance without fabricated stats", async () => {
+  const [chart, performance, automation, schema] = await Promise.all([
+    readFile(new URL("../app/bookmap-timeframe-chart.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/performance/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/automation.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(chart, /MARKET STRUCTURE · KLINES REALES/);
+  assert.match(chart, /WIN RATE/);
+  assert.match(chart, /PROFIT FACTOR/);
+  assert.match(chart, /BRAIN_TIMEFRAMES\.map/);
+  assert.match(performance, /COUNT\(return_5m\)/);
+  assert.match(performance, /profitFactorInfinite/);
+  assert.match(performance, /DATA INSUFICIENTE/);
+  assert.match(automation, /elapsed <= 20 \* 60_000/);
+  assert.match(schema, /return5m/);
+});

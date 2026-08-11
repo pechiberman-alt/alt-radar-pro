@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { BrainTimeframe } from "@/lib/market-brain";
+import BookmapTimeframeChart from "./bookmap-timeframe-chart";
 import MarketBrain from "./market-brain";
 
 type Level = [number, number];
@@ -249,6 +251,7 @@ export default function LiveBookmap({
   const [showCvd, setShowCvd] = useState(true);
   const [showWalls, setShowWalls] = useState(true);
   const [sidePanel, setSidePanel] = useState<"dom" | "tape" | "alerts">("dom");
+  const [marketTimeframe, setMarketTimeframe] = useState<BrainTimeframe>("4h");
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -1231,6 +1234,15 @@ export default function LiveBookmap({
         </div>
       </div>
 
+      <BookmapTimeframeChart
+        symbol={symbol}
+        venue={venue}
+        timeframe={marketTimeframe}
+        onTimeframeChange={setMarketTimeframe}
+      />
+
+      <div className="bookmap-live-divider">MICROESTRUCTURA EN VIVO · DEPTH 100 MS</div>
+
       <div className="professional-map advanced-map">
         <div className="chart-stage">
           <canvas
@@ -1422,6 +1434,8 @@ export default function LiveBookmap({
         cvd={cvd}
         altseason={altseason}
         liveLiquidations={liquidations}
+        timeframe={marketTimeframe}
+        onTimeframeChange={setMarketTimeframe}
       />
     </section>
   );

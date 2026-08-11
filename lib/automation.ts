@@ -48,6 +48,7 @@ type StoredSignal = {
   signal: "SETUP" | "TRIGGER";
   entry_price: number;
   detected_at: string;
+  price_5m: number | null;
   price_15m: number | null;
   price_1h: number | null;
   price_4h: number | null;
@@ -111,6 +112,9 @@ export async function ensureSignalSchema(db: D1Database) {
       status TEXT NOT NULL DEFAULT 'MONITORING' CHECK(status IN ('MONITORING','RESOLVED')),
       reasons TEXT NOT NULL DEFAULT '[]',
       penalties TEXT NOT NULL DEFAULT '[]',
+      price_5m REAL,
+      return_5m REAL,
+      captured_5m TEXT,
       price_15m REAL,
       return_15m REAL,
       captured_15m TEXT,
@@ -142,6 +146,19 @@ export async function ensureSignalSchema(db: D1Database) {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`),
   ]);
+  const columns = await db
+    .prepare("PRAGMA table_info(signal_records)")
+    .all<{ name: string }>();
+  const names = new Set(columns.results.map((column) => column.name));
+  const additions = [
+    ["price_5m", "ALTER TABLE signal_records ADD COLUMN price_5m REAL"],
+    ["return_5m", "ALTER TABLE signal_records ADD COLUMN return_5m REAL"],
+    ["captured_5m", "ALTER TABLE signal_records ADD COLUMN captured_5m TEXT"],
+  ] as const;
+  const missing = additions
+    .filter(([name]) => !names.has(name))
+    .map(([, statement]) => db.prepare(statement));
+  if (missing.length) await db.batch(missing);
 }
 
 async function loadBinanceMarket(): Promise<{ market: MarketAsset[]; source: string }> {
@@ -289,7 +306,7 @@ async function evaluateOpenSignals(
   const result = await db
     .prepare(
       `SELECT id, symbol, side, signal, entry_price, detected_at,
-        price_15m, price_1h, price_4h, price_24h, max_move, min_move
+        price_5m, price_15m, price_1h, price_4h, price_24h, max_move, min_move
       FROM signal_records
       WHERE status = 'MONITORING'
       ORDER BY detected_at ASC
@@ -304,6 +321,8 @@ async function evaluateOpenSignals(
     const detected = new Date(record.detected_at).getTime();
     const elapsed = now.getTime() - detected;
     const movement = directionalReturn(record.side, record.entry_price, currentPrice);
+    const capture5m =
+      record.price_5m === null && elapsed >= 5 * 60_000 && elapsed <= 20 * 60_000;
     const capture15m = record.price_15m === null && elapsed >= 15 * 60_000;
     const capture1h = record.price_1h === null && elapsed >= 60 * 60_000;
     const capture4h = record.price_4h === null && elapsed >= 4 * 60 * 60_000;
@@ -313,25 +332,31 @@ async function evaluateOpenSignals(
     await db
       .prepare(
         `UPDATE signal_records SET
-          price_15m = COALESCE(price_15m, ?1),
-          return_15m = COALESCE(return_15m, ?2),
-          captured_15m = COALESCE(captured_15m, ?3),
-          price_1h = COALESCE(price_1h, ?4),
-          return_1h = COALESCE(return_1h, ?5),
-          captured_1h = COALESCE(captured_1h, ?6),
-          price_4h = COALESCE(price_4h, ?7),
-          return_4h = COALESCE(return_4h, ?8),
-          captured_4h = COALESCE(captured_4h, ?9),
-          price_24h = COALESCE(price_24h, ?10),
-          return_24h = COALESCE(return_24h, ?11),
-          captured_24h = COALESCE(captured_24h, ?12),
-          max_move = ?13,
-          min_move = ?14,
-          status = ?15,
-          updated_at = ?16
-        WHERE id = ?17`,
+          price_5m = COALESCE(price_5m, ?1),
+          return_5m = COALESCE(return_5m, ?2),
+          captured_5m = COALESCE(captured_5m, ?3),
+          price_15m = COALESCE(price_15m, ?4),
+          return_15m = COALESCE(return_15m, ?5),
+          captured_15m = COALESCE(captured_15m, ?6),
+          price_1h = COALESCE(price_1h, ?7),
+          return_1h = COALESCE(return_1h, ?8),
+          captured_1h = COALESCE(captured_1h, ?9),
+          price_4h = COALESCE(price_4h, ?10),
+          return_4h = COALESCE(return_4h, ?11),
+          captured_4h = COALESCE(captured_4h, ?12),
+          price_24h = COALESCE(price_24h, ?13),
+          return_24h = COALESCE(return_24h, ?14),
+          captured_24h = COALESCE(captured_24h, ?15),
+          max_move = ?16,
+          min_move = ?17,
+          status = ?18,
+          updated_at = ?19
+        WHERE id = ?20`,
       )
       .bind(
+        capture5m ? currentPrice : null,
+        capture5m ? movement : null,
+        capture5m ? timestamp : null,
         capture15m ? currentPrice : null,
         capture15m ? movement : null,
         capture15m ? timestamp : null,
