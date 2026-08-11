@@ -1,0 +1,20 @@
+/* Open Heatmap responsive overrides, loaded after the dashboard stylesheet. */
+@media (max-width: 900px) {
+  .market-sidebar {
+    height: auto;
+    max-height: 360px;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .market-sidebar .depth-ladder { display: block; }
+  .time-sales { border-top: 0; border-left: 1px solid var(--line); }
+}
+
+@media (max-width: 700px) {
+  .market-sidebar { display: block; max-height: 260px; }
+  .market-sidebar .depth-ladder { display: none; }
+  .time-sales { border-left: 0; }
+}
