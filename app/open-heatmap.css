@@ -1,4 +1,17 @@
 /* Open Heatmap responsive overrides, loaded after the dashboard stylesheet. */
+.live-bookmap .flow-metrics { grid-template-columns: repeat(6, 1fr); }
+.live-bookmap .heatmap-controls { flex-wrap: wrap; }
+.footprint,.liquidation-tape { border-top: 1px solid #304239; background: #060d0b; }
+.footprint header,.liquidation-tape header { padding: 9px 10px; color: #9aac9f; font: 7px var(--font-mono); letter-spacing: .8px; border-bottom: 1px solid var(--line); }
+.footprint>div { display: grid; grid-template-columns: 1fr 78px 1fr; gap: 5px; padding: 6px 10px; border-bottom: 1px solid #12201b; font: 7px var(--font-mono); text-align: right; }
+.footprint>div span { color: #d9e3dd; text-align: center; }
+.footprint>div b:last-child { text-align: left; }
+.footprint p,.liquidation-tape p { margin: 0; padding: 18px 10px; text-align: center; color: var(--muted); font: 7px var(--font-mono); }
+.liquidation-tape>div { display: grid; grid-template-columns: 45px 45px 1fr; gap: 8px; padding: 7px 10px; border-bottom: 1px solid #12201b; font: 7px var(--font-mono); }
+.liquidation-tape time { color: var(--muted); }
+.liquidation-tape span { text-align: right; color: #d9e3dd; }
+.liquidation-tape .long b { color: var(--red); }
+.liquidation-tape .short b { color: var(--green); }
 @media (max-width: 900px) {
   .market-sidebar {
     height: auto;
@@ -17,4 +30,7 @@
   .market-sidebar { display: block; max-height: 260px; }
   .market-sidebar .depth-ladder { display: none; }
   .time-sales { border-left: 0; }
+  .live-bookmap .flow-metrics { grid-template-columns: repeat(2, 1fr); }
+  .live-bookmap .flow-metrics div:last-child { grid-column: auto; }
+  .live-bookmap .heatmap-controls { grid-template-columns: repeat(2, 1fr); }
 }
