@@ -13,9 +13,15 @@
   --gold: #d7bd74;
 }
 
-html { scroll-behavior: smooth; }
+html {
+  max-width: 100%;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
 
 body {
+  max-width: 100%;
+  overflow-x: hidden;
   min-height: 100vh;
   background:
     radial-gradient(900px 470px at 8% -10%, rgba(29, 174, 112, 0.13), transparent 64%),
