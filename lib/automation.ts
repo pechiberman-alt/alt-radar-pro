@@ -1,0 +1,677 @@
+import {
+  altseasonScore,
+  globalRisk,
+  scoreAssets,
+  type MarketAsset,
+  type NewsEvent,
+} from "./radar";
+
+const BINANCE_ENDPOINTS = [
+  "https://data-api.binance.vision",
+  "https://api-gcp.binance.com",
+  "https://api1.binance.com",
+  "https://api2.binance.com",
+  "https://api3.binance.com",
+  "https://api4.binance.com",
+  "https://api.binance.com",
+];
+const STABLE_BASES = new Set([
+  "USDC",
+  "FDUSD",
+  "TUSD",
+  "USDP",
+  "DAI",
+  "BUSD",
+  "USD1",
+  "EUR",
+  "AEUR",
+  "EURI",
+  "TRY",
+  "BRL",
+]);
+const NEWS_QUERY = encodeURIComponent(
+  "(war OR sanctions OR tariffs OR missile OR Iran OR Israel OR Ukraine OR Taiwan OR OPEC OR Federal Reserve OR crypto regulation)",
+);
+
+type BinanceTicker = {
+  symbol: string;
+  lastPrice: string;
+  priceChangePercent: string;
+  volume: string;
+  quoteVolume: string;
+  highPrice: string;
+  lowPrice: string;
+};
+
+type RollingTicker = { symbol: string; priceChangePercent: string };
+
+type StoredSignal = {
+  id: string;
+  symbol: string;
+  side: "LONG" | "SHORT";
+  signal: "SETUP" | "TRIGGER";
+  entry_price: number;
+  detected_at: string;
+  price_15m: number | null;
+  price_1h: number | null;
+  price_4h: number | null;
+  price_24h: number | null;
+  max_move: number;
+  min_move: number;
+};
+
+export type AutomationResult = {
+  status: "COMPLETED" | "SKIPPED";
+  inserted: number;
+  evaluated: number;
+  universe: number;
+  altseason: number | null;
+  risk: number | null;
+  timestamp: string;
+};
+
+export type BrowserSignalSnapshot = {
+  symbol: string;
+  side: "LONG" | "SHORT";
+  signal: "SETUP" | "TRIGGER";
+  score: number;
+  technicalScore: number;
+  entryPrice: number;
+  reasons: { label: string; points: number }[];
+  penalties: { label: string; points: number }[];
+};
+
+export type BrowserMarketSnapshot = {
+  candidates: BrowserSignalSnapshot[];
+  prices: { symbol: string; price: number }[];
+  altseason: number | null;
+  risk: number | null;
+};
+
+async function fetchJson<T>(url: string, timeout = 7_000): Promise<T> {
+  const response = await fetch(url, {
+    headers: { Accept: "application/json", "User-Agent": "ALT-RADAR-PRO/2.0" },
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status} · ${new URL(url).host}`);
+  return response.json() as Promise<T>;
+}
+
+export async function ensureSignalSchema(db: D1Database) {
+  await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS signal_records (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      side TEXT NOT NULL CHECK(side IN ('LONG','SHORT')),
+      signal TEXT NOT NULL CHECK(signal IN ('SETUP','TRIGGER')),
+      score INTEGER NOT NULL,
+      technical_score INTEGER NOT NULL,
+      altseason_score INTEGER,
+      geopolitical_risk INTEGER,
+      entry_price REAL NOT NULL,
+      source TEXT NOT NULL,
+      timeframe TEXT NOT NULL DEFAULT '15m / 1H',
+      detected_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'MONITORING' CHECK(status IN ('MONITORING','RESOLVED')),
+      reasons TEXT NOT NULL DEFAULT '[]',
+      penalties TEXT NOT NULL DEFAULT '[]',
+      price_15m REAL,
+      return_15m REAL,
+      captured_15m TEXT,
+      price_1h REAL,
+      return_1h REAL,
+      captured_1h TEXT,
+      price_4h REAL,
+      return_4h REAL,
+      captured_4h TEXT,
+      price_24h REAL,
+      return_24h REAL,
+      captured_24h TEXT,
+      max_move REAL NOT NULL DEFAULT 0,
+      min_move REAL NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS signal_records_detected_idx ON signal_records(detected_at)",
+    ),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS signal_records_symbol_side_idx ON signal_records(symbol, side)",
+    ),
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS signal_records_status_idx ON signal_records(status)",
+    ),
+    db.prepare(`CREATE TABLE IF NOT EXISTS automation_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`),
+  ]);
+}
+
+async function loadBinanceMarket(): Promise<{ market: MarketAsset[]; source: string }> {
+  let base = "";
+  let tickers: BinanceTicker[] = [];
+  let lastError: unknown;
+  for (const endpoint of BINANCE_ENDPOINTS) {
+    try {
+      tickers = await fetchJson<BinanceTicker[]>(`${endpoint}/api/v3/ticker/24hr`);
+      base = endpoint;
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (!base || !tickers.length) throw lastError ?? new Error("Binance unavailable");
+  const market = tickers
+    .filter((row) => row.symbol.endsWith("USDT"))
+    .filter((row) => {
+      const base = row.symbol.slice(0, -4);
+      return (
+        !STABLE_BASES.has(base) &&
+        !/(UP|DOWN|BULL|BEAR)$/.test(base) &&
+        Number(row.lastPrice) > 0
+      );
+    })
+    .map((row) => ({
+      symbol: row.symbol,
+      price: Number(row.lastPrice),
+      change1h: null,
+      change4h: null,
+      change24h: Number(row.priceChangePercent),
+      volume: Number(row.volume),
+      quoteVolume: Number(row.quoteVolume),
+      high: Number(row.highPrice),
+      low: Number(row.lowPrice),
+    }))
+    .sort((left, right) => right.quoteVolume - left.quoteVolume);
+
+  const liquid = market.filter((asset) => asset.quoteVolume >= 5_000_000).slice(0, 180);
+  const chunks = Array.from(
+    { length: Math.ceil(liquid.length / 60) },
+    (_, index) => liquid.slice(index * 60, index * 60 + 60).map((asset) => asset.symbol),
+  );
+  const loadWindow = async (windowSize: "1h" | "4h") => {
+    const rows = (
+      await Promise.all(
+        chunks.map((symbols) => {
+          const url = new URL(`${base}/api/v3/ticker`);
+          url.searchParams.set("symbols", JSON.stringify(symbols));
+          url.searchParams.set("windowSize", windowSize);
+          return fetchJson<RollingTicker[]>(url.toString());
+        }),
+      )
+    ).flat();
+    return new Map(rows.map((row) => [row.symbol, Number(row.priceChangePercent)]));
+  };
+
+  try {
+    const [hour, fourHours] = await Promise.all([loadWindow("1h"), loadWindow("4h")]);
+    return {
+      source: `Binance Spot · ${new URL(base).host}`,
+      market: market.map((asset) => ({
+        ...asset,
+        change1h: hour.get(asset.symbol) ?? null,
+        change4h: fourHours.get(asset.symbol) ?? null,
+      })),
+    };
+  } catch {
+    return { market, source: `Binance Spot · ${new URL(base).host} · TF parcial` };
+  }
+}
+
+async function loadCoinLoreMarket(): Promise<{ market: MarketAsset[]; source: string }> {
+  const payload = await fetchJson<{
+    data?: {
+      symbol: string;
+      price_usd: string;
+      percent_change_1h: string;
+      percent_change_24h: string;
+      volume24: number;
+      volume24_native?: number;
+    }[];
+  }>("https://api.coinlore.net/api/tickers/?start=0&limit=100", 7_000);
+  const market = (payload.data ?? [])
+    .filter((row) => row.symbol && Number(row.price_usd) > 0)
+    .map((row) => ({
+      symbol: `${row.symbol.toUpperCase()}USDT`,
+      price: Number(row.price_usd),
+      change1h: Number.isFinite(Number(row.percent_change_1h))
+        ? Number(row.percent_change_1h)
+        : null,
+      change4h: null,
+      change24h: Number(row.percent_change_24h),
+      volume: Number(row.volume24_native ?? 0),
+      quoteVolume: Number(row.volume24),
+      high: null,
+      low: null,
+    }))
+    .sort((left, right) => right.quoteVolume - left.quoteVolume);
+  if (!market.length) throw new Error("CoinLore unavailable");
+  return { market, source: "CoinLore Market · respaldo cloud" };
+}
+
+async function loadMarket() {
+  try {
+    return await loadBinanceMarket();
+  } catch {
+    return loadCoinLoreMarket();
+  }
+}
+
+function classifyNewsRisk(
+  title: string,
+  source: string,
+  publishedAt: string,
+  index: number,
+): NewsEvent {
+  const lower = title.toLowerCase();
+  const critical = /(missile|attack|war |invasion|hormuz|nuclear|bank crisis|emergency)/.test(
+    lower,
+  );
+  const high =
+    critical || /(sanction|tariff|ceasefire|opec|fed |sec |regulation|taiwan)/.test(lower);
+  const tier1 = /(reuters|bloomberg|associated press|ap news|financial times|bbc|wall street journal)/i.test(
+    source,
+  );
+  const risk = Math.min(92, (critical ? 72 : high ? 55 : 38) + (tier1 ? 10 : 2));
+  const bearish = critical || /(sanction|tariff|hawkish|attack|invasion)/.test(lower);
+
+  return {
+    id: `${publishedAt}-${index}`,
+    title,
+    url: "",
+    source,
+    publishedAt,
+    region: "GLOBAL",
+    category: "GEOPOLITICS",
+    tier: tier1 ? 1 : 2,
+    risk,
+    btcImpact: bearish ? -45 : 5,
+    altImpact: bearish ? -68 : 4,
+    goldImpact: critical ? 55 : 5,
+    oilImpact: /oil|hormuz|middle east|iran/.test(lower) ? 72 : 0,
+    status: tier1 && high ? "CONFIRMED" : critical ? "BREAKING" : "MONITORING",
+  };
+}
+
+async function loadRiskScore() {
+  try {
+    const payload = await fetchJson<{
+      articles?: { title: string; domain: string; seendate: string }[];
+    }>(
+      `https://api.gdeltproject.org/api/v2/doc/doc?query=${NEWS_QUERY}&mode=artlist&maxrecords=20&format=json&sort=datedesc`,
+      6_000,
+    );
+    const events = (payload.articles ?? []).map((article, index) =>
+      classifyNewsRisk(article.title, article.domain, article.seendate, index),
+    );
+    return globalRisk(events);
+  } catch {
+    return globalRisk([]);
+  }
+}
+
+async function loadBtcDominance() {
+  try {
+    const [global] = await fetchJson<{ btc_d?: string }[]>(
+      "https://api.coinlore.net/api/global/",
+      5_000,
+    );
+    const value = Number(global?.btc_d);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function directionalReturn(side: "LONG" | "SHORT", entry: number, price: number) {
+  const raw = ((price / entry) - 1) * 100;
+  return side === "LONG" ? raw : -raw;
+}
+
+async function evaluateOpenSignals(
+  db: D1Database,
+  prices: Map<string, number>,
+  now: Date,
+) {
+  const result = await db
+    .prepare(
+      `SELECT id, symbol, side, signal, entry_price, detected_at,
+        price_15m, price_1h, price_4h, price_24h, max_move, min_move
+      FROM signal_records
+      WHERE status = 'MONITORING'
+      ORDER BY detected_at ASC
+      LIMIT 200`,
+    )
+    .all<StoredSignal>();
+  let evaluated = 0;
+
+  for (const record of result.results) {
+    const currentPrice = prices.get(record.symbol);
+    if (!currentPrice) continue;
+    const detected = new Date(record.detected_at).getTime();
+    const elapsed = now.getTime() - detected;
+    const movement = directionalReturn(record.side, record.entry_price, currentPrice);
+    const capture15m = record.price_15m === null && elapsed >= 15 * 60_000;
+    const capture1h = record.price_1h === null && elapsed >= 60 * 60_000;
+    const capture4h = record.price_4h === null && elapsed >= 4 * 60 * 60_000;
+    const capture24h = record.price_24h === null && elapsed >= 24 * 60 * 60_000;
+    const timestamp = now.toISOString();
+
+    await db
+      .prepare(
+        `UPDATE signal_records SET
+          price_15m = COALESCE(price_15m, ?1),
+          return_15m = COALESCE(return_15m, ?2),
+          captured_15m = COALESCE(captured_15m, ?3),
+          price_1h = COALESCE(price_1h, ?4),
+          return_1h = COALESCE(return_1h, ?5),
+          captured_1h = COALESCE(captured_1h, ?6),
+          price_4h = COALESCE(price_4h, ?7),
+          return_4h = COALESCE(return_4h, ?8),
+          captured_4h = COALESCE(captured_4h, ?9),
+          price_24h = COALESCE(price_24h, ?10),
+          return_24h = COALESCE(return_24h, ?11),
+          captured_24h = COALESCE(captured_24h, ?12),
+          max_move = ?13,
+          min_move = ?14,
+          status = ?15,
+          updated_at = ?16
+        WHERE id = ?17`,
+      )
+      .bind(
+        capture15m ? currentPrice : null,
+        capture15m ? movement : null,
+        capture15m ? timestamp : null,
+        capture1h ? currentPrice : null,
+        capture1h ? movement : null,
+        capture1h ? timestamp : null,
+        capture4h ? currentPrice : null,
+        capture4h ? movement : null,
+        capture4h ? timestamp : null,
+        capture24h ? currentPrice : null,
+        capture24h ? movement : null,
+        capture24h ? timestamp : null,
+        Math.max(record.max_move, movement),
+        Math.min(record.min_move, movement),
+        capture24h ? "RESOLVED" : "MONITORING",
+        timestamp,
+        record.id,
+      )
+      .run();
+    evaluated += 1;
+  }
+
+  return evaluated;
+}
+
+export async function runSignalAutomation(
+  db: D1Database,
+  options: { force?: boolean } = {},
+): Promise<AutomationResult> {
+  await ensureSignalSchema(db);
+  const now = new Date();
+  const timestamp = now.toISOString();
+  const lock = await db
+    .prepare("SELECT value FROM automation_state WHERE key = ?1")
+    .bind("last_run")
+    .first<{ value: string }>();
+  const elapsed = lock?.value ? now.getTime() - new Date(lock.value).getTime() : Infinity;
+
+  if (!options.force && elapsed < 4 * 60_000) {
+    return {
+      status: "SKIPPED",
+      inserted: 0,
+      evaluated: 0,
+      universe: 0,
+      altseason: null,
+      risk: null,
+      timestamp,
+    };
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO automation_state(key, value, updated_at)
+       VALUES (?1, ?2, ?2)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    )
+    .bind("last_run", timestamp)
+    .run();
+
+  const [marketLoad, risk, btcDominance] = await Promise.all([
+    loadMarket(),
+    loadRiskScore(),
+    loadBtcDominance(),
+  ]);
+  const market = marketLoad.market;
+  const prices = new Map(market.map((asset) => [asset.symbol, asset.price]));
+  const evaluated = await evaluateOpenSignals(db, prices, now);
+  const altseason = altseasonScore(market, btcDominance, risk.score);
+  const candidates = scoreAssets(market, risk.score, risk.killSwitch)
+    .filter(
+      (asset) =>
+        (asset.signal === "SETUP" || asset.signal === "TRIGGER") &&
+        (asset.side === "LONG" || asset.side === "SHORT"),
+    )
+    .slice(0, 6);
+  let inserted = 0;
+
+  for (const asset of candidates) {
+    const previous = await db
+      .prepare(
+        `SELECT signal, detected_at FROM signal_records
+         WHERE symbol = ?1 AND side = ?2
+         ORDER BY detected_at DESC LIMIT 1`,
+      )
+      .bind(asset.symbol, asset.side)
+      .first<{ signal: "SETUP" | "TRIGGER"; detected_at: string }>();
+    const previousAge = previous
+      ? now.getTime() - new Date(previous.detected_at).getTime()
+      : Infinity;
+    const isUpgrade = previous?.signal === "SETUP" && asset.signal === "TRIGGER";
+    if (previousAge < 60 * 60_000 && !(isUpgrade && previousAge >= 10 * 60_000)) {
+      continue;
+    }
+
+    await db
+      .prepare(
+        `INSERT INTO signal_records (
+          id, symbol, side, signal, score, technical_score, altseason_score,
+          geopolitical_risk, entry_price, source, timeframe, detected_at,
+          status, reasons, penalties, updated_at
+        ) VALUES (
+          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+          'MONITORING', ?13, ?14, ?12
+        )`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        asset.symbol,
+        asset.side,
+        asset.signal,
+        asset.score,
+        asset.technicalScore,
+        altseason.final,
+        risk.score,
+        asset.price,
+        `${marketLoad.source} · GDELT · CoinLore Global`,
+        "15m / 1H / 4H",
+        timestamp,
+        JSON.stringify(asset.reasons),
+        JSON.stringify(asset.penalties),
+      )
+      .run();
+    inserted += 1;
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO automation_state(key, value, updated_at)
+       VALUES (?1, ?2, ?3)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    )
+    .bind(
+      "last_summary",
+      JSON.stringify({ inserted, evaluated, universe: market.length }),
+      timestamp,
+    )
+    .run();
+
+  return {
+    status: "COMPLETED",
+    inserted,
+    evaluated,
+    universe: market.length,
+    altseason: altseason.final,
+    risk: risk.score,
+    timestamp,
+  };
+}
+
+function validReasons(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(0, 12)
+    .filter(
+      (item): item is { label: string; points: number } =>
+        typeof item?.label === "string" &&
+        item.label.length <= 80 &&
+        typeof item?.points === "number" &&
+        Number.isFinite(item.points) &&
+        item.points >= -30 &&
+        item.points <= 30,
+    )
+    .map((item) => ({ label: item.label, points: item.points }));
+}
+
+export async function captureBrowserSignals(
+  db: D1Database,
+  snapshot: BrowserMarketSnapshot,
+): Promise<AutomationResult> {
+  await ensureSignalSchema(db);
+  const now = new Date();
+  const timestamp = now.toISOString();
+  const prices = new Map(
+    (Array.isArray(snapshot.prices) ? snapshot.prices : [])
+      .slice(0, 1_000)
+      .filter(
+        (item) =>
+          typeof item?.symbol === "string" &&
+          /^[A-Z0-9]{2,24}USDT$/.test(item.symbol) &&
+          typeof item?.price === "number" &&
+          Number.isFinite(item.price) &&
+          item.price > 0,
+      )
+      .map((item) => [item.symbol, item.price] as const),
+  );
+  const evaluated = await evaluateOpenSignals(db, prices, now);
+  const altseason =
+    typeof snapshot.altseason === "number" && Number.isFinite(snapshot.altseason)
+      ? Math.max(0, Math.min(100, Math.round(snapshot.altseason)))
+      : null;
+  const risk =
+    typeof snapshot.risk === "number" && Number.isFinite(snapshot.risk)
+      ? Math.max(0, Math.min(100, Math.round(snapshot.risk)))
+      : null;
+  const candidates = (Array.isArray(snapshot.candidates) ? snapshot.candidates : [])
+    .slice(0, 8)
+    .filter(
+      (candidate) =>
+        /^[A-Z0-9]{2,24}USDT$/.test(candidate.symbol) &&
+        (candidate.side === "LONG" || candidate.side === "SHORT") &&
+        (candidate.signal === "SETUP" || candidate.signal === "TRIGGER") &&
+        Number.isFinite(candidate.score) &&
+        candidate.score >= 70 &&
+        candidate.score <= 100 &&
+        Number.isFinite(candidate.technicalScore) &&
+        Number.isFinite(candidate.entryPrice) &&
+        candidate.entryPrice > 0 &&
+        prices.has(candidate.symbol),
+    );
+  let inserted = 0;
+
+  for (const candidate of candidates) {
+    const submittedPrice = prices.get(candidate.symbol)!;
+    const priceDistance = Math.abs(submittedPrice / candidate.entryPrice - 1);
+    if (priceDistance > 0.02) continue;
+    const previous = await db
+      .prepare(
+        `SELECT signal, detected_at FROM signal_records
+         WHERE symbol = ?1 AND side = ?2
+         ORDER BY detected_at DESC LIMIT 1`,
+      )
+      .bind(candidate.symbol, candidate.side)
+      .first<{ signal: "SETUP" | "TRIGGER"; detected_at: string }>();
+    const previousAge = previous
+      ? now.getTime() - new Date(previous.detected_at).getTime()
+      : Infinity;
+    const isUpgrade = previous?.signal === "SETUP" && candidate.signal === "TRIGGER";
+    if (previousAge < 60 * 60_000 && !(isUpgrade && previousAge >= 10 * 60_000)) {
+      continue;
+    }
+
+    await db
+      .prepare(
+        `INSERT INTO signal_records (
+          id, symbol, side, signal, score, technical_score, altseason_score,
+          geopolitical_risk, entry_price, source, timeframe, detected_at,
+          status, reasons, penalties, updated_at
+        ) VALUES (
+          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+          'MONITORING', ?13, ?14, ?12
+        )`,
+      )
+      .bind(
+        crypto.randomUUID(),
+        candidate.symbol,
+        candidate.side,
+        candidate.signal,
+        Math.round(candidate.score),
+        Math.round(candidate.technicalScore),
+        altseason,
+        risk,
+        candidate.entryPrice,
+        "Binance Spot · captura validada en navegador",
+        "15m / 1H / 4H",
+        timestamp,
+        JSON.stringify(validReasons(candidate.reasons)),
+        JSON.stringify(validReasons(candidate.penalties)),
+      )
+      .run();
+    inserted += 1;
+  }
+
+  const summary = {
+    inserted,
+    evaluated,
+    universe: prices.size,
+    mode: "browser-assisted",
+  };
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO automation_state(key, value, updated_at)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      )
+      .bind("last_run", timestamp, timestamp),
+    db
+      .prepare(
+        `INSERT INTO automation_state(key, value, updated_at)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      )
+      .bind("last_summary", JSON.stringify(summary), timestamp),
+  ]);
+
+  return {
+    status: "COMPLETED",
+    inserted,
+    evaluated,
+    universe: prices.size,
+    altseason,
+    risk,
+    timestamp,
+  };
+}

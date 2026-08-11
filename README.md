@@ -2,33 +2,55 @@
 
 Aplicación pública: https://alt-radar-pro.pechiberman.workers.dev
 
-Institutional-style crypto market intelligence dashboard. It combines public market data, altseason breadth, capital rotation, explainable pre-pump scoring, a risk engine, and global geopolitical news into an auditable decision layer.
+Terminal profesional de inteligencia probabilística para criptomonedas. Combina mercado Spot, amplitud de altcoins, rotación de capital, order flow, señales explicables, riesgo geopolítico y validación histórica sin mostrar datos inventados.
 
-## Run locally
+© 2026 URL.FX. Todos los derechos reservados.
 
-Requires Node.js 22.13 or newer.
+## Funciones principales
+
+- Universo completo de pares USDT disponibles en Binance Spot, incluidas monedas pequeñas; los filtros de liquidez impiden convertir activos ilíquidos en TRIGGER.
+- Ventanas reales 1H, 4H y 24H para el universo con volumen suficiente.
+- Score técnico LONG/SHORT con confirmación multi-timeframe, fortaleza relativa, estructura, volumen, liquidez y filtro anti-FOMO.
+- Probabilidad de altseason con score técnico bruto, ajuste macro/geopolítico y resultado final auditable.
+- Order book Spot y Futures mediante WebSocket, mapa de liquidez, footprint, cinta de operaciones, CVD, liquidaciones y batalla compradores/vendedores.
+- Signal Ledger persistente en Cloudflare D1: registra SETUP/TRIGGER, captura resultados a 15m, 1H, 4H y 24H y calcula estadísticas solamente con observaciones reales.
+- Automatización en Cloudflare cada 15 minutos, además de sincronización bajo demanda desde la interfaz.
+- Alertas visuales, sonido y notificaciones del navegador con cooldown configurable.
+- PWA instalable en Android y escritorio.
+
+## Datos y transparencia
+
+- Binance Spot / Futures: precios, volumen, rango, ventanas móviles y order flow.
+- CoinLore Global: dominancia de BTC como respaldo público.
+- GDELT News Index: noticias globales relevantes para mercados.
+- Cloudflare D1: historial persistente y resultados observados.
+
+Cuando una fuente falla, la aplicación muestra `DATA UNAVAILABLE` o un estado degradado. OI, funding, TOTAL2 y TOTAL3 no se reemplazan con estimaciones cuando no existe una fuente pública fiable en el ciclo actual.
+
+Las señales son escenarios probabilísticos, no garantías ni asesoramiento financiero. Los niveles del panel son estructuras indicativas basadas en volatilidad observada; la aplicación no ejecuta operaciones.
+
+## Ejecutar localmente
+
+Requiere Node.js 22.13 o superior.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL printed by the development server. Production validation uses `npm run build`.
+Para validar:
 
-## Live data
+```bash
+npm run lint
+npm test
+```
 
-- Binance Spot: prices, 24h volume/range and hourly candles.
-- CoinGecko Global: BTC market dominance.
-- GDELT News Index: current market-relevant global headlines.
+## Persistencia y automatización
 
-Every provider is isolated behind the `/api/radar` aggregation route. Provider failures return an explicit unavailable state; the UI never substitutes fictional values. The current release uses public endpoints and does not require API keys.
+El esquema está en `db/schema.ts` y las migraciones en `drizzle/`. La configuración lógica de Sites declara el binding `DB`; la configuración de producción enlaza la base D1 y activa el cron cada 15 minutos.
 
-## Decision model
-
-`lib/radar.ts` contains pure, auditable functions for altseason scoring, geopolitical risk, capital rotation, and asset ranking. Raw technical score, news/macro adjustment, penalties, and final score remain separate. A trigger needs score and independent confirmations; extended moves and the geopolitical kill switch block entries.
-
-Risk levels shown in the signal drawer are indicative structures derived from observed 24h range. This is market intelligence software, not order execution or financial advice.
+La infraestructura está diseñada para funcionar dentro de los límites gratuitos de Cloudflare Workers y D1. En el plan gratuito, al alcanzar un límite el servicio se detiene temporalmente en vez de generar cargos; conviene vigilar el uso desde el panel de Cloudflare.
 
 ## Despliegue continuo
 
-El workflow `.github/workflows/deploy-cloudflare.yml` valida y publica los cambios de `main` en Cloudflare Workers. Requiere los secretos `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID` configurados en GitHub Actions.
+El workflow de GitHub valida, aplica migraciones y publica en Cloudflare cuando se actualiza `main`. Requiere `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID` en los secretos del repositorio.

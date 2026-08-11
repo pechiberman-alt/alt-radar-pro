@@ -2,86 +2,742 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RadarPayload, ScoredAsset } from "@/lib/radar";
-import { altseasonScore, globalRisk, rotation, scoreAssets } from "@/lib/radar";
+import {
+  altseasonScore,
+  globalRisk,
+  rotation,
+  scoreAssets,
+} from "@/lib/radar";
+import { useDashboardSettings } from "./dashboard-settings";
 import LiveBookmap from "./live-bookmap";
-type InstallPrompt=Event&{prompt:()=>Promise<void>;userChoice:Promise<{outcome:"accepted"|"dismissed"}>};
+import SignalLedger from "./signal-ledger";
 
-const fmtPrice = (v: number) => v >= 1000 ? `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : v >= 1 ? `$${v.toFixed(2)}` : `$${v.toPrecision(3)}`;
-const pct = (v: number | null) => v === null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
-const compact = (v: number) => new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(v);
-const assetName = (s: string) => s.replace("USDT", "");
-const STABLE_BASES=new Set(["USDC","FDUSD","TUSD","USDP","DAI","BUSD","USD1","EUR","AEUR","EURI","TRY","BRL"]);
-async function loadDirectMarket():Promise<RadarPayload>{
-  const [tickersRes,globalRes]=await Promise.all([fetch("https://data-api.binance.vision/api/v3/ticker/24hr",{cache:"no-store"}),fetch("https://api.coinlore.net/api/global/",{cache:"no-store"})]);
-  if(!tickersRes.ok)throw new Error();const tickers=await tickersRes.json() as {symbol:string;lastPrice:string;priceChangePercent:string;volume:string;quoteVolume:string;highPrice:string;lowPrice:string}[];
-  const global=globalRes.ok?await globalRes.json() as {btc_d?:string;mcap_change?:string}[]:[];
-  const market=tickers.filter(x=>x.symbol.endsWith("USDT")).filter(x=>{const b=x.symbol.slice(0,-4);return !STABLE_BASES.has(b)&&!/(UP|DOWN|BULL|BEAR)$/.test(b)&&Number(x.lastPrice)>0}).map(x=>({symbol:x.symbol,price:Number(x.lastPrice),change1h:null,change4h:null,change24h:Number(x.priceChangePercent),volume:Number(x.volume),quoteVolume:Number(x.quoteVolume),high:Number(x.highPrice),low:Number(x.lowPrice)})).sort((a,b)=>b.quoteVolume-a.quoteVolume);
-  return {timestamp:new Date().toISOString(),sources:["Binance Spot · universo USDT completo"],market,dominance:{btc:global[0]?.btc_d?Number(global[0].btc_d):null,change24h:global[0]?.mcap_change?Number(global[0].mcap_change):null},news:[],errors:["Modo directo activo; confirmaciones multi-temporales solo cuando están disponibles"]};
+type InstallPrompt = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+const STABLE_BASES = new Set([
+  "USDC",
+  "FDUSD",
+  "TUSD",
+  "USDP",
+  "DAI",
+  "BUSD",
+  "USD1",
+  "EUR",
+  "AEUR",
+  "EURI",
+  "TRY",
+  "BRL",
+]);
+
+const formatPrice = (value: number) =>
+  value >= 1000
+    ? `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+    : value >= 1
+      ? `$${value.toFixed(2)}`
+      : `$${value.toPrecision(3)}`;
+const percentage = (value: number | null) =>
+  value === null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+const compact = (value: number) =>
+  new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(
+    value,
+  );
+const assetName = (symbol: string) => symbol.replace("USDT", "");
+
+async function loadDirectMarket(): Promise<RadarPayload> {
+  const [tickersResponse, globalResponse] = await Promise.all([
+    fetch("https://data-api.binance.vision/api/v3/ticker/24hr", { cache: "no-store" }),
+    fetch("https://api.coinlore.net/api/global/", { cache: "no-store" }),
+  ]);
+  if (!tickersResponse.ok) throw new Error("Binance unavailable");
+  const tickers = (await tickersResponse.json()) as {
+    symbol: string;
+    lastPrice: string;
+    priceChangePercent: string;
+    volume: string;
+    quoteVolume: string;
+    highPrice: string;
+    lowPrice: string;
+  }[];
+  const global = globalResponse.ok
+    ? ((await globalResponse.json()) as { btc_d?: string; mcap_change?: string }[])
+    : [];
+  const market = tickers
+    .filter((row) => row.symbol.endsWith("USDT"))
+    .filter((row) => {
+      const base = row.symbol.slice(0, -4);
+      return (
+        !STABLE_BASES.has(base) &&
+        !/(UP|DOWN|BULL|BEAR)$/.test(base) &&
+        Number(row.lastPrice) > 0
+      );
+    })
+    .map((row) => ({
+      symbol: row.symbol,
+      price: Number(row.lastPrice),
+      change1h: null,
+      change4h: null,
+      change24h: Number(row.priceChangePercent),
+      volume: Number(row.volume),
+      quoteVolume: Number(row.quoteVolume),
+      high: Number(row.highPrice),
+      low: Number(row.lowPrice),
+    }))
+    .sort((left, right) => right.quoteVolume - left.quoteVolume);
+
+  return {
+    timestamp: new Date().toISOString(),
+    sources: ["Binance Spot · universo USDT completo"],
+    market,
+    dominance: {
+      btc: global[0]?.btc_d ? Number(global[0].btc_d) : null,
+      change24h: global[0]?.mcap_change ? Number(global[0].mcap_change) : null,
+    },
+    news: [],
+    errors: ["Confirmaciones multi-timeframe cargando"],
+  };
 }
 
-type RollingTicker={symbol:string;priceChangePercent:string};
-async function enrichTimeframes(payload:RadarPayload):Promise<RadarPayload>{
-  const candidates=payload.market.filter(a=>a.quoteVolume>=5_000_000).map(a=>a.symbol);
-  const chunks=Array.from({length:Math.ceil(candidates.length/60)},(_,i)=>candidates.slice(i*60,i*60+60));
-  const load=async(windowSize:"1h"|"4h")=>{
-    const rows=(await Promise.all(chunks.map(async symbols=>{
-      const url=new URL("https://data-api.binance.vision/api/v3/ticker");
-      url.searchParams.set("symbols",JSON.stringify(symbols));url.searchParams.set("windowSize",windowSize);
-      const response=await fetch(url,{cache:"no-store"});if(!response.ok)throw new Error();return response.json() as Promise<RollingTicker[]>;
-    }))).flat();
-    return new Map(rows.map(row=>[row.symbol,Number(row.priceChangePercent)]));
+type RollingTicker = { symbol: string; priceChangePercent: string };
+
+async function enrichTimeframes(payload: RadarPayload): Promise<RadarPayload> {
+  const candidates = payload.market
+    .filter((asset) => asset.quoteVolume >= 5_000_000)
+    .map((asset) => asset.symbol);
+  const chunks = Array.from(
+    { length: Math.ceil(candidates.length / 60) },
+    (_, index) => candidates.slice(index * 60, index * 60 + 60),
+  );
+  const loadWindow = async (windowSize: "1h" | "4h") => {
+    const rows = (
+      await Promise.all(
+        chunks.map(async (symbols) => {
+          const url = new URL("https://data-api.binance.vision/api/v3/ticker");
+          url.searchParams.set("symbols", JSON.stringify(symbols));
+          url.searchParams.set("windowSize", windowSize);
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) throw new Error("Rolling window unavailable");
+          return response.json() as Promise<RollingTicker[]>;
+        }),
+      )
+    ).flat();
+    return new Map(rows.map((row) => [row.symbol, Number(row.priceChangePercent)]));
   };
-  const [hour,fourHours]=await Promise.all([load("1h"),load("4h")]);
-  return {...payload,timestamp:new Date().toISOString(),sources:[...new Set([...payload.sources,"Binance Rolling Window 1H/4H"])],errors:payload.errors.filter(e=>!e.includes("multi-temporales")),market:payload.market.map(asset=>({...asset,change1h:hour.get(asset.symbol)??asset.change1h,change4h:fourHours.get(asset.symbol)??asset.change4h}))};
+
+  const [hour, fourHours] = await Promise.all([loadWindow("1h"), loadWindow("4h")]);
+  return {
+    ...payload,
+    timestamp: new Date().toISOString(),
+    sources: [...new Set([...payload.sources, "Binance Rolling Window 1H/4H"])],
+    errors: payload.errors.filter((error) => !error.includes("multi-timeframe")),
+    market: payload.market.map((asset) => ({
+      ...asset,
+      change1h: hour.get(asset.symbol) ?? asset.change1h,
+      change4h: fourHours.get(asset.symbol) ?? asset.change4h,
+    })),
+  };
 }
 
 function ScoreRing({ score, label }: { score: number | null; label: string }) {
-  const n = score ?? 0;
-  return <div className="score-ring" style={{ "--score": `${n * 3.6}deg` } as React.CSSProperties}><div><b>{score ?? "—"}</b><span>/100</span><small>{label}</small></div></div>;
+  const numericScore = score ?? 0;
+  return (
+    <div
+      className="score-ring"
+      style={{ "--score": `${numericScore * 3.6}deg` } as React.CSSProperties}
+    >
+      <div>
+        <b>{score ?? "—"}</b><span>/100</span><small>{label}</small>
+      </div>
+    </div>
+  );
 }
 
-function SparkBars({ values }: { values: number[] }) { const max = Math.max(...values.map(Math.abs), 1); return <div className="spark">{values.map((v, i) => <i key={i} className={v >= 0 ? "up" : "down"} style={{ height: `${22 + Math.abs(v) / max * 72}%` }} />)}</div>; }
+function SparkBars({ values }: { values: number[] }) {
+  const maximum = Math.max(...values.map(Math.abs), 1);
+  return (
+    <div className="spark">
+      {values.map((value, index) => (
+        <i
+          key={index}
+          className={value >= 0 ? "up" : "down"}
+          style={{ height: `${22 + (Math.abs(value) / maximum) * 72}%` }}
+        />
+      ))}
+    </div>
+  );
+}
 
 function MarketStrip({ data }: { data: RadarPayload }) {
-  const symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"];
-  return <div className="market-strip">{symbols.map(s => { const a = data.market.find(x => x.symbol === s); return <div className="market-tile" key={s}><span>{assetName(s)} <em>SPOT</em></span>{a ? <><strong>{fmtPrice(a.price)}</strong><small className={a.change24h >= 0 ? "positive" : "negative"}>{pct(a.change24h)} 24H</small></> : <strong className="muted">DATOS NO DISPONIBLES</strong>}</div>; })}<div className="market-tile"><span>BTC.D <em>GLOBAL</em></span><strong>{data.dominance.btc === null ? "—" : `${data.dominance.btc.toFixed(2)}%`}</strong><small className="muted">COINGECKO</small></div></div>;
+  const btc = data.market.find((asset) => asset.symbol === "BTCUSDT");
+  const eth = data.market.find((asset) => asset.symbol === "ETHUSDT");
+  const primary = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"];
+  return (
+    <div className="market-strip">
+      {primary.map((symbol) => {
+        const asset = data.market.find((candidate) => candidate.symbol === symbol);
+        return (
+          <div className="market-tile" key={symbol}>
+            <span>{assetName(symbol)} <em>SPOT</em></span>
+            {asset ? (
+              <>
+                <strong>{formatPrice(asset.price)}</strong>
+                <small className={asset.change24h >= 0 ? "positive" : "negative"}>
+                  {percentage(asset.change24h)} 24H
+                </small>
+              </>
+            ) : (
+              <strong className="muted">DATA UNAVAILABLE</strong>
+            )}
+          </div>
+        );
+      })}
+      <div className="market-tile">
+        <span>ETH/BTC <em>DERIVADO SPOT</em></span>
+        <strong>{btc && eth ? (eth.price / btc.price).toFixed(6) : "—"}</strong>
+        <small className={(eth?.change24h ?? 0) - (btc?.change24h ?? 0) >= 0 ? "positive" : "negative"}>
+          {btc && eth ? percentage(eth.change24h - btc.change24h) : "DATA UNAVAILABLE"}
+        </small>
+      </div>
+      <div className="market-tile">
+        <span>BTC.D <em>GLOBAL</em></span>
+        <strong>
+          {data.dominance.btc === null ? "—" : `${data.dominance.btc.toFixed(2)}%`}
+        </strong>
+        <small className="muted">COINLORE GLOBAL</small>
+      </div>
+      {[
+        ["TOTAL2", "ALT MARKET CAP"],
+        ["TOTAL3", "EX BTC + ETH"],
+      ].map(([label, detail]) => (
+        <div className="market-tile unavailable-tile" key={label}>
+          <span>{label} <em>{detail}</em></span>
+          <strong>DATA UNAVAILABLE</strong>
+          <small className="muted">SIN FUENTE PÚBLICA FIABLE</small>
+        </div>
+      ))}
+    </div>
+  );
 }
 
-function SignalDrawer({ asset, close, alt }: { asset: ScoredAsset; close: () => void; alt: number | null }) {
-  const observedRange = asset.high !== null && asset.low !== null ? asset.high - asset.low : null; const atr = observedRange ? Math.max(observedRange * .15, asset.price * .012) : asset.price * .012; const entryLow = asset.price - atr * .15; const stop = asset.price - atr; const risk = asset.price - stop;
-  return <div className="overlay"><aside className="drawer"><button className="close" onClick={close}>×</button><p className="eyebrow">INTELIGENCIA DE SEÑAL / {new Date().toLocaleTimeString()}</p><h2>{assetName(asset.symbol)}<span>/USDT</span></h2><div className={`signal-banner ${asset.signal.toLowerCase().replace(" ", "-")}`}>{asset.extended ? "⚠ MOVIMIENTO YA EXTENDIDO · NO PERSEGUIR" : asset.signal}</div><div className="trade-grid"><div><span>ZONA DE ENTRADA</span><b>{fmtPrice(entryLow)} – {fmtPrice(asset.price)}</b></div><div><span>INVALIDACIÓN</span><b>{fmtPrice(stop)}</b></div><div><span>OBJETIVO 1</span><b>{fmtPrice(asset.price + risk * 1.4)}</b></div><div><span>OBJETIVO 2</span><b>{fmtPrice(asset.price + risk * 2.1)}</b></div><div><span>OBJETIVO 3</span><b>{fmtPrice(asset.price + risk * 3)}</b></div><div><span>R:R ESPERADO</span><b>1 : 3.0</b></div></div><h3>TRAZA DE DECISIÓN</h3><div className="explain-list">{asset.reasons.map(r => <div key={r.label}><span>+{r.points}</span>{r.label}</div>)}{asset.penalties.map(r => <div className="penalty" key={r.label}><span>{r.points}</span>{r.label}</div>)}</div><div className="formula"><span>TÉCNICO {asset.score - asset.penalties.reduce((s,p)=>s+p.points,0)}</span><span>NOTICIAS {asset.penalties.find(p=>p.label.includes("Geopolitical"))?.points ?? 0}</span><b>FINAL {asset.score}</b></div><p className="disclaimer">Fecha: {new Date().toISOString()} · Fuente: Binance Spot · Entorno altseason: {alt ?? "no disponible"}/100. Niveles indicativos derivados del rango observado; validar antes de usar.</p></aside></div>;
+function SignalDrawer({
+  asset,
+  close,
+  altseason,
+  risk,
+}: {
+  asset: ScoredAsset;
+  close: () => void;
+  altseason: number | null;
+  risk: number | null;
+}) {
+  const observedRange =
+    asset.high !== null && asset.low !== null ? asset.high - asset.low : null;
+  const volatility = observedRange
+    ? Math.max(observedRange * 0.15, asset.price * 0.012)
+    : asset.price * 0.012;
+  const isShort = asset.side === "SHORT";
+  const entryA = isShort ? asset.price : asset.price - volatility * 0.15;
+  const entryB = isShort ? asset.price + volatility * 0.15 : asset.price;
+  const stop = isShort ? asset.price + volatility : asset.price - volatility;
+  const riskUnit = Math.abs(asset.price - stop);
+  const target = (multiple: number) =>
+    Math.max(0, asset.price + (isShort ? -1 : 1) * riskUnit * multiple);
+  const penaltyTotal = asset.penalties.reduce((sum, penalty) => sum + penalty.points, 0);
+
+  return (
+    <div className="overlay">
+      <aside className="drawer" aria-label={`Detalle de ${asset.symbol}`}>
+        <button className="close" onClick={close} aria-label="Cerrar">×</button>
+        <p className="eyebrow">INTELIGENCIA DE SEÑAL · {new Date().toLocaleTimeString()}</p>
+        <div className="drawer-symbol">
+          <h2>{assetName(asset.symbol)}<span>/USDT</span></h2>
+          <span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span>
+        </div>
+        <div className={`signal-banner ${asset.signal.toLowerCase().replace(" ", "-")}`}>
+          {asset.extended
+            ? "⚠ MOVIMIENTO YA EXTENDIDO · NO PERSEGUIR"
+            : `${asset.signal} · ${asset.score}/100`}
+        </div>
+        <div className="trade-grid">
+          <div><span>ZONA DE ENTRADA</span><b>{formatPrice(entryA)} – {formatPrice(entryB)}</b></div>
+          <div><span>INVALIDACIÓN</span><b>{formatPrice(stop)}</b></div>
+          <div><span>OBJETIVO 1</span><b>{formatPrice(target(1.4))}</b></div>
+          <div><span>OBJETIVO 2</span><b>{formatPrice(target(2.1))}</b></div>
+          <div><span>OBJETIVO 3</span><b>{formatPrice(target(3))}</b></div>
+          <div><span>R:R ESPERADO</span><b>1 : 3.0</b></div>
+        </div>
+        <h3>TRAZA DE DECISIÓN</h3>
+        <div className="explain-list">
+          {asset.reasons.map((reason) => (
+            <div key={reason.label}><span>+{reason.points}</span>{reason.label}</div>
+          ))}
+          {asset.penalties.map((penalty) => (
+            <div className="penalty" key={penalty.label}>
+              <span>{penalty.points}</span>{penalty.label}
+            </div>
+          ))}
+        </div>
+        <div className="formula">
+          <span>TÉCNICO {asset.technicalScore}</span>
+          <span>PENALIZACIONES {penaltyTotal}</span>
+          <b>FINAL {asset.score}</b>
+        </div>
+        <div className="drawer-context">
+          <span>ALTSEASON <b>{altseason ?? "—"}/100</b></span>
+          <span>RIESGO GLOBAL <b>{risk ?? "—"}/100</b></span>
+          <span>DATOS <b>{asset.dataQuality === "FULL" ? "COMPLETOS" : "PARCIALES"}</b></span>
+        </div>
+        <p className="disclaimer">
+          Timestamp: {new Date().toISOString()} · Fuente: Binance Spot. Niveles indicativos
+          derivados de la volatilidad del rango 24H observado; no son ATR de velas ni una
+          orden ejecutable. Validar estructura y deslizamiento antes de cualquier decisión.
+        </p>
+      </aside>
+    </div>
+  );
 }
 
 export default function RadarApp() {
-  const [data, setData] = useState<RadarPayload | null>(null); const [error, setError] = useState(""); const [loading, setLoading] = useState(true); const [tab, setTab] = useState("RESUMEN"); const [selected, setSelected] = useState<ScoredAsset | null>(null); const [sound, setSound] = useState(false); const [lastUpdate, setLastUpdate] = useState<Date | null>(null); const [installPrompt,setInstallPrompt]=useState<InstallPrompt|null>(null); const [assetSearch,setAssetSearch]=useState("");
-  const refresh = useCallback(async () => { const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),8000);try { const server=fetch("/api/radar",{cache:"no-store",signal:controller.signal}).then(async r=>{if(!r.ok)throw new Error();const j=await r.json() as RadarPayload;if(!j.market.length)throw new Error();return j});const direct=loadDirectMarket();const first=await Promise.any([direct,server]);setData(first);setLastUpdate(new Date());setError("");enrichTimeframes(first).then(enriched=>{setData(enriched);setLastUpdate(new Date())}).catch(()=>undefined);server.then(richer=>{setData(current=>current?{...richer,market:current.market.length>richer.market.length?current.market:richer.market,sources:[...new Set([...current.sources,...richer.sources])]}:richer);setLastUpdate(new Date())}).catch(()=>undefined); } catch { setError("CONEXIÓN DE DATOS NO DISPONIBLE"); } finally { clearTimeout(timeout);setLoading(false); } }, []);
-  useEffect(() => { const boot = setTimeout(refresh, 0); const id = setInterval(refresh, 30000); return () => { clearTimeout(boot); clearInterval(id); }; }, [refresh]);
-  useEffect(()=>{const capture=(event:Event)=>{event.preventDefault();setInstallPrompt(event as InstallPrompt)};window.addEventListener("beforeinstallprompt",capture);return()=>window.removeEventListener("beforeinstallprompt",capture)},[]);
-  const installApp=async()=>{if(!installPrompt)return;await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)};
+  const [data, setData] = useState<RadarPayload | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("RESUMEN");
+  const [selected, setSelected] = useState<ScoredAsset | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
+  const [assetSearch, setAssetSearch] = useState("");
+  const { settings, update: updateSettings } = useDashboardSettings();
+
+  const refresh = useCallback(async () => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8_000);
+    try {
+      const server = fetch("/api/radar", {
+        cache: "no-store",
+        signal: controller.signal,
+      }).then(async (response) => {
+        if (!response.ok) throw new Error();
+        const payload = (await response.json()) as RadarPayload;
+        if (!payload.market.length) throw new Error();
+        return payload;
+      });
+      const direct = loadDirectMarket();
+      const first = await Promise.any([direct, server]);
+      setData(first);
+      setLastUpdate(new Date());
+      setError("");
+      enrichTimeframes(first)
+        .then((enriched) => {
+          setData(enriched);
+          setLastUpdate(new Date());
+        })
+        .catch(() => undefined);
+      server
+        .then((richer) => {
+          setData((current) =>
+            current
+              ? {
+                  ...richer,
+                  market:
+                    current.market.length > richer.market.length
+                      ? current.market
+                      : richer.market,
+                  sources: [...new Set([...current.sources, ...richer.sources])],
+                }
+              : richer,
+          );
+          setLastUpdate(new Date());
+        })
+        .catch(() => undefined);
+    } catch {
+      setError("CONEXIÓN DE DATOS NO DISPONIBLE");
+    } finally {
+      window.clearTimeout(timeout);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const boot = window.setTimeout(refresh, 0);
+    const interval = window.setInterval(refresh, 30_000);
+    return () => {
+      window.clearTimeout(boot);
+      window.clearInterval(interval);
+    };
+  }, [refresh]);
+
+  useEffect(() => {
+    const capture = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPrompt);
+    };
+    window.addEventListener("beforeinstallprompt", capture);
+    return () => window.removeEventListener("beforeinstallprompt", capture);
+  }, []);
+
+  const installApp = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
+
+  const scrollTo = (label: string, id: string) => {
+    setTab(label);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const risk = useMemo(() => globalRisk(data?.news ?? []), [data]);
-  const alt = useMemo(() => altseasonScore(data?.market ?? [], data?.dominance.btc ?? null, risk.score), [data, risk.score]);
-  const scored = useMemo(() => scoreAssets(data?.market ?? [], risk.score, risk.killSwitch), [data, risk]);
-  const rot = useMemo(() => rotation(data?.market ?? []), [data]);
-  const active = scored.filter(a => a.signal !== "NO SIGNAL").slice(0, 3);
-  if (loading) return <main className="loading"><div className="brain-loader"><i/><i/><i/></div><h1>ALT RADAR <b>PRO</b></h1><p>INICIANDO CEREBRO DE MERCADO</p></main>;
-  if (!data) return <main className="loading"><h1>ALT RADAR <b>PRO</b></h1><p>{error}</p><button onClick={refresh}>REINTENTAR CONEXIÓN</button></main>;
-  return <main>
-    <header><div className="brand"><div className="brand-mark"><i/><i/><i/></div><div><b>ALT RADAR</b><span>PRO</span><small>INTELIGENCIA DE MERCADO CRIPTO</small></div></div><nav>{["RESUMEN","ESCÁNER","INTELIGENCIA","HISTORIAL"].map(t => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t}</button>)}</nav><div className="system"><span className={error ? "offline" : "live"}>● {error ? "DEGRADADO" : "EN VIVO"}</span>{installPrompt&&<button className="install-app" onClick={installApp}>↓ INSTALAR</button>}<button aria-label="Activar sonido" onClick={() => setSound(!sound)}>{sound ? "◉" : "○"}</button><button aria-label="Actualizar" onClick={refresh}>↻</button></div></header>
-    <MarketStrip data={data}/>
-    <div className="shell">
-      {risk.killSwitch && <div className="kill"><b>🔴 BLOQUEO GEOPOLÍTICO</b><span>NUEVAS OPERACIONES PAUSADAS</span><small>El riesgo global superó el umbral de seguridad. Las señales existentes muestran advertencia de evento.</small></div>}
-      <section className="hero-grid">
-        <article className="panel alt-panel"><div className="panel-head"><div><p className="eyebrow">CEREBRO DE MERCADO / RÉGIMEN</p><h2>Probabilidad de altseason</h2></div><span className="status-dot">● CALCULADO</span></div><div className="alt-main"><ScoreRing score={alt.final} label="AJUSTADO"/><div className="alt-state"><span>ESTADO ACTUAL</span><h3>{alt.state}</h3><p>{alt.final !== null && alt.final >= 41 ? "La amplitud de capital se expande más allá de BTC. La confirmación depende de liquidez y riesgo." : "El capital permanece concentrado. No hay confirmación amplia de altcoins."}</p><div className="score-audit"><span>TÉCNICO BRUTO <b>{alt.raw ?? "—"}</b></span><span>NOTICIAS / MACRO <b className="negative">{alt.adjustment}</b></span><span>FINAL <b>{alt.final ?? "—"}</b></span></div></div></div><div className="factor-bars">{alt.factors.slice(0,5).map(f => <div key={f.label}><span>{f.label}</span><i><b style={{width:`${f.points/22*100}%`}}/></i><em>+{Math.round(f.points)}</em></div>)}</div></article>
-        <article className="panel risk-panel"><div className="panel-head"><div><p className="eyebrow">INTELIGENCIA GLOBAL</p><h2>Riesgo geopolítico</h2></div><span className={risk.killSwitch ? "badge critical" : "badge"}>{risk.level}</span></div><div className="risk-score"><b>{risk.score ?? "—"}</b><span>/100</span><SparkBars values={(data.news.length ? data.news.slice(0,9).map(n => n.risk - 50) : [0,0,0,0,0])}/></div><div className="risk-scale"><i/><i/><i/><i/><i/></div>{data.news[0] ? <a className="headline" href={data.news[0].url} target="_blank" rel="noreferrer"><span>{data.news[0].status}</span><b>{data.news[0].title}</b><small>{data.news[0].source} · RIESGO {data.news[0].risk}</small></a> : <div className="empty">NOTICIAS NO DISPONIBLES</div>}</article>
-        <article className="panel rotation-panel"><div className="panel-head"><div><p className="eyebrow">FLUJO DE CAPITAL</p><h2>Radar de rotación</h2></div><span className="phase">FASE {rot.phase}</span></div><div className="flow">{rot.values.map((r,i) => <div key={r.label} className={r.label === rot.leader ? "leader" : ""}><span>{r.label}</span><b>{r.value}%</b>{i < 4 && <em>›</em>}</div>)}</div><p className="flow-caption">FASE ACTUAL DE ROTACIÓN</p><h3>BTC <span>→</span> ETH <span>→</span> {rot.leader.toUpperCase()}</h3><small>Inferido del rendimiento transversal de 24h. No representa flujos reales de fondos.</small></article>
-      </section>
-      <section className="signals-section"><div className="section-head"><div><p className="eyebrow">MOTOR DE CONFLUENCIA</p><h2>Inteligencia activa</h2></div><span>{active.length ? `${active.length} CONFIGURACIONES CALIFICADAS` : "SIN SEÑALES DE ALTA CONVICCIÓN"}</span></div>{active.length ? <div className="signal-cards">{active.map(a => <button className="signal-card" key={a.symbol} onClick={() => setSelected(a)}><div><span className={`signal-pill ${a.signal.toLowerCase()}`}>{a.signal}</span><small>{assetName(a.symbol)}/USDT · 15M/1H</small></div><strong>{a.score}<em>/100</em></strong><p>{a.reasons.filter(r=>r.points>=10).slice(0,4).map(r=><span key={r.label}>✓ {r.label}</span>)}</p><div><b>{pct(a.change24h)} <small>24H</small></b><b>{a.liquidity} <small>LIQUIDEZ</small></b><i>VER TRAZA →</i></div></button>)}</div> : <div className="no-signals"><div>◎</div><h3>SIN SEÑALES DE ALTA CONVICCIÓN</h3><p>El cerebro está monitoreando. No fabricará operaciones sin confirmaciones independientes.</p></div>}</section>
-      <LiveBookmap symbols={data.market.map(a=>a.symbol)} altseason={{score:alt.final,raw:alt.raw,adjustment:alt.adjustment,state:alt.state}}/>
-      <section className="lower-grid">
-        <article className="panel scanner"><div className="panel-head"><div><p className="eyebrow">UNIVERSO BINANCE USDT COMPLETO</p><h2>Escáner pre-pump</h2></div><div className="scanner-tools"><input aria-label="Buscar criptomoneda" placeholder="Buscar BABY, SUI, BTC…" value={assetSearch} onChange={e=>setAssetSearch(e.target.value.toUpperCase())}/><span className="muted">{scored.length} ACTIVOS · EN VIVO</span></div></div><div className="table-wrap"><table><thead><tr><th>ACTIVO</th><th>PRECIO</th><th>1H</th><th>4H</th><th>24H</th><th>VOL</th><th>MOMENTUM</th><th>SCORE</th><th>SEÑAL</th></tr></thead><tbody>{scored.filter(a=>!assetSearch||a.symbol.includes(assetSearch)).slice(0,50).map(a => <tr key={a.symbol} onClick={() => setSelected(a)}><td><b>{assetName(a.symbol)}</b><small>/USDT</small></td><td>{fmtPrice(a.price)}</td><td className={(a.change1h??0)>=0?"positive":"negative"}>{pct(a.change1h)}</td><td className={(a.change4h??0)>=0?"positive":"negative"}>{pct(a.change4h)}</td><td className={a.change24h>=0?"positive":"negative"}>{pct(a.change24h)}</td><td>${compact(a.quoteVolume)}</td><td><SparkBars values={[a.change24h*.3,a.change4h??0,a.change1h??0,a.momentum]}/></td><td><div className="mini-score"><i style={{width:`${a.score}%`}}/><b>{a.score}</b></div></td><td><span className={`signal-pill ${a.signal.toLowerCase().replace(" ", "-")}`}>{a.extended ? "EXTENDIDO" : a.signal}</span></td></tr>)}</tbody></table></div></article>
-        <article className="panel intelligence"><div className="panel-head"><div><p className="eyebrow">FLUJO DE EVENTOS CURADO</p><h2>Inteligencia global</h2></div><span className="badge">ALTO + CRÍTICO</span></div><div className="news-list">{data.news.slice(0,7).map(n => <a href={n.url} target="_blank" rel="noreferrer" key={n.id}><time>{new Date(n.publishedAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</time><div><b>{n.title}</b><small>{n.region} · {n.source}</small></div><span className={n.risk > 70 ? "hot" : ""}>{n.risk}</span></a>)}{!data.news.length && <div className="empty">NOTICIAS GLOBALES NO DISPONIBLES</div>}</div></article>
-      </section>
-      <footer><div><b>ALT RADAR PRO</b><span>INTELIGENCIA DE DECISIÓN · NO EJECUCIÓN</span></div><p>Las señales son escenarios probabilísticos, no garantías ni asesoramiento financiero.</p><small>Actualizado {lastUpdate?.toLocaleTimeString() ?? "—"} · Fuentes: {data.sources.join(" · ") || "no disponibles"}</small></footer>
-    </div>{selected && <SignalDrawer asset={selected} close={() => setSelected(null)} alt={alt.final}/>} 
-  </main>;
+  const altseason = useMemo(
+    () => altseasonScore(data?.market ?? [], data?.dominance.btc ?? null, risk.score),
+    [data, risk.score],
+  );
+  const allScored = useMemo(
+    () =>
+      scoreAssets(data?.market ?? [], risk.score, risk.killSwitch, {
+        watch: settings.watch,
+        setup: settings.setup,
+        trigger: settings.trigger,
+        minimumQuoteVolume: settings.minimumQuoteVolume,
+      }),
+    [data, risk, settings],
+  );
+  const universeSymbols = useMemo(() => {
+    if (!data || settings.universe === "ALL") return null;
+    const limit = Number(settings.universe);
+    return new Set(data.market.slice(0, limit).map((asset) => asset.symbol));
+  }, [data, settings.universe]);
+  const scored = useMemo(
+    () =>
+      universeSymbols
+        ? allScored.filter((asset) => universeSymbols.has(asset.symbol))
+        : allScored,
+    [allScored, universeSymbols],
+  );
+  const rotationState = useMemo(() => rotation(data?.market ?? []), [data]);
+  const active = scored.filter((asset) => asset.signal !== "NO SIGNAL").slice(0, 6);
+  const scannerRows = (assetSearch
+    ? allScored.filter((asset) => asset.symbol.includes(assetSearch))
+    : scored
+  ).slice(0, 80);
+  const multiTimeframeCoverage = data
+    ? data.market.filter((asset) => asset.change1h !== null && asset.change4h !== null).length
+    : 0;
+
+  if (loading) {
+    return (
+      <main className="loading">
+        <div className="brain-loader"><i /><i /><i /></div>
+        <h1>ALT RADAR <b>PRO</b></h1>
+        <p>INICIANDO CEREBRO DE MERCADO</p>
+      </main>
+    );
+  }
+
+  if (!data) {
+    return (
+      <main className="loading">
+        <h1>ALT RADAR <b>PRO</b></h1>
+        <p>{error}</p>
+        <button onClick={refresh}>REINTENTAR CONEXIÓN</button>
+      </main>
+    );
+  }
+
+  return (
+    <main>
+      <header>
+        <div className="brand">
+          <div className="brand-mark"><i /><i /><i /></div>
+          <div>
+            <b>ALT RADAR</b><span>PRO</span>
+            <small>INTELIGENCIA DE MERCADO CRIPTO</small>
+          </div>
+        </div>
+        <nav aria-label="Navegación principal">
+          {[
+            ["RESUMEN", "resumen"],
+            ["ESCÁNER", "scanner"],
+            ["ORDER FLOW", "order-flow"],
+            ["HISTORIAL", "historial"],
+          ].map(([label, id]) => (
+            <button
+              key={label}
+              className={tab === label ? "active" : ""}
+              onClick={() => scrollTo(label, id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="system">
+          <span className={error ? "offline" : "live"}>● {error ? "DEGRADADO" : "EN VIVO"}</span>
+          {installPrompt && <button className="install-app" onClick={installApp}>↓ INSTALAR</button>}
+          <button
+            aria-label="Activar o desactivar sonido"
+            onClick={() => updateSettings({ sound: !settings.sound })}
+          >
+            {settings.sound ? "◉" : "○"}
+          </button>
+          <button aria-label="Actualizar" onClick={refresh}>↻</button>
+        </div>
+      </header>
+
+      <MarketStrip data={data} />
+
+      <div className="shell">
+        <div className="command-ribbon">
+          <div><span>MARKET FEED</span><b>{data.market.length} PARES USDT</b></div>
+          <div><span>COBERTURA 1H + 4H</span><b>{multiTimeframeCoverage} ACTIVOS</b></div>
+          <div><span>LATENCIA DE PANEL</span><b>REFRESH 30S</b></div>
+          <div><span>ÚLTIMO CICLO</span><b>{lastUpdate?.toLocaleTimeString() ?? "—"}</b></div>
+          <div className="ownership"><span>PRODUCT SYSTEM</span><b>URL.FX / 2026</b></div>
+        </div>
+
+        {risk.killSwitch && (
+          <div className="kill">
+            <b>🔴 BLOQUEO GEOPOLÍTICO</b>
+            <span>NUEVAS OPERACIONES PAUSADAS</span>
+            <small>
+              El riesgo global superó el umbral de seguridad. Las señales existentes muestran
+              advertencia de evento.
+            </small>
+          </div>
+        )}
+
+        <section className="hero-grid" id="resumen">
+          <article className="panel alt-panel">
+            <div className="panel-head">
+              <div><p className="eyebrow">CEREBRO DE MERCADO · RÉGIMEN</p><h2>Probabilidad de altseason</h2></div>
+              <span className="status-dot">● CALCULADO</span>
+            </div>
+            <div className="alt-main">
+              <ScoreRing score={altseason.final} label="AJUSTADO" />
+              <div className="alt-state">
+                <span>ESTADO ACTUAL</span>
+                <h3>{altseason.state}</h3>
+                <p>
+                  {altseason.final !== null && altseason.final >= 41
+                    ? "La amplitud de capital se expande más allá de BTC. La confirmación depende de liquidez, tendencia y riesgo."
+                    : "El capital permanece concentrado. No hay confirmación amplia de altcoins."}
+                </p>
+                <div className="score-audit">
+                  <span>TÉCNICO BRUTO <b>{altseason.raw ?? "—"}</b></span>
+                  <span>NOTICIAS / MACRO <b className="negative">{altseason.adjustment}</b></span>
+                  <span>FINAL <b>{altseason.final ?? "—"}</b></span>
+                </div>
+              </div>
+            </div>
+            <div className="factor-bars">
+              {altseason.factors.slice(0, 5).map((factor) => (
+                <div key={factor.label}>
+                  <span>{factor.label}</span>
+                  <i><b style={{ width: `${(factor.points / 22) * 100}%` }} /></i>
+                  <em>+{Math.round(factor.points)}</em>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="panel risk-panel">
+            <div className="panel-head">
+              <div><p className="eyebrow">INTELIGENCIA GLOBAL</p><h2>Riesgo geopolítico</h2></div>
+              <span className={risk.killSwitch ? "badge critical" : "badge"}>{risk.level}</span>
+            </div>
+            <div className="risk-score">
+              <b>{risk.score ?? "—"}</b><span>/100</span>
+              <SparkBars
+                values={data.news.length ? data.news.slice(0, 9).map((news) => news.risk - 50) : [0, 0, 0, 0, 0]}
+              />
+            </div>
+            <div className="risk-scale"><i /><i /><i /><i /><i /></div>
+            {data.news[0] ? (
+              <a className="headline" href={data.news[0].url} target="_blank" rel="noreferrer">
+                <span>{data.news[0].status}</span>
+                <b>{data.news[0].title}</b>
+                <small>{data.news[0].source} · RIESGO {data.news[0].risk}</small>
+              </a>
+            ) : (
+              <div className="empty">NOTICIAS NO DISPONIBLES</div>
+            )}
+          </article>
+
+          <article className="panel rotation-panel">
+            <div className="panel-head">
+              <div><p className="eyebrow">FLUJO DE CAPITAL</p><h2>Radar de rotación</h2></div>
+              <span className="phase">FASE {rotationState.phase}</span>
+            </div>
+            <div className="flow">
+              {rotationState.values.map((item, index) => (
+                <div key={item.label} className={item.label === rotationState.leader ? "leader" : ""}>
+                  <span>{item.label}</span><b>{item.value}%</b>{index < 4 && <em>›</em>}
+                </div>
+              ))}
+            </div>
+            <p className="flow-caption">FASE ACTUAL DE ROTACIÓN</p>
+            <h3>BTC <span>→</span> ETH <span>→</span> {rotationState.leader.toUpperCase()}</h3>
+            <small>
+              Inferido del rendimiento transversal de 24H. No representa flujos reales de fondos.
+            </small>
+          </article>
+        </section>
+
+        <section className="signals-section" id="inteligencia">
+          <div className="section-head">
+            <div><p className="eyebrow">MOTOR DE CONFLUENCIA</p><h2>Inteligencia activa</h2></div>
+            <span>
+              {active.length
+                ? `${active.length} CONFIGURACIONES CALIFICADAS`
+                : "SIN SEÑALES DE ALTA CONVICCIÓN"}
+            </span>
+          </div>
+          {active.length ? (
+            <div className="signal-cards">
+              {active.slice(0, 3).map((asset) => (
+                <button className="signal-card" key={asset.symbol} onClick={() => setSelected(asset)}>
+                  <div>
+                    <span className={`signal-pill ${asset.signal.toLowerCase()}`}>{asset.signal}</span>
+                    <span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span>
+                    <small>{assetName(asset.symbol)}/USDT · 15M/1H</small>
+                  </div>
+                  <strong>{asset.score}<em>/100</em></strong>
+                  <p>
+                    {asset.reasons
+                      .filter((reason) => reason.points >= 10)
+                      .slice(0, 4)
+                      .map((reason) => <span key={reason.label}>✓ {reason.label}</span>)}
+                  </p>
+                  <div>
+                    <b>{percentage(asset.change24h)} <small>24H</small></b>
+                    <b>{asset.liquidity} <small>LIQUIDEZ</small></b>
+                    <i>VER TRAZA →</i>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="no-signals">
+              <div>◎</div><h3>SIN SEÑALES DE ALTA CONVICCIÓN</h3>
+              <p>El cerebro está monitoreando. No fabricará operaciones sin confirmaciones independientes.</p>
+            </div>
+          )}
+        </section>
+
+        <div id="order-flow"><LiveBookmap
+          symbols={data.market.map((asset) => asset.symbol)}
+          altseason={{
+            score: altseason.final,
+            raw: altseason.raw,
+            adjustment: altseason.adjustment,
+            state: altseason.state,
+          }}
+        /></div>
+
+        <section className="lower-grid" id="scanner">
+          <article className="panel scanner">
+            <div className="panel-head">
+              <div><p className="eyebrow">UNIVERSO BINANCE USDT COMPLETO</p><h2>Escáner probabilístico</h2></div>
+              <div className="scanner-tools">
+                <input
+                  aria-label="Buscar criptomoneda"
+                  placeholder="Buscar BABY, SUI, BTC…"
+                  value={assetSearch}
+                  onChange={(event) => setAssetSearch(event.target.value.toUpperCase())}
+                />
+                <span className="muted">{scored.length} ACTIVOS · EN VIVO</span>
+              </div>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ACTIVO</th><th>PRECIO</th><th>1H</th><th>4H</th><th>24H</th>
+                    <th>VOL 24H</th><th>MOMENTUM</th><th>OI</th><th>FUNDING</th>
+                    <th>SCORE</th><th>DIRECCIÓN</th><th>SEÑAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scannerRows.map((asset) => (
+                    <tr key={asset.symbol} onClick={() => setSelected(asset)}>
+                      <td><b>{assetName(asset.symbol)}</b><small>/USDT</small></td>
+                      <td>{formatPrice(asset.price)}</td>
+                      <td className={(asset.change1h ?? 0) >= 0 ? "positive" : "negative"}>{percentage(asset.change1h)}</td>
+                      <td className={(asset.change4h ?? 0) >= 0 ? "positive" : "negative"}>{percentage(asset.change4h)}</td>
+                      <td className={asset.change24h >= 0 ? "positive" : "negative"}>{percentage(asset.change24h)}</td>
+                      <td>${compact(asset.quoteVolume)}</td>
+                      <td><SparkBars values={[asset.change24h * 0.3, asset.change4h ?? 0, asset.change1h ?? 0, asset.momentum]} /></td>
+                      <td className="data-na">—</td><td className="data-na">—</td>
+                      <td><div className="mini-score"><i style={{ width: `${asset.score}%` }} /><b>{asset.score}</b></div></td>
+                      <td><span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span></td>
+                      <td>
+                        <span className={`signal-pill ${asset.signal.toLowerCase().replace(" ", "-")}`}>
+                          {asset.extended ? "EXTENDIDO" : asset.signal}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="data-footnote">
+              OI y funding se muestran como “—” cuando el proveedor Spot no los entrega. El sistema
+              no reemplaza datos ausentes con estimaciones.
+            </div>
+          </article>
+
+          <article className="panel intelligence">
+            <div className="panel-head">
+              <div><p className="eyebrow">FLUJO DE EVENTOS CURADO</p><h2>Inteligencia global</h2></div>
+              <span className="badge">ALTO + CRÍTICO</span>
+            </div>
+            <div className="news-list">
+              {data.news.slice(0, 7).map((news) => (
+                <a href={news.url} target="_blank" rel="noreferrer" key={news.id}>
+                  <time>{new Date(news.publishedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+                  <div><b>{news.title}</b><small>{news.region} · {news.source}</small></div>
+                  <span className={news.risk > 70 ? "hot" : ""}>{news.risk}</span>
+                </a>
+              ))}
+              {!data.news.length && <div className="empty">NOTICIAS GLOBALES NO DISPONIBLES</div>}
+            </div>
+          </article>
+        </section>
+
+        <SignalLedger
+          settings={settings}
+          updateSettings={updateSettings}
+          altseason={altseason.final}
+          risk={risk.score}
+          active={active}
+          market={data.market}
+          sources={data.sources}
+        />
+
+        <footer>
+          <div className="footer-brand">
+            <b>ALT RADAR PRO</b>
+            <span>INTELIGENCIA DE DECISIÓN · NO EJECUCIÓN</span>
+          </div>
+          <div className="footer-legal">
+            <p>Las señales son escenarios probabilísticos, no garantías ni asesoramiento financiero.</p>
+            <b>© 2026 URL.FX · TODOS LOS DERECHOS RESERVADOS.</b>
+          </div>
+          <small>
+            Actualizado {lastUpdate?.toLocaleTimeString() ?? "—"} · Fuentes: {data.sources.join(" · ") || "no disponibles"}
+          </small>
+        </footer>
+      </div>
+
+      {selected && (
+        <SignalDrawer
+          asset={selected}
+          close={() => setSelected(null)}
+          altseason={altseason.final}
+          risk={risk.score}
+        />
+      )}
+    </main>
+  );
 }
