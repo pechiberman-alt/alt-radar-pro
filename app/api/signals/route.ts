@@ -105,37 +105,57 @@ function mapRow(row: SignalRow): SignalRecord {
   };
 }
 
-function statsFrom(records: SignalRecord[], total: number): LedgerStats {
-  const returns = records
-    .map((record) => record.outcomes.h4.returnPct)
-    .filter((value): value is number => value !== null);
-  const wins = returns.filter((value) => value > 0).length;
+type LedgerStatsRow = {
+  total: number;
+  evaluated_4h: number;
+  wins_4h: number;
+  gross_profit_4h: number | null;
+  gross_loss_4h: number | null;
+  average_return_4h: number | null;
+  best_return_4h: number | null;
+  worst_return_4h: number | null;
+};
+
+function statsFrom(row: LedgerStatsRow | null): LedgerStats {
+  const total = Number(row?.total ?? 0);
+  const evaluated = Number(row?.evaluated_4h ?? 0);
+  const wins = Number(row?.wins_4h ?? 0);
+  const grossProfit = Number(row?.gross_profit_4h ?? 0);
+  const grossLoss = Number(row?.gross_loss_4h ?? 0);
   return {
     total,
-    evaluated4h: returns.length,
+    evaluated4h: evaluated,
     wins4h: wins,
-    winRate4h: returns.length ? (wins / returns.length) * 100 : null,
-    falseSignalRate4h: returns.length
-      ? ((returns.length - wins) / returns.length) * 100
-      : null,
-    averageReturn4h: returns.length
-      ? returns.reduce((sum, value) => sum + value, 0) / returns.length
-      : null,
-    bestReturn4h: returns.length ? Math.max(...returns) : null,
-    worstReturn4h: returns.length ? Math.min(...returns) : null,
+    winRate4h: evaluated ? (wins / evaluated) * 100 : null,
+    grossProfit4h: grossProfit,
+    grossLoss4h: grossLoss,
+    profitFactor4h: evaluated && grossLoss > 0 ? grossProfit / grossLoss : null,
+    falseSignalRate4h: evaluated ? ((evaluated - wins) / evaluated) * 100 : null,
+    averageReturn4h: row?.average_return_4h ?? null,
+    bestReturn4h: row?.best_return_4h ?? null,
+    worstReturn4h: row?.worst_return_4h ?? null,
   };
 }
 
 async function readLedger(): Promise<LedgerPayload> {
   if (!env.DB) throw new Error("D1_UNAVAILABLE");
   await ensureSignalSchema(env.DB);
-  const [rowsResult, countRow, lastRun, lastSummary] = await Promise.all([
+  const [rowsResult, statsRow, lastRun, lastSummary] = await Promise.all([
     env.DB.prepare(
       `SELECT * FROM signal_records ORDER BY detected_at DESC LIMIT 250`,
     ).all<SignalRow>(),
-    env.DB.prepare("SELECT COUNT(*) AS total FROM signal_records").first<{
-      total: number;
-    }>(),
+    env.DB.prepare(
+      `SELECT
+        COUNT(*) AS total,
+        COUNT(return_4h) AS evaluated_4h,
+        SUM(CASE WHEN return_4h > 0 THEN 1 ELSE 0 END) AS wins_4h,
+        SUM(CASE WHEN return_4h > 0 THEN return_4h ELSE 0 END) AS gross_profit_4h,
+        ABS(SUM(CASE WHEN return_4h < 0 THEN return_4h ELSE 0 END)) AS gross_loss_4h,
+        AVG(return_4h) AS average_return_4h,
+        MAX(return_4h) AS best_return_4h,
+        MIN(return_4h) AS worst_return_4h
+      FROM signal_records`,
+    ).first<LedgerStatsRow>(),
     env.DB.prepare("SELECT value FROM automation_state WHERE key = ?1")
       .bind("last_run")
       .first<{ value: string }>(),
@@ -152,7 +172,7 @@ async function readLedger(): Promise<LedgerPayload> {
   }
   return {
     records,
-    stats: statsFrom(records, Number(countRow?.total ?? 0)),
+    stats: statsFrom(statsRow),
     automation: {
       lastRun: lastRun?.value ?? null,
       lastSummary: summary,

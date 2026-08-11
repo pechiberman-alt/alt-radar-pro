@@ -161,6 +161,25 @@ nav button.active::after {
 
 .risk-score > b { font-size: 52px; font-weight: 480; }
 .headline { border-radius: 5px; background: rgba(16, 29, 23, .75); }
+.global-intel-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 22px 0;
+  color: #667a6f;
+  font: 6px var(--font-mono);
+  letter-spacing: .7px;
+}
+.global-intel-meta span { color: var(--green); }
+.headline-impact { display: flex; gap: 5px; margin-top: 9px; }
+.headline-impact i {
+  padding: 4px 6px;
+  border: 1px solid rgba(110, 153, 132, .2);
+  border-radius: 3px;
+  background: rgba(3, 9, 6, .55);
+  font: 6px var(--font-mono);
+  font-style: normal;
+}
 .flow .leader b { text-shadow: 0 0 14px rgba(77,255,173,.28); }
 
 .signals-section { margin-top: 32px; }
@@ -328,7 +347,7 @@ tbody tr:hover { background: rgba(30, 79, 55, .14); }
 
 .ledger-stats {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 1px;
   background: rgba(92, 136, 113, .12);
   border-bottom: 1px solid rgba(104, 151, 127, .14);

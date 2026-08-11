@@ -20,6 +20,9 @@ const emptyStats: LedgerPayload["stats"] = {
   evaluated4h: 0,
   wins4h: 0,
   winRate4h: null,
+  grossProfit4h: 0,
+  grossLoss4h: 0,
+  profitFactor4h: null,
   falseSignalRate4h: null,
   averageReturn4h: null,
   bestReturn4h: null,
@@ -288,6 +291,14 @@ export default function SignalLedger({
   const falseRate =
     stats.falseSignalRate4h === null ? "—" : `${stats.falseSignalRate4h.toFixed(1)}%`;
   const average = percentage(stats.averageReturn4h);
+  const profitFactor =
+    stats.evaluated4h === 0
+      ? "—"
+      : stats.grossLoss4h === 0 && stats.grossProfit4h > 0
+        ? "∞"
+        : stats.profitFactor4h === null
+          ? "—"
+          : stats.profitFactor4h.toFixed(2);
 
   return (
     <section className="ledger-section" id="historial">
@@ -446,6 +457,22 @@ export default function SignalLedger({
           tone={stats.winRate4h !== null && stats.winRate4h >= 50 ? "positive" : undefined}
         />
         <StatCard
+          label="PROFIT FACTOR 4H"
+          value={profitFactor}
+          detail={
+            stats.evaluated4h
+              ? `ganancia ${stats.grossProfit4h.toFixed(2)}% / pérdida ${stats.grossLoss4h.toFixed(2)}%`
+              : "esperando muestra real"
+          }
+          tone={
+            stats.profitFactor4h !== null && stats.profitFactor4h >= 1
+              ? "positive"
+              : stats.profitFactor4h !== null
+                ? "negative"
+                : undefined
+          }
+        />
+        <StatCard
           label="RETORNO MEDIO 4H"
           value={average}
           detail="ajustado por dirección"
@@ -525,8 +552,8 @@ export default function SignalLedger({
 
       <div className="ledger-footer">
         <p>
-          Estadística principal: retorno direccional a 4H. Una observación positiva cuenta
-          como favorable; no equivale a una operación ejecutada ni incluye comisiones.
+          Estadística principal: retorno direccional a 4H. Win Rate y Profit Factor se calculan
+          sólo con observaciones cerradas; no equivalen a operaciones ejecutadas ni incluyen comisiones.
         </p>
         <div>
           <button onClick={copyReport}>{copied ? "INFORME COPIADO" : "COPIAR INFORME"}</button>

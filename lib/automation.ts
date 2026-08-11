@@ -3,8 +3,8 @@ import {
   globalRisk,
   scoreAssets,
   type MarketAsset,
-  type NewsEvent,
 } from "./radar";
+import { loadGlobalNews } from "./news-intelligence";
 
 const BINANCE_ENDPOINTS = [
   "https://data-api.binance.vision",
@@ -29,10 +29,6 @@ const STABLE_BASES = new Set([
   "TRY",
   "BRL",
 ]);
-const NEWS_QUERY = encodeURIComponent(
-  "(war OR sanctions OR tariffs OR missile OR Iran OR Israel OR Ukraine OR Taiwan OR OPEC OR Federal Reserve OR crypto regulation)",
-);
-
 type BinanceTicker = {
   symbol: string;
   lastPrice: string;
@@ -258,54 +254,10 @@ async function loadMarket() {
   }
 }
 
-function classifyNewsRisk(
-  title: string,
-  source: string,
-  publishedAt: string,
-  index: number,
-): NewsEvent {
-  const lower = title.toLowerCase();
-  const critical = /(missile|attack|war |invasion|hormuz|nuclear|bank crisis|emergency)/.test(
-    lower,
-  );
-  const high =
-    critical || /(sanction|tariff|ceasefire|opec|fed |sec |regulation|taiwan)/.test(lower);
-  const tier1 = /(reuters|bloomberg|associated press|ap news|financial times|bbc|wall street journal)/i.test(
-    source,
-  );
-  const risk = Math.min(92, (critical ? 72 : high ? 55 : 38) + (tier1 ? 10 : 2));
-  const bearish = critical || /(sanction|tariff|hawkish|attack|invasion)/.test(lower);
-
-  return {
-    id: `${publishedAt}-${index}`,
-    title,
-    url: "",
-    source,
-    publishedAt,
-    region: "GLOBAL",
-    category: "GEOPOLITICS",
-    tier: tier1 ? 1 : 2,
-    risk,
-    btcImpact: bearish ? -45 : 5,
-    altImpact: bearish ? -68 : 4,
-    goldImpact: critical ? 55 : 5,
-    oilImpact: /oil|hormuz|middle east|iran/.test(lower) ? 72 : 0,
-    status: tier1 && high ? "CONFIRMED" : critical ? "BREAKING" : "MONITORING",
-  };
-}
-
 async function loadRiskScore() {
   try {
-    const payload = await fetchJson<{
-      articles?: { title: string; domain: string; seendate: string }[];
-    }>(
-      `https://api.gdeltproject.org/api/v2/doc/doc?query=${NEWS_QUERY}&mode=artlist&maxrecords=20&format=json&sort=datedesc`,
-      6_000,
-    );
-    const events = (payload.articles ?? []).map((article, index) =>
-      classifyNewsRisk(article.title, article.domain, article.seendate, index),
-    );
-    return globalRisk(events);
+    const intelligence = await loadGlobalNews();
+    return globalRisk(intelligence.events);
   } catch {
     return globalRisk([]);
   }
@@ -495,7 +447,7 @@ export async function runSignalAutomation(
         altseason.final,
         risk.score,
         asset.price,
-        `${marketLoad.source} · GDELT · CoinLore Global`,
+        `${marketLoad.source} · RSS global verificado · CoinLore Global`,
         "15m / 1H / 4H",
         timestamp,
         JSON.stringify(asset.reasons),

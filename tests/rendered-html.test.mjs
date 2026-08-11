@@ -61,3 +61,21 @@ test("contains the requested ownership and safety language", async () => {
   assert.match(app, /DATA UNAVAILABLE/);
   assert.match(layout, /creator: "URL\.FX"/);
 });
+
+test("wires real performance metrics and redundant global intelligence", async () => {
+  const [signalsRoute, ledger, news, radarRoute] = await Promise.all([
+    readFile(new URL("../app/api/signals/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/signal-ledger.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/news-intelligence.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/radar/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(signalsRoute, /gross_profit_4h/i);
+  assert.match(signalsRoute, /profitFactor4h/i);
+  assert.match(ledger, /WIN RATE 4H/);
+  assert.match(ledger, /PROFIT FACTOR 4H/);
+  assert.match(news, /Dow Jones World RSS/);
+  assert.match(news, /BBC World RSS/);
+  assert.match(news, /clusterEvents/);
+  assert.match(radarRoute, /loadGlobalNews/);
+});

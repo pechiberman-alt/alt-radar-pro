@@ -38,6 +38,9 @@ export type LedgerStats = {
   evaluated4h: number;
   wins4h: number;
   winRate4h: number | null;
+  grossProfit4h: number;
+  grossLoss4h: number;
+  profitFactor4h: number | null;
   falseSignalRate4h: number | null;
   averageReturn4h: number | null;
   bestReturn4h: number | null;

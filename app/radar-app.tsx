@@ -312,7 +312,7 @@ export default function RadarApp() {
 
   const refresh = useCallback(async () => {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 8_000);
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
       const server = fetch("/api/radar", {
         cache: "no-store",
@@ -330,7 +330,19 @@ export default function RadarApp() {
       setError("");
       enrichTimeframes(first)
         .then((enriched) => {
-          setData(enriched);
+          setData((current) =>
+            current
+              ? {
+                  ...current,
+                  timestamp: enriched.timestamp,
+                  market: enriched.market,
+                  sources: [...new Set([...current.sources, ...enriched.sources])],
+                  errors: current.errors.filter(
+                    (message) => !message.toLowerCase().includes("multi-timeframe"),
+                  ),
+                }
+              : enriched,
+          );
           setLastUpdate(new Date());
         })
         .catch(() => undefined);
@@ -344,7 +356,14 @@ export default function RadarApp() {
                     current.market.length > richer.market.length
                       ? current.market
                       : richer.market,
+                  news: richer.news.length ? richer.news : current.news,
+                  dominance: {
+                    btc: richer.dominance.btc ?? current.dominance.btc,
+                    change24h:
+                      richer.dominance.change24h ?? current.dominance.change24h,
+                  },
                   sources: [...new Set([...current.sources, ...richer.sources])],
+                  errors: [...new Set([...current.errors, ...richer.errors])],
                 }
               : richer,
           );
@@ -491,7 +510,7 @@ export default function RadarApp() {
         <div className="command-ribbon">
           <div><span>MARKET FEED</span><b>{data.market.length} PARES USDT</b></div>
           <div><span>COBERTURA 1H + 4H</span><b>{multiTimeframeCoverage} ACTIVOS</b></div>
-          <div><span>LATENCIA DE PANEL</span><b>REFRESH 30S</b></div>
+          <div><span>EVENTOS GLOBALES</span><b>{data.news.length} CLUSTERS CURADOS</b></div>
           <div><span>ÚLTIMO CICLO</span><b>{lastUpdate?.toLocaleTimeString() ?? "—"}</b></div>
           <div className="ownership"><span>PRODUCT SYSTEM</span><b>URL.FX / 2026</b></div>
         </div>
@@ -553,11 +572,25 @@ export default function RadarApp() {
               />
             </div>
             <div className="risk-scale"><i /><i /><i /><i /><i /></div>
+            <div className="global-intel-meta">
+              <span>● RSS EN VIVO</span>
+              <b>{data.news.length} EVENTOS SIN DUPLICADOS</b>
+            </div>
             {data.news[0] ? (
               <a className="headline" href={data.news[0].url} target="_blank" rel="noreferrer">
                 <span>{data.news[0].status}</span>
                 <b>{data.news[0].title}</b>
-                <small>{data.news[0].source} · RIESGO {data.news[0].risk}</small>
+                <small>
+                  {data.news[0].source} · {data.news[0].sourceCount ?? 1} FUENTE(S) · RIESGO {data.news[0].risk}
+                </small>
+                <div className="headline-impact">
+                  <i className={data.news[0].btcImpact >= 0 ? "positive" : "negative"}>
+                    BTC {data.news[0].btcImpact > 0 ? "+" : ""}{data.news[0].btcImpact}
+                  </i>
+                  <i className={data.news[0].altImpact >= 0 ? "positive" : "negative"}>
+                    ALTS {data.news[0].altImpact > 0 ? "+" : ""}{data.news[0].altImpact}
+                  </i>
+                </div>
               </a>
             ) : (
               <div className="empty">NOTICIAS NO DISPONIBLES</div>
@@ -696,7 +729,10 @@ export default function RadarApp() {
               {data.news.slice(0, 7).map((news) => (
                 <a href={news.url} target="_blank" rel="noreferrer" key={news.id}>
                   <time>{new Date(news.publishedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-                  <div><b>{news.title}</b><small>{news.region} · {news.source}</small></div>
+                  <div>
+                    <b>{news.title}</b>
+                    <small>{news.region} · {news.status} · {news.sourceCount ?? 1} FUENTE(S)</small>
+                  </div>
                   <span className={news.risk > 70 ? "hot" : ""}>{news.risk}</span>
                 </a>
               ))}

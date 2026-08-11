@@ -25,6 +25,8 @@ export type NewsEvent = {
   goldImpact: number;
   oilImpact: number;
   status: "BREAKING" | "CONFIRMED" | "MONITORING" | "UNCONFIRMED";
+  sourceCount?: number;
+  sources?: string[];
 };
 
 export type RadarPayload = {
