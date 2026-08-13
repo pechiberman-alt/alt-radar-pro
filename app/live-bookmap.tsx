@@ -90,7 +90,24 @@ type ViewState = {
   plotRight: number;
   columnWidth: number;
   frames: Frame[];
+  maxPanOffset: number;
 };
+type ChartGesture =
+  | {
+      kind: "drag";
+      pointerId: number;
+      startX: number;
+      startY: number;
+      startPanOffset: number;
+      startPricePan: number;
+    }
+  | {
+      kind: "pinch";
+      pointerIds: [number, number];
+      startDistance: number;
+      startTimeZoom: number;
+      startPriceZoom: number;
+    };
 
 const EMPTY_METRICS: Metrics = {
   levels: 0,
@@ -137,6 +154,11 @@ const usdLabel = (value: number) =>
   `${value < 0 ? "-" : ""}$${new Intl.NumberFormat("en", {
     notation: "compact",
     maximumFractionDigits: Math.abs(value) >= 1_000_000 ? 2 : 1,
+  }).format(Math.abs(value))}`;
+const footprintNumber = (value: number) =>
+  `$${new Intl.NumberFormat("en", {
+    notation: Math.abs(value) >= 10_000 ? "compact" : "standard",
+    maximumFractionDigits: Math.abs(value) >= 1_000 ? 1 : 0,
   }).format(Math.abs(value))}`;
 const signed = (value: number, digits = 1) =>
   `${value >= 0 ? "+" : ""}${value.toFixed(digits)}%`;
@@ -187,7 +209,7 @@ function currentWalls(
     });
 }
 
-function footprintRows(trades: TapeTrade[], mid: number, spread: number): FootprintRow[] {
+function footprintRows(trades: Trade[], mid: number, spread: number): FootprintRow[] {
   if (!trades.length || !mid) return [];
   const step = Math.max(spread, mid * 0.00015, Number.EPSILON);
   const rows = new Map<number, { buy: number; sell: number }>();
@@ -201,7 +223,7 @@ function footprintRows(trades: TapeTrade[], mid: number, spread: number): Footpr
   return [...rows.entries()]
     .map(([price, value]) => ({ price, ...value }))
     .sort((left, right) => right.price - left.price)
-    .slice(0, 12);
+    .slice(0, 14);
 }
 
 function depthWithCumulative(levels: Level[]) {
@@ -231,6 +253,8 @@ export default function LiveBookmap({
   const eventCooldownRef = useRef(new Map<string, number>());
   const hoverRef = useRef<{ x: number; y: number } | null>(null);
   const viewRef = useRef<ViewState | null>(null);
+  const pointerPositionsRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef<ChartGesture | null>(null);
   const totalsRef = useRef({
     trades: 0,
     buyQty: 0,
@@ -255,6 +279,7 @@ export default function LiveBookmap({
     asks: [],
   });
   const [tape, setTape] = useState<TapeTrade[]>([]);
+  const [footprintTrades, setFootprintTrades] = useState<Trade[]>([]);
   const [liquidations, setLiquidations] = useState<Liquidation[]>([]);
   const [events, setEvents] = useState<FlowEvent[]>([]);
   const [walls, setWalls] = useState<Wall[]>([]);
@@ -267,11 +292,17 @@ export default function LiveBookmap({
   const [showTrades, setShowTrades] = useState(true);
   const [showCvd, setShowCvd] = useState(true);
   const [showWalls, setShowWalls] = useState(true);
+  const [showFootprintNumbers, setShowFootprintNumbers] = useState(true);
   const [sidePanel, setSidePanel] = useState<"dom" | "tape" | "alerts">("dom");
   const [marketTimeframe, setMarketTimeframe] = useState<BrainTimeframe>("4h");
   const [liquidityHistory, setLiquidityHistory] = useState<Frame[]>([]);
   const [liquidityCoverage, setLiquidityCoverage] = useState({ minutes: 0, samples: 0 });
   const [liquidityArchiveStatus, setLiquidityArchiveStatus] = useState<"loading" | "recording" | "unavailable">("loading");
+  const [timeZoom, setTimeZoom] = useState(1);
+  const [priceZoom, setPriceZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState(0);
+  const [pricePan, setPricePan] = useState(0);
+  const [draggingChart, setDraggingChart] = useState(false);
 
 
   useEffect(() => {
@@ -403,6 +434,7 @@ export default function LiveBookmap({
       setMetrics(EMPTY_METRICS);
       setLadder({ bids: [], asks: [] });
       setTape([]);
+      setFootprintTrades([]);
       setLiquidations([]);
       setEvents([]);
       setWalls([]);
@@ -608,6 +640,7 @@ export default function LiveBookmap({
           large: recent.length >= 10 && trade.notional >= largeAt,
         }));
       setTape(tapeRows);
+      setFootprintTrades(recent.slice(-240));
       setLiquidations(liquidationsRef.current.slice(-12).reverse());
       setLadder({ bids: book.bids.slice(0, 12), asks: book.asks.slice(0, 12) });
 
@@ -749,12 +782,12 @@ export default function LiveBookmap({
       const liveFrames = framesRef.current.slice(-historySize);
       const windowStart = Date.now() - LIQUIDITY_WINDOW_MS[marketTimeframe];
       const archivedFrames = liquidityHistory.filter((frame) => frame.time >= windowStart);
-      const frames = [...archivedFrames, ...liveFrames]
+      const allFrames = [...archivedFrames, ...liveFrames]
         .sort((left, right) => left.time - right.time)
         .filter((frame, index, values) =>
           index === 0 || frame.time - values[index - 1].time >= 180,
         );
-      if (!frames.length) {
+      if (!allFrames.length) {
         context.fillStyle = "#718078";
         context.font = "11px monospace";
         context.textAlign = "center";
@@ -769,10 +802,19 @@ export default function LiveBookmap({
         return;
       }
 
+      const visibleCount = Math.min(
+        allFrames.length,
+        Math.max(12, Math.round(allFrames.length / timeZoom)),
+      );
+      const maxPanOffset = Math.max(0, allFrames.length - visibleCount);
+      const safePanOffset = Math.round(clamp(panOffset, 0, maxPanOffset));
+      const frameEnd = allFrames.length - safePanOffset;
+      const frames = allFrames.slice(Math.max(0, frameEnd - visibleCount), frameEnd);
+
       const latestMid = frames.at(-1)!.mid;
       const plotLeft = 0;
       const plotRight = width - 88;
-      const plotTop = 18;
+      const plotTop = 58;
       const plotBottom = showCvd ? height - 118 : height - 34;
       const plotHeight = plotBottom - plotTop;
       const plotWidth = plotRight - plotLeft;
@@ -808,6 +850,12 @@ export default function LiveBookmap({
         high = latestMid * (1 + rangePct / 100);
       }
 
+      const baseRange = Math.max(high - low, latestMid * 0.00001);
+      const priceCenter = (low + high) / 2 + pricePan;
+      const zoomedHalfRange = baseRange / (2 * priceZoom);
+      low = priceCenter - zoomedHalfRange;
+      high = priceCenter + zoomedHalfRange;
+
       const y = (price: number) =>
         plotBottom - ((price - low) / (high - low)) * plotHeight;
       const columnWidth = plotWidth / Math.max(frames.length, 1);
@@ -820,6 +868,7 @@ export default function LiveBookmap({
         plotRight,
         columnWidth,
         frames,
+        maxPanOffset,
       };
 
       context.fillStyle = "#07110e";
@@ -975,8 +1024,10 @@ export default function LiveBookmap({
         const x = plotRight - (frames.length - frameIndex) * columnWidth;
         context.fillText(
           marketTimeframe === "1d"
-            ? new Date(frame.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            : new Date(frame.time).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" }),
+            ? new Date(frame.time).toLocaleString([], { day: "2-digit", hour: "2-digit", minute: "2-digit" })
+            : marketTimeframe === "4h" || marketTimeframe === "1h"
+              ? new Date(frame.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : new Date(frame.time).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" }),
           x,
           plotBottom + 15,
         );
@@ -1054,6 +1105,10 @@ export default function LiveBookmap({
     showWalls,
     liquidityHistory,
     marketTimeframe,
+    timeZoom,
+    priceZoom,
+    panOffset,
+    pricePan,
   ]);
 
   const flowTotal = metrics.buyNotional + metrics.sellNotional;
@@ -1126,12 +1181,28 @@ export default function LiveBookmap({
   const actualFootprint = useMemo(
     () =>
       footprintRows(
-        tape,
+        footprintTrades,
         metrics.bid && metrics.ask ? (metrics.bid + metrics.ask) / 2 : 0,
         metrics.ask && metrics.bid ? metrics.ask - metrics.bid : 0,
       ),
-    [tape, metrics.bid, metrics.ask],
+    [footprintTrades, metrics.bid, metrics.ask],
   );
+  const footprintTotal = actualFootprint.reduce(
+    (sum, row) => sum + row.buy + row.sell,
+    0,
+  );
+  const footprintDelta = actualFootprint.reduce(
+    (sum, row) => sum + row.buy - row.sell,
+    0,
+  );
+  const footprintPoc = [...actualFootprint].sort(
+    (left, right) => right.buy + right.sell - (left.buy + left.sell),
+  )[0] ?? null;
+  const stackedImbalances = actualFootprint.filter((row) => {
+    const weakerSide = Math.min(row.buy, row.sell);
+    const strongerSide = Math.max(row.buy, row.sell);
+    return strongerSide > 0 && (weakerSide === 0 || strongerSide / weakerSide >= 3);
+  }).length;
   const bidRows = depthWithCumulative(ladder.bids);
   const askRows = depthWithCumulative(ladder.asks);
   const maxCumulative = Math.max(
@@ -1155,18 +1226,24 @@ export default function LiveBookmap({
       sellNotional: 0,
     };
     setTape([]);
+    setFootprintTrades([]);
     setLiquidations([]);
     setEvents([]);
     setWalls([]);
     setMetrics((current) => ({ ...EMPTY_METRICS, bid: current.bid, ask: current.ask }));
+    resetViewport();
   };
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const updateHover = (
+    canvas: HTMLCanvasElement,
+    clientX: number,
+    clientY: number,
+  ) => {
     const view = viewRef.current;
     if (!view) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
     hoverRef.current = { x, y };
     if (
       x < view.plotLeft ||
@@ -1196,7 +1273,158 @@ export default function LiveBookmap({
     });
   };
 
+  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const view = viewRef.current;
+    if (!view) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const rect = event.currentTarget.getBoundingClientRect();
+    pointerPositionsRef.current.set(event.pointerId, {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    });
+    const pointers = [...pointerPositionsRef.current.entries()];
+    if (pointers.length >= 2) {
+      const [first, second] = pointers;
+      gestureRef.current = {
+        kind: "pinch",
+        pointerIds: [first[0], second[0]],
+        startDistance: Math.max(
+          1,
+          Math.hypot(first[1].x - second[1].x, first[1].y - second[1].y),
+        ),
+        startTimeZoom: timeZoom,
+        startPriceZoom: priceZoom,
+      };
+    } else {
+      gestureRef.current = {
+        kind: "drag",
+        pointerId: event.pointerId,
+        startX: pointers[0][1].x,
+        startY: pointers[0][1].y,
+        startPanOffset: panOffset,
+        startPricePan: pricePan,
+      };
+    }
+    hoverRef.current = null;
+    setHover(null);
+    setDraggingChart(true);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (pointerPositionsRef.current.has(event.pointerId)) {
+      pointerPositionsRef.current.set(event.pointerId, { x, y });
+    }
+
+    const gesture = gestureRef.current;
+    if (gesture?.kind === "pinch") {
+      const first = pointerPositionsRef.current.get(gesture.pointerIds[0]);
+      const second = pointerPositionsRef.current.get(gesture.pointerIds[1]);
+      if (!first || !second) return;
+      const ratio = Math.hypot(first.x - second.x, first.y - second.y) /
+        gesture.startDistance;
+      setTimeZoom(clamp(gesture.startTimeZoom * ratio, 1, 16));
+      setPriceZoom(clamp(gesture.startPriceZoom * ratio, 1, 12));
+      return;
+    }
+
+    if (gesture?.kind === "drag" && gesture.pointerId === event.pointerId) {
+      const horizontalFrames = (x - gesture.startX) / Math.max(view.columnWidth, 1);
+      const verticalPrice =
+        ((y - gesture.startY) / Math.max(view.plotBottom - view.plotTop, 1)) *
+        (view.high - view.low);
+      setPanOffset(
+        Math.round(
+          clamp(
+            gesture.startPanOffset + horizontalFrames,
+            0,
+            view.maxPanOffset,
+          ),
+        ),
+      );
+      setPricePan(gesture.startPricePan + verticalPrice);
+      return;
+    }
+
+    updateHover(event.currentTarget, event.clientX, event.clientY);
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    pointerPositionsRef.current.delete(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const remaining = [...pointerPositionsRef.current.entries()];
+    if (remaining.length === 1) {
+      gestureRef.current = {
+        kind: "drag",
+        pointerId: remaining[0][0],
+        startX: remaining[0][1].x,
+        startY: remaining[0][1].y,
+        startPanOffset: panOffset,
+        startPricePan: pricePan,
+      };
+    } else if (!remaining.length) {
+      gestureRef.current = null;
+      setDraggingChart(false);
+    }
+  };
+
+  const handleWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
+    event.preventDefault();
+    const factor = event.deltaY < 0 ? 1.16 : 1 / 1.16;
+    if (event.ctrlKey) {
+      setTimeZoom((value) => clamp(value * factor, 1, 16));
+      setPriceZoom((value) => clamp(value * factor, 1, 12));
+    } else if (event.shiftKey || event.altKey) {
+      setPriceZoom((value) => clamp(value * factor, 1, 12));
+    } else {
+      setTimeZoom((value) => clamp(value * factor, 1, 16));
+    }
+  };
+
+  const resetViewport = () => {
+    setTimeZoom(1);
+    setPriceZoom(1);
+    setPanOffset(0);
+    setPricePan(0);
+  };
+
+  const followLive = () => {
+    setPanOffset(0);
+    setPricePan(0);
+  };
+
+  const handleChartKeyDown = (event: React.KeyboardEvent<HTMLCanvasElement>) => {
+    const view = viewRef.current;
+    if (!view) return;
+    if (event.key === "+" || event.key === "=") {
+      event.preventDefault();
+      setTimeZoom((value) => clamp(value * 1.2, 1, 16));
+    } else if (event.key === "-") {
+      event.preventDefault();
+      setTimeZoom((value) => clamp(value / 1.2, 1, 16));
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      setPanOffset((value) =>
+        Math.round(clamp(value + (event.key === "ArrowLeft" ? 8 : -8), 0, view.maxPanOffset)),
+      );
+    } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const step = (view.high - view.low) * 0.08;
+      setPricePan((value) => value + (event.key === "ArrowUp" ? step : -step));
+    } else if (event.key === "Escape" || event.key === "0") {
+      event.preventDefault();
+      resetViewport();
+    }
+  };
+
   const handlePointerLeave = () => {
+    if (gestureRef.current) return;
     hoverRef.current = null;
     setHover(null);
   };
@@ -1283,6 +1511,7 @@ export default function LiveBookmap({
           <button className={showTrades ? "enabled" : ""} onClick={() => setShowTrades((value) => !value)}>TRADES</button>
           <button className={showWalls ? "enabled" : ""} onClick={() => setShowWalls((value) => !value)}>WALLS</button>
           <button className={showCvd ? "enabled" : ""} onClick={() => setShowCvd((value) => !value)}>CVD</button>
+          <button className={showFootprintNumbers ? "enabled" : ""} onClick={() => setShowFootprintNumbers((value) => !value)}>FOOTPRINT #</button>
         </div>
       </div>
 
@@ -1395,14 +1624,49 @@ export default function LiveBookmap({
       </div>
 
       <div className="professional-map advanced-map">
-        <div className="chart-stage">
+        <div className={`chart-stage interactive-chart ${draggingChart ? "dragging" : ""}`}>
+          <div className="chart-viewport-controls" role="toolbar" aria-label="Controles del mapa de liquidez">
+            <div className="viewport-zoom-group">
+              <span>TIEMPO</span>
+              <button aria-label="Alejar tiempo" onClick={() => setTimeZoom((value) => clamp(value / 1.25, 1, 16))}>−</button>
+              <b>{timeZoom.toFixed(1)}×</b>
+              <button aria-label="Acercar tiempo" onClick={() => setTimeZoom((value) => clamp(value * 1.25, 1, 16))}>+</button>
+            </div>
+            <div className="viewport-zoom-group">
+              <span>PRECIO</span>
+              <button aria-label="Alejar precio" onClick={() => setPriceZoom((value) => clamp(value / 1.25, 1, 12))}>−</button>
+              <b>{priceZoom.toFixed(1)}×</b>
+              <button aria-label="Acercar precio" onClick={() => setPriceZoom((value) => clamp(value * 1.25, 1, 12))}>+</button>
+            </div>
+            <button
+              className={`viewport-live ${panOffset === 0 && pricePan === 0 ? "active" : ""}`}
+              onClick={followLive}
+            >
+              <i /> {panOffset === 0 && pricePan === 0 ? "SIGUIENDO LIVE" : `${panOffset} MUESTRAS ATRÁS`}
+            </button>
+            <button
+              className={showFootprintNumbers ? "viewport-footprint active" : "viewport-footprint"}
+              onClick={() => setShowFootprintNumbers((value) => !value)}
+            >
+              BID × ASK #
+            </button>
+            <button className="viewport-reset" onClick={resetViewport}>RESET</button>
+          </div>
           <canvas
             ref={canvasRef}
             className="bookmap-canvas pro-bookmap-canvas"
             role="img"
+            tabIndex={0}
             aria-label={`Heatmap de liquidez real de ${base(symbol)} con profundidad, trades, paredes y CVD`}
+            aria-describedby="bookmap-gesture-help"
+            onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
             onPointerLeave={handlePointerLeave}
+            onWheel={handleWheel}
+            onDoubleClick={followLive}
+            onKeyDown={handleChartKeyDown}
           />
           <div className="chart-live-badge"><i /> {LIQUIDITY_FRAME_LABEL[marketTimeframe]} · LIVE DEPTH</div>
           {liquidityCoverage.minutes < LIQUIDITY_WINDOW_MS[marketTimeframe] / 60_000 && (
@@ -1413,6 +1677,45 @@ export default function LiveBookmap({
           <div className="chart-legend-overlay">
             <span>BAJA</span><i /><span>ALTA LIQUIDEZ</span>
           </div>
+          <div id="bookmap-gesture-help" className="chart-gesture-help">
+            RUEDA: ZOOM TIEMPO · SHIFT+RUEDA: PRECIO · ARRASTRAR: MOVER · PINZA: ZOOM · DOBLE TOQUE: LIVE
+          </div>
+          {showFootprintNumbers && (
+            <div className="chart-footprint-numbers" aria-label="Footprint numérico de ejecuciones reales">
+              <header>
+                <div><span>FOOTPRINT</span><b>BID × ASK</b></div>
+                <small>USD EJECUTADO</small>
+              </header>
+              <div className="chart-footprint-summary">
+                <span>Δ <b className={footprintDelta >= 0 ? "positive" : "negative"}>{footprintDelta >= 0 ? "+" : "−"}{footprintNumber(footprintDelta)}</b></span>
+                <span>POC <b>{footprintPoc ? priceLabel(footprintPoc.price) : "—"}</b></span>
+                <span>IMB <b>{stackedImbalances}</b></span>
+              </div>
+              <div className="chart-footprint-head"><span>BID</span><b>PRECIO</b><span>ASK</span><em>Δ</em></div>
+              <div className="chart-footprint-body">
+                {actualFootprint.slice(0, 10).map((row) => {
+                  const total = Math.max(row.buy + row.sell, 1);
+                  const weaker = Math.min(row.buy, row.sell);
+                  const ratio = Math.max(row.buy, row.sell) / Math.max(weaker, 1);
+                  const dominant = ratio >= 3 ? (row.buy > row.sell ? "buy-imbalance" : "sell-imbalance") : "";
+                  const rowDelta = row.buy - row.sell;
+                  return (
+                    <div
+                      className={`chart-footprint-row ${dominant} ${footprintPoc?.price === row.price ? "poc" : ""}`}
+                      key={`chart-footprint-${row.price}`}
+                      style={{ "--sell-share": `${(row.sell / total) * 100}%`, "--buy-share": `${(row.buy / total) * 100}%` } as React.CSSProperties}
+                    >
+                      <span>{footprintNumber(row.sell)}</span>
+                      <b>{priceLabel(row.price)}</b>
+                      <span>{footprintNumber(row.buy)}</span>
+                      <em className={rowDelta >= 0 ? "positive" : "negative"}>{rowDelta >= 0 ? "+" : "−"}{footprintNumber(rowDelta)}</em>
+                    </div>
+                  );
+                })}
+                {!actualFootprint.length && <p>ESPERANDO EJECUCIONES…</p>}
+              </div>
+            </div>
+          )}
           {hover && (
             <div
               className="chart-tooltip"
@@ -1537,17 +1840,28 @@ export default function LiveBookmap({
         </article>
 
         <article className="micro-card footprint-pro">
-          <header><div><span>FOOTPRINT NOTIONAL</span><b>Agresión por nivel</b></div><small>SELL / BUY USD</small></header>
-          <div className="footprint-columns"><span>VENTA</span><b>PRECIO</b><span>COMPRA</span></div>
+          <header><div><span>FOOTPRINT NOTIONAL</span><b>BID × ASK por nivel</b></div><small>TRADES REALES · USD</small></header>
+          <div className="footprint-kpis">
+            <span>VOLUMEN <b>{footprintNumber(footprintTotal)}</b></span>
+            <span>DELTA <b className={footprintDelta >= 0 ? "positive" : "negative"}>{footprintDelta >= 0 ? "+" : "−"}{footprintNumber(footprintDelta)}</b></span>
+            <span>POC <b>{footprintPoc ? priceLabel(footprintPoc.price) : "—"}</b></span>
+            <span>IMBALANCES <b>{stackedImbalances}</b></span>
+          </div>
+          <div className="footprint-columns footprint-columns-pro"><span>BID HIT</span><b>PRECIO</b><span>ASK LIFT</span><em>DELTA</em></div>
           {actualFootprint.map((row) => {
             const total = Math.max(row.buy + row.sell, 1);
+            const rowDelta = row.buy - row.sell;
+            const weaker = Math.min(row.buy, row.sell);
+            const ratio = Math.max(row.buy, row.sell) / Math.max(weaker, 1);
+            const dominant = ratio >= 3 ? (row.buy > row.sell ? "buy-imbalance" : "sell-imbalance") : "";
             return (
-              <div className="footprint-row" key={row.price}>
-                <em className="negative">{usdLabel(row.sell)}</em>
+              <div className={`footprint-row footprint-row-pro ${dominant} ${footprintPoc?.price === row.price ? "poc" : ""}`} key={row.price}>
+                <em className="negative">{footprintNumber(row.sell)}</em>
                 <span style={{ "--sell": `${(row.sell / total) * 100}%`, "--buy": `${(row.buy / total) * 100}%` } as React.CSSProperties}>
                   <i /><b>{priceLabel(row.price)}</b><u />
                 </span>
-                <em className="positive">{usdLabel(row.buy)}</em>
+                <em className="positive">{footprintNumber(row.buy)}</em>
+                <strong className={rowDelta >= 0 ? "positive" : "negative"}>{rowDelta >= 0 ? "+" : "−"}{footprintNumber(rowDelta)}</strong>
               </div>
             );
           })}

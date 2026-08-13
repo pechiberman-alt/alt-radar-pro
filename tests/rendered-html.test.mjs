@@ -137,3 +137,22 @@ test("archives observed liquidity for honest 5M through 1D Bookmap windows", asy
   assert.match(bookmap, /ACUMULANDO/);
   assert.match(schema, /liquiditySnapshots/);
 });
+
+test("adds a numeric real-trade footprint and an interactive liquidity viewport", async () => {
+  const [bookmap, interactionCss, layout] = await Promise.all([
+    readFile(new URL("../app/live-bookmap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/bookmap-interactions.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(bookmap, /BID × ASK/);
+  assert.match(bookmap, /USD EJECUTADO/);
+  assert.match(bookmap, /stackedImbalances/);
+  assert.match(bookmap, /onWheel=\{handleWheel\}/);
+  assert.match(bookmap, /onPointerDown=\{handlePointerDown\}/);
+  assert.match(bookmap, /startDistance/);
+  assert.match(bookmap, /SIGUIENDO LIVE/);
+  assert.match(interactionCss, /touch-action:\s*none/);
+  assert.match(interactionCss, /chart-footprint-numbers/);
+  assert.match(layout, /bookmap-interactions\.css/);
+});

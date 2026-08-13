@@ -41,7 +41,7 @@
 }
 .orderflow-terminal .advanced-controls label { min-width: 0; }
 .orderflow-terminal .advanced-controls select { width: 100%; min-width: 0; height: 34px; }
-.layer-switches { display: grid; grid-template-columns: repeat(3, 1fr); align-self: end; gap: 4px; }
+.layer-switches { display: grid; grid-template-columns: repeat(4, 1fr); align-self: end; gap: 4px; }
 .layer-switches button {
   height: 34px; border: 1px solid rgba(100, 150, 125, .2); border-radius: 3px;
   color: #64766c; background: #07100c; font: 6px var(--font-mono); cursor: pointer;
