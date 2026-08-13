@@ -14,7 +14,10 @@ Terminal profesional de inteligencia probabilística para criptomonedas. Combina
 - Probabilidad de altseason con score técnico bruto, ajuste macro/geopolítico y resultado final auditable.
 - Order book Spot y Futures mediante WebSocket, mapa de liquidez, footprint, cinta de operaciones, CVD, liquidaciones y batalla compradores/vendedores.
 - Signal Ledger persistente en Cloudflare D1: registra SETUP/TRIGGER, captura resultados a 15m, 1H, 4H y 24H y calcula estadísticas solamente con observaciones reales.
-- Automatización en Cloudflare cada 15 minutos, además de sincronización bajo demanda desde la interfaz.
+- Modo Scalping 5M/15M separado: velas cerradas, ATR, EMA, RSI, MACD, volumen relativo, spread real, estructura, stop e invalidación obligatorios.
+- Cerebro seguro con memoria walk-forward persistente y eventos encadenados por SHA-256; el chat no se guarda ni se envía a terceros.
+- Analista cuantitativo local sin LLM ni consumo de tokens de API, especializado en responder sobre el snapshot real disponible.
+- Automatización de scalping en Cloudflare cada 5 minutos y modelo swing cada 15 minutos, además de sincronización bajo demanda.
 - Alertas visuales, sonido y notificaciones del navegador con cooldown configurable.
 - PWA instalable en Android y escritorio.
 
@@ -47,7 +50,7 @@ npm test
 
 ## Persistencia y automatización
 
-El esquema está en `db/schema.ts` y las migraciones en `drizzle/`. La configuración lógica de Sites declara el binding `DB`; la configuración de producción enlaza la base D1 y activa el cron cada 15 minutos.
+El esquema está en `db/schema.ts` y las migraciones en `drizzle/`. La configuración lógica de Sites declara el binding `DB`; la configuración de producción enlaza la base D1 y activa los ciclos automáticos de 5 y 15 minutos.
 
 La infraestructura está diseñada para funcionar dentro de los límites gratuitos de Cloudflare Workers y D1. En el plan gratuito, al alcanzar un límite el servicio se detiene temporalmente en vez de generar cargos; conviene vigilar el uso desde el panel de Cloudflare.
 

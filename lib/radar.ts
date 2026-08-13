@@ -8,6 +8,11 @@ export type MarketAsset = {
   quoteVolume: number;
   high: number | null;
   low: number | null;
+  change5m?: number | null;
+  change15m?: number | null;
+  bidPrice?: number | null;
+  askPrice?: number | null;
+  spreadPct?: number | null;
 };
 
 export type NewsEvent = {

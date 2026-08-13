@@ -16,6 +16,13 @@ import {
   type MarketVenue,
   type TimeframeAnalysis,
 } from "@/lib/market-brain";
+import {
+  appendBrainAuditEvent,
+  ensureBrainSecuritySchema,
+  readBrainSecurity,
+  registerBrainManifest,
+  unavailableBrainSecurity,
+} from "@/lib/brain-security";
 
 export const dynamic = "force-dynamic";
 
@@ -230,6 +237,7 @@ export async function ensureBrainSchema(db: D1Database) {
     db.prepare(`CREATE INDEX IF NOT EXISTS brain_observations_evaluation_idx
       ON brain_observations (timeframe, evaluated_at)`),
   ]);
+  await ensureBrainSecuritySchema(db);
 }
 
 function outcomeCandle(candles: Candle[], targetMs: number, nowMs: number) {
@@ -250,12 +258,30 @@ async function evaluateDueObservations(
      WHERE symbol = ?1 AND outcome_price IS NULL AND target_at <= ?2
      ORDER BY target_at ASC LIMIT 100`,
   ).bind(symbol, now.toISOString()).all<ObservationRow>();
+  const audits: {
+    eventKey: string;
+    symbol: string;
+    timeframe: BrainTimeframe;
+    targetAt: string;
+    price: number;
+    directionalReturn: number;
+    success: boolean;
+  }[] = [];
   const updates = due.results.flatMap((row) => {
     const candles = candleSets[row.timeframe] ?? [];
     const candle = outcomeCandle(candles, Date.parse(row.target_at), now.getTime());
     if (!candle || !row.entry_price) return [];
     const rawReturn = ((candle.close / row.entry_price) - 1) * 100;
     const directionalReturn = row.direction === "BULLISH" ? rawReturn : -rawReturn;
+    audits.push({
+      eventKey: `outcome:${row.id}`,
+      symbol,
+      timeframe: row.timeframe,
+      targetAt: row.target_at,
+      price: candle.close,
+      directionalReturn,
+      success: directionalReturn > 0,
+    });
     return [db.prepare(
       `UPDATE brain_observations
        SET outcome_price = ?1, directional_return = ?2, success = ?3, evaluated_at = ?4
@@ -269,6 +295,22 @@ async function evaluateDueObservations(
     )];
   });
   if (updates.length) await db.batch(updates);
+  for (const audit of audits) {
+    await appendBrainAuditEvent(db, {
+      eventKey: audit.eventKey,
+      eventType: "MARKET_OUTCOME",
+      symbol: audit.symbol,
+      timeframe: audit.timeframe,
+      source: "Binance klines · vela cerrada posterior",
+      observedAt: now.toISOString(),
+      payload: {
+        targetAt: audit.targetAt,
+        outcomePrice: audit.price,
+        directionalReturn: audit.directionalReturn,
+        success: audit.success,
+      },
+    });
+  }
 }
 
 async function loadCalibration(db: D1Database, timeframe: BrainTimeframe) {
@@ -332,6 +374,23 @@ async function rememberObservation(
     now.toISOString(),
     targetAt,
   ).run();
+  await appendBrainAuditEvent(db, {
+    eventKey: `observation:${id}`,
+    eventType: "MARKET_OBSERVATION",
+    symbol,
+    timeframe,
+    source: "Binance Spot/Futures · snapshot validado",
+    observedAt: now.toISOString(),
+    payload: {
+      direction,
+      entryPrice,
+      rawConfidence,
+      calibratedConfidence: confidence,
+      horizonMinutes,
+      targetAt,
+      features,
+    },
+  });
 }
 
 async function learn(
@@ -342,7 +401,11 @@ async function learn(
   candleSets: Record<BrainTimeframe, Candle[]>,
   derivatives: DerivativesSnapshot,
   now: Date,
-): Promise<{ learning: BrainLearning; confidence: number }> {
+): Promise<{
+  learning: BrainLearning;
+  confidence: number;
+  security: Awaited<ReturnType<typeof readBrainSecurity>>;
+}> {
   if (!env.DB) {
     return {
       learning: {
@@ -355,10 +418,12 @@ async function learn(
         methodology: "Calibración walk-forward sin usar información futura.",
       },
       confidence: rawConfidence,
+      security: unavailableBrainSecurity(),
     };
   }
   try {
     await ensureBrainSchema(env.DB);
+    await registerBrainManifest(env.DB, now.toISOString());
     await evaluateDueObservations(env.DB, symbol, candleSets, now);
     const stats = await loadCalibration(env.DB, timeframe);
     const confidence = calibratedConfidence(rawConfidence, stats);
@@ -382,6 +447,7 @@ async function learn(
         now,
       );
     }
+    const security = await readBrainSecurity(env.DB);
     return {
       learning: {
         status: stats.samples >= MINIMUM_CALIBRATION_SAMPLES ? "CALIBRADO" : "CALIBRANDO",
@@ -393,6 +459,7 @@ async function learn(
         methodology: "Observaciones registradas al cierre y evaluadas walk-forward al cumplirse el horizonte; sin look-ahead.",
       },
       confidence,
+      security,
     };
   } catch (error) {
     console.error("[ALT_RADAR_BRAIN_MEMORY]", error);
@@ -407,6 +474,7 @@ async function learn(
         methodology: "La lectura actual continúa, pero no se inventan métricas sin memoria persistente.",
       },
       confidence: rawConfidence,
+      security: unavailableBrainSecurity(),
     };
   }
 }
@@ -516,6 +584,7 @@ export async function POST(request: Request) {
       liquidationZones: theoreticalLiquidationZones(referencePrice),
       consensus: { ...consensusBase, calibratedConfidence: learned.confidence },
       learning: learned.learning,
+      security: learned.security,
       warnings,
     };
     return Response.json(payload, {

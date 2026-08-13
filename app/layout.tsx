@@ -8,6 +8,8 @@ import "./bookmap-timeframe.css";
 import "./bookmap-interactions.css";
 import "./bookmap-premium.css";
 import "./market-brain.css";
+import "./scalping-desk.css";
+import "./secure-brain.css";
 import PwaRegister from "./pwa-register";
 
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });

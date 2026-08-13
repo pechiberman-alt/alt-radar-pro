@@ -95,6 +95,8 @@ export type BrainLearning = {
   methodology: string;
 };
 
+export type BrainSecurity = import("./brain-security").BrainSecurityState;
+
 export type MarketBrainPayload = {
   ok: boolean;
   symbol: string;
@@ -114,6 +116,7 @@ export type MarketBrainPayload = {
   liquidationZones: LiquidationZone[];
   consensus: BrainConsensus;
   learning: BrainLearning;
+  security: BrainSecurity;
   warnings: string[];
 };
 

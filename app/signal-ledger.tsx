@@ -32,7 +32,7 @@ const emptyStats: LedgerPayload["stats"] = {
 const initialPayload: LedgerPayload = {
   records: [],
   stats: emptyStats,
-  automation: { lastRun: null, lastSummary: null, schedule: "Cada 15 minutos" },
+  automation: { lastRun: null, lastSummary: null, schedule: "Scalping cada 5 min · swing cada 15 min" },
 };
 
 const assetName = (symbol: string) => symbol.replace("USDT", "");
@@ -332,8 +332,8 @@ export default function SignalLedger({
           <b>{payload.automation.lastSummary?.universe ?? "—"} ACTIVOS</b>
         </div>
         <p>
-          Cloudflare ejecuta un ciclo cada 15 minutos y la PWA aporta el universo Binance cada
-          5 minutos mientras está abierta. Nunca completa resultados con datos futuros retroactivos.
+          Cloudflare revisa scalping cada 5 minutos y el modelo swing cada 15 minutos; la PWA
+          aporta el universo Binance mientras está abierta. Nunca completa resultados con datos futuros.
         </p>
       </div>
 

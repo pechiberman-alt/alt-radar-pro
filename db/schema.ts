@@ -95,6 +95,34 @@ export const brainObservations = sqliteTable(
   ],
 );
 
+export const brainSecurityEvents = sqliteTable(
+  "brain_security_events",
+  {
+    sequence: integer("sequence").primaryKey({ autoIncrement: true }),
+    eventKey: text("event_key").notNull().unique(),
+    eventType: text("event_type").notNull(),
+    symbol: text("symbol"),
+    timeframe: text("timeframe"),
+    source: text("source").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    previousHash: text("previous_hash").notNull().unique(),
+    chainHash: text("chain_hash").notNull().unique(),
+    observedAt: text("observed_at").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("brain_security_events_previous_idx").on(table.previousHash),
+    index("brain_security_events_time_idx").on(table.observedAt),
+    index("brain_security_events_symbol_idx").on(
+      table.symbol,
+      table.timeframe,
+      table.observedAt,
+    ),
+  ],
+);
+
 export const liquiditySnapshots = sqliteTable(
   "liquidity_snapshots",
   {

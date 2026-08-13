@@ -159,6 +159,16 @@ function buildAnswer(
     return `No puedo emitir análisis para ${brain.symbol}: DATA UNAVAILABLE. No completaré los valores faltantes con estimaciones. ${evidence}`;
   }
 
+  if (normalized.includes("memoria") || normalized.includes("aprend") || normalized.includes("segur") || normalized.includes("privacidad")) {
+    const hash = brain.security.latestHash ? `${brain.security.latestHash.slice(0, 12)}…` : "—";
+    return `El cerebro conserva ${brain.security.storedEvents} eventos de mercado en una cadena de integridad SHA-256 (${brain.security.status.toLowerCase()}, huella ${hash}). Aprende sólo al comparar una observación con el precio real posterior; no memoriza esta pregunta, conversaciones ni datos personales. La confianza no se recalibra hasta reunir ${brain.learning.minimumSamples} resultados evaluados y nunca usa información futura. ${evidence}`;
+  }
+
+  if (normalized.includes("scalp") || normalized.includes("entrada") || normalized.includes("stop") || normalized.includes("objetivo")) {
+    const aligned = brain.analyses["5m"]?.bias === brain.analyses["15m"]?.bias && brain.analyses["5m"]?.bias !== "NEUTRAL";
+    return `Lectura scalping: 5M ${brain.analyses["5m"] ? biasText(brain.analyses["5m"]!.bias).toLowerCase() : "DATA UNAVAILABLE"} y 15M ${brain.analyses["15m"] ? biasText(brain.analyses["15m"]!.bias).toLowerCase() : "DATA UNAVAILABLE"}. ${aligned ? "Los marcos están alineados, pero la entrada exige además volumen, spread, estructura y stop ATR válidos en el Modo Scalping." : "No hay alineación mínima 5M/15M; no corresponde fabricar una entrada."} Este analista no improvisa niveles: el panel Scalping calcula entrada, invalidación y objetivos únicamente con velas y estructura reales. ${evidence}`;
+  }
+
   if (normalized.includes("liquid") || /x(?:5|10|20|50|100)/.test(normalized)) {
     const requested = normalized.match(/x(5|10|20|50|100)/)?.[1];
     const zones = requested
@@ -301,6 +311,9 @@ export default function MarketBrain(props: MarketBrainProps) {
           <span className={brain?.learning.status === "CALIBRADO" ? "learned" : "learning"}>
             {brain?.learning.status ?? "CARGANDO MEMORIA"}
           </span>
+          <span className={brain?.security.chainVerified ? "verified" : "learning"}>
+            {brain?.security.chainVerified ? "SHA-256 VERIFIED" : "AUDITANDO"}
+          </span>
         </div>
       </header>
 
@@ -442,6 +455,20 @@ export default function MarketBrain(props: MarketBrainProps) {
               <div className="learning-progress"><i style={{ width: `${Math.min(100, ((brain?.learning.samples ?? 0) / (brain?.learning.minimumSamples ?? 20)) * 100)}%` }} /></div>
               <p>{brain?.learning.methodology ?? "La memoria se inicializa con observaciones reales."}</p>
               <small>No reescribe el pasado, no usa datos futuros y no inventa win rate. Mínimo {brain?.learning.minimumSamples ?? 20} resultados antes de mostrar rendimiento.</small>
+              <div className="secure-memory">
+                <div>
+                  <span>CEREBRO SEGURO · AUDIT LEDGER</span>
+                  <b className={brain?.security.chainVerified ? "positive" : "negative"}>{brain?.security.status ?? "MEMORIA NO DISPONIBLE"}</b>
+                </div>
+                <div className="secure-memory-stats">
+                  <span>EVENTOS <b>{brain?.security.storedEvents ?? 0}</b></span>
+                  <span>VERIFICADOS <b>{brain?.security.checkedEvents ?? 0}</b></span>
+                  <span>MODELO <b>{brain?.security.modelVersion ?? "—"}</b></span>
+                </div>
+                <code>{brain?.security.latestHash ? `${brain.security.latestHash.slice(0, 20)}…${brain.security.latestHash.slice(-8)}` : "HUELLA NO DISPONIBLE"}</code>
+                <p>{brain?.security.policy ?? "Sólo se guardan observaciones de mercado verificables."}</p>
+                <small>{brain?.security.privacy ?? "El chat no se guarda."}</small>
+              </div>
             </section>
 
             <section className="brain-chat">
@@ -452,12 +479,12 @@ export default function MarketBrain(props: MarketBrainProps) {
                 <small>Respuesta determinística generada con el snapshot actual; no envía el texto a servicios externos.</small>
               </div>
               <div className="quick-prompts">
-                {["Resumen 4H", "¿Long o short?", "Liquidaciones x20", "¿Cómo está altseason?"].map((prompt) => (
+                {["Resumen 4H", "¿Long o short?", "¿Hay scalp?", "¿Cómo aprende?", "Liquidaciones x20", "¿Cómo está altseason?"].map((prompt) => (
                   <button key={prompt} disabled={!brain} onClick={() => ask(prompt)}>{prompt}</button>
                 ))}
               </div>
               <form onSubmit={(event) => { event.preventDefault(); ask(); }}>
-                <input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Pregunta por momentum, riesgo, liquidaciones…" aria-label="Pregunta al analista local" />
+                <input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Pregunta por momentum, scalp, riesgo o memoria…" aria-label="Pregunta al analista local" />
                 <button disabled={!brain || !question.trim()}>ANALIZAR</button>
               </form>
             </section>

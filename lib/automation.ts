@@ -46,6 +46,7 @@ type StoredSignal = {
   symbol: string;
   side: "LONG" | "SHORT";
   signal: "SETUP" | "TRIGGER";
+  timeframe: string;
   entry_price: number;
   detected_at: string;
   price_5m: number | null;
@@ -188,6 +189,8 @@ async function loadBinanceMarket(): Promise<{ market: MarketAsset[]; source: str
     .map((row) => ({
       symbol: row.symbol,
       price: Number(row.lastPrice),
+      change5m: null,
+      change15m: null,
       change1h: null,
       change4h: null,
       change24h: Number(row.priceChangePercent),
@@ -203,7 +206,7 @@ async function loadBinanceMarket(): Promise<{ market: MarketAsset[]; source: str
     { length: Math.ceil(liquid.length / 60) },
     (_, index) => liquid.slice(index * 60, index * 60 + 60).map((asset) => asset.symbol),
   );
-  const loadWindow = async (windowSize: "1h" | "4h") => {
+  const loadWindow = async (windowSize: "5m" | "15m" | "1h" | "4h") => {
     const rows = (
       await Promise.all(
         chunks.map((symbols) => {
@@ -218,11 +221,15 @@ async function loadBinanceMarket(): Promise<{ market: MarketAsset[]; source: str
   };
 
   try {
-    const [hour, fourHours] = await Promise.all([loadWindow("1h"), loadWindow("4h")]);
+    const [fiveMinutes, fifteenMinutes, hour, fourHours] = await Promise.all([
+      loadWindow("5m"), loadWindow("15m"), loadWindow("1h"), loadWindow("4h"),
+    ]);
     return {
       source: `Binance Spot · ${new URL(base).host}`,
       market: market.map((asset) => ({
         ...asset,
+        change5m: fiveMinutes.get(asset.symbol) ?? null,
+        change15m: fifteenMinutes.get(asset.symbol) ?? null,
         change1h: hour.get(asset.symbol) ?? null,
         change4h: fourHours.get(asset.symbol) ?? null,
       })),
@@ -263,7 +270,7 @@ async function loadCoinLoreMarket(): Promise<{ market: MarketAsset[]; source: st
   return { market, source: "CoinLore Market · respaldo cloud" };
 }
 
-async function loadMarket() {
+export async function loadMarket() {
   try {
     return await loadBinanceMarket();
   } catch {
@@ -271,7 +278,7 @@ async function loadMarket() {
   }
 }
 
-async function loadRiskScore() {
+export async function loadRiskScore() {
   try {
     const intelligence = await loadGlobalNews();
     return globalRisk(intelligence.events);
@@ -280,7 +287,7 @@ async function loadRiskScore() {
   }
 }
 
-async function loadBtcDominance() {
+export async function loadBtcDominance() {
   try {
     const [global] = await fetchJson<{ btc_d?: string }[]>(
       "https://api.coinlore.net/api/global/",
@@ -298,14 +305,14 @@ function directionalReturn(side: "LONG" | "SHORT", entry: number, price: number)
   return side === "LONG" ? raw : -raw;
 }
 
-async function evaluateOpenSignals(
+export async function evaluateOpenSignals(
   db: D1Database,
   prices: Map<string, number>,
   now: Date,
 ) {
   const result = await db
     .prepare(
-      `SELECT id, symbol, side, signal, entry_price, detected_at,
+      `SELECT id, symbol, side, signal, timeframe, entry_price, detected_at,
         price_5m, price_15m, price_1h, price_4h, price_24h, max_move, min_move
       FROM signal_records
       WHERE status = 'MONITORING'
@@ -371,7 +378,9 @@ async function evaluateOpenSignals(
         capture24h ? timestamp : null,
         Math.max(record.max_move, movement),
         Math.min(record.min_move, movement),
-        capture24h ? "RESOLVED" : "MONITORING",
+        record.timeframe.startsWith("SCALP") && capture15m
+          ? "RESOLVED"
+          : capture24h ? "RESOLVED" : "MONITORING",
         timestamp,
         record.id,
       )

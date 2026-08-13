@@ -11,6 +11,7 @@ import {
 import { useDashboardSettings } from "./dashboard-settings";
 import LiveBookmap from "./live-bookmap";
 import SignalLedger from "./signal-ledger";
+import ScalpingDesk from "./scalping-desk";
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -60,6 +61,8 @@ async function loadDirectMarket(): Promise<RadarPayload> {
     quoteVolume: string;
     highPrice: string;
     lowPrice: string;
+    bidPrice: string;
+    askPrice: string;
   }[];
   const global = globalResponse.ok
     ? ((await globalResponse.json()) as { btc_d?: string; mcap_change?: string }[])
@@ -74,17 +77,27 @@ async function loadDirectMarket(): Promise<RadarPayload> {
         Number(row.lastPrice) > 0
       );
     })
-    .map((row) => ({
-      symbol: row.symbol,
-      price: Number(row.lastPrice),
-      change1h: null,
-      change4h: null,
-      change24h: Number(row.priceChangePercent),
-      volume: Number(row.volume),
-      quoteVolume: Number(row.quoteVolume),
-      high: Number(row.highPrice),
-      low: Number(row.lowPrice),
-    }))
+    .map((row) => {
+      const bidPrice = Number(row.bidPrice);
+      const askPrice = Number(row.askPrice);
+      const mid = (bidPrice + askPrice) / 2;
+      return {
+        symbol: row.symbol,
+        price: Number(row.lastPrice),
+        change5m: null,
+        change15m: null,
+        change1h: null,
+        change4h: null,
+        change24h: Number(row.priceChangePercent),
+        volume: Number(row.volume),
+        quoteVolume: Number(row.quoteVolume),
+        high: Number(row.highPrice),
+        low: Number(row.lowPrice),
+        bidPrice: bidPrice > 0 ? bidPrice : null,
+        askPrice: askPrice > 0 ? askPrice : null,
+        spreadPct: mid > 0 ? ((askPrice - bidPrice) / mid) * 100 : null,
+      };
+    })
     .sort((left, right) => right.quoteVolume - left.quoteVolume);
 
   return {
@@ -110,7 +123,7 @@ async function enrichTimeframes(payload: RadarPayload): Promise<RadarPayload> {
     { length: Math.ceil(candidates.length / 60) },
     (_, index) => candidates.slice(index * 60, index * 60 + 60),
   );
-  const loadWindow = async (windowSize: "1h" | "4h") => {
+  const loadWindow = async (windowSize: "5m" | "15m" | "1h" | "4h") => {
     const rows = (
       await Promise.all(
         chunks.map(async (symbols) => {
@@ -126,14 +139,18 @@ async function enrichTimeframes(payload: RadarPayload): Promise<RadarPayload> {
     return new Map(rows.map((row) => [row.symbol, Number(row.priceChangePercent)]));
   };
 
-  const [hour, fourHours] = await Promise.all([loadWindow("1h"), loadWindow("4h")]);
+  const [fiveMinutes, fifteenMinutes, hour, fourHours] = await Promise.all([
+    loadWindow("5m"), loadWindow("15m"), loadWindow("1h"), loadWindow("4h"),
+  ]);
   return {
     ...payload,
     timestamp: new Date().toISOString(),
-    sources: [...new Set([...payload.sources, "Binance Rolling Window 1H/4H"])],
+    sources: [...new Set([...payload.sources, "Binance Rolling Window 5M/15M/1H/4H"])],
     errors: payload.errors.filter((error) => !error.includes("multi-timeframe")),
     market: payload.market.map((asset) => ({
       ...asset,
+      change5m: fiveMinutes.get(asset.symbol) ?? asset.change5m ?? null,
+      change15m: fifteenMinutes.get(asset.symbol) ?? asset.change15m ?? null,
       change1h: hour.get(asset.symbol) ?? asset.change1h,
       change4h: fourHours.get(asset.symbol) ?? asset.change4h,
     })),
@@ -479,6 +496,7 @@ export default function RadarApp() {
           {[
             ["RESUMEN", "resumen"],
             ["ESCÁNER", "scanner"],
+            ["SCALPING", "scalping"],
             ["ORDER FLOW", "order-flow"],
             ["HISTORIAL", "historial"],
           ].map(([label, id]) => (
@@ -657,6 +675,14 @@ export default function RadarApp() {
             </div>
           )}
         </section>
+
+        <ScalpingDesk
+          market={data.market}
+          riskScore={risk.score}
+          killSwitch={risk.killSwitch}
+          altseasonScore={altseason.final}
+          minimumQuoteVolume={settings.minimumQuoteVolume}
+        />
 
         <div id="order-flow"><LiveBookmap
           symbols={data.market.map((asset) => asset.symbol)}

@@ -199,3 +199,30 @@ test("uses real 100-level depth and an unattended core liquidity archive", async
   assert.match(worker, /archiveCoreLiquidity/);
   assert.match(wrangler, /"\* \* \* \* \*"/);
 });
+
+test("adds secure market memory, a zero-token analyst and an independent scalping mode", async () => {
+  const [security, brainRoute, brainPanel, scalpEngine, scalpRoute, scalpPanel, worker, schema] = await Promise.all([
+    readFile(new URL("../lib/brain-security.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/brain/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/market-brain.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/scalping-engine.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/scalping/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/scalping-desk.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(security, /SHA-256/);
+  assert.match(security, /previous_hash TEXT NOT NULL UNIQUE/);
+  assert.match(security, /Las preguntas del analista no se guardan/);
+  assert.match(brainRoute, /appendBrainAuditEvent/);
+  assert.match(brainPanel, /CEREBRO SEGURO/);
+  assert.match(brainPanel, /¿Hay scalp\?/);
+  assert.match(scalpEngine, /Alineación real 5M \+ 15M/);
+  assert.match(scalpEngine, /Anti-FOMO/);
+  assert.match(scalpRoute, /velas cerradas 5M\/15M/);
+  assert.match(scalpPanel, /Modo Scalping/);
+  assert.match(scalpPanel, /LOCAL · 0 TOKENS/);
+  assert.match(worker, /runScalpingAutomation/);
+  assert.match(schema, /brainSecurityEvents/);
+});

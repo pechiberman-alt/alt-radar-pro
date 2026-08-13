@@ -3,6 +3,7 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 import { runSignalAutomation } from "../lib/automation";
 import { archiveCoreLiquidity } from "../lib/liquidity-archive";
+import { runScalpingAutomation } from "../lib/scalping-automation";
 
 interface Env {
   ASSETS: Fetcher;
@@ -63,6 +64,14 @@ const worker = {
         runSignalAutomation(env.DB).catch((error) => {
           console.error("[ALT_RADAR_SCHEDULED]", error);
           // The next scheduled run retries automatically. No synthetic records are written.
+        }),
+      );
+    }
+    if (controller.cron === "*/5 * * * *") {
+      ctx.waitUntil(
+        runScalpingAutomation(env.DB).catch((error) => {
+          console.error("[ALT_RADAR_SCALPING_SCHEDULED]", error);
+          // No record is created when public market data is unavailable.
         }),
       );
     }

@@ -176,7 +176,7 @@ async function readLedger(): Promise<LedgerPayload> {
     automation: {
       lastRun: lastRun?.value ?? null,
       lastSummary: summary,
-      schedule: "Cada 15 minutos",
+      schedule: "Scalping cada 5 min · swing cada 15 min",
     },
   };
 }
