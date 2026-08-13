@@ -33,6 +33,14 @@ const STABLE_BASES = new Set([
   "BRL",
 ]);
 
+const NAV_ITEMS = [
+  { label: "RESUMEN", mobile: "INICIO", icon: "⌂", id: "resumen" },
+  { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
+  { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
+  { label: "ORDER FLOW", mobile: "MAPA", icon: "▦", id: "order-flow" },
+  { label: "HISTORIAL", mobile: "DATOS", icon: "≡", id: "historial" },
+] as const;
+
 const formatPrice = (value: number) =>
   value >= 1000
     ? `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
@@ -425,6 +433,26 @@ export default function RadarApp() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  useEffect(() => {
+    if (loading) return;
+    const sections = NAV_ITEMS.map((item) => ({
+      item,
+      element: document.getElementById(item.id),
+    })).filter((entry) => entry.element !== null);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+        const match = sections.find((entry) => entry.element === visible?.target);
+        if (match) setTab(match.item.label);
+      },
+      { rootMargin: "-18% 0px -18% 0px", threshold: [0, 0.12, 0.35] },
+    );
+    sections.forEach(({ element }) => element && observer.observe(element));
+    return () => observer.disconnect();
+  }, [loading]);
+
   const risk = useMemo(() => globalRisk(data?.news ?? []), [data]);
   const altseason = useMemo(
     () => altseasonScore(data?.market ?? [], data?.dominance.btc ?? null, risk.score),
@@ -484,7 +512,7 @@ export default function RadarApp() {
 
   return (
     <main>
-      <header>
+      <header className="app-header">
         <div className="brand">
           <div className="brand-mark"><i /><i /><i /></div>
           <div>
@@ -492,14 +520,8 @@ export default function RadarApp() {
             <small>INTELIGENCIA DE MERCADO CRIPTO</small>
           </div>
         </div>
-        <nav aria-label="Navegación principal">
-          {[
-            ["RESUMEN", "resumen"],
-            ["ESCÁNER", "scanner"],
-            ["SCALPING", "scalping"],
-            ["ORDER FLOW", "order-flow"],
-            ["HISTORIAL", "historial"],
-          ].map(([label, id]) => (
+        <nav className="desktop-nav" aria-label="Navegación principal">
+          {NAV_ITEMS.map(({ label, id }) => (
             <button
               key={label}
               className={tab === label ? "active" : ""}
@@ -801,6 +823,21 @@ export default function RadarApp() {
           risk={risk.score}
         />
       )}
+
+      <nav className="mobile-nav" aria-label="Navegación móvil">
+        {NAV_ITEMS.map(({ label, mobile, icon, id }) => (
+          <button
+            key={label}
+            className={tab === label ? "active" : ""}
+            aria-current={tab === label ? "page" : undefined}
+            aria-label={label}
+            onClick={() => scrollTo(label, id)}
+          >
+            <span aria-hidden="true">{icon}</span>
+            <small>{mobile}</small>
+          </button>
+        ))}
+      </nav>
     </main>
   );
 }

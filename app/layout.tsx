@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./component-header-reset.css";
 import "./open-heatmap.css";
 import "./premium.css";
 import "./bookmap-pro.css";
@@ -10,6 +11,7 @@ import "./bookmap-premium.css";
 import "./market-brain.css";
 import "./scalping-desk.css";
 import "./secure-brain.css";
+import "./mobile-pro.css";
 import PwaRegister from "./pwa-register";
 
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });

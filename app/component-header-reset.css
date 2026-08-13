@@ -1,0 +1,15 @@
+/* Keep the application chrome rule from leaking into semantic headers inside widgets. */
+header:not(.app-header) {
+  position: relative;
+  top: auto;
+  z-index: auto;
+  width: auto;
+  height: auto !important;
+  min-height: 0;
+  padding: 0 !important;
+  border-bottom: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  touch-action: auto;
+}
