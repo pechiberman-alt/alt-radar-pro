@@ -666,6 +666,7 @@ export default function RadarApp() {
             adjustment: altseason.adjustment,
             state: altseason.state,
           }}
+          news={data.news}
         /></div>
 
         <section className="lower-grid" id="scanner">

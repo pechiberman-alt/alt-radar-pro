@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BrainTimeframe } from "@/lib/market-brain";
+import type { DerivativesSnapshot } from "@/lib/market-brain";
 import type { LiquiditySnapshot } from "@/lib/liquidity-history";
+import type { NewsEvent } from "@/lib/radar";
 import BookmapTimeframeChart from "./bookmap-timeframe-chart";
 import MarketBrain from "./market-brain";
 
@@ -108,6 +110,20 @@ type ChartGesture =
       startTimeZoom: number;
       startPriceZoom: number;
     };
+type IntelligencePanel = "liquidations" | "open-interest" | "funding" | "volume" | "news";
+
+const EMPTY_DERIVATIVES: DerivativesSnapshot = {
+  available: false,
+  markPrice: null,
+  openInterest: null,
+  openInterestUsd: null,
+  openInterestChangePct: null,
+  fundingRatePct: null,
+  nextFundingAt: null,
+  takerBuySellRatio: null,
+  longShortAccountRatio: null,
+  source: "Binance Futures public API",
+};
 
 const EMPTY_METRICS: Metrics = {
   levels: 0,
@@ -238,9 +254,11 @@ function depthWithCumulative(levels: Level[]) {
 export default function LiveBookmap({
   symbols,
   altseason,
+  news,
 }: {
   symbols: string[];
   altseason: AltseasonContext;
+  news: NewsEvent[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const framesRef = useRef<Frame[]>([]);
@@ -264,7 +282,7 @@ export default function LiveBookmap({
   });
 
   const [symbol, setSymbol] = useState("BTCUSDT");
-  const [venue, setVenue] = useState<"spot" | "futures">("spot");
+  const [venue, setVenue] = useState<"spot" | "futures">("futures");
   const [futuresSymbols, setFuturesSymbols] = useState<string[]>([]);
   const [status, setStatus] = useState<"conectando" | "en vivo" | "no disponible">(
     "conectando",
@@ -303,11 +321,43 @@ export default function LiveBookmap({
   const [panOffset, setPanOffset] = useState(0);
   const [pricePan, setPricePan] = useState(0);
   const [draggingChart, setDraggingChart] = useState(false);
+  const [derivatives, setDerivatives] = useState<DerivativesSnapshot>(EMPTY_DERIVATIVES);
+  const [intelligencePanel, setIntelligencePanel] = useState<IntelligencePanel>("liquidations");
+  const [fullscreenMap, setFullscreenMap] = useState(false);
 
 
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
+
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    const load = async (quiet = false) => {
+      try {
+        const brainResponse = await fetch("/api/brain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol, venue, timeframe: marketTimeframe }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const brain = await brainResponse.json() as { derivatives?: DerivativesSnapshot };
+        if (!alive) return;
+        setDerivatives(brainResponse.ok && brain.derivatives ? brain.derivatives : EMPTY_DERIVATIVES);
+      } catch {
+        if (!alive || controller.signal.aborted) return;
+        if (!quiet) setDerivatives(EMPTY_DERIVATIVES);
+      }
+    };
+    void load();
+    const refresh = window.setInterval(() => void load(true), 45_000);
+    return () => {
+      alive = false;
+      controller.abort();
+      window.clearInterval(refresh);
+    };
+  }, [symbol, venue, marketTimeframe]);
 
   useEffect(() => {
     let alive = true;
@@ -1623,7 +1673,52 @@ export default function LiveBookmap({
         LIQUIDEZ OBSERVADA {LIQUIDITY_FRAME_LABEL[marketTimeframe]} + MICROESTRUCTURA EN VIVO
       </div>
 
-      <div className="professional-map advanced-map">
+      <section className={`bookmap-premium-shell ${fullscreenMap ? "fullscreen" : ""}`}>
+        <header className="bookmap-premium-head">
+          <div className="bookmap-product-title">
+            <i><span /><span /><span /></i>
+            <div><b>{base(symbol)} Heatmap</b><small>ALT RADAR · LIQUIDEZ REAL</small></div>
+          </div>
+          <div className="bookmap-quick-assets" aria-label="Mercados rápidos">
+            {(["BTCUSDT", "ETHUSDT", "SOLUSDT"] as const).map((asset) => (
+              <button
+                key={asset}
+                className={symbol === asset ? "active" : ""}
+                onClick={() => setSymbol(asset)}
+                disabled={!availableSymbols.includes(asset)}
+              >
+                {base(asset)}
+              </button>
+            ))}
+            <span>MKT</span>
+          </div>
+          <div className="bookmap-window-actions">
+            <button aria-label="Volver al mercado en vivo" onClick={followLive}>↻</button>
+            <button aria-label="Restablecer mapa" onClick={resetViewport}>⌁</button>
+            <button aria-label={fullscreenMap ? "Salir de pantalla completa" : "Abrir pantalla completa"} onClick={() => setFullscreenMap((value) => !value)}>{fullscreenMap ? "×" : "⛶"}</button>
+          </div>
+        </header>
+        <div className="bookmap-market-strip">
+          <label htmlFor="premium-bookmap-symbol"><i /> MERCADO
+            <select id="premium-bookmap-symbol" value={symbol} onChange={(event) => setSymbol(event.target.value)}>
+              {availableSymbols.map((item) => <option value={item} key={item}>{base(item)}/USDT</option>)}
+            </select>
+          </label>
+          <div className="bookmap-strip-timeframes" role="tablist" aria-label="Temporalidad del heatmap">
+            {(Object.keys(LIQUIDITY_FRAME_LABEL) as BrainTimeframe[]).map((frame) => (
+              <button
+                key={`premium-${frame}`}
+                role="tab"
+                aria-selected={marketTimeframe === frame}
+                className={marketTimeframe === frame ? "active" : ""}
+                onClick={() => setMarketTimeframe(frame)}
+              >{LIQUIDITY_FRAME_LABEL[frame]}</button>
+            ))}
+          </div>
+          <button className="bookmap-fullscreen-button" onClick={() => setFullscreenMap((value) => !value)}>{fullscreenMap ? "SALIR" : "PANTALLA COMPLETA"}</button>
+        </div>
+
+      <div className="professional-map advanced-map premium-map-grid">
         <div className={`chart-stage interactive-chart ${draggingChart ? "dragging" : ""}`}>
           <div className="chart-viewport-controls" role="toolbar" aria-label="Controles del mapa de liquidez">
             <div className="viewport-zoom-group">
@@ -1821,6 +1916,85 @@ export default function LiveBookmap({
           )}
         </aside>
       </div>
+
+        <section className="bookmap-intelligence-dock" aria-label="Datos agregados del mercado">
+          <div className="dock-tabs" role="tablist" aria-label="Paneles de datos">
+            {([
+              ["liquidations", "LIQUIDACIONES"],
+              ["open-interest", "OPEN INTEREST"],
+              ["funding", "FUNDING"],
+              ["volume", "VOLUMEN"],
+              ["news", "NOTICIAS"],
+            ] as [IntelligencePanel, string][]).map(([panel, label]) => (
+              <button
+                key={panel}
+                role="tab"
+                aria-selected={intelligencePanel === panel}
+                className={intelligencePanel === panel ? `active ${panel}` : panel}
+                onClick={() => setIntelligencePanel(panel)}
+              >
+                <i /> {label} <span>{intelligencePanel === panel ? "⌄" : "›"}</span>
+              </button>
+            ))}
+          </div>
+          <div className="dock-content">
+            {intelligencePanel === "liquidations" && (
+              <div className="dock-liquidations">
+                <header><span>MAYORES LIQUIDACIONES OBSERVADAS</span><small>BINANCE FUTURES · FORCE ORDER</small></header>
+                {venue !== "futures" ? (
+                  <p className="dock-unavailable">CAMBIA LA FUENTE A BINANCE FUTUROS PARA RECIBIR LIQUIDACIONES REALES</p>
+                ) : liquidations.length ? liquidations.slice(0, 5).map((item) => {
+                  const maxNotional = Math.max(...liquidations.map((entry) => entry.notional), 1);
+                  return (
+                    <div className={`dock-liquidation-row ${item.side.toLowerCase()}`} key={`dock-${item.time}-${item.price}`}>
+                      <b>{item.side === "LONG" ? "▼" : "▲"} {priceLabel(item.price)}</b>
+                      <span>{new Date(item.time).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" })}</span>
+                      <i><u style={{ width: `${(item.notional / maxNotional) * 100}%` }} /></i>
+                      <em>{usdLabel(item.notional)}</em>
+                      <small>{item.side === "LONG" ? "LONGS" : "SHORTS"}</small>
+                    </div>
+                  );
+                }) : <p className="dock-unavailable">SIN LIQUIDACIONES RECIBIDAS EN LA VENTANA ACTUAL</p>}
+              </div>
+            )}
+            {intelligencePanel === "open-interest" && (
+              <div className="dock-metric-grid">
+                <div><span>OPEN INTEREST</span><b>{derivatives.openInterestUsd === null ? "DATA UNAVAILABLE" : usdLabel(derivatives.openInterestUsd)}</b></div>
+                <div><span>CAMBIO {LIQUIDITY_FRAME_LABEL[marketTimeframe]}</span><b className={(derivatives.openInterestChangePct ?? 0) >= 0 ? "positive" : "negative"}>{derivatives.openInterestChangePct === null ? "—" : signed(derivatives.openInterestChangePct, 2)}</b></div>
+                <div><span>MARK PRICE</span><b>{derivatives.markPrice === null ? "—" : priceLabel(derivatives.markPrice)}</b></div>
+                <small>{derivatives.available ? derivatives.source : "Binance Futures public API · DATA UNAVAILABLE"}</small>
+              </div>
+            )}
+            {intelligencePanel === "funding" && (
+              <div className="dock-metric-grid">
+                <div><span>FUNDING ACTUAL</span><b className={(derivatives.fundingRatePct ?? 0) > 0.04 ? "negative" : "positive"}>{derivatives.fundingRatePct === null ? "DATA UNAVAILABLE" : `${derivatives.fundingRatePct.toFixed(4)}%`}</b></div>
+                <div><span>TAKER BUY/SELL</span><b>{derivatives.takerBuySellRatio === null ? "—" : `${derivatives.takerBuySellRatio.toFixed(3)}×`}</b></div>
+                <div><span>LONG/SHORT</span><b>{derivatives.longShortAccountRatio === null ? "—" : `${derivatives.longShortAccountRatio.toFixed(3)}×`}</b></div>
+                <small>Funding y ratios reales cuando Binance Futures los entrega.</small>
+              </div>
+            )}
+            {intelligencePanel === "volume" && (
+              <div className="dock-metric-grid">
+                <div><span>COMPRA AGRESIVA</span><b className="positive">{usdLabel(metrics.buyNotional)}</b></div>
+                <div><span>VENTA AGRESIVA</span><b className="negative">{usdLabel(metrics.sellNotional)}</b></div>
+                <div><span>DELTA EJECUTADO</span><b className={delta >= 0 ? "positive" : "negative"}>{signed(delta)}</b></div>
+                <small>{metrics.trades} ejecuciones WebSocket observadas desde {started || "—"}.</small>
+              </div>
+            )}
+            {intelligencePanel === "news" && (
+              <div className="dock-news-list">
+                {news.length ? news.slice(0, 5).map((item) => (
+                  <a href={item.url} target="_blank" rel="noreferrer" key={`dock-news-${item.id}`}>
+                    <time>{new Date(item.publishedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+                    <div><b>{item.title}</b><small>{item.source} · {item.status}</small></div>
+                    <span className={item.risk >= 70 ? "hot" : ""}>R {item.risk}</span>
+                  </a>
+                )) : <p className="dock-unavailable">NOTICIAS HIGH/CRITICAL NO DISPONIBLES</p>}
+              </div>
+            )}
+          </div>
+        </section>
+      </section>
 
       <section className="microstructure-grid">
         <article className="micro-card wall-monitor">

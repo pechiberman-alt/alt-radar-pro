@@ -6,6 +6,7 @@ import "./premium.css";
 import "./bookmap-pro.css";
 import "./bookmap-timeframe.css";
 import "./bookmap-interactions.css";
+import "./bookmap-premium.css";
 import "./market-brain.css";
 import PwaRegister from "./pwa-register";
 

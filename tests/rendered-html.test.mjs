@@ -156,3 +156,24 @@ test("adds a numeric real-trade footprint and an interactive liquidity viewport"
   assert.match(interactionCss, /chart-footprint-numbers/);
   assert.match(layout, /bookmap-interactions\.css/);
 });
+
+test("matches the premium heatmap reference with real expandable market context", async () => {
+  const [bookmap, premiumCss, radar, layout] = await Promise.all([
+    readFile(new URL("../app/live-bookmap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/bookmap-premium.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/radar-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(bookmap, /bookmap-premium-shell/);
+  assert.match(bookmap, /PANTALLA COMPLETA/);
+  assert.match(bookmap, /OPEN INTEREST/);
+  assert.match(bookmap, /FUNDING/);
+  assert.match(bookmap, /MAYORES LIQUIDACIONES OBSERVADAS/);
+  assert.match(bookmap, /Binance Futures public API · DATA UNAVAILABLE/);
+  assert.match(bookmap, /news\.slice\(0, 5\)/);
+  assert.match(radar, /news=\{data\.news\}/);
+  assert.match(premiumCss, /dock-tabs/);
+  assert.match(premiumCss, /bookmap-premium-shell\.fullscreen/);
+  assert.match(layout, /bookmap-premium\.css/);
+});
