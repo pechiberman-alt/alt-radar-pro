@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { runSignalAutomation } from "../lib/automation";
+import { archiveCoreLiquidity } from "../lib/liquidity-archive";
 
 interface Env {
   ASSETS: Fetcher;
@@ -45,17 +46,26 @@ const worker = {
   },
 
   async scheduled(
-    _controller: { scheduledTime: number; cron: string },
+    controller: { scheduledTime: number; cron: string },
     env: Env,
     ctx: ExecutionContext,
   ): Promise<void> {
     if (!env.DB) return;
-    ctx.waitUntil(
-      runSignalAutomation(env.DB).catch((error) => {
-        console.error("[ALT_RADAR_SCHEDULED]", error);
-        // The next scheduled run retries automatically. No synthetic records are written.
-      }),
-    );
+    if (controller.cron === "* * * * *") {
+      ctx.waitUntil(
+        archiveCoreLiquidity(env.DB).catch((error) => {
+          console.error("[ALT_RADAR_LIQUIDITY_SCHEDULED]", error);
+        }),
+      );
+    }
+    if (controller.cron === "*/15 * * * *") {
+      ctx.waitUntil(
+        runSignalAutomation(env.DB).catch((error) => {
+          console.error("[ALT_RADAR_SCHEDULED]", error);
+          // The next scheduled run retries automatically. No synthetic records are written.
+        }),
+      );
+    }
   },
 };
 

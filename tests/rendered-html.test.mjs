@@ -177,3 +177,25 @@ test("matches the premium heatmap reference with real expandable market context"
   assert.match(premiumCss, /bookmap-premium-shell\.fullscreen/);
   assert.match(layout, /bookmap-premium\.css/);
 });
+
+test("uses real 100-level depth and an unattended core liquidity archive", async () => {
+  const [bookmap, orderbook, history, archive, worker, wrangler] = await Promise.all([
+    readFile(new URL("../app/live-bookmap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/orderbook/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/liquidity-history.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/liquidity-archive.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.production.jsonc", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(bookmap, /compositeBook/);
+  assert.match(bookmap, /100 NIVELES REALES/);
+  assert.match(bookmap, /streamDepth/);
+  assert.match(bookmap, /forwardFillLiquidity/);
+  assert.match(orderbook, /fapi\.binance\.com\/fapi\/v1\/depth/);
+  assert.match(orderbook, /payload\.bids \?\? payload\.b/);
+  assert.match(history, /MAX_LEVELS = 100/);
+  assert.match(archive, /archiveCoreLiquidity/);
+  assert.match(worker, /archiveCoreLiquidity/);
+  assert.match(wrangler, /"\* \* \* \* \*"/);
+});

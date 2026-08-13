@@ -22,7 +22,7 @@ type SnapshotRow = {
   source: string;
 };
 
-const MAX_LEVELS = 20;
+const MAX_LEVELS = 100;
 const MAX_BODY_BYTES = 48_000;
 
 export async function ensureLiquiditySchema(db: D1Database) {
@@ -117,6 +117,7 @@ export async function storeLiquiditySnapshot(
     mid: number;
     bids: unknown;
     asks: unknown;
+    source?: string;
   },
 ) {
   await ensureLiquiditySchema(db);
@@ -168,7 +169,8 @@ export async function storeLiquiditySnapshot(
       calculatedMid,
       JSON.stringify(bids),
       JSON.stringify(asks),
-      `Binance ${input.venue === "futures" ? "Futures" : "Spot"} WebSocket · navegador validado`,
+      input.source ??
+        `Binance ${input.venue === "futures" ? "Futures" : "Spot"} WebSocket · navegador validado`,
     ),
     db.prepare(
       `DELETE FROM liquidity_snapshots

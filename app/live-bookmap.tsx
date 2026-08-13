@@ -30,6 +30,7 @@ type Frame = {
   trades: Trade[];
   mid: number;
   time: number;
+  source?: "archive" | "live";
 };
 type Metrics = {
   levels: number;
@@ -93,6 +94,8 @@ type ViewState = {
   columnWidth: number;
   frames: Frame[];
   maxPanOffset: number;
+  observedStart: number;
+  observedEnd: number;
 };
 type ChartGesture =
   | {
@@ -157,6 +160,14 @@ const LIQUIDITY_FRAME_LABEL: Record<BrainTimeframe, string> = {
   "1d": "1D",
 };
 
+const HEATMAP_BUCKETS: Record<BrainTimeframe, number> = {
+  "5m": 96,
+  "15m": 120,
+  "1h": 160,
+  "4h": 220,
+  "1d": 300,
+};
+
 const base = (symbol: string) => symbol.replace("USDT", "");
 const clamp = (value: number, min = 0, max = 100) =>
   Math.max(min, Math.min(max, value));
@@ -186,6 +197,27 @@ function percentile(values: number[], quantile: number) {
   const sorted = [...values].sort((left, right) => left - right);
   const index = Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * quantile)));
   return sorted[index];
+}
+
+function heatColor(intensity: number, alpha = 1) {
+  const stops = [
+    { at: 0, color: [4, 18, 34] },
+    { at: 0.16, color: [8, 51, 92] },
+    { at: 0.34, color: [8, 109, 139] },
+    { at: 0.52, color: [9, 175, 152] },
+    { at: 0.7, color: [96, 210, 93] },
+    { at: 0.86, color: [226, 225, 53] },
+    { at: 1, color: [255, 101, 34] },
+  ];
+  const value = clamp(intensity, 0, 1);
+  const upper = stops.find((stop) => stop.at >= value) ?? stops.at(-1)!;
+  const lower = [...stops].reverse().find((stop) => stop.at <= value) ?? stops[0];
+  const span = Math.max(upper.at - lower.at, Number.EPSILON);
+  const mix = (value - lower.at) / span;
+  const rgb = lower.color.map((channel, index) =>
+    Math.round(channel + (upper.color[index] - channel) * mix),
+  );
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
 }
 
 function currentWalls(
@@ -251,6 +283,75 @@ function depthWithCumulative(levels: Level[]) {
   });
 }
 
+function compositeBook(
+  live: { bids: Level[]; asks: Level[] },
+  deep: { bids: Level[]; asks: Level[] },
+  limit: number,
+) {
+  if (!deep.bids.length || !deep.asks.length) {
+    return {
+      bids: live.bids.slice(0, limit),
+      asks: live.asks.slice(0, limit),
+    };
+  }
+  if (!live.bids.length || !live.asks.length) {
+    return {
+      bids: deep.bids.slice(0, limit),
+      asks: deep.asks.slice(0, limit),
+    };
+  }
+  const liveBidFloor = live.bids.at(-1)![0];
+  const liveAskCeiling = live.asks.at(-1)![0];
+  return {
+    bids: [
+      ...live.bids,
+      ...deep.bids.filter(([price]) => price < liveBidFloor),
+    ].sort((left, right) => right[0] - left[0]).slice(0, limit),
+    asks: [
+      ...live.asks,
+      ...deep.asks.filter(([price]) => price > liveAskCeiling),
+    ].sort((left, right) => left[0] - right[0]).slice(0, limit),
+  };
+}
+
+function displayFrames(frames: Frame[], maximum = 360) {
+  if (frames.length <= maximum) return frames;
+  const step = frames.length / maximum;
+  const reduced: Frame[] = [];
+  for (let index = 0; index < maximum; index += 1) {
+    const from = Math.floor(index * step);
+    const to = Math.max(from + 1, Math.floor((index + 1) * step));
+    const group = frames.slice(from, to);
+    const last = group.at(-1)!;
+    reduced.push({
+      ...last,
+      trades: group.flatMap((frame) => frame.trades),
+    });
+  }
+  return reduced;
+}
+
+function forwardFillLiquidity(columns: Float64Array[], times: number[], maximumGap: number) {
+  if (!columns.length) return columns;
+  const persisted: Float64Array[] = [];
+  columns.forEach((column, index) => {
+    if (!index) {
+      persisted.push(column);
+      return;
+    }
+    const elapsed = Math.max(0, times[index] - times[index - 1]);
+    const previous = persisted[index - 1];
+    persisted.push(
+      elapsed > maximumGap
+        ? column
+        : Float64Array.from(column, (value, row) =>
+            value > 0 ? value : previous[row] * 0.985,
+          ),
+    );
+  });
+  return persisted;
+}
+
 export default function LiveBookmap({
   symbols,
   altseason,
@@ -263,6 +364,7 @@ export default function LiveBookmap({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const framesRef = useRef<Frame[]>([]);
   const bookRef = useRef<{ bids: Level[]; asks: Level[] }>({ bids: [], asks: [] });
+  const deepBookRef = useRef<{ bids: Level[]; asks: Level[] }>({ bids: [], asks: [] });
   const pendingTradesRef = useRef<Trade[]>([]);
   const tapeRef = useRef<Trade[]>([]);
   const cvdRef = useRef<{ time: number; value: number }[]>([]);
@@ -303,16 +405,22 @@ export default function LiveBookmap({
   const [walls, setWalls] = useState<Wall[]>([]);
   const [hover, setHover] = useState<HoverPoint | null>(null);
   const [sampleMs, setSampleMs] = useState(500);
-  const [depth, setDepth] = useState(20);
-  const [historySize, setHistorySize] = useState(180);
+  const [depth, setDepth] = useState(100);
+  const [historySize, setHistorySize] = useState(600);
   const [rangePct, setRangePct] = useState<"auto" | number>("auto");
   const [scale, setScale] = useState<"log" | "linear">("log");
-  const [showTrades, setShowTrades] = useState(true);
-  const [showCvd, setShowCvd] = useState(true);
+  const [showTrades, setShowTrades] = useState(false);
+  const [showCvd, setShowCvd] = useState(false);
   const [showWalls, setShowWalls] = useState(true);
-  const [showFootprintNumbers, setShowFootprintNumbers] = useState(true);
+  const [showFootprintNumbers, setShowFootprintNumbers] = useState(false);
+  const [showMarketSidebar, setShowMarketSidebar] = useState(false);
   const [sidePanel, setSidePanel] = useState<"dom" | "tape" | "alerts">("dom");
-  const [marketTimeframe, setMarketTimeframe] = useState<BrainTimeframe>("4h");
+  const [marketTimeframe, setMarketTimeframe] = useState<BrainTimeframe>("5m");
+  const [deepFeed, setDeepFeed] = useState<{
+    status: "loading" | "live" | "unavailable";
+    source: string | null;
+    updatedAt: number | null;
+  }>({ status: "loading", source: null, updatedAt: null });
   const [liquidityHistory, setLiquidityHistory] = useState<Frame[]>([]);
   const [liquidityCoverage, setLiquidityCoverage] = useState({ minutes: 0, samples: 0 });
   const [liquidityArchiveStatus, setLiquidityArchiveStatus] = useState<"loading" | "recording" | "unavailable">("loading");
@@ -382,6 +490,7 @@ export default function LiveBookmap({
             trades: [],
             mid: snapshot.mid,
             time: Date.parse(snapshot.capturedAt),
+            source: "archive" as const,
           }))
           .filter((frame) => Number.isFinite(frame.time) && frame.bids.length && frame.asks.length);
         setLiquidityHistory(frames);
@@ -407,7 +516,7 @@ export default function LiveBookmap({
   useEffect(() => {
     let stopped = false;
     const upload = async () => {
-      const book = bookRef.current;
+      const book = compositeBook(bookRef.current, deepBookRef.current, 100);
       if (
         stopped ||
         pausedRef.current ||
@@ -425,8 +534,8 @@ export default function LiveBookmap({
             venue,
             capturedAt: new Date().toISOString(),
             mid,
-            bids: book.bids.slice(0, 20),
-            asks: book.asks.slice(0, 20),
+            bids: book.bids.slice(0, 100),
+            asks: book.asks.slice(0, 100),
           }),
         });
         if (response.ok && !stopped) setLiquidityArchiveStatus("recording");
@@ -442,6 +551,54 @@ export default function LiveBookmap({
       window.clearInterval(interval);
     };
   }, [symbol, venue, status]);
+
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    const load = async (quiet = false) => {
+      if (!quiet) setDeepFeed({ status: "loading", source: null, updatedAt: null });
+      try {
+        const response = await fetch(
+          `/api/orderbook?symbol=${encodeURIComponent(symbol)}&venue=${venue}&limit=100`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (!response.ok) throw new Error("DEEP_BOOK_UNAVAILABLE");
+        const payload = await response.json() as {
+          bids?: (string | number)[][];
+          asks?: (string | number)[][];
+          source?: string;
+        };
+        const parse = (levels: (string | number)[][] | undefined, side: "bid" | "ask") =>
+          (levels ?? [])
+            .map((level) => [Number(level[0]), Number(level[1])] as Level)
+            .filter(([price, qty]) => price > 0 && qty > 0)
+            .sort((left, right) => side === "bid" ? right[0] - left[0] : left[0] - right[0])
+            .slice(0, 100);
+        const next = {
+          bids: parse(payload.bids, "bid"),
+          asks: parse(payload.asks, "ask"),
+        };
+        if (next.bids.length < 5 || next.asks.length < 5) throw new Error("EMPTY_DEEP_BOOK");
+        if (!alive) return;
+        deepBookRef.current = next;
+        setDeepFeed({
+          status: "live",
+          source: payload.source ?? `Binance ${venue === "futures" ? "Futures" : "Spot"} REST`,
+          updatedAt: Date.now(),
+        });
+      } catch {
+        if (!alive || controller.signal.aborted) return;
+        if (!quiet) setDeepFeed({ status: "unavailable", source: null, updatedAt: null });
+      }
+    };
+    void load();
+    const refresh = window.setInterval(() => void load(true), 2_500);
+    return () => {
+      alive = false;
+      controller.abort();
+      window.clearInterval(refresh);
+    };
+  }, [symbol, venue]);
 
   useEffect(() => {
     let alive = true;
@@ -464,6 +621,7 @@ export default function LiveBookmap({
   useEffect(() => {
     framesRef.current = [];
     bookRef.current = { bids: [], asks: [] };
+    deepBookRef.current = { bids: [], asks: [] };
     pendingTradesRef.current = [];
     tapeRef.current = [];
     cvdRef.current = [];
@@ -496,10 +654,11 @@ export default function LiveBookmap({
     let activeSocket: WebSocket | null = null;
     let failures = 0;
     const key = symbol.toLowerCase();
+    const streamDepth = depth <= 5 ? 5 : depth <= 10 ? 10 : 20;
 
     const connect = (host: string) => {
       if (closed) return;
-      const streams = `${key}@depth${depth}@100ms/${key}@${venue === "futures" ? "trade" : "aggTrade"}${venue === "futures" ? `/${key}@forceOrder` : ""}`;
+      const streams = `${key}@depth${streamDepth}@100ms/${key}@${venue === "futures" ? "trade" : "aggTrade"}${venue === "futures" ? `/${key}@forceOrder` : ""}`;
       const socket = new WebSocket(`${host}/stream?streams=${streams}`);
       activeSocket = socket;
       let receivedDepth = false;
@@ -652,7 +811,7 @@ export default function LiveBookmap({
 
     const capture = setInterval(() => {
       if (pausedRef.current) return;
-      const book = bookRef.current;
+      const book = compositeBook(bookRef.current, deepBookRef.current, depth);
       if (!book.bids.length || !book.asks.length) return;
 
       const trades = pendingTradesRef.current.splice(0);
@@ -666,6 +825,7 @@ export default function LiveBookmap({
         trades,
         mid,
         time: Date.now(),
+        source: "live",
       });
       if (framesRef.current.length > historySize) framesRef.current.shift();
 
@@ -836,6 +996,22 @@ export default function LiveBookmap({
         .sort((left, right) => left.time - right.time)
         .filter((frame, index, values) =>
           index === 0 || frame.time - values[index - 1].time >= 180,
+        )
+        .filter((frame, index, values) => {
+          if (!index) return true;
+          const previous = values[index - 1];
+          if (frame.time - previous.time > Math.max(sampleMs * 5, 12_000)) return true;
+          return Math.abs(frame.mid / previous.mid - 1) < 0.025;
+        })
+        .filter((frame, index, values) => {
+          if (!index || index === values.length - 1) return true;
+          const before = values[index - 1];
+          const after = values[index + 1];
+          const localReference = (before.mid + after.mid) / 2;
+          return Math.abs(frame.mid / localReference - 1) < 0.02;
+        })
+        .filter((frame) =>
+          Number.isFinite(frame.mid) && frame.mid > 0,
         );
       if (!allFrames.length) {
         context.fillStyle = "#718078";
@@ -852,14 +1028,25 @@ export default function LiveBookmap({
         return;
       }
 
-      const visibleCount = Math.min(
-        allFrames.length,
-        Math.max(12, Math.round(allFrames.length / timeZoom)),
-      );
-      const maxPanOffset = Math.max(0, allFrames.length - visibleCount);
+      const maxPanOffset = Math.max(0, allFrames.length - 2);
       const safePanOffset = Math.round(clamp(panOffset, 0, maxPanOffset));
-      const frameEnd = allFrames.length - safePanOffset;
-      const frames = allFrames.slice(Math.max(0, frameEnd - visibleCount), frameEnd);
+      const domainEnd = safePanOffset
+        ? allFrames[Math.max(0, allFrames.length - 1 - safePanOffset)].time
+        : Date.now();
+      const observedSpan = LIQUIDITY_WINDOW_MS[marketTimeframe] / timeZoom;
+      const observedStart = domainEnd - observedSpan;
+      const observedEnd = domainEnd;
+      const inDomain = allFrames.filter(
+        (frame) => frame.time >= observedStart && frame.time <= observedEnd,
+      );
+      const selectedFrames = inDomain.length
+        ? inDomain
+        : [allFrames[Math.max(0, allFrames.length - 1 - safePanOffset)]];
+      const medianMid = percentile(selectedFrames.map((frame) => frame.mid), 0.5);
+      const coherentFrames = selectedFrames.filter(
+        (frame) => Math.abs(frame.mid / medianMid - 1) < 0.025,
+      );
+      const frames = displayFrames(coherentFrames.length ? coherentFrames : selectedFrames);
 
       const latestMid = frames.at(-1)!.mid;
       const plotLeft = 0;
@@ -908,7 +1095,18 @@ export default function LiveBookmap({
 
       const y = (price: number) =>
         plotBottom - ((price - low) / (high - low)) * plotHeight;
-      const columnWidth = plotWidth / Math.max(frames.length, 1);
+      const xForTime = (time: number) =>
+        plotLeft + ((time - observedStart) / observedSpan) * plotWidth;
+      const medianSpacing = frames.length > 1
+        ? percentile(
+            frames.slice(1).map((frame, index) => frame.time - frames[index].time),
+            0.5,
+          )
+        : Math.min(observedSpan, sampleMs);
+      const columnWidth = Math.max(
+        1,
+        (medianSpacing / observedSpan) * plotWidth,
+      );
       viewRef.current = {
         low,
         high,
@@ -919,6 +1117,8 @@ export default function LiveBookmap({
         columnWidth,
         frames,
         maxPanOffset,
+        observedStart,
+        observedEnd,
       };
 
       context.fillStyle = "#07110e";
@@ -946,17 +1146,55 @@ export default function LiveBookmap({
         context.stroke();
       }
 
-      const visibleNotionals = frames.flatMap((frame) =>
-        [...frame.bids, ...frame.asks]
-          .filter(([price]) => price >= low && price <= high)
-          .map(([price, qty]) => price * qty),
-      );
-      const liquidityReference = Math.max(percentile(visibleNotionals, 0.95), 1);
       const tradePriceStep = Math.max(
         (high - low) / Math.max(plotHeight / 4, 1),
         Number.EPSILON,
       );
-      const plottedTrades = frames.flatMap((frame, index) => {
+      const priceBucketCount = Math.max(
+        56,
+        Math.min(HEATMAP_BUCKETS[marketTimeframe], Math.floor(plotHeight / 2)),
+      );
+      const heatRowHeight = plotHeight / priceBucketCount;
+      const heatPriceStep = (high - low) / priceBucketCount;
+      const rawHeatColumns = frames.map((frame) => {
+        const buckets = new Float64Array(priceBucketCount);
+        [...frame.bids, ...frame.asks].forEach(([price, qty]) => {
+          if (price < low || price > high) return;
+          const bucket = clamp(
+            Math.floor(((price - low) / (high - low)) * priceBucketCount),
+            0,
+            priceBucketCount - 1,
+          );
+          buckets[bucket] += price * qty;
+        });
+        return buckets;
+      });
+      const persistenceWindow = marketTimeframe === "5m"
+        ? 2_500
+        : marketTimeframe === "15m"
+          ? 6_000
+          : 80_000;
+      const heatColumns = forwardFillLiquidity(
+        rawHeatColumns,
+        frames.map((frame) => frame.time),
+        persistenceWindow,
+      );
+      const positiveHeatValues = heatColumns.flatMap((column) =>
+        [...column].filter((value) => value > 0),
+      );
+      const heatFloor = Math.max(percentile(positiveHeatValues, 0.18), 1);
+      const heatCeiling = Math.max(percentile(positiveHeatValues, 0.97), heatFloor * 1.01);
+      const persistenceAlpha = 0.2;
+      const smoothedHeat = heatColumns.map((column, index) => {
+        const previous = index ? heatColumns[index - 1] : column;
+        const next = index < heatColumns.length - 1 ? heatColumns[index + 1] : column;
+        return Float64Array.from(column, (value, row) =>
+          value * (1 - persistenceAlpha) +
+          previous[row] * (persistenceAlpha * 0.65) +
+          next[row] * (persistenceAlpha * 0.35),
+        );
+      });
+      const plottedTrades = frames.flatMap((frame) => {
         const grouped = new Map<string, Trade>();
         frame.trades.forEach((trade) => {
           if (trade.price < low || trade.price > high) return;
@@ -974,46 +1212,62 @@ export default function LiveBookmap({
             });
           }
         });
-        const x = plotRight - (frames.length - index) * columnWidth + columnWidth / 2;
+        const x = xForTime(frame.time);
         return [...grouped.values()].map((trade) => ({ ...trade, x }));
       });
       const tradeNotionals = plottedTrades.map((trade) => trade.notional);
       const tradeReference = Math.max(percentile(tradeNotionals, 0.94), 1);
       const largeTradeAt = percentile(tradeNotionals, 0.9);
 
-      frames.forEach((frame, index) => {
-        const x = plotRight - (frames.length - index) * columnWidth;
-        [...frame.bids, ...frame.asks].forEach(([price, qty]) => {
-          if (price < low || price > high) return;
-          const notional = price * qty;
-          const rawIntensity =
-            scale === "log"
-              ? Math.log1p(notional) / Math.log1p(liquidityReference)
-              : notional / liquidityReference;
-          const intensity = clamp(rawIntensity, 0, 1);
-          context.fillStyle =
-            intensity >= 0.88
-              ? `rgba(255, 75, 44, ${0.62 + intensity * 0.32})`
-              : intensity >= 0.63
-                ? `rgba(255, 214, 58, ${0.42 + intensity * 0.42})`
-                : intensity >= 0.36
-                  ? `rgba(25, 202, 190, ${0.25 + intensity * 0.45})`
-                  : `rgba(22, 91, 129, ${0.12 + intensity * 0.42})`;
-          context.fillRect(x, y(price) - 2.5, columnWidth + 1.1, 5);
+      const heatSpanLimit = marketTimeframe === "5m"
+        ? 2_000
+        : marketTimeframe === "15m"
+          ? 5_000
+          : marketTimeframe === "1h"
+            ? 75_000
+            : marketTimeframe === "4h"
+              ? 90_000
+              : 120_000;
+      smoothedHeat.forEach((column, index) => {
+        const frame = frames[index];
+        const x = xForTime(frame.time);
+        const nextFrame = frames[index + 1];
+        const observedColumnMs = nextFrame
+          ? Math.min(nextFrame.time - frame.time, heatSpanLimit)
+          : Math.min(medianSpacing, heatSpanLimit);
+        const heatColumnWidth = Math.max(
+          1.5,
+          (observedColumnMs / observedSpan) * plotWidth + 1.25,
+        );
+        column.forEach((notional, row) => {
+          if (notional <= 0) return;
+          const normalized = scale === "log"
+            ? (Math.log1p(notional) - Math.log1p(heatFloor)) /
+              Math.max(Math.log1p(heatCeiling) - Math.log1p(heatFloor), Number.EPSILON)
+            : (notional - heatFloor) / Math.max(heatCeiling - heatFloor, Number.EPSILON);
+          const intensity = clamp(normalized, 0, 1);
+          const price = low + (row + 0.5) * heatPriceStep;
+          context.fillStyle = heatColor(intensity, 0.2 + intensity * 0.76);
+          context.fillRect(
+            x,
+            y(price) - heatRowHeight * 0.62,
+            heatColumnWidth,
+            Math.max(1.25, heatRowHeight * 1.24),
+          );
         });
       });
 
       if (showTrades) {
         plottedTrades.forEach((trade) => {
           const radius = Math.min(
-            11.5,
-            2.1 + Math.sqrt(trade.notional / tradeReference) * 5.5,
+            7.2,
+            1.3 + Math.sqrt(trade.notional / tradeReference) * 3.1,
           );
           context.beginPath();
           context.arc(trade.x, y(trade.price), radius, 0, Math.PI * 2);
           context.fillStyle = trade.buyerMaker
-            ? "rgba(255, 73, 88, .86)"
-            : "rgba(42, 241, 150, .86)";
+            ? "rgba(255, 73, 88, .74)"
+            : "rgba(42, 241, 150, .74)";
           context.fill();
           if (tradeNotionals.length >= 10 && trade.notional >= largeTradeAt) {
             context.strokeStyle = "#fff1a6";
@@ -1042,16 +1296,24 @@ export default function LiveBookmap({
         });
       }
 
-      context.strokeStyle = "#eaf3ee";
-      context.lineWidth = 1.25;
+      context.save();
+      context.shadowBlur = 6;
+      context.shadowColor = "rgba(246, 211, 75, .48)";
+      context.strokeStyle = "#f2d34a";
+      context.lineWidth = 1.55;
       context.beginPath();
       frames.forEach((frame, index) => {
-        const x = plotRight - (frames.length - index) * columnWidth + columnWidth / 2;
+        const x = xForTime(frame.time);
         const yy = y(frame.mid);
-        if (index) context.lineTo(x, yy);
-        else context.moveTo(x, yy);
+        const previous = index ? frames[index - 1] : null;
+        if (previous && frame.time - previous.time <= heatSpanLimit * 1.5) {
+          context.lineTo(x, yy);
+        } else {
+          context.moveTo(x, yy);
+        }
       });
       context.stroke();
+      context.restore();
 
       const last = frames.at(-1)!;
       const lastY = clamp(y(last.mid), plotTop + 11, plotBottom - 11);
@@ -1071,7 +1333,7 @@ export default function LiveBookmap({
           frames.length - 1 - Math.round((index * (frames.length - 1)) / 3),
         );
         const frame = frames[frameIndex];
-        const x = plotRight - (frames.length - frameIndex) * columnWidth;
+        const x = xForTime(frame.time);
         context.fillText(
           marketTimeframe === "1d"
             ? new Date(frame.time).toLocaleString([], { day: "2-digit", hour: "2-digit", minute: "2-digit" })
@@ -1084,7 +1346,9 @@ export default function LiveBookmap({
       }
 
       if (showCvd) {
-        const cvd = cvdRef.current.slice(-historySize);
+          const cvd = cvdRef.current
+            .slice(-historySize)
+            .filter((item) => item.time >= observedStart && item.time <= observedEnd);
         if (cvd.length > 1) {
           const values = cvd.map((item) => item.value);
           const cvdMin = Math.min(...values, 0);
@@ -1111,7 +1375,7 @@ export default function LiveBookmap({
           context.lineWidth = 1.4;
           context.beginPath();
           cvd.forEach((item, index) => {
-            const x = plotRight - (cvd.length - index) * columnWidth;
+            const x = xForTime(item.time);
             const yy = cy(item.value);
             if (index) context.lineTo(x, yy);
             else context.moveTo(x, yy);
@@ -1140,6 +1404,13 @@ export default function LiveBookmap({
       context.font = "bold 10px monospace";
       context.textAlign = "left";
       context.fillText("ALT RADAR PRO · ORDER FLOW", 10, 13);
+      context.fillStyle = "rgba(118, 148, 165, .82)";
+      context.font = "7px monospace";
+      context.fillText(
+        `PROFUNDIDAD OBSERVADA · ${frames.filter((frame) => frame.source === "archive").length} ARCHIVO + ${frames.filter((frame) => frame.source === "live").length} LIVE`,
+        10,
+        28,
+      );
       animation = requestAnimationFrame(draw);
     };
 
@@ -1150,6 +1421,7 @@ export default function LiveBookmap({
     scale,
     rangePct,
     historySize,
+    sampleMs,
     showTrades,
     showCvd,
     showWalls,
@@ -1304,8 +1576,16 @@ export default function LiveBookmap({
       setHover(null);
       return;
     }
-    const frameOffset = Math.floor((view.plotRight - x) / view.columnWidth);
-    const frameIndex = Math.max(0, view.frames.length - 1 - frameOffset);
+    const pointerTime = view.observedStart +
+      ((x - view.plotLeft) / Math.max(view.plotRight - view.plotLeft, 1)) *
+        (view.observedEnd - view.observedStart);
+    const frameIndex = view.frames.reduce(
+      (nearestIndex, frame, index) =>
+        Math.abs(frame.time - pointerTime) < Math.abs(view.frames[nearestIndex].time - pointerTime)
+          ? index
+          : nearestIndex,
+      0,
+    );
     const frame = view.frames[frameIndex];
     const price =
       view.high - ((y - view.plotTop) / (view.plotBottom - view.plotTop)) *
@@ -1383,7 +1663,9 @@ export default function LiveBookmap({
     }
 
     if (gesture?.kind === "drag" && gesture.pointerId === event.pointerId) {
-      const horizontalFrames = (x - gesture.startX) / Math.max(view.columnWidth, 1);
+      const horizontalFrames =
+        ((x - gesture.startX) / Math.max(view.plotRight - view.plotLeft, 1)) *
+        view.frames.length;
       const verticalPrice =
         ((y - gesture.startY) / Math.max(view.plotBottom - view.plotTop, 1)) *
         (view.high - view.low);
@@ -1518,11 +1800,13 @@ export default function LiveBookmap({
             <option value="futures">Binance Futuros</option>
           </select>
         </label>
-        <label>PROFUNDIDAD
+        <label>PROFUNDIDAD REAL
           <select value={depth} onChange={(event) => setDepth(Number(event.target.value))}>
             <option value={5}>5 niveles</option>
             <option value={10}>10 niveles</option>
             <option value={20}>20 niveles</option>
+            <option value={50}>50 niveles</option>
+            <option value={100}>100 niveles</option>
           </select>
         </label>
         <label>MUESTREO
@@ -1534,9 +1818,9 @@ export default function LiveBookmap({
         </label>
         <label>VENTANA
           <select value={historySize} onChange={(event) => setHistorySize(Number(event.target.value))}>
-            <option value={100}>100 muestras</option>
-            <option value={180}>180 muestras</option>
-            <option value={240}>240 muestras</option>
+            <option value={300}>300 muestras</option>
+            <option value={600}>600 muestras</option>
+            <option value={1200}>1200 muestras</option>
           </select>
         </label>
         <label>RANGO PRECIO
@@ -1667,6 +1951,11 @@ export default function LiveBookmap({
           <span>{liquidityArchiveStatus === "recording" ? "ARCHIVO REAL ACTIVO" : liquidityArchiveStatus === "loading" ? "CARGANDO ARCHIVO" : "ARCHIVO NO DISPONIBLE"}</span>
           <small>{liquidityCoverage.samples} snapshots · {Math.round(liquidityCoverage.minutes)} min observados</small>
         </div>
+        <div className={`deep-liquidity-state ${deepFeed.status}`}>
+          <i />
+          <span>{deepFeed.status === "live" ? "100 NIVELES REALES" : deepFeed.status === "loading" ? "CARGANDO DEPTH" : "DEPTH AMPLIO NO DISPONIBLE"}</span>
+          <small>{deepFeed.source ?? "Binance público"}{deepFeed.updatedAt ? ` · ${new Date(deepFeed.updatedAt).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" })}` : ""}</small>
+        </div>
       </div>
 
       <div className="bookmap-live-divider">
@@ -1716,9 +2005,10 @@ export default function LiveBookmap({
             ))}
           </div>
           <button className="bookmap-fullscreen-button" onClick={() => setFullscreenMap((value) => !value)}>{fullscreenMap ? "SALIR" : "PANTALLA COMPLETA"}</button>
+          <button className={`bookmap-dom-button ${showMarketSidebar ? "active" : ""}`} onClick={() => setShowMarketSidebar((value) => !value)}>{showMarketSidebar ? "OCULTAR DOM" : "ABRIR DOM"}</button>
         </div>
 
-      <div className="professional-map advanced-map premium-map-grid">
+      <div className={`professional-map advanced-map premium-map-grid ${showMarketSidebar ? "sidebar-open" : ""}`}>
         <div className={`chart-stage interactive-chart ${draggingChart ? "dragging" : ""}`}>
           <div className="chart-viewport-controls" role="toolbar" aria-label="Controles del mapa de liquidez">
             <div className="viewport-zoom-group">
@@ -1769,8 +2059,8 @@ export default function LiveBookmap({
               ACUMULANDO {LIQUIDITY_FRAME_LABEL[marketTimeframe]} · DISPONIBLE {Math.round(liquidityCoverage.minutes)} MIN
             </div>
           )}
-          <div className="chart-legend-overlay">
-            <span>BAJA</span><i /><span>ALTA LIQUIDEZ</span>
+          <div className="chart-legend-overlay premium-heat-legend">
+            <b>INTENSIDAD</b><span>BAJA</span><i /><span>ALTA</span><em>ÓRDENES LÍMITE OBSERVADAS · NO ES LIQUIDACIÓN</em>
           </div>
           <div id="bookmap-gesture-help" className="chart-gesture-help">
             RUEDA: ZOOM TIEMPO · SHIFT+RUEDA: PRECIO · ARRASTRAR: MOVER · PINZA: ZOOM · DOBLE TOQUE: LIVE
@@ -1826,7 +2116,7 @@ export default function LiveBookmap({
           )}
         </div>
 
-        <aside className="market-sidebar pro-sidebar">
+        {showMarketSidebar && <aside className="market-sidebar pro-sidebar">
           <div className="sidebar-tabs" role="tablist" aria-label="Panel de microestructura">
             {(["dom", "tape", "alerts"] as const).map((panel) => (
               <button
@@ -1914,7 +2204,7 @@ export default function LiveBookmap({
               </div>
             </div>
           )}
-        </aside>
+        </aside>}
       </div>
 
         <section className="bookmap-intelligence-dock" aria-label="Datos agregados del mercado">
@@ -2064,7 +2354,7 @@ export default function LiveBookmap({
         <span><i className="sell" /> Venta agresiva</span>
         <span><i className="large-dot" /> Trade grande relativo</span>
         <small>
-          Binance {venue === "futures" ? "Futures" : "Spot"} WebSocket · profundidad 100 ms · trades reales · sin órdenes simuladas
+          Binance {venue === "futures" ? "Futures" : "Spot"} · top 20 WebSocket 100 ms + hasta 100 niveles REST 2.5 s · sin órdenes simuladas
         </small>
       </div>
 
