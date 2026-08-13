@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BRAIN_TIMEFRAMES,
   type BrainTimeframe,
@@ -34,6 +34,7 @@ type MarketBrainProps = {
   liveLiquidations: LiveLiquidation[];
   timeframe: BrainTimeframe;
   onTimeframeChange: (timeframe: BrainTimeframe) => void;
+  onDerivativesChange?: (derivatives: MarketBrainPayload["derivatives"]) => void;
 };
 
 type ChatEntry = { id: string; question: string; answer: string; at: string };
@@ -212,6 +213,11 @@ export default function MarketBrain(props: MarketBrainProps) {
   const [error, setError] = useState("");
   const [question, setQuestion] = useState("");
   const [chat, setChat] = useState<ChatEntry[]>([]);
+  const publishDerivatives = props.onDerivativesChange;
+  const publishBrainDerivatives = useCallback(
+    (payload: MarketBrainPayload) => publishDerivatives?.(payload.derivatives),
+    [publishDerivatives],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -248,6 +254,7 @@ export default function MarketBrain(props: MarketBrainProps) {
         if (!response.ok || !payload.selected) throw new Error(payload.error ?? "DATA UNAVAILABLE");
         if (!alive) return;
         setBrain(payload);
+        publishBrainDerivatives(payload);
         setError("");
         setStatus("ready");
       } catch (loadError) {
@@ -264,7 +271,7 @@ export default function MarketBrain(props: MarketBrainProps) {
       clearInterval(refresh);
       controller.abort();
     };
-  }, [props.symbol, props.venue, timeframe]);
+  }, [props.symbol, props.venue, publishBrainDerivatives, timeframe]);
 
   const defaultAnswer = useMemo(() => {
     if (!brain) return "Selecciona una temporalidad. El analista utilizará únicamente los datos reales disponibles.";

@@ -412,7 +412,9 @@ export function buildConsensus(
   ));
   const strong = alignmentPct >= 60 && Math.abs(score - 50) >= 14;
   const verdict = strong
-    ? "ALTA CONFLUENCIA"
+    ? bias === "BULLISH"
+      ? "VIGILANCIA ALCISTA"
+      : "VIGILANCIA BAJISTA"
     : bias === "BULLISH"
       ? "VIGILANCIA ALCISTA"
       : bias === "BEARISH"

@@ -77,7 +77,113 @@ test("wires real performance metrics and redundant global intelligence", async (
   assert.match(news, /Dow Jones World RSS/);
   assert.match(news, /BBC World RSS/);
   assert.match(news, /clusterEvents/);
+  assert.match(news, /COMMENTARY_TERMS/);
+  assert.match(news, /CONCRETE_EVENT_TERMS/);
   assert.match(radarRoute, /loadGlobalNews/);
+});
+
+test("does not let opinion headlines or unconfirmed events trigger market safety", async () => {
+  const [news, radar] = await Promise.all([
+    readFile(new URL("../lib/news-intelligence.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/radar.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(news, /commentary \|\| \(question && !concreteEvent\)/);
+  assert.match(news, /primary\.status === "CONFIRMED"/);
+  assert.match(radar, /event\.status !== "UNCONFIRMED"/);
+  assert.match(radar, /event\.tier <= 2 \|\| \(event\.sourceCount \?\? 1\) >= 2/);
+});
+
+test("filters commentary in executable geopolitical intelligence", async () => {
+  const suffix = `?case=${process.pid}-${Date.now()}`;
+  const [{ classifyNewsItems }, { globalRisk }] = await Promise.all([
+    import(new URL(`../lib/news-intelligence.ts${suffix}`, import.meta.url)),
+    import(new URL(`../lib/radar.ts${suffix}`, import.meta.url)),
+  ]);
+  const now = Date.parse("2026-08-13T17:00:00.000Z");
+  const events = classifyNewsItems([
+    {
+      title: "Opinion | Spain’s Migration Invasion Wasn’t Normal",
+      url: "https://example.com/opinion",
+      source: "Dow Jones",
+      publishedAt: new Date(now - 10 * 60_000).toISOString(),
+    },
+    {
+      title: "Major Russian grain export terminals hit in Ukraine Black Sea port attack",
+      url: "https://example.com/event",
+      source: "BBC",
+      publishedAt: new Date(now - 5 * 60_000).toISOString(),
+    },
+  ], now);
+
+  assert.equal(events.some((event) => event.url.endsWith("/opinion")), false);
+  assert.equal(events.some((event) => event.url.endsWith("/event")), true);
+  assert.equal(globalRisk([{
+    id: "rumor",
+    title: "Unconfirmed social media claim",
+    url: "https://example.com/rumor",
+    source: "Secondary",
+    publishedAt: new Date(now).toISOString(),
+    region: "GLOBAL",
+    category: "GEOPOLITICS",
+    tier: 3,
+    risk: 94,
+    btcImpact: -50,
+    altImpact: -70,
+    goldImpact: 40,
+    oilImpact: 0,
+    status: "UNCONFIRMED",
+    sourceCount: 1,
+  }]).killSwitch, false);
+  assert.ok(globalRisk([{
+    id: "rumor",
+    title: "Unconfirmed social media claim",
+    url: "https://example.com/rumor",
+    source: "Secondary",
+    publishedAt: new Date(now).toISOString(),
+    region: "GLOBAL",
+    category: "GEOPOLITICS",
+    tier: 3,
+    risk: 94,
+    btcImpact: -50,
+    altImpact: -70,
+    goldImpact: 40,
+    oilImpact: 0,
+    status: "UNCONFIRMED",
+    sourceCount: 1,
+  }]).score <= 40);
+});
+
+test("does not merge unrelated country headlines into fake corroboration", async () => {
+  const suffix = `?cluster=${process.pid}-${Date.now()}`;
+  const { classifyNewsItems } = await import(
+    new URL(`../lib/news-intelligence.ts${suffix}`, import.meta.url)
+  );
+  const now = Date.parse("2026-08-13T17:00:00.000Z");
+  const events = classifyNewsItems([
+    {
+      title: "China announces new securities market rules",
+      url: "https://example.com/rules",
+      source: "BBC",
+      publishedAt: new Date(now - 4 * 60_000).toISOString(),
+    },
+    {
+      title: "Former China premier dies at 97",
+      url: "https://example.com/obituary",
+      source: "Dow Jones",
+      publishedAt: new Date(now - 3 * 60_000).toISOString(),
+    },
+    {
+      title: "China announces new securities market rules",
+      url: "https://example.com/rules-two",
+      source: "Dow Jones",
+      publishedAt: new Date(now - 2 * 60_000).toISOString(),
+    },
+  ], now);
+
+  const rules = events.find((event) => event.title.includes("securities market rules"));
+  assert.equal(rules?.sourceCount, 2);
+  assert.equal(events.some((event) => event.title.includes("premier dies") && event.sourceCount > 1), false);
 });
 
 test("wires the zero-token market brain, real timeframes and auditable learning", async () => {

@@ -48,7 +48,7 @@ export async function GET() {
   }
   try {
     const r = await fetch("https://api.coingecko.com/api/v3/global", { next: { revalidate: 120 }, signal: AbortSignal.timeout(4000), headers: { "User-Agent": "ALT-RADAR-PRO/1.0", Accept: "application/json" } });
-    if (!r.ok) throw new Error(); const j = await r.json(); btcDom = Number(j.data.market_cap_percentage.btc); domChange = Number(j.data.market_cap_change_percentage_24h_usd); sources.push("CoinGecko Global");
+    if (!r.ok) throw new Error(); const j = await r.json() as { data?: { market_cap_percentage?: { btc?: number }; market_cap_change_percentage_24h_usd?: number } }; btcDom = Number(j.data?.market_cap_percentage?.btc); domChange = Number(j.data?.market_cap_change_percentage_24h_usd); sources.push("CoinGecko Global");
   } catch {
     try {
       const r = await fetch("https://api.coinlore.net/api/global/", { next: { revalidate: 120 }, signal: AbortSignal.timeout(5000), headers: { Accept: "application/json" } });

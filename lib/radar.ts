@@ -86,12 +86,31 @@ export function globalRisk(events: NewsEvent[]) {
     } as const;
   }
 
-  const sorted = [...events].sort((a, b) => b.risk - a.risk);
+  const actionable = events.filter(
+    (event) =>
+      event.status !== "UNCONFIRMED" &&
+      (event.tier <= 2 || (event.sourceCount ?? 1) >= 2),
+  );
+  if (!actionable.length) {
+    const discountedScore = Math.min(
+      40,
+      Math.round(Math.max(...events.map((event) => event.risk)) * 0.35),
+    );
+    return {
+      score: discountedScore,
+      level: discountedScore > 20 ? "NORMAL" : "BAJO",
+      killSwitch: false,
+    } as const;
+  }
+  const sorted = [...actionable].sort((a, b) => b.risk - a.risk);
+  const reliableCount = sorted.filter(
+    (event) => event.tier <= 2 || (event.sourceCount ?? 1) >= 2,
+  ).length;
   const score = Math.round(
     clamp(
       sorted[0].risk * 0.72 +
         (sorted[1]?.risk ?? 0) * 0.18 +
-        Math.min(events.length, 10),
+        Math.min(reliableCount, 10),
     ),
   );
 
@@ -107,7 +126,14 @@ export function globalRisk(events: NewsEvent[]) {
             : score > 20
               ? "NORMAL"
               : "BAJO",
-    killSwitch: score > 80,
+    killSwitch:
+      score > 80 &&
+      sorted.some(
+        (event) =>
+          event.risk > 80 &&
+          event.status !== "UNCONFIRMED" &&
+          (event.tier === 1 || (event.sourceCount ?? 1) >= 2),
+      ),
   };
 }
 

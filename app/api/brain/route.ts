@@ -484,7 +484,7 @@ function validInput(body: unknown) {
   const symbol = typeof input?.symbol === "string"
     ? input.symbol.toUpperCase().replaceAll("/", "").trim()
     : "";
-  const venue = input?.venue === "futures" ? "futures" : "spot";
+  const venue: MarketVenue = input?.venue === "futures" ? "futures" : "spot";
   const timeframe = BRAIN_TIMEFRAMES.includes(input?.timeframe as BrainTimeframe)
     ? input.timeframe as BrainTimeframe
     : "4h";
@@ -503,8 +503,12 @@ export async function POST(request: Request) {
     const input = validInput(body);
     if (!input) return Response.json({ ok: false, error: "PAR INVÁLIDO" }, { status: 400 });
     const now = new Date();
-    const candleSets = Object.fromEntries(BRAIN_TIMEFRAMES.map((timeframe) => [timeframe, []])) as Record<BrainTimeframe, Candle[]>;
-    const analyses = Object.fromEntries(BRAIN_TIMEFRAMES.map((timeframe) => [timeframe, null])) as Record<BrainTimeframe, TimeframeAnalysis | null>;
+    const candleSets = Object.fromEntries(
+      BRAIN_TIMEFRAMES.map((timeframe) => [timeframe, [] as Candle[]]),
+    ) as unknown as Record<BrainTimeframe, Candle[]>;
+    const analyses = Object.fromEntries(
+      BRAIN_TIMEFRAMES.map((timeframe) => [timeframe, null as TimeframeAnalysis | null]),
+    ) as unknown as Record<BrainTimeframe, TimeframeAnalysis | null>;
     const sources = new Set<string>();
     const hasBrowserSnapshot = Boolean(body.snapshot?.klines);
     if (hasBrowserSnapshot) {

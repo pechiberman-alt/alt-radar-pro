@@ -353,14 +353,17 @@ export default function RadarApp() {
       setData(first);
       setLastUpdate(new Date());
       setError("");
-      enrichTimeframes(first)
+      const applyTimeframes = (payload: RadarPayload) => enrichTimeframes(payload)
         .then((enriched) => {
           setData((current) =>
             current
               ? {
                   ...current,
                   timestamp: enriched.timestamp,
-                  market: enriched.market,
+                  market:
+                    enriched.market.length >= current.market.length
+                      ? enriched.market
+                      : current.market,
                   sources: [...new Set([...current.sources, ...enriched.sources])],
                   errors: current.errors.filter(
                     (message) => !message.toLowerCase().includes("multi-timeframe"),
@@ -371,6 +374,7 @@ export default function RadarApp() {
           setLastUpdate(new Date());
         })
         .catch(() => undefined);
+      void applyTimeframes(first);
       server
         .then((richer) => {
           setData((current) =>
@@ -393,6 +397,27 @@ export default function RadarApp() {
               : richer,
           );
           setLastUpdate(new Date());
+        })
+        .catch(() => undefined);
+      direct
+        .then((complete) => {
+          setData((current) =>
+            current
+              ? {
+                  ...current,
+                  market: complete.market.length > current.market.length
+                    ? complete.market
+                    : current.market,
+                  dominance: {
+                    btc: current.dominance.btc ?? complete.dominance.btc,
+                    change24h: current.dominance.change24h ?? complete.dominance.change24h,
+                  },
+                  sources: [...new Set([...current.sources, ...complete.sources])],
+                }
+              : complete,
+          );
+          setLastUpdate(new Date());
+          if (complete !== first) void applyTimeframes(complete);
         })
         .catch(() => undefined);
     } catch {

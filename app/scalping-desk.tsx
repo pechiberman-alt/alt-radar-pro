@@ -22,7 +22,11 @@ type Payload = {
   error?: string;
 };
 
-const SPOT_BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
+const SPOT_BASES = [
+  "https://data-api.binance.vision",
+  "https://api.binance.us",
+  "https://api.binance.com",
+];
 
 function formatPrice(value: number) {
   if (!Number.isFinite(value)) return "—";

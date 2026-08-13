@@ -442,35 +442,6 @@ export default function LiveBookmap({
     let alive = true;
     const controller = new AbortController();
     const load = async (quiet = false) => {
-      try {
-        const brainResponse = await fetch("/api/brain", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symbol, venue, timeframe: marketTimeframe }),
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const brain = await brainResponse.json() as { derivatives?: DerivativesSnapshot };
-        if (!alive) return;
-        setDerivatives(brainResponse.ok && brain.derivatives ? brain.derivatives : EMPTY_DERIVATIVES);
-      } catch {
-        if (!alive || controller.signal.aborted) return;
-        if (!quiet) setDerivatives(EMPTY_DERIVATIVES);
-      }
-    };
-    void load();
-    const refresh = window.setInterval(() => void load(true), 45_000);
-    return () => {
-      alive = false;
-      controller.abort();
-      window.clearInterval(refresh);
-    };
-  }, [symbol, venue, marketTimeframe]);
-
-  useEffect(() => {
-    let alive = true;
-    const controller = new AbortController();
-    const load = async (quiet = false) => {
       if (!quiet) setLiquidityArchiveStatus("loading");
       try {
         const response = await fetch(
@@ -603,8 +574,11 @@ export default function LiveBookmap({
   useEffect(() => {
     let alive = true;
     fetch("https://fapi.binance.com/fapi/v1/exchangeInfo")
-      .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((data: { symbols?: { symbol: string; quoteAsset: string; status: string }[] }) => {
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json() as { symbols?: { symbol: string; quoteAsset: string; status: string }[] };
+      })
+      .then((data) => {
         if (!alive) return;
         setFuturesSymbols(
           (data.symbols ?? [])
@@ -2370,6 +2344,7 @@ export default function LiveBookmap({
         liveLiquidations={liquidations}
         timeframe={marketTimeframe}
         onTimeframeChange={setMarketTimeframe}
+        onDerivativesChange={setDerivatives}
       />
     </section>
   );

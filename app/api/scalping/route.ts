@@ -10,7 +10,11 @@ import { buildScalpSignal, type ScalpSignal } from "@/lib/scalping-engine";
 
 export const dynamic = "force-dynamic";
 
-const BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
+const BASES = [
+  "https://data-api.binance.vision",
+  "https://api.binance.us",
+  "https://api.binance.com",
+];
 const MAX_ASSETS = 12;
 
 type Snapshot = { "5m"?: unknown; "15m"?: unknown };
@@ -170,7 +174,7 @@ export async function POST(request: Request) {
       generatedAt,
       mode: "SCALPING 5M / 15M",
       engine: "Determinístico local · 0 tokens",
-      sources: ["Binance Spot public API · velas cerradas 5M/15M", "Ticker 24H · bid/ask real"],
+      sources: ["Binance / Binance.US Spot public APIs · velas cerradas 5M/15M", "Ticker 24H · bid/ask real"],
       scanned: signals.length,
       unavailable: errors,
       signals: signals satisfies ScalpSignal[],

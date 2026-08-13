@@ -210,7 +210,7 @@ export function buildScalpSignal(
   return {
     symbol: asset.symbol,
     generatedAt,
-    source: "Binance Spot · velas cerradas 5M/15M · ticker 24H",
+    source: "Binance / Binance.US Spot · velas cerradas 5M/15M · ticker 24H",
     side: status === "NO SIGNAL" ? "NEUTRAL" : side,
     status,
     score: finalScore,

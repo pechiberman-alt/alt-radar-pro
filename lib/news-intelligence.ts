@@ -74,6 +74,11 @@ const CRITICAL_TERMS =
 const HIGH_TERMS =
   /\b(attack|strike|war|conflict|sanctions?|tariffs?|embargo|ceasefire|opec|hormuz|taiwan|nato|trade restrictions?|bank(?:ing)? crisis|emergency meeting|crypto ban|regulatory crackdown|rate (?:hike|cut))\b/i;
 const RUMOR_TERMS = /\b(rumou?r|unconfirmed|alleged|social media claims?|reportedly)\b/i;
+const COMMENTARY_TERMS =
+  /^(?:opinion|editorial|analysis|commentary|column|review|podcast|video)\s*[|:—-]|\bwhat (?:china|russia|iran|israel|america|europe) might have been\b|\bwasn.t normal\b/i;
+const QUESTION_TERMS = /\?\s*$|^(?:will|could|would|can|is|are|should|why|how)\b/i;
+const CONCRETE_EVENT_TERMS =
+  /\b(missile|drone|attack(?:ed|s|ing)?|strike(?:s|d|ing)?|airstrike|invasion|ceasefire|peace deal|peace talks?|sanctions?|tariffs?|embargo|closed|closure|blocked|shutdown|halted|collapse|default|cyberattack|ransomware|rate (?:hike|cut)|approv(?:al|ed)|ban(?:ned)?|crackdown|lawsuit|launch(?:ed)?|signed|announced|declared|imposed|lifted|voted|election result|oil spill|shipping disruption)\b/i;
 const TIER_ONE =
   /\b(reuters|bloomberg|associated press|ap news|financial times|wall street journal|dow jones|bbc|official|white house|federal reserve|european central bank|bank of japan|people.s bank of china|sec|nato|united nations)\b/i;
 const TIER_TWO =
@@ -207,11 +212,17 @@ function clusterKey(title: string) {
   const lower = title.toLowerCase();
   const entities = ENTITY_TERMS.filter((term) => lower.includes(term)).slice(0, 2);
   const event = EVENT_TERMS.find((term) => lower.includes(term));
-  if (entities.length || event) return [...entities, event ?? "event"].join("|");
-  return lower
+  if (event) return [...entities, event].join("|");
+  const words = lower
     .replace(/[^a-z0-9 ]/g, " ")
     .split(/\s+/)
-    .filter((word) => word.length > 3)
+    .filter((word) =>
+      word.length > 3 &&
+      !/^(?:about|after|against|amid|been|from|have|into|near|over|says|that|their|this|with|would)$/.test(word) &&
+      !entities.some((entity) => entity.split(" ").includes(word)),
+    );
+  if (entities.length) return [...entities, ...words.slice(0, 5)].join("|");
+  return words
     .slice(0, 7)
     .join("|");
 }
@@ -224,12 +235,17 @@ function classify(item: RawNewsItem, now: number): NewsEvent | null {
   if (ageHours > 72) return null;
 
   const tier = sourceTier(item.source);
+  const commentary = COMMENTARY_TERMS.test(item.title);
+  const question = QUESTION_TERMS.test(item.title);
+  const concreteEvent = CONCRETE_EVENT_TERMS.test(item.title);
+  if (commentary || (question && !concreteEvent)) return null;
   const critical = CRITICAL_TERMS.test(item.title);
   const high = critical || HIGH_TERMS.test(item.title);
   const rumor = RUMOR_TERMS.test(item.title);
   const reliability = tier === 1 ? 9 : tier === 2 ? 4 : -4;
   const recency = ageHours <= 1 ? 6 : ageHours <= 6 ? 3 : 0;
-  const risk = Math.round(clamp((critical ? 73 : high ? 57 : 43) + reliability + recency - (rumor ? 20 : 0), 18, 94));
+  const contextPenalty = commentary ? 22 : question ? 14 : !concreteEvent ? 9 : 0;
+  const risk = Math.round(clamp((critical ? 73 : high ? 57 : 43) + reliability + recency - (rumor ? 20 : 0) - contextPenalty, 18, 94));
   const lower = item.title.toLowerCase();
   const easing = /ceasefire|peace deal|peace talks|de.escalat|rate cut|dovish|etf approv/.test(lower);
   const riskOff = /attack|strike|invasion|sanction|tariff|embargo|hawkish|bank crisis|cyberattack/.test(lower);
@@ -270,7 +286,7 @@ function clusterEvents(events: NewsEvent[]) {
   const groups = new Map<string, NewsEvent[]>();
   const seenTitles = new Set<string>();
   for (const event of events.sort((left, right) => right.risk - left.risk)) {
-    const titleKey = event.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 120);
+    const titleKey = `${event.source.toLowerCase()}|${event.title.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 120)}`;
     if (seenTitles.has(titleKey)) continue;
     seenTitles.add(titleKey);
     const key = clusterKey(event.title);
@@ -292,7 +308,11 @@ function clusterEvents(events: NewsEvent[]) {
         ...primary,
         id: clusterKey(primary.title),
         risk,
-        status: confirmed ? "CONFIRMED" as const : primary.status,
+        status: confirmed
+          ? "CONFIRMED" as const
+          : primary.status === "CONFIRMED"
+            ? "MONITORING" as const
+            : primary.status,
         sourceCount: sources.length,
         sources,
         source:
@@ -305,6 +325,14 @@ function clusterEvents(events: NewsEvent[]) {
     })
     .filter((event) => event.risk >= 50)
     .slice(0, 14);
+}
+
+export function classifyNewsItems(items: RawNewsItem[], now = Date.now()) {
+  return clusterEvents(
+    items
+      .map((item) => classify(item, now))
+      .filter((event): event is NewsEvent => event !== null),
+  );
 }
 
 async function loadFeed(feed: FeedDefinition) {
@@ -335,13 +363,8 @@ export async function loadGlobalNews(): Promise<NewsIntelligenceResult> {
     }
   });
 
-  const now = Date.now();
-  const classified = rawItems
-    .map((item) => classify(item, now))
-    .filter((event): event is NewsEvent => event !== null);
-
   return {
-    events: clusterEvents(classified),
+    events: classifyNewsItems(rawItems),
     sources,
     errors,
   };

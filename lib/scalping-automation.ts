@@ -3,7 +3,11 @@ import { evaluateOpenSignals, ensureSignalSchema, loadMarket, loadRiskScore } fr
 import { parseBinanceKlines, type Candle } from "./market-brain";
 import { buildScalpSignal } from "./scalping-engine";
 
-const BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
+const BASES = [
+  "https://data-api.binance.vision",
+  "https://api.binance.us",
+  "https://api.binance.com",
+];
 
 export type ScalpingAutomationResult = {
   status: "COMPLETED" | "SKIPPED";
