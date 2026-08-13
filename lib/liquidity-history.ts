@@ -94,9 +94,18 @@ export async function readLiquidityHistory(
      FROM liquidity_snapshots
      WHERE symbol = ?1 AND venue = ?2 AND captured_at >= ?3
      ORDER BY captured_at ASC
-     LIMIT 600`,
+     LIMIT 1600`,
   ).bind(symbol, venue, since).all<SnapshotRow>();
-  return result.results.map(mapRow).filter((snapshot) => snapshot.bids.length && snapshot.asks.length);
+  const snapshots = result.results
+    .map(mapRow)
+    .filter((snapshot) => snapshot.bids.length && snapshot.asks.length);
+  const targetSamples = 520;
+  if (snapshots.length <= targetSamples) return snapshots;
+  const step = Math.ceil(snapshots.length / targetSamples);
+  const sampled = snapshots.filter((_, index) => index % step === 0);
+  const latest = snapshots.at(-1)!;
+  if (sampled.at(-1)?.id !== latest.id) sampled.push(latest);
+  return sampled;
 }
 
 export async function storeLiquiditySnapshot(
