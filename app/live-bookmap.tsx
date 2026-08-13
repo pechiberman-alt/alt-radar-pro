@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BrainTimeframe } from "@/lib/market-brain";
+import type { LiquiditySnapshot } from "@/lib/liquidity-history";
 import BookmapTimeframeChart from "./bookmap-timeframe-chart";
 import MarketBrain from "./market-brain";
 
@@ -105,6 +106,22 @@ const EMPTY_METRICS: Metrics = {
   ask: 0,
   latency: null,
   velocity: 0,
+};
+
+const LIQUIDITY_WINDOW_MS: Record<BrainTimeframe, number> = {
+  "5m": 5 * 60_000,
+  "15m": 15 * 60_000,
+  "1h": 60 * 60_000,
+  "4h": 4 * 60 * 60_000,
+  "1d": 24 * 60 * 60_000,
+};
+
+const LIQUIDITY_FRAME_LABEL: Record<BrainTimeframe, string> = {
+  "5m": "5M",
+  "15m": "15M",
+  "1h": "1H",
+  "4h": "4H",
+  "1d": "1D",
 };
 
 const base = (symbol: string) => symbol.replace("USDT", "");
@@ -252,10 +269,98 @@ export default function LiveBookmap({
   const [showWalls, setShowWalls] = useState(true);
   const [sidePanel, setSidePanel] = useState<"dom" | "tape" | "alerts">("dom");
   const [marketTimeframe, setMarketTimeframe] = useState<BrainTimeframe>("4h");
+  const [liquidityHistory, setLiquidityHistory] = useState<Frame[]>([]);
+  const [liquidityCoverage, setLiquidityCoverage] = useState({ minutes: 0, samples: 0 });
+  const [liquidityArchiveStatus, setLiquidityArchiveStatus] = useState<"loading" | "recording" | "unavailable">("loading");
+
 
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
+
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    const load = async (quiet = false) => {
+      if (!quiet) setLiquidityArchiveStatus("loading");
+      try {
+        const response = await fetch(
+          `/api/liquidity-history?symbol=${encodeURIComponent(symbol)}&venue=${venue}&hours=24`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (!response.ok) throw new Error();
+        const payload = await response.json() as {
+          snapshots?: LiquiditySnapshot[];
+          coverage?: { minutes?: number; samples?: number };
+        };
+        if (!alive) return;
+        const frames = (payload.snapshots ?? [])
+          .map((snapshot) => ({
+            bids: snapshot.bids as Level[],
+            asks: snapshot.asks as Level[],
+            trades: [],
+            mid: snapshot.mid,
+            time: Date.parse(snapshot.capturedAt),
+          }))
+          .filter((frame) => Number.isFinite(frame.time) && frame.bids.length && frame.asks.length);
+        setLiquidityHistory(frames);
+        setLiquidityCoverage({
+          minutes: Number(payload.coverage?.minutes ?? 0),
+          samples: Number(payload.coverage?.samples ?? frames.length),
+        });
+        setLiquidityArchiveStatus("recording");
+      } catch {
+        if (!alive || controller.signal.aborted) return;
+        setLiquidityArchiveStatus("unavailable");
+      }
+    };
+    void load();
+    const refresh = window.setInterval(() => void load(true), 60_000);
+    return () => {
+      alive = false;
+      controller.abort();
+      window.clearInterval(refresh);
+    };
+  }, [symbol, venue]);
+
+  useEffect(() => {
+    let stopped = false;
+    const upload = async () => {
+      const book = bookRef.current;
+      if (
+        stopped ||
+        pausedRef.current ||
+        status !== "en vivo" ||
+        book.bids.length < 5 ||
+        book.asks.length < 5
+      ) return;
+      const mid = (book.bids[0][0] + book.asks[0][0]) / 2;
+      try {
+        const response = await fetch("/api/liquidity-history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            symbol,
+            venue,
+            capturedAt: new Date().toISOString(),
+            mid,
+            bids: book.bids.slice(0, 20),
+            asks: book.asks.slice(0, 20),
+          }),
+        });
+        if (response.ok && !stopped) setLiquidityArchiveStatus("recording");
+      } catch {
+        if (!stopped) setLiquidityArchiveStatus("unavailable");
+      }
+    };
+    const first = window.setTimeout(() => void upload(), 12_000);
+    const interval = window.setInterval(() => void upload(), 60_000);
+    return () => {
+      stopped = true;
+      window.clearTimeout(first);
+      window.clearInterval(interval);
+    };
+  }, [symbol, venue, status]);
 
   useEffect(() => {
     let alive = true;
@@ -641,7 +746,14 @@ export default function LiveBookmap({
       context.fillStyle = "#030a08";
       context.fillRect(0, 0, width, height);
 
-      const frames = framesRef.current.slice(-historySize);
+      const liveFrames = framesRef.current.slice(-historySize);
+      const windowStart = Date.now() - LIQUIDITY_WINDOW_MS[marketTimeframe];
+      const archivedFrames = liquidityHistory.filter((frame) => frame.time >= windowStart);
+      const frames = [...archivedFrames, ...liveFrames]
+        .sort((left, right) => left.time - right.time)
+        .filter((frame, index, values) =>
+          index === 0 || frame.time - values[index - 1].time >= 180,
+        );
       if (!frames.length) {
         context.fillStyle = "#718078";
         context.font = "11px monospace";
@@ -698,7 +810,7 @@ export default function LiveBookmap({
 
       const y = (price: number) =>
         plotBottom - ((price - low) / (high - low)) * plotHeight;
-      const columnWidth = plotWidth / historySize;
+      const columnWidth = plotWidth / Math.max(frames.length, 1);
       viewRef.current = {
         low,
         high,
@@ -862,7 +974,9 @@ export default function LiveBookmap({
         const frame = frames[frameIndex];
         const x = plotRight - (frames.length - frameIndex) * columnWidth;
         context.fillText(
-          new Date(frame.time).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" }),
+          marketTimeframe === "1d"
+            ? new Date(frame.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : new Date(frame.time).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" }),
           x,
           plotBottom + 15,
         );
@@ -930,7 +1044,17 @@ export default function LiveBookmap({
 
     draw();
     return () => cancelAnimationFrame(animation);
-  }, [status, scale, rangePct, historySize, showTrades, showCvd, showWalls]);
+  }, [
+    status,
+    scale,
+    rangePct,
+    historySize,
+    showTrades,
+    showCvd,
+    showWalls,
+    liquidityHistory,
+    marketTimeframe,
+  ]);
 
   const flowTotal = metrics.buyNotional + metrics.sellNotional;
   const delta = flowTotal
@@ -1241,7 +1365,34 @@ export default function LiveBookmap({
         onTimeframeChange={setMarketTimeframe}
       />
 
-      <div className="bookmap-live-divider">MICROESTRUCTURA EN VIVO · DEPTH 100 MS</div>
+      <div className="liquidity-horizon-bar">
+        <div>
+          <span>MAPA DE LIQUIDEZ</span>
+          <b>VENTANA {LIQUIDITY_FRAME_LABEL[marketTimeframe]}</b>
+        </div>
+        <div className="liquidity-horizon-tabs" role="tablist" aria-label="Horizonte del mapa de liquidez">
+          {(Object.keys(LIQUIDITY_FRAME_LABEL) as BrainTimeframe[]).map((frame) => (
+            <button
+              key={frame}
+              role="tab"
+              aria-selected={marketTimeframe === frame}
+              className={marketTimeframe === frame ? "active" : ""}
+              onClick={() => setMarketTimeframe(frame)}
+            >
+              {LIQUIDITY_FRAME_LABEL[frame]}
+            </button>
+          ))}
+        </div>
+        <div className={`liquidity-archive-state ${liquidityArchiveStatus}`}>
+          <i />
+          <span>{liquidityArchiveStatus === "recording" ? "ARCHIVO REAL ACTIVO" : liquidityArchiveStatus === "loading" ? "CARGANDO ARCHIVO" : "ARCHIVO NO DISPONIBLE"}</span>
+          <small>{liquidityCoverage.samples} snapshots · {Math.round(liquidityCoverage.minutes)} min observados</small>
+        </div>
+      </div>
+
+      <div className="bookmap-live-divider">
+        LIQUIDEZ OBSERVADA {LIQUIDITY_FRAME_LABEL[marketTimeframe]} + MICROESTRUCTURA EN VIVO
+      </div>
 
       <div className="professional-map advanced-map">
         <div className="chart-stage">
@@ -1253,7 +1404,12 @@ export default function LiveBookmap({
             onPointerMove={handlePointerMove}
             onPointerLeave={handlePointerLeave}
           />
-          <div className="chart-live-badge"><i /> LIVE DEPTH</div>
+          <div className="chart-live-badge"><i /> {LIQUIDITY_FRAME_LABEL[marketTimeframe]} · LIVE DEPTH</div>
+          {liquidityCoverage.minutes < LIQUIDITY_WINDOW_MS[marketTimeframe] / 60_000 && (
+            <div className="liquidity-coverage-warning">
+              ACUMULANDO {LIQUIDITY_FRAME_LABEL[marketTimeframe]} · DISPONIBLE {Math.round(liquidityCoverage.minutes)} MIN
+            </div>
+          )}
           <div className="chart-legend-overlay">
             <span>BAJA</span><i /><span>ALTA LIQUIDEZ</span>
           </div>

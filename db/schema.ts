@@ -94,3 +94,25 @@ export const brainObservations = sqliteTable(
     ),
   ],
 );
+
+export const liquiditySnapshots = sqliteTable(
+  "liquidity_snapshots",
+  {
+    id: text("id").primaryKey(),
+    symbol: text("symbol").notNull(),
+    venue: text("venue", { enum: ["spot", "futures"] }).notNull(),
+    capturedAt: text("captured_at").notNull(),
+    mid: real("mid").notNull(),
+    bids: text("bids").notNull(),
+    asks: text("asks").notNull(),
+    source: text("source").notNull(),
+  },
+  (table) => [
+    index("liquidity_snapshots_market_time_idx").on(
+      table.symbol,
+      table.venue,
+      table.capturedAt,
+    ),
+    index("liquidity_snapshots_captured_idx").on(table.capturedAt),
+  ],
+);

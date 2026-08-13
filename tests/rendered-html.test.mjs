@@ -118,3 +118,22 @@ test("adds real Bookmap timeframes and horizon performance without fabricated st
   assert.match(automation, /elapsed <= 20 \* 60_000/);
   assert.match(schema, /return5m/);
 });
+
+test("archives observed liquidity for honest 5M through 1D Bookmap windows", async () => {
+  const [history, route, bookmap, schema] = await Promise.all([
+    readFile(new URL("../lib/liquidity-history.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/liquidity-history/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/live-bookmap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(history, /liquidity_snapshots/);
+  assert.match(history, /55_000/);
+  assert.match(history, /25 \* 3_600_000/);
+  assert.match(route, /Sólo snapshots observados/);
+  assert.match(route, /ORIGEN NO AUTORIZADO/);
+  assert.match(bookmap, /LIQUIDITY_WINDOW_MS/);
+  assert.match(bookmap, /ARCHIVO REAL ACTIVO/);
+  assert.match(bookmap, /ACUMULANDO/);
+  assert.match(schema, /liquiditySnapshots/);
+});
