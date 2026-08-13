@@ -211,7 +211,9 @@ function categoryFor(title: string) {
 function clusterKey(title: string) {
   const lower = title.toLowerCase();
   const entities = ENTITY_TERMS.filter((term) => lower.includes(term)).slice(0, 2);
-  const event = EVENT_TERMS.find((term) => lower.includes(term));
+  const event = EVENT_TERMS.find((term) =>
+    new RegExp(`\\b${term.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}s?\\b`, "i").test(lower),
+  );
   if (event) return [...entities, event].join("|");
   const words = lower
     .replace(/[^a-z0-9 ]/g, " ")

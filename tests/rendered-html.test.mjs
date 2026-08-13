@@ -186,6 +186,31 @@ test("does not merge unrelated country headlines into fake corroboration", async
   assert.equal(events.some((event) => event.title.includes("premier dies") && event.sourceCount > 1), false);
 });
 
+test("does not treat words containing war as conflict corroboration", async () => {
+  const suffix = `?boundary=${process.pid}-${Date.now()}`;
+  const { classifyNewsItems } = await import(
+    new URL(`../lib/news-intelligence.ts${suffix}`, import.meta.url)
+  );
+  const now = Date.parse("2026-08-13T17:00:00.000Z");
+  const events = classifyNewsItems([
+    {
+      title: "Ukraine Black Sea port attack damages grain terminal",
+      url: "https://example.com/attack",
+      source: "BBC",
+      publishedAt: new Date(now - 3 * 60_000).toISOString(),
+    },
+    {
+      title: "Ukraine business gets an award after grain export growth",
+      url: "https://example.com/award",
+      source: "Dow Jones",
+      publishedAt: new Date(now - 2 * 60_000).toISOString(),
+    },
+  ], now);
+
+  const attack = events.find((event) => event.url.endsWith("/attack"));
+  assert.equal(attack?.sourceCount, 1);
+});
+
 test("wires the zero-token market brain, real timeframes and auditable learning", async () => {
   const [engine, route, panel, schema] = await Promise.all([
     readFile(new URL("../lib/market-brain.ts", import.meta.url), "utf8"),
