@@ -12,6 +12,8 @@ import { useDashboardSettings } from "./dashboard-settings";
 import LiveBookmap from "./live-bookmap";
 import SignalLedger from "./signal-ledger";
 import ScalpingDesk from "./scalping-desk";
+import CompareChart from "./compare-chart";
+import CorrelationWatch from "./correlation-watch";
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -37,6 +39,8 @@ const NAV_ITEMS = [
   { label: "RESUMEN", mobile: "INICIO", icon: "⌂", id: "resumen" },
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
+  { label: "COMPARAR", mobile: "COMP", icon: "⇄", id: "comparador" },
+  { label: "VIGILANCIA", mobile: "WATCH", icon: "◈", id: "vigilancia" },
   { label: "ORDER FLOW", mobile: "MAPA", icon: "▦", id: "order-flow" },
   { label: "HISTORIAL", mobile: "DATOS", icon: "≡", id: "historial" },
 ] as const;
@@ -730,6 +734,10 @@ export default function RadarApp() {
           altseasonScore={altseason.final}
           minimumQuoteVolume={settings.minimumQuoteVolume}
         />
+
+        <CompareChart symbols={data.market.map((asset) => asset.symbol)} />
+
+        <CorrelationWatch />
 
         <div id="order-flow"><LiveBookmap
           symbols={data.market.map((asset) => asset.symbol)}

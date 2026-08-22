@@ -10,6 +10,8 @@ import "./bookmap-interactions.css";
 import "./bookmap-premium.css";
 import "./market-brain.css";
 import "./scalping-desk.css";
+import "./compare-chart.css";
+import "./correlation-watch.css";
 import "./secure-brain.css";
 import "./mobile-pro.css";
 import PwaRegister from "./pwa-register";
