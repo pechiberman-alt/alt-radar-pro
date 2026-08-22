@@ -5,6 +5,7 @@ import type { BrainTimeframe } from "@/lib/market-brain";
 import type { DerivativesSnapshot } from "@/lib/market-brain";
 import type { LiquiditySnapshot } from "@/lib/liquidity-history";
 import type { NewsEvent } from "@/lib/radar";
+import { footprintRows, percentile } from "@/lib/order-flow";
 import BookmapTimeframeChart from "./bookmap-timeframe-chart";
 import MarketBrain from "./market-brain";
 
@@ -73,16 +74,6 @@ type Wall = {
   strength: number;
   distance: number;
   persistence: number;
-};
-type FootprintRow = {
-  price: number;
-  buy: number;
-  sell: number;
-  /** Ratio of the dominant side over the weaker one; Infinity when one side is empty. */
-  imbalance: number;
-  dominant: "buy" | "sell" | "flat";
-  /** True while the row sits inside the 70% volume value area. */
-  inValueArea: boolean;
 };
 type HoverPoint = {
   x: number;
@@ -200,12 +191,6 @@ const signed = (value: number, digits = 1) =>
 const wallStrengthLabel = (value: number) =>
   value >= 99 ? "99×+" : `${value.toFixed(1)}×`;
 
-function percentile(values: number[], quantile: number) {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((left, right) => left - right);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * quantile)));
-  return sorted[index];
-}
 
 function heatColor(intensity: number, alpha = 1) {
   const stops = [
@@ -265,92 +250,6 @@ function currentWalls(
     });
 }
 
-const FOOTPRINT_TARGET_ROWS = 16;
-
-/**
- * Snap a raw bucket width to a readable 1 / 2 / 5 × 10^n step so prices on the
- * ladder line up instead of landing on arbitrary fractions.
- */
-function niceStep(raw: number) {
-  if (!Number.isFinite(raw) || raw <= 0) return 0;
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
-  const normalized = raw / magnitude;
-  const snapped = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-  return snapped * magnitude;
-}
-
-/**
- * Builds the footprint from real executions. The bucket width adapts to the
- * price range the trades actually covered, so a quiet window still resolves
- * into distinct levels instead of collapsing everything into one row, and the
- * rows kept are the ones nearest the market rather than the highest priced.
- */
-function footprintRows(trades: Trade[], mid: number, spread: number): FootprintRow[] {
-  if (!trades.length || !mid) return [];
-
-  const prices = trades.map((trade) => trade.price);
-  const low = Math.min(...prices);
-  const high = Math.max(...prices);
-  const observedRange = high - low;
-
-  // Aim for roughly FOOTPRINT_TARGET_ROWS levels across the traded range, but
-  // never finer than the spread (that would invent resolution the book lacks).
-  const step =
-    niceStep(
-      Math.max(
-        observedRange / FOOTPRINT_TARGET_ROWS,
-        spread > 0 ? spread : 0,
-        mid * 0.000002,
-      ),
-    ) || Math.max(mid * 0.00001, Number.EPSILON);
-
-  const rows = new Map<number, { buy: number; sell: number }>();
-  trades.forEach((trade) => {
-    const bucket = Math.round(trade.price / step) * step;
-    const current = rows.get(bucket) ?? { buy: 0, sell: 0 };
-    if (trade.buyerMaker) current.sell += trade.notional;
-    else current.buy += trade.notional;
-    rows.set(bucket, current);
-  });
-
-  const nearest = [...rows.entries()]
-    .map(([price, value]) => ({ price, ...value }))
-    .sort(
-      (left, right) => Math.abs(left.price - mid) - Math.abs(right.price - mid),
-    )
-    .slice(0, FOOTPRINT_TARGET_ROWS);
-
-  // Value area: the levels that together hold 70% of the traded volume, walking
-  // outward from the point of control.
-  const byVolume = [...nearest].sort(
-    (left, right) => right.buy + right.sell - (left.buy + left.sell),
-  );
-  const totalVolume = byVolume.reduce((sum, row) => sum + row.buy + row.sell, 0);
-  const valueAreaPrices = new Set<number>();
-  let accumulated = 0;
-  for (const row of byVolume) {
-    if (totalVolume > 0 && accumulated >= totalVolume * 0.7) break;
-    valueAreaPrices.add(row.price);
-    accumulated += row.buy + row.sell;
-  }
-
-  return nearest
-    .map((row) => {
-      const stronger = Math.max(row.buy, row.sell);
-      const weaker = Math.min(row.buy, row.sell);
-      const imbalance = stronger === 0 ? 0 : weaker === 0 ? Infinity : stronger / weaker;
-      return {
-        ...row,
-        imbalance,
-        dominant:
-          row.buy === row.sell ? ("flat" as const)
-          : row.buy > row.sell ? ("buy" as const)
-          : ("sell" as const),
-        inValueArea: valueAreaPrices.has(row.price),
-      };
-    })
-    .sort((left, right) => right.price - left.price);
-}
 
 function depthWithCumulative(levels: Level[]) {
   let cumulative = 0;

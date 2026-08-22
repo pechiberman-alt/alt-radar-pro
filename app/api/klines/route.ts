@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cached } from "@/lib/upstream-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -43,27 +44,46 @@ export async function GET(request: NextRequest) {
   const safeLimit = Math.max(10, Math.min(500, Number.isFinite(limit) ? limit : 120));
 
   let lastStatus = 0;
-  for (const base of BASES) {
-    try {
-      const response = await fetch(
-        `${base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${safeLimit}`,
-        {
-          headers: { Accept: "application/json", "User-Agent": "ALT-RADAR-PRO/2.1" },
-          signal: AbortSignal.timeout(7_000),
-        },
-      );
-      if (!response.ok) {
-        lastStatus = response.status;
-        continue;
+
+  // Candles only change when one closes, so a short shared TTL keeps every
+  // open tab on one upstream call instead of each spending the rate limit.
+  const ttl = interval === "1m" ? 15_000 : interval === "5m" ? 30_000 : 60_000;
+
+  const { value, state, ageMs } = await cached<unknown[]>(
+    `klines:${symbol}:${interval}:${safeLimit}`,
+    ttl,
+    async () => {
+      for (const base of BASES) {
+        try {
+          const response = await fetch(
+            `${base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${safeLimit}`,
+            {
+              headers: { Accept: "application/json", "User-Agent": "ALT-RADAR-PRO/2.1" },
+              signal: AbortSignal.timeout(7_000),
+            },
+          );
+          if (!response.ok) {
+            lastStatus = response.status;
+            continue;
+          }
+          const rows = await response.json();
+          if (Array.isArray(rows) && rows.length) return rows;
+        } catch {
+          // Try the next mirror.
+        }
       }
-      const rows = await response.json();
-      if (!Array.isArray(rows) || !rows.length) continue;
-      return NextResponse.json(rows, {
-        headers: { "Cache-Control": "no-store" },
-      });
-    } catch {
-      // Try the next mirror.
-    }
+      return null;
+    },
+  );
+
+  if (value) {
+    return NextResponse.json(value, {
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Cache": state,
+        "X-Cache-Age": String(Math.round(ageMs / 1000)),
+      },
+    });
   }
 
   return NextResponse.json(

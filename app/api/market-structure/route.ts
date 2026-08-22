@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cached } from "@/lib/upstream-cache";
 import {
   parseCoinGeckoGlobal,
   parseCoinLoreGlobal,
@@ -13,7 +14,8 @@ export const dynamic = "force-dynamic";
  * shared reading per minute is more current than the data itself.
  */
 const CACHE_TTL_MS = 60_000;
-let cached: { payload: MarketStructure; at: number } | null = null;
+/** Global capitalisation stays informative for a while; 15 minutes stale beats blank. */
+const STALE_WINDOW_MS = 15 * 60_000;
 
 async function loadCoinGecko(): Promise<MarketStructure | null> {
   try {
@@ -42,33 +44,27 @@ async function loadCoinLore(): Promise<MarketStructure | null> {
 }
 
 export async function GET() {
-  const now = Date.now();
-  if (cached && now - cached.at < CACHE_TTL_MS) {
-    return NextResponse.json(cached.payload, {
-      headers: { "Cache-Control": "no-store", "X-Cache": "HIT" },
-    });
-  }
+  const { value, state, ageMs } = await cached<MarketStructure>(
+    "market-structure",
+    CACHE_TTL_MS,
+    // CoinGecko first: it is the only free source that breaks out stablecoin
+    // dominance. CoinLore covers total and BTC/ETH dominance if that fails.
+    async () => (await loadCoinGecko()) ?? (await loadCoinLore()),
+    STALE_WINDOW_MS,
+  );
 
-  // CoinGecko first: it is the only free source that breaks out stablecoin
-  // dominance. CoinLore covers total and BTC/ETH dominance if that fails.
-  const payload = (await loadCoinGecko()) ?? (await loadCoinLore());
-
-  if (!payload) {
-    // Serve a stale reading rather than nothing — labelled, so the interface
-    // can show its age instead of implying it is live.
-    if (cached) {
-      return NextResponse.json(cached.payload, {
-        headers: { "Cache-Control": "no-store", "X-Cache": "STALE" },
-      });
-    }
+  if (!value) {
     return NextResponse.json(
       { error: "DATA UNAVAILABLE" },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
 
-  cached = { payload, at: now };
-  return NextResponse.json(payload, {
-    headers: { "Cache-Control": "no-store", "X-Cache": "MISS" },
+  return NextResponse.json(value, {
+    headers: {
+      "Cache-Control": "no-store",
+      "X-Cache": state,
+      "X-Cache-Age": String(Math.round(ageMs / 1000)),
+    },
   });
 }

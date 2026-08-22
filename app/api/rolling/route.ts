@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cached } from "@/lib/upstream-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -42,28 +43,47 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "SIN SÍMBOLOS VÁLIDOS" }, { status: 400 });
   }
 
-  for (const base of BASES) {
-    try {
-      const url = new URL(`${base}/api/v3/ticker`);
-      url.searchParams.set("symbols", JSON.stringify(symbols));
-      url.searchParams.set("windowSize", windowSize);
-      const response = await fetch(url, {
-        headers: { Accept: "application/json", "User-Agent": "ALT-RADAR-PRO/2.1" },
-        signal: AbortSignal.timeout(8_000),
-      });
-      if (!response.ok) continue;
-      const rows = (await response.json()) as { symbol?: string; priceChangePercent?: string }[];
-      if (!Array.isArray(rows) || !rows.length) continue;
-      return NextResponse.json(
-        rows.map((row) => ({
-          symbol: row.symbol,
-          priceChangePercent: row.priceChangePercent,
-        })),
-        { headers: { "Cache-Control": "no-store" } },
-      );
-    } catch {
-      // Try the next mirror.
+  // Keyed on the exact symbol set so different chunks stay independent.
+  const key = `rolling:${windowSize}:${symbols.join(",")}`;
+
+  const { value, state, ageMs } = await cached<
+    { symbol?: string; priceChangePercent?: string }[]
+  >(key, 30_000, async () => {
+    for (const base of BASES) {
+      try {
+        const url = new URL(`${base}/api/v3/ticker`);
+        url.searchParams.set("symbols", JSON.stringify(symbols));
+        url.searchParams.set("windowSize", windowSize);
+        const response = await fetch(url, {
+          headers: { Accept: "application/json", "User-Agent": "ALT-RADAR-PRO/2.1" },
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (!response.ok) continue;
+        const rows = (await response.json()) as {
+          symbol?: string;
+          priceChangePercent?: string;
+        }[];
+        if (Array.isArray(rows) && rows.length) {
+          return rows.map((row) => ({
+            symbol: row.symbol,
+            priceChangePercent: row.priceChangePercent,
+          }));
+        }
+      } catch {
+        // Try the next mirror.
+      }
     }
+    return null;
+  });
+
+  if (value) {
+    return NextResponse.json(value, {
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Cache": state,
+        "X-Cache-Age": String(Math.round(ageMs / 1000)),
+      },
+    });
   }
 
   return NextResponse.json(

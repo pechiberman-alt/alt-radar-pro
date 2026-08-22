@@ -1,9 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+/** Rolling-window enrichment cadence, decoupled from the price refresh. */
+const ENRICHMENT_INTERVAL_MS = 150_000;
 import type { RadarPayload, ScoredAsset } from "@/lib/radar";
 import {
   altseasonScore,
+  diagnoseSignals,
   globalRisk,
   rotation,
   scoreAssets,
@@ -66,24 +70,71 @@ const compact = (value: number) =>
   );
 const assetName = (symbol: string) => symbol.replace("USDT", "");
 
+type RawTicker = {
+  symbol: string;
+  lastPrice: string;
+  priceChangePercent: string;
+  volume: string;
+  quoteVolume: string;
+  highPrice: string;
+  lowPrice: string;
+  bidPrice: string;
+  askPrice: string;
+};
+
+/**
+ * The full universe, direct from Binance when the client is allowed, otherwise
+ * through the Worker proxy. Without this fallback a throttled browser dropped
+ * to the server's small fixed watch list.
+ */
+async function loadTickers(): Promise<RawTicker[]> {
+  try {
+    const response = await fetch("https://data-api.binance.vision/api/v3/ticker/24hr", {
+      cache: "no-store",
+    });
+    if (response.ok) {
+      const rows = (await response.json()) as RawTicker[];
+      if (Array.isArray(rows) && rows.length) return rows;
+    }
+  } catch {
+    // Binance refuses throttled browsers without CORS headers.
+  }
+  const proxied = await fetch("/api/tickers", { cache: "no-store" });
+  if (!proxied.ok) throw new Error("Binance unavailable");
+  const payload = (await proxied.json()) as {
+    market?: {
+      symbol: string;
+      price: number;
+      change24h: number;
+      volume: number;
+      quoteVolume: number;
+      high: number;
+      low: number;
+      bidPrice: number | null;
+      askPrice: number | null;
+    }[];
+  };
+  if (!payload.market?.length) throw new Error("Binance unavailable");
+  // Re-shape to the raw ticker form the caller already parses.
+  return payload.market.map((row) => ({
+    symbol: row.symbol,
+    lastPrice: String(row.price),
+    priceChangePercent: String(row.change24h),
+    volume: String(row.volume),
+    quoteVolume: String(row.quoteVolume),
+    highPrice: String(row.high),
+    lowPrice: String(row.low),
+    bidPrice: String(row.bidPrice ?? 0),
+    askPrice: String(row.askPrice ?? 0),
+  }));
+}
+
 async function loadDirectMarket(): Promise<RadarPayload> {
-  const [tickersResponse, globalResponse] = await Promise.all([
-    fetch("https://data-api.binance.vision/api/v3/ticker/24hr", { cache: "no-store" }),
-    fetch("https://api.coinlore.net/api/global/", { cache: "no-store" }),
+  const [tickers, globalResponse] = await Promise.all([
+    loadTickers(),
+    fetch("https://api.coinlore.net/api/global/", { cache: "no-store" }).catch(() => null),
   ]);
-  if (!tickersResponse.ok) throw new Error("Binance unavailable");
-  const tickers = (await tickersResponse.json()) as {
-    symbol: string;
-    lastPrice: string;
-    priceChangePercent: string;
-    volume: string;
-    quoteVolume: string;
-    highPrice: string;
-    lowPrice: string;
-    bidPrice: string;
-    askPrice: string;
-  }[];
-  const global = globalResponse.ok
+  const global = globalResponse?.ok
     ? ((await globalResponse.json()) as { btc_d?: string; mcap_change?: string }[])
     : [];
   const market = tickers
@@ -432,6 +483,7 @@ export default function RadarApp() {
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const [assetSearch, setAssetSearch] = useState("");
   const [profile, setProfile] = useState<ProfileId>("TRADING_PRO");
+  const lastEnrichment = useRef(0);
   const [structure, setStructure] = useState<MarketStructure | null>(null);
   const [structureError, setStructureError] = useState("");
   const { settings, update: updateSettings } = useDashboardSettings();
@@ -455,7 +507,18 @@ export default function RadarApp() {
       setData(first);
       setLastUpdate(new Date());
       setError("");
-      const applyTimeframes = (payload: RadarPayload) => enrichTimeframes(payload)
+      // Rolling-window requests are the heaviest calls the app makes: four
+      // windows across ~180 symbols in chunks, and Binance weights that
+      // endpoint far above a plain ticker. Running it on the 30s price cadence
+      // is what gets a client rate limited, and 1H/4H values do not meaningfully
+      // move in 30 seconds, so enrichment runs on its own slower clock.
+      const applyTimeframes = (payload: RadarPayload) => {
+        const now = Date.now();
+        if (now - lastEnrichment.current < ENRICHMENT_INTERVAL_MS) {
+          return Promise.resolve();
+        }
+        lastEnrichment.current = now;
+        return enrichTimeframes(payload)
         .then((enriched) => {
           setData((current) =>
             current
@@ -472,7 +535,11 @@ export default function RadarApp() {
           );
           setLastUpdate(new Date());
         })
-        .catch(() => undefined);
+        .catch(() => {
+          // A failed enrichment should not lock out the next attempt.
+          lastEnrichment.current = 0;
+        });
+      };
       void applyTimeframes(first);
       server
         .then((richer) => {
@@ -621,6 +688,16 @@ export default function RadarApp() {
     [allScored, universeSymbols],
   );
   const rotationState = useMemo(() => rotation(data?.market ?? []), [data]);
+  const diagnostic = useMemo(
+    () =>
+      diagnoseSignals(scored, {
+        watch: settings.watch,
+        setup: settings.setup,
+        trigger: settings.trigger,
+        minimumQuoteVolume: settings.minimumQuoteVolume,
+      }),
+    [scored, settings],
+  );
   const active = scored.filter((asset) => asset.signal !== "NO SIGNAL").slice(0, 6);
   const scannerRows = (assetSearch
     ? allScored.filter((asset) => asset.symbol.includes(assetSearch))
@@ -843,6 +920,49 @@ export default function RadarApp() {
             <div className="no-signals">
               <div>◎</div><h3>SIN SEÑALES DE ALTA CONVICCIÓN</h3>
               <p>El cerebro está monitoreando. No fabricará operaciones sin confirmaciones independientes.</p>
+              {diagnostic.topScore !== null && (
+                <div className="signal-diagnostic">
+                  <p className="diagnostic-title">POR QUÉ NO HAY SEÑALES AHORA</p>
+                  <div className="diagnostic-grid">
+                    <div>
+                      <span>MEJOR CANDIDATO</span>
+                      <b>
+                        {assetName(diagnostic.topSymbol ?? "")} · {diagnostic.topScore}/100
+                      </b>
+                    </div>
+                    <div>
+                      <span>LE FALTA PARA WATCH</span>
+                      <b>{diagnostic.pointsToWatch} PUNTOS</b>
+                    </div>
+                    <div>
+                      <span>COBERTURA 1H + 4H</span>
+                      <b
+                        className={
+                          diagnostic.partialDataPct > 50 ? "negative" : undefined
+                        }
+                      >
+                        {(100 - diagnostic.partialDataPct).toFixed(0)}% DEL UNIVERSO
+                      </b>
+                    </div>
+                  </div>
+                  {diagnostic.blockers.length > 0 && (
+                    <div className="diagnostic-blockers">
+                      {diagnostic.blockers.map((blocker) => (
+                        <span key={blocker.label}>
+                          {blocker.label} <em>{blocker.count}/20</em>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {diagnostic.partialDataPct > 50 && (
+                    <p className="diagnostic-warning">
+                      Más de la mitad del universo no tiene confirmación 1H/4H. Esto es una
+                      limitación de datos, no una lectura de mercado: los scores están
+                      penalizados por información incompleta.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </section>

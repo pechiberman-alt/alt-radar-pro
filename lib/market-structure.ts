@@ -78,9 +78,10 @@ export function deriveTotals(
   return { total2, total3 };
 }
 
-export function parseCoinGeckoGlobal(payload: CoinGeckoGlobal): MarketStructure | null {
-  const data = payload?.data;
-  if (!data) return null;
+/** Accepts unknown because it parses a third-party response. */
+export function parseCoinGeckoGlobal(payload: unknown): MarketStructure | null {
+  const data = (payload as CoinGeckoGlobal | null)?.data;
+  if (!data || typeof data !== "object") return null;
   const totalMarketCap = finite(data.total_market_cap?.usd);
   if (totalMarketCap === null || totalMarketCap <= 0) return null;
   const shares = data.market_cap_percentage ?? {};
@@ -111,9 +112,10 @@ export function parseCoinGeckoGlobal(payload: CoinGeckoGlobal): MarketStructure 
   };
 }
 
-export function parseCoinLoreGlobal(rows: CoinLoreGlobal[]): MarketStructure | null {
-  const row = Array.isArray(rows) ? rows[0] : null;
-  if (!row) return null;
+/** Accepts unknown because it parses a third-party response. */
+export function parseCoinLoreGlobal(rows: unknown): MarketStructure | null {
+  const row = Array.isArray(rows) ? (rows[0] as CoinLoreGlobal | undefined) : null;
+  if (!row || typeof row !== "object") return null;
   const totalMarketCap = finite(row.total_mcap);
   if (totalMarketCap === null || totalMarketCap <= 0) return null;
   const btc = finite(row.btc_d);

@@ -4,6 +4,42 @@ import handler from "vinext/server/app-router-entry";
 import { runSignalAutomation } from "../lib/automation";
 import { archiveCoreLiquidity } from "../lib/liquidity-archive";
 import { runScalpingAutomation } from "../lib/scalping-automation";
+import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
+import { recordStructureSnapshot } from "../lib/structure-archive";
+
+/**
+ * Free sources publish dominance only as a current value. Recording it on a
+ * schedule is what turns USDT.D and BTC.D into a trend the app can read.
+ */
+async function archiveMarketStructure(db: D1Database) {
+  const fetchJson = async (url: string) => {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json", "User-Agent": "ALT-RADAR-PRO/2.1" },
+      signal: AbortSignal.timeout(7_000),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  };
+
+  let structure = null;
+  try {
+    structure = parseCoinGeckoGlobal(
+      await fetchJson("https://api.coingecko.com/api/v3/global"),
+    );
+  } catch {
+    // Fall through to the backup source.
+  }
+  if (!structure) {
+    try {
+      structure = parseCoinLoreGlobal(
+        await fetchJson("https://api.coinlore.net/api/global/"),
+      );
+    } catch {
+      return;
+    }
+  }
+  if (structure) await recordStructureSnapshot(db, structure);
+}
 
 interface Env {
   ASSETS: Fetcher;
@@ -64,6 +100,11 @@ const worker = {
         runSignalAutomation(env.DB).catch((error) => {
           console.error("[ALT_RADAR_SCHEDULED]", error);
           // The next scheduled run retries automatically. No synthetic records are written.
+        }),
+      );
+      ctx.waitUntil(
+        archiveMarketStructure(env.DB).catch((error) => {
+          console.error("[ALT_RADAR_STRUCTURE_SCHEDULED]", error);
         }),
       );
     }

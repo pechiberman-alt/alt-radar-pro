@@ -413,6 +413,65 @@ export function scoreAssets(
     .sort((a, b) => b.score - a.score);
 }
 
+export type SignalDiagnostic = {
+  /** Best score reached in the current universe, whatever its signal. */
+  topScore: number | null;
+  topSymbol: string | null;
+  /** How far the best candidate sits from the WATCH threshold. */
+  pointsToWatch: number | null;
+  /** Penalty labels holding the leaders back, most frequent first. */
+  blockers: { label: string; count: number }[];
+  /** Share of the universe missing 1H/4H confirmation. */
+  partialDataPct: number;
+  universe: number;
+};
+
+/**
+ * Explains an empty signal list.
+ *
+ * "No high-conviction signals" reads the same whether the market is genuinely
+ * quiet or the feed is degraded, which makes a data outage look like a market
+ * condition. This reports what actually held the leaders back.
+ */
+export function diagnoseSignals(
+  scored: ScoredAsset[],
+  config: ScoreConfig = DEFAULT_SCORE_CONFIG,
+): SignalDiagnostic {
+  if (!scored.length) {
+    return {
+      topScore: null,
+      topSymbol: null,
+      pointsToWatch: null,
+      blockers: [],
+      partialDataPct: 0,
+      universe: 0,
+    };
+  }
+
+  const ranked = [...scored].sort((left, right) => right.score - left.score);
+  const leaders = ranked.slice(0, 20);
+  const counts = new Map<string, number>();
+  for (const asset of leaders) {
+    for (const penalty of asset.penalties) {
+      counts.set(penalty.label, (counts.get(penalty.label) ?? 0) + 1);
+    }
+  }
+
+  const partial = scored.filter((asset) => asset.dataQuality !== "FULL").length;
+
+  return {
+    topScore: ranked[0].score,
+    topSymbol: ranked[0].symbol,
+    pointsToWatch: Math.max(0, config.watch - ranked[0].score),
+    blockers: [...counts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((left, right) => right.count - left.count)
+      .slice(0, 3),
+    partialDataPct: (partial / scored.length) * 100,
+    universe: scored.length,
+  };
+}
+
 export function rotation(market: MarketAsset[]) {
   const buckets = [
     { label: "BTC", symbols: ["BTCUSDT"] },
