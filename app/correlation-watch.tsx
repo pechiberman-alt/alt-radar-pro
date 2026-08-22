@@ -113,6 +113,28 @@ function pearson(a: number[], b: number[]): number | null {
   return numerator / Math.sqrt(denomA * denomB);
 }
 
+/**
+ * Slope of the asset against BTC: how much it historically amplifies (or damps)
+ * a BTC move. Beta 1.8 means a 1% BTC candle has come with ~1.8% here.
+ */
+function beta(assetReturns: number[], btcReturns: number[]): number | null {
+  const n = Math.min(assetReturns.length, btcReturns.length);
+  if (n < 8) return null;
+  const asset = assetReturns.slice(assetReturns.length - n);
+  const btc = btcReturns.slice(btcReturns.length - n);
+  const meanAsset = asset.reduce((sum, value) => sum + value, 0) / n;
+  const meanBtc = btc.reduce((sum, value) => sum + value, 0) / n;
+  let covariance = 0;
+  let varianceBtc = 0;
+  for (let index = 0; index < n; index += 1) {
+    const diffBtc = btc[index] - meanBtc;
+    covariance += (asset[index] - meanAsset) * diffBtc;
+    varianceBtc += diffBtc * diffBtc;
+  }
+  if (varianceBtc === 0) return null;
+  return covariance / varianceBtc;
+}
+
 function correlationTone(value: number | null) {
   if (value === null) return "na";
   if (value >= 0.7) return "strong-positive";
@@ -207,6 +229,54 @@ export default function CorrelationWatch() {
   const loading = WATCHLIST.some((item) => assets[item.symbol]?.loading);
   const anyError = WATCHLIST.some((item) => assets[item.symbol]?.error);
 
+  const insights = useMemo(() => {
+    const btcReturns = returnsBySymbol.get("BTCUSDT") ?? [];
+    const gold = "PAXGUSDT";
+    const crypto = WATCHLIST.filter(
+      (item) => item.symbol !== gold && item.symbol !== "BTCUSDT",
+    );
+
+    const betas = crypto
+      .map((item) => ({
+        label: item.label as string,
+        value: beta(returnsBySymbol.get(item.symbol) ?? [], btcReturns),
+      }))
+      .filter((entry): entry is { label: string; value: number } => entry.value !== null)
+      .sort((left, right) => right.value - left.value);
+
+    // Every distinct crypto pair, to find what actually moves together.
+    const cryptoSymbols = WATCHLIST.filter((item) => item.symbol !== gold);
+    const pairs: { label: string; value: number }[] = [];
+    for (let i = 0; i < cryptoSymbols.length; i += 1) {
+      for (let j = i + 1; j < cryptoSymbols.length; j += 1) {
+        const value = pearson(
+          returnsBySymbol.get(cryptoSymbols[i].symbol) ?? [],
+          returnsBySymbol.get(cryptoSymbols[j].symbol) ?? [],
+        );
+        if (value !== null) {
+          pairs.push({ label: `${cryptoSymbols[i].label} · ${cryptoSymbols[j].label}`, value });
+        }
+      }
+    }
+    pairs.sort((left, right) => right.value - left.value);
+
+    const averagePair = pairs.length
+      ? pairs.reduce((sum, pair) => sum + pair.value, 0) / pairs.length
+      : null;
+
+    const goldReturns = returnsBySymbol.get(gold) ?? [];
+    const goldVsBtc = pearson(goldReturns, btcReturns);
+
+    return {
+      highestBeta: betas[0] ?? null,
+      lowestBeta: betas[betas.length - 1] ?? null,
+      tightestPair: pairs[0] ?? null,
+      loosestPair: pairs[pairs.length - 1] ?? null,
+      averagePair,
+      goldVsBtc,
+    };
+  }, [returnsBySymbol]);
+
   return (
     <article className="panel correlation-panel" id="vigilancia">
       <div className="panel-head">
@@ -250,6 +320,84 @@ export default function CorrelationWatch() {
             </div>
           );
         })}
+      </div>
+
+      <div className="key-readings">
+        <p className="key-readings-title">LECTURAS CLAVE</p>
+        <div className="key-grid">
+          <div>
+            <span>MAYOR BETA vs BTC</span>
+            <b>
+              {insights.highestBeta
+                ? `${insights.highestBeta.label} ${insights.highestBeta.value.toFixed(2)}×`
+                : "—"}
+            </b>
+            <small>Amplifica más cada movimiento de BTC</small>
+          </div>
+          <div>
+            <span>MENOR BETA vs BTC</span>
+            <b>
+              {insights.lowestBeta
+                ? `${insights.lowestBeta.label} ${insights.lowestBeta.value.toFixed(2)}×`
+                : "—"}
+            </b>
+            <small>El más amortiguado del bloque</small>
+          </div>
+          <div>
+            <span>PAR MÁS ACOPLADO</span>
+            <b className={insights.tightestPair && insights.tightestPair.value >= 0.7 ? "negative" : ""}>
+              {insights.tightestPair
+                ? `${insights.tightestPair.label} ${insights.tightestPair.value.toFixed(2)}`
+                : "—"}
+            </b>
+            <small>Operarlos juntos no diversifica</small>
+          </div>
+          <div>
+            <span>PAR MÁS DESACOPLADO</span>
+            <b className={insights.loosestPair && insights.loosestPair.value < 0.3 ? "positive" : ""}>
+              {insights.loosestPair
+                ? `${insights.loosestPair.label} ${insights.loosestPair.value.toFixed(2)}`
+                : "—"}
+            </b>
+            <small>El par con mayor lectura independiente</small>
+          </div>
+          <div>
+            <span>ACOPLE MEDIO DEL BLOQUE</span>
+            <b className={insights.averagePair !== null && insights.averagePair >= 0.7 ? "negative" : ""}>
+              {insights.averagePair === null ? "—" : insights.averagePair.toFixed(2)}
+            </b>
+            <small>
+              {insights.averagePair === null
+                ? "Muestra insuficiente"
+                : insights.averagePair >= 0.7
+                  ? "Riesgo concentrado: el bloque se mueve como un solo activo"
+                  : insights.averagePair >= 0.4
+                    ? "Acople moderado entre criptos"
+                    : "Bloque disperso: hay lecturas independientes"}
+            </small>
+          </div>
+          <div>
+            <span>ORO vs BTC</span>
+            <b
+              className={
+                insights.goldVsBtc === null
+                  ? ""
+                  : insights.goldVsBtc < 0.2
+                    ? "positive"
+                    : "negative"
+              }
+            >
+              {insights.goldVsBtc === null ? "—" : insights.goldVsBtc.toFixed(2)}
+            </b>
+            <small>
+              {insights.goldVsBtc === null
+                ? "Muestra insuficiente"
+                : insights.goldVsBtc < 0.2
+                  ? "Oro desacoplado: sirve como refugio frente a esta cartera"
+                  : "Oro acompañando a cripto: no está cubriendo el riesgo"}
+            </small>
+          </div>
+        </div>
       </div>
 
       <div className="correlation-matrix-wrap">

@@ -12,8 +12,10 @@ import "./market-brain.css";
 import "./scalping-desk.css";
 import "./compare-chart.css";
 import "./correlation-watch.css";
+import "./pump-radar.css";
 import "./secure-brain.css";
 import "./mobile-pro.css";
+import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });

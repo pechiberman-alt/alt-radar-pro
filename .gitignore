@@ -43,3 +43,7 @@ yarn-error.log*
 .gh-auth-*.log
 .cf-auth-*.log
 .codex-remote-attachments/
+
+# typescript incremental build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo

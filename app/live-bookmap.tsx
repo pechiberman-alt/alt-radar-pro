@@ -75,6 +75,11 @@ type FootprintRow = {
   price: number;
   buy: number;
   sell: number;
+  /** Ratio of the dominant side over the weaker one; Infinity when one side is empty. */
+  imbalance: number;
+  dominant: "buy" | "sell" | "flat";
+  /** True while the row sits inside the 70% volume value area. */
+  inValueArea: boolean;
 };
 type HoverPoint = {
   x: number;
@@ -257,9 +262,45 @@ function currentWalls(
     });
 }
 
+const FOOTPRINT_TARGET_ROWS = 16;
+
+/**
+ * Snap a raw bucket width to a readable 1 / 2 / 5 × 10^n step so prices on the
+ * ladder line up instead of landing on arbitrary fractions.
+ */
+function niceStep(raw: number) {
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const normalized = raw / magnitude;
+  const snapped = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return snapped * magnitude;
+}
+
+/**
+ * Builds the footprint from real executions. The bucket width adapts to the
+ * price range the trades actually covered, so a quiet window still resolves
+ * into distinct levels instead of collapsing everything into one row, and the
+ * rows kept are the ones nearest the market rather than the highest priced.
+ */
 function footprintRows(trades: Trade[], mid: number, spread: number): FootprintRow[] {
   if (!trades.length || !mid) return [];
-  const step = Math.max(spread, mid * 0.00015, Number.EPSILON);
+
+  const prices = trades.map((trade) => trade.price);
+  const low = Math.min(...prices);
+  const high = Math.max(...prices);
+  const observedRange = high - low;
+
+  // Aim for roughly FOOTPRINT_TARGET_ROWS levels across the traded range, but
+  // never finer than the spread (that would invent resolution the book lacks).
+  const step =
+    niceStep(
+      Math.max(
+        observedRange / FOOTPRINT_TARGET_ROWS,
+        spread > 0 ? spread : 0,
+        mid * 0.000002,
+      ),
+    ) || Math.max(mid * 0.00001, Number.EPSILON);
+
   const rows = new Map<number, { buy: number; sell: number }>();
   trades.forEach((trade) => {
     const bucket = Math.round(trade.price / step) * step;
@@ -268,10 +309,44 @@ function footprintRows(trades: Trade[], mid: number, spread: number): FootprintR
     else current.buy += trade.notional;
     rows.set(bucket, current);
   });
-  return [...rows.entries()]
+
+  const nearest = [...rows.entries()]
     .map(([price, value]) => ({ price, ...value }))
-    .sort((left, right) => right.price - left.price)
-    .slice(0, 14);
+    .sort(
+      (left, right) => Math.abs(left.price - mid) - Math.abs(right.price - mid),
+    )
+    .slice(0, FOOTPRINT_TARGET_ROWS);
+
+  // Value area: the levels that together hold 70% of the traded volume, walking
+  // outward from the point of control.
+  const byVolume = [...nearest].sort(
+    (left, right) => right.buy + right.sell - (left.buy + left.sell),
+  );
+  const totalVolume = byVolume.reduce((sum, row) => sum + row.buy + row.sell, 0);
+  const valueAreaPrices = new Set<number>();
+  let accumulated = 0;
+  for (const row of byVolume) {
+    if (totalVolume > 0 && accumulated >= totalVolume * 0.7) break;
+    valueAreaPrices.add(row.price);
+    accumulated += row.buy + row.sell;
+  }
+
+  return nearest
+    .map((row) => {
+      const stronger = Math.max(row.buy, row.sell);
+      const weaker = Math.min(row.buy, row.sell);
+      const imbalance = stronger === 0 ? 0 : weaker === 0 ? Infinity : stronger / weaker;
+      return {
+        ...row,
+        imbalance,
+        dominant:
+          row.buy === row.sell ? ("flat" as const)
+          : row.buy > row.sell ? ("buy" as const)
+          : ("sell" as const),
+        inValueArea: valueAreaPrices.has(row.price),
+      };
+    })
+    .sort((left, right) => right.price - left.price);
 }
 
 function depthWithCumulative(levels: Level[]) {
@@ -1494,11 +1569,14 @@ export default function LiveBookmap({
   const footprintPoc = [...actualFootprint].sort(
     (left, right) => right.buy + right.sell - (left.buy + left.sell),
   )[0] ?? null;
-  const stackedImbalances = actualFootprint.filter((row) => {
-    const weakerSide = Math.min(row.buy, row.sell);
-    const strongerSide = Math.max(row.buy, row.sell);
-    return strongerSide > 0 && (weakerSide === 0 || strongerSide / weakerSide >= 3);
-  }).length;
+  const stackedImbalances = actualFootprint.filter((row) => row.imbalance >= 3).length;
+  const valueAreaRows = actualFootprint.filter((row) => row.inValueArea);
+  const valueAreaHigh = valueAreaRows.length
+    ? Math.max(...valueAreaRows.map((row) => row.price))
+    : null;
+  const valueAreaLow = valueAreaRows.length
+    ? Math.min(...valueAreaRows.map((row) => row.price))
+    : null;
   const bidRows = depthWithCumulative(ladder.bids);
   const askRows = depthWithCumulative(ladder.asks);
   const maxCumulative = Math.max(
@@ -2054,13 +2132,16 @@ export default function LiveBookmap({
               <div className="chart-footprint-body">
                 {actualFootprint.slice(0, 10).map((row) => {
                   const total = Math.max(row.buy + row.sell, 1);
-                  const weaker = Math.min(row.buy, row.sell);
-                  const ratio = Math.max(row.buy, row.sell) / Math.max(weaker, 1);
-                  const dominant = ratio >= 3 ? (row.buy > row.sell ? "buy-imbalance" : "sell-imbalance") : "";
+                  const dominant =
+                    row.imbalance >= 3
+                      ? row.dominant === "buy"
+                        ? "buy-imbalance"
+                        : "sell-imbalance"
+                      : "";
                   const rowDelta = row.buy - row.sell;
                   return (
                     <div
-                      className={`chart-footprint-row ${dominant} ${footprintPoc?.price === row.price ? "poc" : ""}`}
+                      className={`chart-footprint-row ${dominant} ${footprintPoc?.price === row.price ? "poc" : ""} ${row.inValueArea ? "value-area" : ""}`}
                       key={`chart-footprint-${row.price}`}
                       style={{ "--sell-share": `${(row.sell / total) * 100}%`, "--buy-share": `${(row.buy / total) * 100}%` } as React.CSSProperties}
                     >
@@ -2283,17 +2364,36 @@ export default function LiveBookmap({
             <span>VOLUMEN <b>{footprintNumber(footprintTotal)}</b></span>
             <span>DELTA <b className={footprintDelta >= 0 ? "positive" : "negative"}>{footprintDelta >= 0 ? "+" : "−"}{footprintNumber(footprintDelta)}</b></span>
             <span>POC <b>{footprintPoc ? priceLabel(footprintPoc.price) : "—"}</b></span>
-            <span>IMBALANCES <b>{stackedImbalances}</b></span>
+            <span>IMBALANCES <b className={stackedImbalances >= 3 ? "positive" : ""}>{stackedImbalances}</b></span>
+            <span>
+              ÁREA VALOR{" "}
+              <b>
+                {valueAreaLow !== null && valueAreaHigh !== null
+                  ? `${priceLabel(valueAreaLow)} – ${priceLabel(valueAreaHigh)}`
+                  : "—"}
+              </b>
+            </span>
           </div>
           <div className="footprint-columns footprint-columns-pro"><span>BID HIT</span><b>PRECIO</b><span>ASK LIFT</span><em>DELTA</em></div>
           {actualFootprint.map((row) => {
             const total = Math.max(row.buy + row.sell, 1);
             const rowDelta = row.buy - row.sell;
-            const weaker = Math.min(row.buy, row.sell);
-            const ratio = Math.max(row.buy, row.sell) / Math.max(weaker, 1);
-            const dominant = ratio >= 3 ? (row.buy > row.sell ? "buy-imbalance" : "sell-imbalance") : "";
+            const imbalanceClass =
+              row.imbalance >= 3
+                ? row.dominant === "buy"
+                  ? "buy-imbalance"
+                  : "sell-imbalance"
+                : "";
             return (
-              <div className={`footprint-row footprint-row-pro ${dominant} ${footprintPoc?.price === row.price ? "poc" : ""}`} key={row.price}>
+              <div
+                className={`footprint-row footprint-row-pro ${imbalanceClass} ${footprintPoc?.price === row.price ? "poc" : ""} ${row.inValueArea ? "value-area" : ""}`}
+                key={row.price}
+                title={
+                  row.imbalance >= 3
+                    ? `Desequilibrio ${row.imbalance === Infinity ? "total" : `${row.imbalance.toFixed(1)}×`} a favor de ${row.dominant === "buy" ? "compradores" : "vendedores"}`
+                    : undefined
+                }
+              >
                 <em className="negative">{footprintNumber(row.sell)}</em>
                 <span style={{ "--sell": `${(row.sell / total) * 100}%`, "--buy": `${(row.buy / total) * 100}%` } as React.CSSProperties}>
                   <i /><b>{priceLabel(row.price)}</b><u />

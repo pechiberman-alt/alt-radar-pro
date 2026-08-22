@@ -14,6 +14,7 @@ import SignalLedger from "./signal-ledger";
 import ScalpingDesk from "./scalping-desk";
 import CompareChart from "./compare-chart";
 import CorrelationWatch from "./correlation-watch";
+import PumpRadar from "./pump-radar";
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -39,6 +40,7 @@ const NAV_ITEMS = [
   { label: "RESUMEN", mobile: "INICIO", icon: "⌂", id: "resumen" },
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
+  { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
   { label: "COMPARAR", mobile: "COMP", icon: "⇄", id: "comparador" },
   { label: "VIGILANCIA", mobile: "WATCH", icon: "◈", id: "vigilancia" },
   { label: "ORDER FLOW", mobile: "MAPA", icon: "▦", id: "order-flow" },
@@ -732,6 +734,11 @@ export default function RadarApp() {
           riskScore={risk.score}
           killSwitch={risk.killSwitch}
           altseasonScore={altseason.final}
+          minimumQuoteVolume={settings.minimumQuoteVolume}
+        />
+
+        <PumpRadar
+          market={data.market}
           minimumQuoteVolume={settings.minimumQuoteVolume}
         />
 

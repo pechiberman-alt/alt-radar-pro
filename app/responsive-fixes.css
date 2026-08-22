@@ -1,0 +1,35 @@
+/* Loaded last so it resolves layout conflicts between the earlier stylesheets.
+   Two wide tables (scanner and signal ledger) were pushing the whole document
+   sideways on narrow viewports instead of scrolling inside their own wrapper,
+   and the scanner clipped its right-hand columns with no way to reach them. */
+
+/* Grid and flex children default to min-width:auto, which makes them refuse to
+   shrink below their content. Without this the overflow wrappers below can
+   never actually scroll. */
+.lower-grid > *,
+.hero-grid > *,
+.shell > *,
+.signals-section > *,
+.pump-grid > * {
+  min-width: 0;
+}
+
+/* Let the wide tables scroll horizontally inside their own container. */
+.table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ledger-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* The document itself should never scroll sideways. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}

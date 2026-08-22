@@ -182,3 +182,11 @@
   .chart-gesture-help { left: 8px; right: 90px; bottom: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .footprint-columns-pro,.footprint-row-pro { grid-template-columns: 58px minmax(96px, 1fr) 58px 65px; gap: 5px; }
 }
+
+/* Value area: the 70% of executed volume, marked so the balance point of the
+   session reads at a glance without competing with the POC highlight. */
+.footprint-row-pro.value-area { background: rgba(85, 214, 190, .05); }
+.footprint-row-pro.value-area.poc { background: rgba(225, 193, 91, .07); }
+.chart-footprint-row.value-area { background: rgba(85, 214, 190, .055); }
+.chart-footprint-row.value-area.poc { background: rgba(230, 198, 92, .075); }
+.footprint-kpis span:last-child b { font-size: 8px; letter-spacing: -.2px; }
