@@ -60,3 +60,9 @@
 .flow-brain>header{flex-direction:column;gap:6px}
 .brain-footnote{padding:13px 14px}
 }
+
+/* Legend swatches for the heatmap layers added alongside the brain. */
+.bookmap-caption i.poc-mark{background:#f2d34a}
+.bookmap-caption i.level-mark{background:linear-gradient(90deg,var(--green),var(--red));width:16px;border-radius:0}
+.bookmap-caption i.vwap-mark{background:#8ca0ff}
+.bookmap-caption .marker-legend{font-family:var(--font-mono);letter-spacing:.3px}

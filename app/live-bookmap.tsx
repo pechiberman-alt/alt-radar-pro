@@ -418,6 +418,13 @@ export default function LiveBookmap({
   const [showTrades, setShowTrades] = useState(false);
   const [showCvd, setShowCvd] = useState(false);
   const [showWalls, setShowWalls] = useState(true);
+  const [showProfile, setShowProfile] = useState(true);
+  const [showLevels, setShowLevels] = useState(true);
+  const [showVwap, setShowVwap] = useState(false);
+  // The brain's readings are drawn on the canvas, which runs outside React's
+  // render, so they are mirrored into refs the draw loop can read.
+  const structureLevelsRef = useRef<ReturnType<typeof findStructureLevels>>([]);
+  const institutionalRef = useRef<ReturnType<typeof detectInstitutional>>([]);
   const [showFootprintNumbers, setShowFootprintNumbers] = useState(false);
   const [showMarketSidebar, setShowMarketSidebar] = useState(false);
   const [sidePanel, setSidePanel] = useState<"dom" | "tape" | "alerts">("dom");
@@ -1284,6 +1291,150 @@ export default function LiveBookmap({
         });
       }
 
+      // ---- Volume profile -------------------------------------------------
+      // Traded volume by price across the visible window, drawn against the
+      // right edge. This is what tells you where the market agreed on value,
+      // as opposed to the heatmap, which shows where liquidity merely rested.
+      if (showProfile && plottedTrades.length >= 12) {
+        const buckets = new Map<number, { buy: number; sell: number }>();
+        const bucketHeight = Math.max(heatPriceStep, (high - low) / 90);
+        for (const trade of plottedTrades) {
+          if (trade.price < low || trade.price > high) continue;
+          const bucket = Math.round(trade.price / bucketHeight) * bucketHeight;
+          const entry = buckets.get(bucket) ?? { buy: 0, sell: 0 };
+          if (trade.buyerMaker) entry.sell += trade.notional;
+          else entry.buy += trade.notional;
+          buckets.set(bucket, entry);
+        }
+        const rows = [...buckets.entries()].map(([price, value]) => ({
+          price,
+          total: value.buy + value.sell,
+          buy: value.buy,
+        }));
+        const peak = Math.max(...rows.map((row) => row.total), 1);
+        const profileWidth = Math.min(96, plotWidth * 0.2);
+        const pocRow = rows.reduce(
+          (best, row) => (row.total > best.total ? row : best),
+          rows[0],
+        );
+
+        context.save();
+        for (const row of rows) {
+          const barWidth = (row.total / peak) * profileWidth;
+          if (barWidth < 0.6) continue;
+          const yy = y(row.price);
+          const barHeight = Math.max(1.2, (bucketHeight / (high - low)) * plotHeight - 0.6);
+          // Buy share fills from the right so the balance per level is visible.
+          const buyWidth = barWidth * (row.buy / Math.max(row.total, 1));
+          context.fillStyle = "rgba(255, 89, 100, .30)";
+          context.fillRect(plotRight - barWidth, yy - barHeight / 2, barWidth, barHeight);
+          context.fillStyle = "rgba(57, 242, 154, .32)";
+          context.fillRect(plotRight - buyWidth, yy - barHeight / 2, buyWidth, barHeight);
+        }
+        if (pocRow) {
+          const yy = y(pocRow.price);
+          context.strokeStyle = "rgba(246, 211, 75, .85)";
+          context.lineWidth = 1.1;
+          context.beginPath();
+          context.moveTo(plotRight - profileWidth, yy);
+          context.lineTo(plotRight, yy);
+          context.stroke();
+          context.fillStyle = "#f2d34a";
+          context.font = "bold 7px monospace";
+          context.textAlign = "left";
+          context.fillText("POC", plotRight - profileWidth - 22, yy + 3);
+        }
+        context.restore();
+      }
+
+      // ---- VWAP -----------------------------------------------------------
+      // Volume-weighted average of the window: the reference most desks use to
+      // judge whether current price is expensive or cheap for the session.
+      if (showVwap && plottedTrades.length >= 10) {
+        let cumulativeVolume = 0;
+        let cumulativeNotional = 0;
+        const points: { x: number; price: number }[] = [];
+        for (const trade of [...plottedTrades].sort((a, b) => a.x - b.x)) {
+          cumulativeNotional += trade.price * trade.notional;
+          cumulativeVolume += trade.notional;
+          if (cumulativeVolume > 0) {
+            points.push({ x: trade.x, price: cumulativeNotional / cumulativeVolume });
+          }
+        }
+        if (points.length > 1) {
+          context.save();
+          context.strokeStyle = "rgba(140, 160, 255, .9)";
+          context.lineWidth = 1.3;
+          context.setLineDash([4, 3]);
+          context.beginPath();
+          points.forEach((point, index) => {
+            if (index === 0) context.moveTo(point.x, y(point.price));
+            else context.lineTo(point.x, y(point.price));
+          });
+          context.stroke();
+          context.restore();
+          const lastVwap = points[points.length - 1].price;
+          context.fillStyle = "#8ca0ff";
+          context.font = "bold 7px monospace";
+          context.textAlign = "left";
+          context.fillText(`VWAP ${priceLabel(lastVwap)}`, plotLeft + 6, y(lastVwap) - 4);
+        }
+      }
+
+      // ---- Structure levels ----------------------------------------------
+      // Floors and ceilings from the brain, drawn with weight proportional to
+      // the evidence behind them so a confluent level reads stronger.
+      if (showLevels) {
+        for (const level of structureLevelsRef.current.slice(0, 6)) {
+          if (level.price < low || level.price > high) continue;
+          const yy = y(level.price);
+          const isFloor = level.kind === "PISO";
+          const alpha = 0.25 + (level.strength / 100) * 0.55;
+          context.save();
+          context.strokeStyle = isFloor
+            ? `rgba(57, 242, 154, ${alpha})`
+            : `rgba(255, 89, 100, ${alpha})`;
+          context.lineWidth = 0.8 + (level.strength / 100) * 1.8;
+          context.beginPath();
+          context.moveTo(plotLeft, yy);
+          context.lineTo(plotRight, yy);
+          context.stroke();
+          context.fillStyle = isFloor ? "#39f29a" : "#ff5964";
+          context.font = "bold 7px monospace";
+          context.textAlign = "left";
+          context.fillText(
+            `${level.kind} ${level.strength}`,
+            plotLeft + 6,
+            yy + (isFloor ? 9 : -4),
+          );
+          context.restore();
+        }
+      }
+
+      // ---- Institutional markers ------------------------------------------
+      // Where hidden size refilled or aggression was absorbed, at its price.
+      if (showLevels) {
+        for (const event of institutionalRef.current.slice(0, 5)) {
+          if (event.price < low || event.price > high) continue;
+          const yy = y(event.price);
+          const marker =
+            event.kind === "ICEBERG" ? "◆" : event.kind === "ABSORCIÓN" ? "▣" : event.kind === "BARRIDO" ? "»" : "●";
+          context.save();
+          context.fillStyle =
+            event.kind === "ICEBERG"
+              ? "#55d6be"
+              : event.kind === "ABSORCIÓN"
+                ? "#f4b84a"
+                : event.kind === "BARRIDO"
+                  ? "#ff5964"
+                  : "#39f29a";
+          context.font = "bold 10px monospace";
+          context.textAlign = "right";
+          context.fillText(marker, plotRight - 4, yy + 3.5);
+          context.restore();
+        }
+      }
+
       context.save();
       context.shadowBlur = 6;
       context.shadowColor = "rgba(246, 211, 75, .48)";
@@ -1413,6 +1564,9 @@ export default function LiveBookmap({
     showTrades,
     showCvd,
     showWalls,
+    showProfile,
+    showLevels,
+    showVwap,
     liquidityHistory,
     marketTimeframe,
     timeZoom,
@@ -1608,6 +1762,11 @@ export default function LiveBookmap({
     (sum, row) => sum + row.buy + row.sell,
     0,
   );
+
+  useEffect(() => {
+    structureLevelsRef.current = structureLevels;
+    institutionalRef.current = institutional;
+  }, [structureLevels, institutional]);
 
   // Publish the reading upward, deferred so the parent is never updated while
   // this component is still rendering.
@@ -1966,6 +2125,9 @@ export default function LiveBookmap({
         <div className="layer-switches" aria-label="Capas visibles">
           <button className={showTrades ? "enabled" : ""} onClick={() => setShowTrades((value) => !value)}>TRADES</button>
           <button className={showWalls ? "enabled" : ""} onClick={() => setShowWalls((value) => !value)}>WALLS</button>
+          <button className={showProfile ? "enabled" : ""} onClick={() => setShowProfile((value) => !value)}>PERFIL</button>
+          <button className={showLevels ? "enabled" : ""} onClick={() => setShowLevels((value) => !value)}>NIVELES</button>
+          <button className={showVwap ? "enabled" : ""} onClick={() => setShowVwap((value) => !value)}>VWAP</button>
           <button className={showCvd ? "enabled" : ""} onClick={() => setShowCvd((value) => !value)}>CVD</button>
           <button className={showFootprintNumbers ? "enabled" : ""} onClick={() => setShowFootprintNumbers((value) => !value)}>FOOTPRINT #</button>
         </div>
@@ -2654,6 +2816,10 @@ export default function LiveBookmap({
         <span><i className="buy" /> Compra agresiva</span>
         <span><i className="sell" /> Venta agresiva</span>
         <span><i className="large-dot" /> Trade grande relativo</span>
+        {showProfile && <span><i className="poc-mark" /> Perfil de volumen · POC</span>}
+        {showLevels && <span><i className="level-mark" /> Piso / techo con su fuerza</span>}
+        {showLevels && <span className="marker-legend">◆ iceberg · ▣ absorción · » barrido</span>}
+        {showVwap && <span><i className="vwap-mark" /> VWAP de la ventana</span>}
         <small>
           Binance {venue === "futures" ? "Futures" : "Spot"} · top 20 WebSocket 100 ms + hasta 100 niveles REST 2.5 s · sin órdenes simuladas
         </small>
