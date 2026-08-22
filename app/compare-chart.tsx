@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { fetchKlineRows } from "./binance-klines";
 
 type Candle = {
   openTime: number;
@@ -23,36 +24,16 @@ const INTERVALS: { value: Interval; label: string; limit: number }[] = [
   { value: "1d", label: "1D · 6M", limit: 180 },
 ];
 
-const BASES = [
-  "https://data-api.binance.vision",
-  "https://api1.binance.com",
-  "https://api.binance.com",
-];
-
 const COLORS = ["var(--green)", "var(--cyan)", "var(--amber)"] as const;
 
 const assetName = (symbol: string) => symbol.replace("USDT", "");
 
 async function fetchKlines(symbol: string, interval: Interval, limit: number): Promise<Candle[]> {
-  let lastError: unknown;
-  for (const base of BASES) {
-    try {
-      const response = await fetch(
-        `${base}/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`,
-        { signal: AbortSignal.timeout(8_000), headers: { Accept: "application/json" } },
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const rows = (await response.json()) as unknown[];
-      if (!Array.isArray(rows) || !rows.length) throw new Error("SIN VELAS");
-      return rows
-        .filter((row): row is unknown[] => Array.isArray(row) && row.length >= 5)
-        .map((row) => ({ openTime: Number(row[0]), close: Number(row[4]) }))
-        .filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError ?? new Error("DATA UNAVAILABLE");
+  const rows = await fetchKlineRows(symbol, interval, limit);
+  return rows
+    .filter((row): row is unknown[] => Array.isArray(row) && row.length >= 5)
+    .map((row) => ({ openTime: Number(row[0]), close: Number(row[4]) }))
+    .filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
 }
 
 function normalize(candles: Candle[]) {
@@ -123,8 +104,22 @@ function CompareLine({
   );
 }
 
-export default function CompareChart({ symbols }: { symbols: string[] }) {
-  const [interval, setInterval_] = useState<Interval>("1h");
+export default function CompareChart({
+  symbols,
+  defaultInterval = "1h",
+}: {
+  symbols: string[];
+  defaultInterval?: Interval;
+}) {
+  const [interval, setInterval_] = useState<Interval>(defaultInterval);
+  const appliedProfileInterval = useRef(defaultInterval);
+
+  // The trading profile sets the horizon, but a manual pick afterwards stands.
+  useEffect(() => {
+    if (appliedProfileInterval.current === defaultInterval) return;
+    appliedProfileInterval.current = defaultInterval;
+    setInterval_(defaultInterval);
+  }, [defaultInterval]);
   const [picks, setPicks] = useState<string[]>(["SOLUSDT", "BTCUSDT"]);
   const [states, setStates] = useState<Record<string, SeriesState>>({});
   const requestId = useRef(0);

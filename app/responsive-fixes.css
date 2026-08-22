@@ -33,3 +33,67 @@ body {
   max-width: 100%;
   overflow-x: hidden;
 }
+
+/* ---- Reading comfort ----------------------------------------------------
+   The terminal look relies on very small monospace type. These adjustments
+   raise the floor on the sizes that were hardest to read and open up the
+   spacing between sections, without changing the visual language. */
+
+/* 6px labels sit below what most screens render legibly. */
+.pump-readout span,
+.risk-grid span,
+.correlation-matrix th {
+  font-size: 7px;
+}
+
+/* Long-form explanatory copy reads better with a slightly looser measure. */
+.pump-footnote,
+.compare-footnote,
+.correlation-footnote,
+.risk-footnote,
+.dominance-note {
+  max-width: 92ch;
+  letter-spacing: 0.1px;
+}
+
+/* Give each major panel room to breathe so the dashboard scans as sections
+   rather than one continuous wall. */
+.pump-panel,
+.compare-panel,
+.correlation-panel,
+.risk-desk {
+  scroll-margin-top: 88px;
+}
+
+/* Numbers are the content here: tabular figures stop columns from jittering
+   as values update in place. */
+.pump-readout b,
+.pump-metric em,
+.risk-grid b,
+.risk-headline b,
+.correlation-cell,
+.dominance-row em,
+.watch-tile strong,
+.key-grid b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus was invisible against the dark panels. */
+.pump-actions button:focus-visible,
+.compare-intervals button:focus-visible,
+.correlation-intervals button:focus-visible,
+.profile-switch button:focus-visible,
+.risk-desk input:focus-visible,
+.risk-desk select:focus-visible,
+.pump-toggle:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+@media (max-width: 700px) {
+  /* Touch targets on the profile switch and interval pickers. */
+  .compare-intervals button,
+  .correlation-intervals button {
+    min-height: 34px;
+  }
+}

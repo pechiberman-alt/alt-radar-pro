@@ -2,7 +2,7 @@
 .correlation-intervals{display:flex;gap:6px;padding:0 22px 14px}
 .correlation-intervals button{background:#0c130f;border:1px solid var(--line);color:var(--muted);padding:7px 10px;border-radius:3px;font:8px var(--font-mono);letter-spacing:.5px;cursor:pointer}
 .correlation-intervals button.active{color:var(--green);border-color:#2d6a4d;background:#0c251a}
-.watch-strip{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.watch-strip{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .watch-tile{padding:12px 14px;border-right:1px solid var(--line);display:grid;gap:4px}
 .watch-tile:last-child{border-right:0}
 .watch-tile span{font:8px var(--font-mono);color:#a1ada7}
@@ -15,6 +15,22 @@
 .key-grid span{display:block;font:7px var(--font-mono);letter-spacing:.6px;color:var(--muted)}
 .key-grid b{display:block;margin:5px 0 4px;font:12px var(--font-mono)}
 .key-grid small{display:block;font-size:9px;line-height:1.4;color:#8c9992}
+
+.dominance-block{padding:16px 22px 4px;border-top:1px solid var(--line)}
+.dominance-block .key-readings-title{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.dominance-block .key-readings-title em{font-style:normal;color:var(--muted);letter-spacing:.6px}
+.dominance-bars{display:grid;gap:7px;border:1px solid var(--line);background:#0c130f;padding:12px}
+.dominance-row{display:grid;grid-template-columns:58px minmax(0,1fr) 62px;gap:10px;align-items:center}
+.dominance-row>span{font:9px var(--font-mono);color:var(--text)}
+.dominance-row i{position:relative;height:6px;background:#141d18;border-radius:2px;overflow:hidden}
+/* Zero line sits at the centre so rotation reads in both directions. */
+.dominance-row i:after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:#2f3a34}
+.dominance-row i b{position:absolute;top:0;bottom:0;border-radius:2px}
+.dominance-row i b.up{background:var(--green)}
+.dominance-row i b.down{background:var(--red)}
+.dominance-row em{font:9px var(--font-mono);font-style:normal;text-align:right}
+.dominance-empty{margin:0;text-align:center;font:8px var(--font-mono);color:var(--muted);padding:10px}
+.dominance-note{margin:10px 0 0;font-size:9px;line-height:1.5;color:var(--muted)}
 
 .correlation-matrix-wrap{overflow-x:auto;padding:18px 22px}
 .correlation-matrix{width:100%;border-collapse:collapse}
@@ -47,6 +63,7 @@
 .correlation-intervals{padding:0 14px 12px}
 .key-readings{padding:14px 14px 4px}
 .key-grid{grid-template-columns:1fr}
+.dominance-block{padding:14px 14px 4px}
 .watch-strip{grid-template-columns:repeat(2,1fr)}
 .watch-tile:nth-child(2n){border-right:0}
 .correlation-matrix-wrap{padding:14px}

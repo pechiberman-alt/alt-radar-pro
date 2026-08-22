@@ -15,6 +15,8 @@ import ScalpingDesk from "./scalping-desk";
 import CompareChart from "./compare-chart";
 import CorrelationWatch from "./correlation-watch";
 import PumpRadar from "./pump-radar";
+import RiskDesk from "./risk-desk";
+import { TRADING_PROFILES, type ProfileId } from "@/lib/trading-profiles";
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -41,6 +43,7 @@ const NAV_ITEMS = [
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
+  { label: "RIESGO", mobile: "RIESGO", icon: "◎", id: "riesgo" },
   { label: "COMPARAR", mobile: "COMP", icon: "⇄", id: "comparador" },
   { label: "VIGILANCIA", mobile: "WATCH", icon: "◈", id: "vigilancia" },
   { label: "ORDER FLOW", mobile: "MAPA", icon: "▦", id: "order-flow" },
@@ -339,7 +342,9 @@ export default function RadarApp() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const [assetSearch, setAssetSearch] = useState("");
+  const [profile, setProfile] = useState<ProfileId>("TRADING_PRO");
   const { settings, update: updateSettings } = useDashboardSettings();
+  const profileInterval = TRADING_PROFILES[profile].interval;
 
   const refresh = useCallback(async () => {
     const controller = new AbortController();
@@ -742,9 +747,14 @@ export default function RadarApp() {
           minimumQuoteVolume={settings.minimumQuoteVolume}
         />
 
-        <CompareChart symbols={data.market.map((asset) => asset.symbol)} />
+        <RiskDesk profile={profile} setProfile={setProfile} market={data.market} />
 
-        <CorrelationWatch />
+        <CompareChart
+          symbols={data.market.map((asset) => asset.symbol)}
+          defaultInterval={profileInterval}
+        />
+
+        <CorrelationWatch defaultInterval={profileInterval} market={data.market} />
 
         <div id="order-flow"><LiveBookmap
           symbols={data.market.map((asset) => asset.symbol)}

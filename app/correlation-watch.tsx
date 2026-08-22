@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { MarketAsset } from "@/lib/radar";
+import { fetchKlineRows } from "./binance-klines";
 
 type Candle = { openTime: number; close: number };
 
@@ -21,6 +23,7 @@ const WATCHLIST = [
   { symbol: "LINKUSDT", label: "LINK" },
   { symbol: "AVAXUSDT", label: "AVAX" },
   { symbol: "UNIUSDT", label: "UNI" },
+  { symbol: "WLDUSDT", label: "WLD" },
   { symbol: "PAXGUSDT", label: "ORO · PAXG" },
 ] as const;
 
@@ -30,56 +33,12 @@ const INTERVALS: { value: Interval; label: string; limit: number }[] = [
   { value: "1d", label: "1D · 6M", limit: 180 },
 ];
 
-const BASES = [
-  "https://data-api.binance.vision",
-  "https://api1.binance.com",
-  "https://api.binance.com",
-];
-
-async function fetchJson<T>(url: string, timeout = 8_000): Promise<T> {
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(timeout),
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json() as Promise<T>;
-}
-
 async function fetchKlines(symbol: string, interval: Interval, limit: number): Promise<Candle[]> {
-  let lastError: unknown;
-  for (const base of BASES) {
-    try {
-      const rows = await fetchJson<unknown[]>(
-        `${base}/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`,
-      );
-      if (!Array.isArray(rows) || !rows.length) throw new Error("SIN VELAS");
-      return rows
-        .filter((row): row is unknown[] => Array.isArray(row) && row.length >= 5)
-        .map((row) => ({ openTime: Number(row[0]), close: Number(row[4]) }))
-        .filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError ?? new Error("DATA UNAVAILABLE");
-}
-
-async function fetchTicker(symbol: string): Promise<{ price: number; change24h: number }> {
-  let lastError: unknown;
-  for (const base of BASES) {
-    try {
-      const row = await fetchJson<{ lastPrice: string; priceChangePercent: string }>(
-        `${base}/api/v3/ticker/24hr?symbol=${encodeURIComponent(symbol)}`,
-      );
-      const price = Number(row.lastPrice);
-      const change24h = Number(row.priceChangePercent);
-      if (!Number.isFinite(price) || price <= 0) throw new Error("PRECIO INVÁLIDO");
-      return { price, change24h };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError ?? new Error("DATA UNAVAILABLE");
+  const rows = await fetchKlineRows(symbol, interval, limit);
+  return rows
+    .filter((row): row is unknown[] => Array.isArray(row) && row.length >= 5)
+    .map((row) => ({ openTime: Number(row[0]), close: Number(row[4]) }))
+    .filter((candle) => Number.isFinite(candle.close) && candle.close > 0);
 }
 
 function returnsOf(candles: Candle[]) {
@@ -155,10 +114,30 @@ const formatPrice = (value: number | null) => {
       : `$${value.toPrecision(4)}`;
 };
 
-export default function CorrelationWatch() {
-  const [interval, setInterval_] = useState<Interval>("1h");
+export default function CorrelationWatch({
+  defaultInterval = "1h",
+  market = [],
+}: {
+  defaultInterval?: Interval;
+  market?: MarketAsset[];
+}) {
+  const [interval, setInterval_] = useState<Interval>(defaultInterval);
+  const appliedProfileInterval = useRef(defaultInterval);
+
+  // Switching trading profile changes the horizon this panel should be read on,
+  // but a manual timeframe choice afterwards must not be overridden.
+  useEffect(() => {
+    if (appliedProfileInterval.current === defaultInterval) return;
+    appliedProfileInterval.current = defaultInterval;
+    setInterval_(defaultInterval);
+  }, [defaultInterval]);
   const [assets, setAssets] = useState<Record<string, AssetState>>({});
   const requestId = useRef(0);
+  const marketRef = useRef(market);
+
+  useEffect(() => {
+    marketRef.current = market;
+  }, [market]);
 
   useEffect(() => {
     const id = ++requestId.current;
@@ -181,17 +160,18 @@ export default function CorrelationWatch() {
       await Promise.all(
         WATCHLIST.map(async (item) => {
           try {
-            const [candles, ticker] = await Promise.all([
-              fetchKlines(item.symbol, interval, config.limit),
-              fetchTicker(item.symbol),
-            ]);
+            const candles = await fetchKlines(item.symbol, interval, config.limit);
             if (requestId.current !== id) return;
+            // Spot price comes from the market feed the app already holds, so
+            // this panel does not issue its own ticker requests.
+            const quote = marketRef.current.find((asset) => asset.symbol === item.symbol);
+            const lastClose = candles.at(-1)?.close ?? null;
             setAssets((current) => ({
               ...current,
               [item.symbol]: {
                 candles,
-                price: ticker.price,
-                change24h: ticker.change24h,
+                price: quote?.price ?? lastClose,
+                change24h: quote?.change24h ?? null,
                 loading: false,
                 error: "",
               },
@@ -267,6 +247,27 @@ export default function CorrelationWatch() {
     const goldReturns = returnsBySymbol.get(gold) ?? [];
     const goldVsBtc = pearson(goldReturns, btcReturns);
 
+    // Dominance expressed the way it can actually be traded: each alt measured
+    // against BTC over the same window. Positive means capital rotated into the
+    // alt (BTC dominance losing ground to it), negative means back into BTC.
+    const rotation = crypto
+      .map((item) => {
+        const candles = assets[item.symbol]?.candles ?? [];
+        const btcCandles = assets.BTCUSDT?.candles ?? [];
+        const length = Math.min(candles.length, btcCandles.length);
+        if (length < 2) return null;
+        const first =
+          candles[candles.length - length].close /
+          btcCandles[btcCandles.length - length].close;
+        const last = candles[candles.length - 1].close / btcCandles[btcCandles.length - 1].close;
+        if (!Number.isFinite(first) || first <= 0 || !Number.isFinite(last)) return null;
+        return { label: item.label as string, value: ((last - first) / first) * 100 };
+      })
+      .filter((entry): entry is { label: string; value: number } => entry !== null)
+      .sort((left, right) => right.value - left.value);
+
+    const gainingOnBtc = rotation.filter((entry) => entry.value > 0).length;
+
     return {
       highestBeta: betas[0] ?? null,
       lowestBeta: betas[betas.length - 1] ?? null,
@@ -274,8 +275,11 @@ export default function CorrelationWatch() {
       loosestPair: pairs[pairs.length - 1] ?? null,
       averagePair,
       goldVsBtc,
+      rotation,
+      gainingOnBtc,
+      rotationTotal: rotation.length,
     };
-  }, [returnsBySymbol]);
+  }, [returnsBySymbol, assets]);
 
   return (
     <article className="panel correlation-panel" id="vigilancia">
@@ -398,6 +402,51 @@ export default function CorrelationWatch() {
             </small>
           </div>
         </div>
+      </div>
+
+      <div className="dominance-block">
+        <p className="key-readings-title">
+          DOMINANCIA · FUERZA CONTRA BTC EN LA VENTANA
+          <em>
+            {insights.gainingOnBtc}/{insights.rotationTotal} GANANDO TERRENO A BTC
+          </em>
+        </p>
+        <div className="dominance-bars">
+          {insights.rotation.map((entry) => {
+            const magnitude = Math.max(
+              1,
+              ...insights.rotation.map((item) => Math.abs(item.value)),
+            );
+            const width = (Math.abs(entry.value) / magnitude) * 50;
+            return (
+              <div className="dominance-row" key={entry.label}>
+                <span>{entry.label}</span>
+                <i>
+                  <b
+                    className={entry.value >= 0 ? "up" : "down"}
+                    style={{
+                      width: `${width}%`,
+                      left: entry.value >= 0 ? "50%" : `${50 - width}%`,
+                    }}
+                  />
+                </i>
+                <em className={entry.value >= 0 ? "positive" : "negative"}>
+                  {entry.value >= 0 ? "+" : ""}
+                  {entry.value.toFixed(2)}%
+                </em>
+              </div>
+            );
+          })}
+          {!insights.rotation.length && (
+            <p className="dominance-empty">MUESTRA INSUFICIENTE PARA MEDIR ROTACIÓN</p>
+          )}
+        </div>
+        <p className="dominance-note">
+          Cada activo medido contra BTC en el mismo período (par ALT/BTC). Positivo significa
+          que el capital rotó hacia el activo y le quitó terreno a la dominancia de BTC;
+          negativo, que volvió a BTC. Es la lectura operable de la dominancia: BTC.D global
+          sólo está disponible como valor puntual, sin serie histórica pública gratuita.
+        </p>
       </div>
 
       <div className="correlation-matrix-wrap">

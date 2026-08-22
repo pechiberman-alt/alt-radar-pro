@@ -9,17 +9,13 @@ import {
   type PumpReading,
   type PumpStage,
 } from "@/lib/pump-radar";
+import { fetchKlineRows } from "./binance-klines";
 
 type Props = {
   market: MarketAsset[];
   minimumQuoteVolume: number;
 };
 
-const BASES = [
-  "https://data-api.binance.vision",
-  "https://api1.binance.com",
-  "https://api.binance.com",
-];
 
 const STAGE_ORDER: Record<PumpStage, number> = {
   "IGNICIÓN": 0,
@@ -50,20 +46,7 @@ const formatPrice = (value: number) =>
       : `$${value.toPrecision(4)}`;
 
 async function fetchKlines(symbol: string) {
-  let lastError: unknown;
-  for (const base of BASES) {
-    try {
-      const response = await fetch(
-        `${base}/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=5m&limit=60`,
-        { signal: AbortSignal.timeout(7_000), headers: { Accept: "application/json" } },
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return parsePumpKlines(await response.json());
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError ?? new Error("DATA UNAVAILABLE");
+  return parsePumpKlines(await fetchKlineRows(symbol, "5m", 60));
 }
 
 function MetricBar({ label, value, cap }: { label: string; value: number; cap: number }) {

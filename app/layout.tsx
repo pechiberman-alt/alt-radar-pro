@@ -13,6 +13,7 @@ import "./scalping-desk.css";
 import "./compare-chart.css";
 import "./correlation-watch.css";
 import "./pump-radar.css";
+import "./risk-desk.css";
 import "./secure-brain.css";
 import "./mobile-pro.css";
 import "./responsive-fixes.css";
