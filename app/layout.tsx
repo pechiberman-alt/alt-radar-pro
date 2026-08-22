@@ -17,6 +17,7 @@ import "./risk-desk.css";
 import "./market-structure.css";
 import "./assistant-console.css";
 import "./install-panel.css";
+import "./flow-brain.css";
 import "./secure-brain.css";
 import "./mobile-pro.css";
 import "./responsive-fixes.css";

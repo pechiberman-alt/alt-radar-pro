@@ -6,6 +6,11 @@ import type { DerivativesSnapshot } from "@/lib/market-brain";
 import type { LiquiditySnapshot } from "@/lib/liquidity-history";
 import type { NewsEvent } from "@/lib/radar";
 import { footprintRows, percentile } from "@/lib/order-flow";
+import {
+  detectInstitutional,
+  detectSqueeze,
+  findStructureLevels,
+} from "@/lib/order-flow-brain";
 import BookmapTimeframeChart from "./bookmap-timeframe-chart";
 import MarketBrain from "./market-brain";
 
@@ -1517,6 +1522,72 @@ export default function LiveBookmap({
       ),
     [footprintTrades, metrics.bid, metrics.ask],
   );
+  // Order-flow brain. Recomputed from the same executions and depth the rest of
+  // the panel already holds, so it adds interpretation rather than new requests.
+  const brainMid = metrics.bid && metrics.ask ? (metrics.bid + metrics.ask) / 2 : 0;
+  const brainSpread = metrics.ask && metrics.bid ? metrics.ask - metrics.bid : 0;
+
+  const institutional = useMemo(
+    () =>
+      detectInstitutional(
+        footprintTrades,
+        {
+          bids: ladder.bids.map(([price, qty]) => ({ price, qty, notional: price * qty })),
+          asks: ladder.asks.map(([price, qty]) => ({ price, qty, notional: price * qty })),
+        },
+        brainMid,
+        brainSpread,
+      ),
+    [footprintTrades, ladder, brainMid, brainSpread],
+  );
+
+  const squeeze = useMemo(
+    () =>
+      detectSqueeze(
+        {
+          fundingRatePct: derivatives.fundingRatePct,
+          openInterestUsd: derivatives.openInterestUsd,
+          openInterestChangePct: derivatives.openInterestChangePct,
+          takerBuySellRatio: derivatives.takerBuySellRatio,
+          longShortAccountRatio: derivatives.longShortAccountRatio,
+        },
+        liquidations.map((item) => ({
+          time: item.time,
+          side: item.side,
+          price: item.price,
+          notional: item.notional,
+        })),
+        delta,
+        // Ticking clock rather than Date.now(), which would be impure here.
+        // Until the first tick this reports no recent liquidations, which is
+        // accurate: none have been observed yet in this session.
+        clock,
+      ),
+    [derivatives, liquidations, delta, clock],
+  );
+
+  const structureLevels = useMemo(
+    () =>
+      findStructureLevels(
+        footprintTrades,
+        walls.map((wall) => ({
+          side: wall.side,
+          price: wall.price,
+          notional: wall.notional,
+          persistence: wall.persistence,
+        })),
+        liquidations.map((item) => ({
+          time: item.time,
+          side: item.side,
+          price: item.price,
+          notional: item.notional,
+        })),
+        brainMid,
+        brainSpread,
+      ),
+    [footprintTrades, walls, liquidations, brainMid, brainSpread],
+  );
+
   const footprintTotal = actualFootprint.reduce(
     (sum, row) => sum + row.buy + row.sell,
     0,
@@ -1870,6 +1941,99 @@ export default function LiveBookmap({
         <div><span>MAYOR WALL</span><b>{strongestWall ? usdLabel(strongestWall.notional) : "—"}</b></div>
         <div><span>CALIDAD MUESTRA</span><b>{dataConfidence}%</b></div>
       </div>
+
+      <section className="flow-brain" aria-label="Cerebro de order flow">
+        <header>
+          <div>
+            <span>CEREBRO DE ORDER FLOW · LECTURA DE MICROESTRUCTURA</span>
+            <b>Liquidez institucional, squeeze y estructura</b>
+          </div>
+          <small>{symbol.replace("USDT", "")} · {venue === "futures" ? "FUTUROS" : "SPOT"}</small>
+        </header>
+
+        <div className="brain-columns">
+          <article className="brain-card">
+            <h4>HUELLA INSTITUCIONAL</h4>
+            {institutional.length ? (
+              <div className="brain-events">
+                {institutional.slice(0, 4).map((event) => (
+                  <div className={`brain-event ${event.kind.toLowerCase()}`} key={`${event.kind}-${event.price}-${event.notional}`}>
+                    <div>
+                      <b>{event.kind}</b>
+                      <em className={event.side === "COMPRA" ? "positive" : "negative"}>
+                        {event.side}
+                      </em>
+                      <span>{priceLabel(event.price)}</span>
+                      <i>{usdLabel(event.notional)}</i>
+                    </div>
+                    <p>{event.detail}</p>
+                    <small>CONFIANZA {event.confidence}/100</small>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="brain-empty">
+                Sin patrones de tamaño deliberado en la muestra actual. Hace falta flujo
+                suficiente para distinguir una orden trabajada del ruido normal.
+              </p>
+            )}
+          </article>
+
+          <article className={`brain-card squeeze-card ${squeeze.type === "SIN PRESIÓN" ? "" : squeeze.bias === "ALCISTA" ? "up" : "down"}`}>
+            <h4>PRESIÓN DE POSICIONAMIENTO</h4>
+            <div className="squeeze-headline">
+              <b>{squeeze.type}</b>
+              <strong>{squeeze.score}<small>/100</small></strong>
+            </div>
+            <p className="squeeze-detail">{squeeze.detail}</p>
+            {squeeze.factors.length > 0 && (
+              <div className="squeeze-factors">
+                {squeeze.factors.slice(0, 5).map((factor) => (
+                  <span key={factor.label}>
+                    {factor.label} <em>+{Math.round(factor.points)}</em>
+                  </span>
+                ))}
+              </div>
+            )}
+            {squeeze.missing.length > 0 && (
+              <small className="squeeze-missing">
+                Sin dato de: {squeeze.missing.join(", ")}.
+              </small>
+            )}
+          </article>
+
+          <article className="brain-card">
+            <h4>PISOS Y TECHOS</h4>
+            {structureLevels.length ? (
+              <div className="structure-levels">
+                {structureLevels.slice(0, 6).map((level) => (
+                  <div className={`structure-level ${level.kind.toLowerCase()}`} key={level.price}>
+                    <b>{level.kind}</b>
+                    <span>{priceLabel(level.price)}</span>
+                    <em className={level.distancePct >= 0 ? "positive" : "negative"}>
+                      {level.distancePct >= 0 ? "+" : ""}{level.distancePct.toFixed(2)}%
+                    </em>
+                    <i style={{ width: `${level.strength}%` }} />
+                    <small>{level.sources.join(" · ")}</small>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="brain-empty">
+                Todavía no hay niveles con evidencia suficiente. Un nivel entra cuando lo
+                respalda volumen concentrado, liquidez persistente o cúmulos de liquidaciones.
+              </p>
+            )}
+          </article>
+        </div>
+
+        <p className="brain-footnote">
+          «Institucional» describe un patrón de tamaño y comportamiento —reposición oculta,
+          absorción sin ceder terreno—, no una identidad verificada: ningún feed público revela
+          quién está detrás de una orden. Todo esto es lectura probabilística de
+          microestructura y no constituye asesoramiento financiero.
+        </p>
+      </section>
 
       <section className="decision-board pro-decision-board">
         <article
