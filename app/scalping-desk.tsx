@@ -106,7 +106,7 @@ export default function ScalpingDesk({
   }, [market, minimumQuoteVolume]);
 
   const refresh = useCallback(async () => {
-    if (!candidates.length || killSwitch) return;
+    if (!candidates.length) return;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 18_000);
     setStatus("loading");
@@ -150,14 +150,14 @@ export default function ScalpingDesk({
   }, [altseasonScore, candidates, killSwitch, minimumQuoteVolume, riskScore]);
 
   useEffect(() => {
-    if (!auto || killSwitch) return;
+    if (!auto) return;
     const boot = window.setTimeout(() => void refresh(), 900);
     const interval = window.setInterval(() => void refresh(), 5 * 60_000);
     return () => {
       window.clearTimeout(boot);
       window.clearInterval(interval);
     };
-  }, [auto, killSwitch, refresh]);
+  }, [auto, refresh]);
 
   useEffect(() => {
     const tick = window.setTimeout(() => setClock(Date.now()), 0);
@@ -189,13 +189,13 @@ export default function ScalpingDesk({
           </div>
         </div>
         <div className="scalp-controls">
-          <span className={`scalp-state ${killSwitch ? "paused" : status}`}>
-            <i /> {killSwitch ? "PAUSADO POR RIESGO" : status === "loading" ? "ANALIZANDO" : status === "error" ? "DEGRADADO" : "MOTOR ACTIVO"}
+          <span className={`scalp-state ${status}`}>
+            <i /> {status === "loading" ? "ANALIZANDO" : status === "error" ? "DEGRADADO" : "MOTOR ACTIVO"}
           </span>
           <button className={auto ? "enabled" : ""} onClick={() => setAuto((value) => !value)}>
             {auto ? "● AUTO 5M" : "○ MANUAL"}
           </button>
-          <button onClick={() => void refresh()} disabled={status === "loading" || killSwitch}>↻ ESCANEAR</button>
+          <button onClick={() => void refresh()} disabled={status === "loading"}>↻ ESCANEAR</button>
         </div>
       </header>
 
@@ -207,12 +207,17 @@ export default function ScalpingDesk({
         <div><span>FUENTE</span><b>BINANCE REAL</b></div>
       </div>
 
-      {killSwitch ? (
-        <div className="scalp-empty danger">
-          <b>🔴 NUEVOS SCALPS PAUSADOS</b>
-          <span>El kill switch geopolítico bloquea nuevas señales. No se ignora el régimen macro.</span>
+      {killSwitch && (
+        <div className="scalp-advisory">
+          <b>⚠ CONTEXTO MACRO EXTREMO</b>
+          <span>
+            El flujo de noticias marca riesgo elevado. Las señales siguen calculándose y se
+            muestran con su score penalizado: la decisión de operar es tuya, no del feed.
+          </span>
         </div>
-      ) : status === "error" && !payload ? (
+      )}
+
+      {status === "error" && !payload ? (
         <div className="scalp-empty">
           <b>SCALPING DATA UNAVAILABLE</b>
           <span>{error}. No se generan niveles con datos incompletos.</span>
@@ -300,7 +305,7 @@ export default function ScalpingDesk({
         </div>
       )}
 
-      {!killSwitch && status === "ready" && !qualified.length && (
+      {status === "ready" && !qualified.length && (
         <div className="scalp-empty compact-state">
           <b>NO HAY SCALPS DE ALTA CONVICCIÓN</b>
           <span>El motor revisó {payload?.scanned ?? 0} activos y no forzará una operación.</span>

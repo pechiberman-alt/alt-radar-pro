@@ -65,6 +65,13 @@ export type ScoredAsset = MarketAsset & {
   dataQuality: "FULL" | "PARTIAL";
   reasons: ScoreReason[];
   penalties: ScoreReason[];
+  /**
+   * Set when the macro/news layer is in an extreme state. It annotates the
+   * signal as context; it never suppresses it. The news read is kept beside
+   * the technical read so the operator decides, rather than the feed deciding
+   * for them.
+   */
+  riskAdvisory: boolean;
 };
 
 export const DEFAULT_SCORE_CONFIG: ScoreConfig = {
@@ -364,8 +371,10 @@ export function scoreAssets(
         asset.quoteVolume >= Math.max(config.minimumQuoteVolume, 100_000_000) &&
         direction.structureConfirmed &&
         direction.confirmationCount >= 5;
+      // Only the asset's own state can void its signal. An extreme macro
+      // reading is reported alongside it, not substituted for it.
       const signal =
-        killSwitch || direction.extended
+        direction.extended
           ? "NO SIGNAL"
           : score >= config.trigger && hasTriggerData
             ? "TRIGGER"
@@ -398,6 +407,7 @@ export function scoreAssets(
         dataQuality,
         reasons: direction.reasons,
         penalties,
+        riskAdvisory: killSwitch,
       } satisfies ScoredAsset;
     })
     .sort((a, b) => b.score - a.score);

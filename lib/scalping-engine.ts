@@ -152,7 +152,7 @@ export function buildScalpSignal(
   const technicalScore = Math.round(clamp(reasons.reduce((sum, item) => sum + item.points, 0)));
   const penalties: ScoreReason[] = [
     ...(extended ? [{ label: "Anti-FOMO: movimiento extendido", points: -25 }] : []),
-    ...(context.killSwitch ? [{ label: "Kill switch geopolítico", points: -35 }] : []),
+    ...(context.killSwitch ? [{ label: "Contexto macro extremo", points: -12 }] : []),
     ...(context.riskScore === null ? [{ label: "Macro no disponible", points: -8 }] : []),
     ...(context.riskScore !== null && context.riskScore > 60
       ? [{ label: "Riesgo geopolítico elevado", points: context.riskScore > 80 ? -25 : -10 }]
@@ -193,7 +193,9 @@ export function buildScalpSignal(
   const validRisk = riskUnit >= atr * 0.65 && riskUnit <= atr * 2.4;
   if (!validRisk) penalties.push({ label: "Stop estructural fuera de rango", points: -12 });
   const finalScore = validRisk ? score : Math.round(clamp(score - 12));
-  const status: ScalpStatus = context.killSwitch || extended
+  // Macro context weighs on the score but does not veto the read; only the
+  // asset being extended voids its own setup.
+  const status: ScalpStatus = extended
     ? "NO SIGNAL"
     : finalScore >= 85 && triggerReady && validRisk
       ? "TRIGGER"

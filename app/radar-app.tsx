@@ -132,6 +132,39 @@ async function loadDirectMarket(): Promise<RadarPayload> {
 
 type RollingTicker = { symbol: string; priceChangePercent: string };
 
+/**
+ * Combine two market snapshots without losing information from either.
+ *
+ * The direct browser fetch returns the full USDT universe but no rolling
+ * windows, while the Worker returns a smaller list that may carry 1H/4H data.
+ * Picking whichever array was longer used to throw the timeframe values away,
+ * which silently dropped every multi-timeframe confirmation and pushed scores
+ * under the signal thresholds. The wider list wins on coverage, and any
+ * timeframe value the other snapshot holds is kept.
+ */
+function mergeMarkets(
+  primary: RadarPayload["market"],
+  secondary: RadarPayload["market"],
+): RadarPayload["market"] {
+  const base = primary.length >= secondary.length ? primary : secondary;
+  const other = base === primary ? secondary : primary;
+  if (!other.length) return base;
+  const bySymbol = new Map(other.map((asset) => [asset.symbol, asset]));
+  return base.map((asset) => {
+    const match = bySymbol.get(asset.symbol);
+    if (!match) return asset;
+    return {
+      ...asset,
+      change5m: asset.change5m ?? match.change5m ?? null,
+      change15m: asset.change15m ?? match.change15m ?? null,
+      change1h: asset.change1h ?? match.change1h ?? null,
+      change4h: asset.change4h ?? match.change4h ?? null,
+      high: asset.high ?? match.high ?? null,
+      low: asset.low ?? match.low ?? null,
+    };
+  });
+}
+
 async function enrichTimeframes(payload: RadarPayload): Promise<RadarPayload> {
   const candidates = payload.market
     .filter((asset) => asset.quoteVolume >= 5_000_000)
@@ -140,18 +173,31 @@ async function enrichTimeframes(payload: RadarPayload): Promise<RadarPayload> {
     { length: Math.ceil(candidates.length / 60) },
     (_, index) => candidates.slice(index * 60, index * 60 + 60),
   );
+  const loadChunk = async (
+    symbols: string[],
+    windowSize: "5m" | "15m" | "1h" | "4h",
+  ): Promise<RollingTicker[]> => {
+    try {
+      const url = new URL("https://data-api.binance.vision/api/v3/ticker");
+      url.searchParams.set("symbols", JSON.stringify(symbols));
+      url.searchParams.set("windowSize", windowSize);
+      const response = await fetch(url, { cache: "no-store" });
+      if (response.ok) return (await response.json()) as RollingTicker[];
+    } catch {
+      // Binance refuses throttled browsers without CORS headers; fall through.
+    }
+    // Retry through the Worker so timeframe coverage survives a rate limit.
+    const proxied = await fetch(
+      `/api/rolling?windowSize=${windowSize}&symbols=${symbols.join(",")}`,
+      { cache: "no-store" },
+    );
+    if (!proxied.ok) throw new Error("Rolling window unavailable");
+    return (await proxied.json()) as RollingTicker[];
+  };
+
   const loadWindow = async (windowSize: "5m" | "15m" | "1h" | "4h") => {
     const rows = (
-      await Promise.all(
-        chunks.map(async (symbols) => {
-          const url = new URL("https://data-api.binance.vision/api/v3/ticker");
-          url.searchParams.set("symbols", JSON.stringify(symbols));
-          url.searchParams.set("windowSize", windowSize);
-          const response = await fetch(url, { cache: "no-store" });
-          if (!response.ok) throw new Error("Rolling window unavailable");
-          return response.json() as Promise<RollingTicker[]>;
-        }),
-      )
+      await Promise.all(chunks.map((symbols) => loadChunk(symbols, windowSize)))
     ).flat();
     return new Map(rows.map((row) => [row.symbol, Number(row.priceChangePercent)]));
   };
@@ -371,10 +417,7 @@ export default function RadarApp() {
               ? {
                   ...current,
                   timestamp: enriched.timestamp,
-                  market:
-                    enriched.market.length >= current.market.length
-                      ? enriched.market
-                      : current.market,
+                  market: mergeMarkets(enriched.market, current.market),
                   sources: [...new Set([...current.sources, ...enriched.sources])],
                   errors: current.errors.filter(
                     (message) => !message.toLowerCase().includes("multi-timeframe"),
@@ -392,10 +435,7 @@ export default function RadarApp() {
             current
               ? {
                   ...richer,
-                  market:
-                    current.market.length > richer.market.length
-                      ? current.market
-                      : richer.market,
+                  market: mergeMarkets(current.market, richer.market),
                   news: richer.news.length ? richer.news : current.news,
                   dominance: {
                     btc: richer.dominance.btc ?? current.dominance.btc,
@@ -416,9 +456,7 @@ export default function RadarApp() {
             current
               ? {
                   ...current,
-                  market: complete.market.length > current.market.length
-                    ? complete.market
-                    : current.market,
+                  market: mergeMarkets(complete.market, current.market),
                   dominance: {
                     btc: current.dominance.btc ?? complete.dominance.btc,
                     change24h: current.dominance.change24h ?? complete.dominance.change24h,
@@ -592,13 +630,15 @@ export default function RadarApp() {
         </div>
 
         {risk.killSwitch && (
-          <div className="kill">
-            <b>🔴 BLOQUEO GEOPOLÍTICO</b>
-            <span>NUEVAS OPERACIONES PAUSADAS</span>
+          <div className="macro-advisory">
+            <b>⚠ CONTEXTO MACRO EXTREMO</b>
+            <span>RIESGO {risk.score}/100 · CAPA INFORMATIVA</span>
             <small>
-              El riesgo global superó el umbral de seguridad. Las señales existentes muestran
-              advertencia de evento.
+              El flujo de noticias marca riesgo elevado y penaliza el score de cada señal, pero
+              no las bloquea: el motor técnico sigue operando y las señales afectadas quedan
+              marcadas. La lectura de noticias está en su propio panel.
             </small>
+            <a href="#inteligencia-global">VER PANEL DE NOTICIAS →</a>
           </div>
         )}
 
@@ -705,12 +745,19 @@ export default function RadarApp() {
           {active.length ? (
             <div className="signal-cards">
               {active.slice(0, 3).map((asset) => (
-                <button className="signal-card" key={asset.symbol} onClick={() => setSelected(asset)}>
+                <button
+                  className={asset.riskAdvisory ? "signal-card risk-flagged" : "signal-card"}
+                  key={asset.symbol}
+                  onClick={() => setSelected(asset)}
+                >
                   <div>
                     <span className={`signal-pill ${asset.signal.toLowerCase()}`}>{asset.signal}</span>
                     <span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span>
                     <small>{assetName(asset.symbol)}/USDT · 15M/1H</small>
                   </div>
+                  {asset.riskAdvisory && (
+                    <span className="risk-flag">⚠ CONTEXTO MACRO EXTREMO</span>
+                  )}
                   <strong>{asset.score}<em>/100</em></strong>
                   <p>
                     {asset.reasons
@@ -819,11 +866,20 @@ export default function RadarApp() {
             </div>
           </article>
 
-          <article className="panel intelligence">
+          <article className="panel intelligence" id="inteligencia-global">
             <div className="panel-head">
-              <div><p className="eyebrow">FLUJO DE EVENTOS CURADO</p><h2>Inteligencia global</h2></div>
-              <span className="badge">ALTO + CRÍTICO</span>
+              <div>
+                <p className="eyebrow">FLUJO DE EVENTOS CURADO · CAPA SEPARADA</p>
+                <h2>Inteligencia global</h2>
+              </div>
+              <span className={risk.killSwitch ? "badge critical" : "badge"}>
+                {risk.killSwitch ? "RIESGO EXTREMO" : "ALTO + CRÍTICO"}
+              </span>
             </div>
+            <p className="intelligence-note">
+              Contexto para interpretar los movimientos que ves en el radar. No bloquea señales
+              ni decide por vos.
+            </p>
             <div className="news-list">
               {data.news.slice(0, 7).map((news) => (
                 <a href={news.url} target="_blank" rel="noreferrer" key={news.id}>

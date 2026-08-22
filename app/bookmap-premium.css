@@ -38,3 +38,107 @@
 
 @media(max-width:1000px){.bookmap-premium-shell{margin-inline:12px}.bookmap-quick-assets{justify-content:flex-start;overflow-x:auto}.bookmap-quick-assets button,.bookmap-quick-assets span{min-width:45px}.bookmap-market-strip{grid-template-columns:1fr auto auto}.bookmap-market-strip label{grid-column:1/-1}.orderflow-terminal .premium-map-grid.sidebar-open{grid-template-columns:minmax(0,1fr) 300px}.dock-tabs{overflow-x:auto;grid-template-columns:repeat(5,minmax(130px,1fr))}}
 @media(max-width:700px){.bookmap-premium-shell{margin:0 8px 18px;border-radius:6px}.bookmap-premium-head{grid-template-columns:1fr auto;padding:0 8px}.bookmap-product-title small{display:none}.bookmap-quick-assets{grid-column:1/-1;grid-row:2;height:38px;border-top:1px solid #1a2d3a}.bookmap-quick-assets button,.bookmap-quick-assets span{height:38px;flex:1}.bookmap-window-actions button{width:30px;height:30px}.bookmap-market-strip{grid-template-columns:1fr 1fr;padding:8px;gap:7px}.bookmap-market-strip label,.bookmap-strip-timeframes{grid-column:1/-1;width:100%}.bookmap-strip-timeframes button{flex:1;height:34px}.bookmap-fullscreen-button,.bookmap-dom-button{margin:0}.orderflow-terminal .premium-map-grid.sidebar-open{grid-template-columns:1fr}.orderflow-terminal .premium-map-grid.sidebar-open .pro-sidebar{height:390px}.dock-content{min-height:150px}.dock-liquidation-row{grid-template-columns:85px 1fr 65px;padding-inline:10px}.dock-liquidation-row>span,.dock-liquidation-row>small{display:none}.dock-metric-grid{grid-template-columns:1fr;padding:8px}.dock-metric-grid>small{grid-column:auto}.dock-news-list a{grid-template-columns:40px 1fr 40px;padding-inline:9px}.deep-liquidity-state{grid-column:1/-1}.premium-heat-legend{right:88px}.premium-heat-legend b,.premium-heat-legend em{display:none}.premium-heat-legend i{width:72px}.bookmap-premium-shell.fullscreen{inset:2px}.bookmap-premium-shell.fullscreen .chart-stage,.bookmap-premium-shell.fullscreen .orderflow-terminal .pro-bookmap-canvas{height:calc(100vh - 390px)}.bookmap-premium-shell.fullscreen .pro-sidebar{display:none}}
+
+/* ---- Change of control and significant orders ---------------------------
+   The steady-state "who is winning" read hid the two moments that actually
+   demand attention: control changing hands, and a genuinely large order
+   landing. Both are surfaced with a decaying emphasis so a fresh event is
+   unmistakable and an old one recedes to plain reference. */
+
+.battle-card.control-shifted {
+  border-color: #3d7f5f;
+  box-shadow: 0 0 0 1px rgba(57, 242, 154, .18), 0 0 24px rgba(57, 242, 154, .12);
+}
+
+.control-shift {
+  display: grid;
+  gap: 3px;
+  margin: 11px 0 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #3a4a42;
+  border-radius: 4px;
+  background: #0d1512;
+}
+.control-shift b {
+  font: 8px var(--font-mono);
+  letter-spacing: .9px;
+  color: var(--muted);
+}
+.control-shift span {
+  font: 10px var(--font-mono);
+  color: #a9b5ae;
+}
+.control-shift em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--text);
+}
+.control-shift small {
+  font: 7px var(--font-mono);
+  color: var(--muted);
+}
+
+.control-shift.fresh {
+  background: #0c2419;
+  border-left-color: var(--green);
+  animation: control-shift-in .45s ease-out;
+}
+.control-shift.fresh b { color: var(--green); }
+.control-shift.fresh.to-vendedores {
+  background: #2a1116;
+  border-left-color: var(--red);
+}
+.control-shift.fresh.to-vendedores b { color: var(--red); }
+.control-shift.fresh.to-vendedores em { color: var(--red); }
+.control-shift.fresh.to-compradores em { color: var(--green); }
+.control-shift.fresh.to-equilibrio {
+  background: #201703;
+  border-left-color: var(--amber);
+}
+.control-shift.fresh.to-equilibrio b { color: var(--amber); }
+
+@keyframes control-shift-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.large-order-flash {
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border: 1px solid #5c5228;
+  border-left: 3px solid var(--amber);
+  border-radius: 4px;
+  background: #1a1607;
+}
+.large-order-flash b {
+  font: 8px var(--font-mono);
+  letter-spacing: .9px;
+  color: var(--amber);
+}
+.large-order-flash span {
+  font: 10px var(--font-mono);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.large-order-flash small {
+  font: 7px var(--font-mono);
+  color: #9a8f6d;
+}
+.large-order-flash.buy { border-left-color: var(--green); }
+.large-order-flash.buy span { color: var(--green); }
+.large-order-flash.sell { border-left-color: var(--red); }
+.large-order-flash.sell span { color: var(--red); }
+
+/* Liquidations from the whole market: the pair on screen stands out. */
+.dock-liquidation-row.current-symbol,
+.liquidation-block .current-symbol {
+  box-shadow: inset 2px 0 var(--cyan);
+  background: rgba(85, 214, 190, .06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control-shift.fresh { animation: none; }
+}

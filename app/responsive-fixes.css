@@ -34,6 +34,100 @@ body {
   overflow-x: hidden;
 }
 
+/* ---- Macro context as an advisory layer ---------------------------------
+   News used to hard-block every signal. It now annotates instead, so the
+   styling reads as caution rather than as a stop sign. */
+.macro-advisory {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 8px 18px;
+  margin-bottom: 12px;
+  padding: 13px 18px;
+  border: 1px solid #7b5f29;
+  border-left: 3px solid var(--amber);
+  border-radius: 6px;
+  background: #201703;
+}
+.macro-advisory b {
+  color: var(--amber);
+  font: 10px var(--font-mono);
+  letter-spacing: 0.9px;
+}
+.macro-advisory > span {
+  font: 8px var(--font-mono);
+  letter-spacing: 0.8px;
+  color: #c8b586;
+}
+.macro-advisory small {
+  grid-column: 1 / -1;
+  color: #bcae90;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.macro-advisory a {
+  grid-column: 1 / -1;
+  justify-self: start;
+  color: var(--amber);
+  font: 8px var(--font-mono);
+  letter-spacing: 0.8px;
+  text-decoration: none;
+  border-bottom: 1px solid #7b5f29;
+  padding-bottom: 2px;
+}
+
+.scalp-advisory {
+  margin: 0 22px 14px;
+  padding: 11px 14px;
+  border: 1px solid #7b5f29;
+  border-left: 3px solid var(--amber);
+  border-radius: 5px;
+  background: #201703;
+  display: grid;
+  gap: 5px;
+}
+.scalp-advisory b {
+  color: var(--amber);
+  font: 9px var(--font-mono);
+  letter-spacing: 0.8px;
+}
+.scalp-advisory span {
+  color: #bcae90;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.signal-card.risk-flagged {
+  border-color: #6b5424;
+}
+.signal-card .risk-flag {
+  display: block;
+  margin-top: 9px;
+  font: 7px var(--font-mono);
+  letter-spacing: 0.7px;
+  color: var(--amber);
+}
+
+.intelligence-note {
+  margin: 0 22px 4px;
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+@media (max-width: 700px) {
+  .macro-advisory {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .scalp-advisory {
+    margin: 0 14px 12px;
+  }
+  .intelligence-note {
+    margin: 0 14px 4px;
+  }
+}
+
 /* ---- Reading comfort ----------------------------------------------------
    The terminal look relies on very small monospace type. These adjustments
    raise the floor on the sizes that were hardest to read and open up the

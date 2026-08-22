@@ -23,6 +23,9 @@ type Liquidation = {
   price: number;
   qty: number;
   notional: number;
+  symbol: string;
+  /** True when the event belongs to the pair currently on screen. */
+  isCurrentSymbol: boolean;
 };
 type Frame = {
   bids: Level[];
@@ -476,6 +479,14 @@ export default function LiveBookmap({
   const [tape, setTape] = useState<TapeTrade[]>([]);
   const [footprintTrades, setFootprintTrades] = useState<Trade[]>([]);
   const [liquidations, setLiquidations] = useState<Liquidation[]>([]);
+  const [controlShift, setControlShift] = useState<{
+    from: string;
+    to: string;
+    at: number;
+  } | null>(null);
+  // Recency of the control shift and of large orders has to come from a ticking
+  // value rather than Date.now() during render, which would be impure.
+  const [clock, setClock] = useState(0);
   const [events, setEvents] = useState<FlowEvent[]>([]);
   const [walls, setWalls] = useState<Wall[]>([]);
   const [hover, setHover] = useState<HoverPoint | null>(null);
@@ -707,7 +718,11 @@ export default function LiveBookmap({
 
     const connect = (host: string) => {
       if (closed) return;
-      const streams = `${key}@depth${streamDepth}@100ms/${key}@${venue === "futures" ? "trade" : "aggTrade"}${venue === "futures" ? `/${key}@forceOrder` : ""}`;
+      // Liquidations subscribe to the market-wide stream rather than this one
+      // pair: a single symbol fires rarely, so the panel looked broken during
+      // perfectly normal quiet stretches. Events are tagged with their symbol
+      // and the ones for the pair on screen are highlighted.
+      const streams = `${key}@depth${streamDepth}@100ms/${key}@${venue === "futures" ? "trade" : "aggTrade"}${venue === "futures" ? "/!forceOrder@arr" : ""}`;
       const socket = new WebSocket(`${host}/stream?streams=${streams}`);
       activeSocket = socket;
       let receivedDepth = false;
@@ -797,15 +812,19 @@ export default function LiveBookmap({
           } else if (data?.e === "forceOrder" && data.o) {
             const price = Number(data.o.ap || data.o.p);
             const qty = Number(data.o.z || data.o.q);
+            const eventSymbol = String(data.o.s ?? "").toUpperCase();
             if (price > 0 && qty > 0) {
               liquidationsRef.current.push({
                 time: Number(data.o.T || data.E) || Date.now(),
+                // A forced SELL closes a long position, and vice versa.
                 side: data.o.S === "SELL" ? "LONG" : "SHORT",
                 price,
                 qty,
                 notional: price * qty,
+                symbol: eventSymbol,
+                isCurrentSymbol: eventSymbol === symbol.toUpperCase(),
               });
-              if (liquidationsRef.current.length > 80) liquidationsRef.current.shift();
+              if (liquidationsRef.current.length > 120) liquidationsRef.current.shift();
             }
           }
         } catch {
@@ -1538,6 +1557,47 @@ export default function LiveBookmap({
     dataConfidence,
     Math.round(Math.abs(buyerPower - 50) * 2),
   );
+  // A static "who is winning" label hides the thing that actually matters: the
+  // moment control changes hands. The flip is captured with a timestamp and
+  // stays prominent briefly, then fades back to the steady-state read.
+  useEffect(() => {
+    const tick = window.setTimeout(() => setClock(Date.now()), 0);
+    const interval = window.setInterval(() => setClock(Date.now()), 1_000);
+    return () => {
+      window.clearTimeout(tick);
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const previousWinner = useRef(winner);
+  useEffect(() => {
+    if (previousWinner.current === winner) return;
+    const from = previousWinner.current;
+    previousWinner.current = winner;
+    // Passing through a low-sample state is not a real change of control.
+    if (from === "MUESTRA BAJA" || winner === "MUESTRA BAJA") return;
+    if (winner === "EQUILIBRIO" && from === "EQUILIBRIO") return;
+    const timer = window.setTimeout(
+      () => setControlShift({ from, to: winner, at: Date.now() }),
+      0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [winner]);
+
+  const shiftAgeSeconds =
+    controlShift && clock ? Math.round((clock - controlShift.at) / 1000) : null;
+  const controlShiftFresh = shiftAgeSeconds !== null && shiftAgeSeconds <= 90;
+
+  // Orders worth reacting to, split from merely above-average ones.
+  const dominantLarge = largeTrades
+    .slice()
+    .sort((left, right) => right.notional - left.notional)[0] ?? null;
+  const largeRecent = largeTrades.filter(
+    (trade) => clock - trade.time <= 60_000,
+  );
+  const largeRecentBuy = largeRecent.filter((trade) => !trade.buyerMaker).length;
+  const largeRecentSell = largeRecent.filter((trade) => trade.buyerMaker).length;
+
   const confluence =
     altseason.score === null
       ? "CONTEXTO INCOMPLETO"
@@ -1913,11 +1973,51 @@ export default function LiveBookmap({
       </div>
 
       <section className="decision-board pro-decision-board">
-        <article className={`battle-card ${winner.toLowerCase().replaceAll(" ", "-")}`}>
+        <article
+          className={`battle-card ${winner.toLowerCase().replaceAll(" ", "-")}${controlShiftFresh ? " control-shifted" : ""}`}
+        >
           <div className="decision-title">
             <span>DOMINIO DE MICROESTRUCTURA</span>
             <b>GANANDO: {winner}</b>
           </div>
+
+          {controlShift && (
+            <div
+              className={
+                controlShiftFresh
+                  ? `control-shift fresh to-${controlShift.to.toLowerCase().replaceAll(" ", "-")}`
+                  : "control-shift"
+              }
+            >
+              <b>
+                {controlShiftFresh ? "⚡ TOMA DE CONTROL" : "ÚLTIMO CAMBIO DE CONTROL"}
+              </b>
+              <span>
+                {controlShift.from} → <em>{controlShift.to}</em>
+              </span>
+              <small>
+                {shiftAgeSeconds !== null && shiftAgeSeconds < 60
+                  ? `hace ${shiftAgeSeconds}s`
+                  : `hace ${Math.round((shiftAgeSeconds ?? 0) / 60)} min`}
+                {" · "}
+                {new Date(controlShift.at).toLocaleTimeString()}
+              </small>
+            </div>
+          )}
+
+          {dominantLarge && (
+            <div className={`large-order-flash ${dominantLarge.buyerMaker ? "sell" : "buy"}`}>
+              <b>ORDEN IMPORTANTE</b>
+              <span>
+                {dominantLarge.buyerMaker ? "VENTA AGRESIVA" : "COMPRA AGRESIVA"}{" "}
+                {usdLabel(dominantLarge.notional)} @ {priceLabel(dominantLarge.price)}
+              </span>
+              <small>
+                último minuto: {largeRecentBuy} compra{largeRecentBuy === 1 ? "" : "s"} ·{" "}
+                {largeRecentSell} venta{largeRecentSell === 1 ? "" : "s"} de tamaño relevante
+              </small>
+            </div>
+          )}
           <div className="battle-numbers">
             <strong className="negative">{sellerPower}%<small>VENDEDORES</small></strong>
             <div className="battle-track">
@@ -2248,13 +2348,23 @@ export default function LiveBookmap({
                   <p>DISPONIBLES AL CAMBIAR A BINANCE FUTUROS</p>
                 ) : liquidations.length ? (
                   liquidations.map((item) => (
-                    <div className={item.side === "LONG" ? "long" : "short"} key={`${item.time}-${item.price}`}>
+                    <div
+                      className={`${item.side === "LONG" ? "long" : "short"}${item.isCurrentSymbol ? " current-symbol" : ""}`}
+                      key={`${item.time}-${item.price}-${item.symbol}`}
+                    >
                       <time>{new Date(item.time).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" })}</time>
+                      <b>{item.symbol.replace("USDT", "")}</b>
                       <b>{item.side}</b><span>{usdLabel(item.notional)}</span>
                     </div>
                   ))
+                ) : status !== "en vivo" ? (
+                  <p>
+                    {status === "conectando"
+                      ? "CONECTANDO AL FEED DE LIQUIDACIONES…"
+                      : "FEED NO DISPONIBLE · SIN CONEXIÓN A BINANCE FUTUROS"}
+                  </p>
                 ) : (
-                  <p>SIN LIQUIDACIONES RECIBIDAS</p>
+                  <p>FEED CONECTADO · NINGUNA LIQUIDACIÓN EN LA VENTANA</p>
                 )}
               </div>
             </div>
@@ -2285,21 +2395,35 @@ export default function LiveBookmap({
           <div className="dock-content">
             {intelligencePanel === "liquidations" && (
               <div className="dock-liquidations">
-                <header><span>MAYORES LIQUIDACIONES OBSERVADAS</span><small>BINANCE FUTURES · FORCE ORDER</small></header>
+                <header>
+                  <span>LIQUIDACIONES DE TODO EL MERCADO</span>
+                  <small>BINANCE FUTURES · FORCE ORDER · {symbol.replace("USDT", "")} RESALTADO</small>
+                </header>
                 {venue !== "futures" ? (
                   <p className="dock-unavailable">CAMBIA LA FUENTE A BINANCE FUTUROS PARA RECIBIR LIQUIDACIONES REALES</p>
                 ) : liquidations.length ? liquidations.slice(0, 5).map((item) => {
                   const maxNotional = Math.max(...liquidations.map((entry) => entry.notional), 1);
                   return (
-                    <div className={`dock-liquidation-row ${item.side.toLowerCase()}`} key={`dock-${item.time}-${item.price}`}>
-                      <b>{item.side === "LONG" ? "▼" : "▲"} {priceLabel(item.price)}</b>
+                    <div
+                      className={`dock-liquidation-row ${item.side.toLowerCase()}${item.isCurrentSymbol ? " current-symbol" : ""}`}
+                      key={`dock-${item.time}-${item.price}-${item.symbol}`}
+                    >
+                      <b>{item.side === "LONG" ? "▼" : "▲"} {item.symbol.replace("USDT", "")} {priceLabel(item.price)}</b>
                       <span>{new Date(item.time).toLocaleTimeString([], { minute: "2-digit", second: "2-digit" })}</span>
                       <i><u style={{ width: `${(item.notional / maxNotional) * 100}%` }} /></i>
                       <em>{usdLabel(item.notional)}</em>
                       <small>{item.side === "LONG" ? "LONGS" : "SHORTS"}</small>
                     </div>
                   );
-                }) : <p className="dock-unavailable">SIN LIQUIDACIONES RECIBIDAS EN LA VENTANA ACTUAL</p>}
+                }) : (
+                  <p className="dock-unavailable">
+                    {status === "conectando"
+                      ? "CONECTANDO AL FEED DE LIQUIDACIONES…"
+                      : status !== "en vivo"
+                        ? "FEED NO DISPONIBLE · NO SE PUDO CONECTAR A BINANCE FUTUROS"
+                        : "FEED CONECTADO · NINGUNA LIQUIDACIÓN EN LA VENTANA ACTUAL"}
+                  </p>
+                )}
               </div>
             )}
             {intelligencePanel === "open-interest" && (

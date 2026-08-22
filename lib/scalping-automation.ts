@@ -64,9 +64,9 @@ export async function runScalpingAutomation(db: D1Database): Promise<ScalpingAut
   const market = marketLoad.market;
   const prices = new Map(market.map((asset) => [asset.symbol, asset.price]));
   const evaluated = await evaluateOpenSignals(db, prices, now);
-  if (risk.killSwitch) {
-    return { status: "COMPLETED", scanned: 0, qualified: 0, inserted: 0, evaluated, timestamp };
-  }
+  // Macro risk penalises the score inside the engine; it no longer stops the
+  // cycle, so the ledger keeps recording observations through volatile regimes
+  // instead of leaving a gap exactly when the data is most interesting.
   const core = market.filter((asset) => ["BTCUSDT", "ETHUSDT"].includes(asset.symbol));
   const candidates = market
     .filter((asset) => !["BTCUSDT", "ETHUSDT"].includes(asset.symbol))
