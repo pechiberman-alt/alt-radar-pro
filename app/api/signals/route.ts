@@ -142,7 +142,9 @@ async function readLedger(): Promise<LedgerPayload> {
   await ensureSignalSchema(env.DB);
   const [rowsResult, statsRow, lastRun, lastSummary] = await Promise.all([
     env.DB.prepare(
-      `SELECT * FROM signal_records ORDER BY detected_at DESC LIMIT 250`,
+      `SELECT * FROM signal_records
+       WHERE timeframe NOT LIKE 'SCALP%'
+       ORDER BY detected_at DESC LIMIT 250`,
     ).all<SignalRow>(),
     env.DB.prepare(
       `SELECT
@@ -154,7 +156,8 @@ async function readLedger(): Promise<LedgerPayload> {
         AVG(return_4h) AS average_return_4h,
         MAX(return_4h) AS best_return_4h,
         MIN(return_4h) AS worst_return_4h
-      FROM signal_records`,
+      FROM signal_records
+      WHERE timeframe NOT LIKE 'SCALP%'`,
     ).first<LedgerStatsRow>(),
     env.DB.prepare("SELECT value FROM automation_state WHERE key = ?1")
       .bind("last_run")
