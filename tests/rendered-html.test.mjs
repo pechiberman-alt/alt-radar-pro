@@ -300,7 +300,9 @@ test("matches the premium heatmap reference with real expandable market context"
   assert.match(bookmap, /PANTALLA COMPLETA/);
   assert.match(bookmap, /OPEN INTEREST/);
   assert.match(bookmap, /FUNDING/);
-  assert.match(bookmap, /MAYORES LIQUIDACIONES OBSERVADAS/);
+  // The panel reads the market-wide forceOrder stream, not one pair, because a
+  // single symbol fires too rarely to tell a quiet market from a dead feed.
+  assert.match(bookmap, /LIQUIDACIONES DE TODO EL MERCADO/);
   assert.match(bookmap, /Binance Futures public API · DATA UNAVAILABLE/);
   assert.match(bookmap, /news\.slice\(0, 5\)/);
   assert.match(radar, /news=\{data\.news\}/);

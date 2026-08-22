@@ -1,7 +1,6 @@
 import vinext from "vinext";
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import hostingConfig from "./.openai/hosting.json";
-import { sites } from "./build/sites-vite-plugin";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -33,6 +32,22 @@ const localBindingConfig = {
     : [],
 };
 
+/**
+ * The hosting platform injects `build/sites-vite-plugin` at build time, and
+ * that directory is gitignored — so it exists in the platform's environment
+ * and nowhere else. Importing it unconditionally meant the project could not
+ * be built from a plain checkout, which also blocked CI. It is loaded when
+ * present and skipped when it is not.
+ */
+async function optionalSitesPlugin(): Promise<PluginOption[]> {
+  try {
+    const injected = await import("./build/sites-vite-plugin");
+    return typeof injected.sites === "function" ? [injected.sites()] : [];
+  } catch {
+    return [];
+  }
+}
+
 export default defineConfig(async () => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
@@ -49,7 +64,7 @@ export default defineConfig(async () => {
       : undefined,
     plugins: [
       vinext(),
-      sites(),
+      ...(await optionalSitesPlugin()),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,

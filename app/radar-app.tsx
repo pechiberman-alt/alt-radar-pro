@@ -22,6 +22,7 @@ import PumpRadar from "./pump-radar";
 import RiskDesk from "./risk-desk";
 import MarketStructurePanel from "./market-structure-panel";
 import AssistantConsole from "./assistant-console";
+import InstallPanel from "./install-panel";
 import type { AssistantContext } from "@/lib/assistant/index";
 import type { PumpReading } from "@/lib/pump-radar";
 import type { CorrelationInsights } from "./correlation-watch";
@@ -1153,6 +1154,8 @@ export default function RadarApp() {
           market={data.market}
           sources={data.sources}
         />
+
+        <InstallPanel />
 
         <footer>
           <div className="footer-brand">
