@@ -26,7 +26,7 @@ import InstallPanel from "./install-panel";
 import type { AssistantContext } from "@/lib/assistant/index";
 import type { PumpReading } from "@/lib/pump-radar";
 import type { CorrelationInsights } from "./correlation-watch";
-import type { MarketStructure } from "@/lib/market-structure";
+import { parseCoinGeckoGlobal, type MarketStructure } from "@/lib/market-structure";
 import { TRADING_PROFILES, type ProfileId } from "@/lib/trading-profiles";
 
 type InstallPrompt = Event & {
@@ -617,10 +617,31 @@ export default function RadarApp() {
     };
   }, [refresh]);
 
-  // Global capitalisation and dominance come from the Worker, which caches the
-  // upstream call so every open tab does not spend the shared rate limit.
+  // Global capitalisation and dominance.
+  //
+  // CoinGecko is the only free source that breaks out stablecoin dominance, but
+  // it blocks Cloudflare's egress addresses, so the Worker falls back to
+  // CoinLore and USDT.D comes back null. It does allow browsers, so the client
+  // asks directly first and keeps the Worker as the fallback — which also
+  // spreads the request across users instead of one shared server IP.
   useEffect(() => {
     const load = async () => {
+      try {
+        const direct = await fetch("https://api.coingecko.com/api/v3/global", {
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (direct.ok) {
+          const parsed = parseCoinGeckoGlobal(await direct.json());
+          if (parsed) {
+            setStructure(parsed);
+            setStructureError("");
+            return;
+          }
+        }
+      } catch {
+        // Blocked or throttled for this client; use the Worker instead.
+      }
       try {
         const response = await fetch("/api/market-structure", { cache: "no-store" });
         if (!response.ok) throw new Error();
