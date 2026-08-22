@@ -14,6 +14,8 @@ import { fetchKlineRows } from "./binance-klines";
 type Props = {
   market: MarketAsset[];
   minimumQuoteVolume: number;
+  /** Reports each completed scan so the assistant can answer about it. */
+  onReadings?: (readings: PumpReading[]) => void;
 };
 
 
@@ -139,7 +141,7 @@ function PumpCard({ reading }: { reading: PumpReading }) {
   );
 }
 
-export default function PumpRadar({ market, minimumQuoteVolume }: Props) {
+export default function PumpRadar({ market, minimumQuoteVolume, onReadings }: Props) {
   const [readings, setReadings] = useState<PumpReading[]>([]);
   const [scanned, setScanned] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -167,6 +169,7 @@ export default function PumpRadar({ market, minimumQuoteVolume }: Props) {
       if (!candidates.length) {
         if (runId.current === id) {
           setReadings([]);
+          onReadings?.([]);
           setError("");
           setLastRun(new Date());
         }
@@ -189,6 +192,7 @@ export default function PumpRadar({ market, minimumQuoteVolume }: Props) {
         });
       const failures = settled.filter((result) => result.status === "rejected").length;
       setReadings(next);
+      onReadings?.(next);
       setError(failures === candidates.length ? "DATA UNAVAILABLE" : "");
       setLastRun(new Date());
     } catch {
@@ -196,7 +200,7 @@ export default function PumpRadar({ market, minimumQuoteVolume }: Props) {
     } finally {
       if (runId.current === id) setLoading(false);
     }
-  }, [minimumQuoteVolume]);
+  }, [minimumQuoteVolume, onReadings]);
 
   // The 5m rolling window arrives after the first market payload, so the scan
   // waits for that coverage instead of burning its first cycle on empty data.

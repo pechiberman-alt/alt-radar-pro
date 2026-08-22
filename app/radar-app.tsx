@@ -21,6 +21,10 @@ import CorrelationWatch from "./correlation-watch";
 import PumpRadar from "./pump-radar";
 import RiskDesk from "./risk-desk";
 import MarketStructurePanel from "./market-structure-panel";
+import AssistantConsole from "./assistant-console";
+import type { AssistantContext } from "@/lib/assistant/index";
+import type { PumpReading } from "@/lib/pump-radar";
+import type { CorrelationInsights } from "./correlation-watch";
 import type { MarketStructure } from "@/lib/market-structure";
 import { TRADING_PROFILES, type ProfileId } from "@/lib/trading-profiles";
 
@@ -50,6 +54,7 @@ const NAV_ITEMS = [
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
   { label: "RIESGO", mobile: "RIESGO", icon: "◎", id: "riesgo" },
+  { label: "ANALISTA", mobile: "CHAT", icon: "◈", id: "asistente" },
   { label: "COMPARAR", mobile: "COMP", icon: "⇄", id: "comparador" },
   { label: "VIGILANCIA", mobile: "WATCH", icon: "◈", id: "vigilancia" },
   { label: "ORDER FLOW", mobile: "MAPA", icon: "▦", id: "order-flow" },
@@ -484,6 +489,19 @@ export default function RadarApp() {
   const [assetSearch, setAssetSearch] = useState("");
   const [profile, setProfile] = useState<ProfileId>("TRADING_PRO");
   const lastEnrichment = useRef(0);
+  // Readings that live inside child panels. Held in a ref so the high-frequency
+  // pump and correlation cycles do not re-render the whole dashboard; the
+  // assistant reads them when a question is actually asked.
+  const liveReadings = useRef<{
+    pumps: PumpReading[];
+    correlations: CorrelationInsights | null;
+  }>({ pumps: [], correlations: null });
+  const handlePumpReadings = useCallback((readings: PumpReading[]) => {
+    liveReadings.current.pumps = readings;
+  }, []);
+  const handleCorrelationInsights = useCallback((insights: CorrelationInsights) => {
+    liveReadings.current.correlations = insights;
+  }, []);
   const [structure, setStructure] = useState<MarketStructure | null>(null);
   const [structureError, setStructureError] = useState("");
   const { settings, update: updateSettings } = useDashboardSettings();
@@ -703,6 +721,41 @@ export default function RadarApp() {
     ? allScored.filter((asset) => asset.symbol.includes(assetSearch))
     : scored
   ).slice(0, 80);
+  // Everything the assistant needs that comes from this component's own state.
+  // The child panels' readings are merged in at question time, not here, so no
+  // ref is read during render.
+  const assistantBase = useMemo(
+    () => ({
+      timestamp: data?.timestamp ?? new Date().toISOString(),
+      market: data?.market ?? [],
+      scored,
+      altseason: {
+        final: altseason.final,
+        raw: altseason.raw,
+        state: altseason.state,
+        adjustment: altseason.adjustment,
+      },
+      risk: { score: risk.score, level: risk.level, killSwitch: risk.killSwitch },
+      structure,
+      ledger: null,
+      profile: {
+        name: TRADING_PROFILES[profile].name,
+        horizon: TRADING_PROFILES[profile].horizon,
+        market: TRADING_PROFILES[profile].market,
+      },
+    }),
+    [data, scored, altseason, risk, structure, profile],
+  );
+
+  const getAssistantContext = useCallback(
+    (): AssistantContext => ({
+      ...assistantBase,
+      pumps: liveReadings.current.pumps,
+      correlations: liveReadings.current.correlations,
+    }),
+    [assistantBase],
+  );
+
   const multiTimeframeCoverage = data
     ? data.market.filter((asset) => asset.change1h !== null && asset.change4h !== null).length
     : 0;
@@ -978,7 +1031,10 @@ export default function RadarApp() {
         <PumpRadar
           market={data.market}
           minimumQuoteVolume={settings.minimumQuoteVolume}
+          onReadings={handlePumpReadings}
         />
+
+        <AssistantConsole getContext={getAssistantContext} />
 
         <RiskDesk profile={profile} setProfile={setProfile} market={data.market} />
 
@@ -989,7 +1045,11 @@ export default function RadarApp() {
 
         <MarketStructurePanel data={structure} error={structureError} />
 
-        <CorrelationWatch defaultInterval={profileInterval} market={data.market} />
+        <CorrelationWatch
+          defaultInterval={profileInterval}
+          market={data.market}
+          onInsights={handleCorrelationInsights}
+        />
 
         <div id="order-flow"><LiveBookmap
           symbols={data.market.map((asset) => asset.symbol)}

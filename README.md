@@ -17,6 +17,7 @@ Terminal profesional de inteligencia probabilística para criptomonedas. Combina
 - Modo Scalping 5M/15M separado: velas cerradas, ATR, EMA, RSI, MACD, volumen relativo, spread real, estructura, stop e invalidación obligatorios.
 - Cerebro seguro con memoria walk-forward persistente y eventos encadenados por SHA-256; el chat no se guarda ni se envía a terceros.
 - Analista cuantitativo local sin LLM ni consumo de tokens de API, especializado en responder sobre el snapshot real disponible.
+- Consola de analista conversacional: responde por activo, señal, pumpeo, dominancia, correlaciones, riesgo y rendimiento registrado, y explica los conceptos del panel (CVD, footprint, desequilibrios, área de valor, funding, open interest, beta, R:R). Es determinista: la misma pregunta sobre el mismo snapshot devuelve siempre la misma respuesta, cada cifra sale de los paneles y las explicaciones son texto revisado, no generado. Cuando un dato falta lo declara en lugar de completarlo.
 - Automatización de scalping en Cloudflare cada 5 minutos y modelo swing cada 15 minutos, además de sincronización bajo demanda.
 - Alertas visuales, sonido y notificaciones del navegador con cooldown configurable.
 - PWA instalable en Android y escritorio.

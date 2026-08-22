@@ -114,12 +114,24 @@ const formatPrice = (value: number | null) => {
       : `$${value.toPrecision(4)}`;
 };
 
+export type CorrelationInsights = {
+  interval: string;
+  averagePair: number | null;
+  tightestPair: { label: string; value: number } | null;
+  loosestPair: { label: string; value: number } | null;
+  goldVsBtc: number | null;
+  rotation: { label: string; value: number }[];
+};
+
 export default function CorrelationWatch({
   defaultInterval = "1h",
   market = [],
+  onInsights,
 }: {
   defaultInterval?: Interval;
   market?: MarketAsset[];
+  /** Reports the derived readings so the assistant can answer about them. */
+  onInsights?: (insights: CorrelationInsights) => void;
 }) {
   const [interval, setInterval_] = useState<Interval>(defaultInterval);
   const appliedProfileInterval = useRef(defaultInterval);
@@ -280,6 +292,24 @@ export default function CorrelationWatch({
       rotationTotal: rotation.length,
     };
   }, [returnsBySymbol, assets]);
+
+  // Publish the derived readings upward. Deferred so the parent is not updated
+  // while this component is still rendering.
+  useEffect(() => {
+    if (!onInsights) return;
+    const label = INTERVALS.find((entry) => entry.value === interval)?.label ?? interval;
+    const timer = window.setTimeout(() => {
+      onInsights({
+        interval: label,
+        averagePair: insights.averagePair,
+        tightestPair: insights.tightestPair,
+        loosestPair: insights.loosestPair,
+        goldVsBtc: insights.goldVsBtc,
+        rotation: insights.rotation,
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [insights, interval, onInsights]);
 
   return (
     <article className="panel correlation-panel" id="vigilancia">
