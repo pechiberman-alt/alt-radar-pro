@@ -24,11 +24,14 @@ Terminal profesional de inteligencia probabilística para criptomonedas. Combina
 ## Datos y transparencia
 
 - Binance Spot / Futures: precios, volumen, rango, ventanas móviles y order flow.
-- CoinLore Global: dominancia de BTC como respaldo público.
+- CoinGecko Global: capitalización total y dominancia de BTC, ETH, USDT y USDC.
+- CoinLore Global: respaldo de capitalización y dominancia BTC/ETH.
 - GDELT News Index: noticias globales relevantes para mercados.
 - Cloudflare D1: historial persistente y resultados observados.
 
-Cuando una fuente falla, la aplicación muestra `DATA UNAVAILABLE` o un estado degradado. OI, funding, TOTAL2 y TOTAL3 no se reemplazan con estimaciones cuando no existe una fuente pública fiable en el ciclo actual.
+TOTAL2 y TOTAL3 se derivan de la capitalización total y la dominancia publicada (TOTAL2 = TOTAL − BTC; TOTAL3 = TOTAL − BTC − ETH), no de una estimación. La dominancia de USDT se usa como lectura de capital al margen.
+
+Cuando una fuente falla, la aplicación muestra `DATA UNAVAILABLE` o un estado degradado. OI y funding no se reemplazan con estimaciones cuando no existe una fuente pública fiable en el ciclo actual.
 
 Las señales son escenarios probabilísticos, no garantías ni asesoramiento financiero. Los niveles del panel son estructuras indicativas basadas en volatilidad observada; la aplicación no ejecuta operaciones.
 

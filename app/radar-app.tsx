@@ -16,6 +16,8 @@ import CompareChart from "./compare-chart";
 import CorrelationWatch from "./correlation-watch";
 import PumpRadar from "./pump-radar";
 import RiskDesk from "./risk-desk";
+import MarketStructurePanel from "./market-structure-panel";
+import type { MarketStructure } from "@/lib/market-structure";
 import { TRADING_PROFILES, type ProfileId } from "@/lib/trading-profiles";
 
 type InstallPrompt = Event & {
@@ -249,7 +251,20 @@ function SparkBars({ values }: { values: number[] }) {
   );
 }
 
-function MarketStrip({ data }: { data: RadarPayload }) {
+const capLabel = (value: number | null) => {
+  if (value === null) return "DATA UNAVAILABLE";
+  if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+  return `$${value.toFixed(0)}`;
+};
+
+function MarketStrip({
+  data,
+  structure,
+}: {
+  data: RadarPayload;
+  structure: MarketStructure | null;
+}) {
   const btc = data.market.find((asset) => asset.symbol === "BTCUSDT");
   const eth = data.market.find((asset) => asset.symbol === "ETHUSDT");
   const primary = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"];
@@ -283,20 +298,48 @@ function MarketStrip({ data }: { data: RadarPayload }) {
       <div className="market-tile">
         <span>BTC.D <em>GLOBAL</em></span>
         <strong>
-          {data.dominance.btc === null ? "—" : `${data.dominance.btc.toFixed(2)}%`}
+          {structure?.dominance.btc != null
+            ? `${structure.dominance.btc.toFixed(2)}%`
+            : data.dominance.btc === null
+              ? "—"
+              : `${data.dominance.btc.toFixed(2)}%`}
         </strong>
-        <small className="muted">COINLORE GLOBAL</small>
+        <small className="muted">{structure?.source ?? "COINLORE GLOBAL"}</small>
       </div>
-      {[
-        ["TOTAL2", "ALT MARKET CAP"],
-        ["TOTAL3", "EX BTC + ETH"],
-      ].map(([label, detail]) => (
-        <div className="market-tile unavailable-tile" key={label}>
-          <span>{label} <em>{detail}</em></span>
-          <strong>DATA UNAVAILABLE</strong>
-          <small className="muted">SIN FUENTE PÚBLICA FIABLE</small>
-        </div>
-      ))}
+      <div className={structure?.dominance.usdt == null ? "market-tile unavailable-tile" : "market-tile"}>
+        <span>USDT.D <em>CAPITAL AL MARGEN</em></span>
+        <strong>
+          {structure?.dominance.usdt != null
+            ? `${structure.dominance.usdt.toFixed(2)}%`
+            : "DATA UNAVAILABLE"}
+        </strong>
+        <small className="muted">
+          {structure?.dominance.stablecoins != null
+            ? `+USDC ${structure.dominance.stablecoins.toFixed(2)}%`
+            : "SIN DESGLOSE DE STABLES"}
+        </small>
+      </div>
+      <div className="market-tile">
+        <span>TOTAL <em>CAPITALIZACIÓN</em></span>
+        <strong>{capLabel(structure?.totalMarketCap ?? null)}</strong>
+        <small
+          className={(structure?.marketCapChange24h ?? 0) >= 0 ? "positive" : "negative"}
+        >
+          {structure?.marketCapChange24h == null
+            ? "—"
+            : `${structure.marketCapChange24h >= 0 ? "+" : ""}${structure.marketCapChange24h.toFixed(2)}% 24H`}
+        </small>
+      </div>
+      <div className="market-tile">
+        <span>TOTAL2 <em>ALT MARKET CAP</em></span>
+        <strong>{capLabel(structure?.total2 ?? null)}</strong>
+        <small className="muted">SIN BTC</small>
+      </div>
+      <div className="market-tile">
+        <span>TOTAL3 <em>EX BTC + ETH</em></span>
+        <strong>{capLabel(structure?.total3 ?? null)}</strong>
+        <small className="muted">SIN BTC NI ETH</small>
+      </div>
     </div>
   );
 }
@@ -389,6 +432,8 @@ export default function RadarApp() {
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const [assetSearch, setAssetSearch] = useState("");
   const [profile, setProfile] = useState<ProfileId>("TRADING_PRO");
+  const [structure, setStructure] = useState<MarketStructure | null>(null);
+  const [structureError, setStructureError] = useState("");
   const { settings, update: updateSettings } = useDashboardSettings();
   const profileInterval = TRADING_PROFILES[profile].interval;
 
@@ -485,6 +530,27 @@ export default function RadarApp() {
       window.clearInterval(interval);
     };
   }, [refresh]);
+
+  // Global capitalisation and dominance come from the Worker, which caches the
+  // upstream call so every open tab does not spend the shared rate limit.
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await fetch("/api/market-structure", { cache: "no-store" });
+        if (!response.ok) throw new Error();
+        setStructure((await response.json()) as MarketStructure);
+        setStructureError("");
+      } catch {
+        setStructureError("ESTRUCTURA GLOBAL NO DISPONIBLE");
+      }
+    };
+    const boot = window.setTimeout(load, 200);
+    const interval = window.setInterval(load, 120_000);
+    return () => {
+      window.clearTimeout(boot);
+      window.clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     const capture = (event: Event) => {
@@ -618,7 +684,7 @@ export default function RadarApp() {
         </div>
       </header>
 
-      <MarketStrip data={data} />
+      <MarketStrip data={data} structure={structure} />
 
       <div className="shell">
         <div className="command-ribbon">
@@ -800,6 +866,8 @@ export default function RadarApp() {
           symbols={data.market.map((asset) => asset.symbol)}
           defaultInterval={profileInterval}
         />
+
+        <MarketStructurePanel data={structure} error={structureError} />
 
         <CorrelationWatch defaultInterval={profileInterval} market={data.market} />
 
