@@ -12,10 +12,12 @@ type Entry = {
 
 const SUGGESTIONS = [
   "Dame un resumen del mercado",
+  "¿Dónde está el piso más fuerte?",
+  "¿Hay absorción?",
+  "¿Hay squeeze?",
   "¿Hay pumpeo ahora?",
   "¿Cómo está la dominancia?",
-  "¿Cuál es la mejor señal?",
-  "¿Qué es el CVD?",
+  "¿Qué es un iceberg?",
   "¿Cuánto arriesgo por operación?",
 ];
 
@@ -47,7 +49,7 @@ export default function AssistantConsole({
           context.structure !== null,
           context.pumps.length > 0,
           context.correlations != null,
-          context.ledger != null,
+          context.orderFlow != null,
         ].filter(Boolean).length,
         total: 5,
       });

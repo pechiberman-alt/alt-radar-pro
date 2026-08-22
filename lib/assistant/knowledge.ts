@@ -192,6 +192,50 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
       "Detectar un pump no es una razón para comprarlo. Clímax y distribución señalan lo contrario, y son las fases donde entra la mayoría.",
   },
   {
+    id: "iceberg",
+    title: "Iceberg",
+    aliases: ["iceberg", "icebergs", "orden oculta", "tamano oculto"],
+    summary:
+      "Una orden grande que muestra sólo una porción por vez y se repone cada vez que la ejecutan.",
+    detail:
+      "Se detecta cuando un nivel absorbe mucho más volumen del que el libro llegó a mostrar ahí. Quien la coloca no quiere revelar su tamaño, porque hacerlo movería el precio en su contra antes de terminar.",
+    caveat:
+      "Que haya tamaño oculto no dice hacia dónde va el precio. Un iceberg comprador puede estar acumulando o simplemente ejecutando una orden que ya estaba decidida.",
+  },
+  {
+    id: "absorcion",
+    title: "Absorción",
+    aliases: ["absorcion", "absorbe", "absorbido"],
+    summary:
+      "Un lado agrede con fuerza y el precio no avanza: alguien está tomando todo ese flujo sin ceder.",
+    detail:
+      "Es de las lecturas más útiles del order flow, porque muestra un lado gastando munición sin resultado. Cuando la agresión se agota, el precio suele girar hacia el lado que absorbió.",
+    caveat:
+      "La absorción puede fallar: si el que absorbe se queda sin tamaño, el nivel cede de golpe y el movimiento se acelera en la dirección original.",
+  },
+  {
+    id: "barrido",
+    title: "Barrido (sweep)",
+    aliases: ["barrido", "sweep", "barre"],
+    summary:
+      "Una ráfaga que atraviesa varios niveles de precio en segundos, tomando liquidez de golpe.",
+    detail:
+      "Indica urgencia: quien barre prioriza entrar ya sobre conseguir buen precio. Suele aparecer en rupturas y al inicio de cascadas de liquidaciones.",
+    caveat:
+      "Un barrido también puede ser una parada de stops: se toma la liquidez y el precio vuelve. Por sí solo no confirma continuación.",
+  },
+  {
+    id: "squeeze",
+    title: "Squeeze (short y long)",
+    aliases: ["squeeze", "short squeeze", "long squeeze", "apretada"],
+    summary:
+      "Un lado queda demasiado cargado y, al moverse el precio en su contra, sus cierres forzados empujan más en esa dirección.",
+    detail:
+      "En un short squeeze hay mucho posicionamiento corto: si el precio sube, cada liquidación de short es una compra forzada que lo empuja más arriba, y eso liquida al siguiente. El long squeeze es el espejo, hacia abajo. Se lee combinando funding, open interest, liquidaciones y flujo agresivo.",
+    caveat:
+      "Un posicionamiento cargado puede quedarse así mucho tiempo. El squeeze necesita un detonante, y saber que existe la condición no dice cuándo se dispara.",
+  },
+  {
     id: "spread-liquidez",
     title: "Spread y liquidez",
     aliases: ["spread", "liquidez", "slippage", "deslizamiento"],

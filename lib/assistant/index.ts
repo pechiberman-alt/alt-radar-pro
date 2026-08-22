@@ -1,6 +1,11 @@
 import type { MarketAsset, ScoredAsset } from "../radar";
 import type { MarketStructure } from "../market-structure";
 import type { PumpReading } from "../pump-radar";
+import type {
+  InstitutionalEvent,
+  SqueezeReading,
+  StructureLevel,
+} from "../order-flow-brain";
 // Explicit extension so Node can run this module directly in the unit tests;
 // the bundler resolves it the same way.
 import { findConcepts, normalize, type KnowledgeEntry } from "./knowledge.ts";
@@ -45,6 +50,19 @@ export type AssistantContext = {
     averageReturn4h: number | null;
   } | null;
   profile?: { name: string; horizon: string; market: string } | null;
+  /** Live microstructure reading from the bookmap, when that panel is running. */
+  orderFlow?: {
+    symbol: string;
+    venue: "spot" | "futures";
+    mid: number | null;
+    deltaPct: number | null;
+    cvd: number | null;
+    bookImbalancePct: number | null;
+    winner: string;
+    institutional: InstitutionalEvent[];
+    squeeze: SqueezeReading;
+    levels: StructureLevel[];
+  } | null;
 };
 
 export type AssistantAnswer = {
@@ -192,12 +210,13 @@ const INTENTS: Intent[] = [
     build: () => ({
       text: [
         "Soy el analista local de la terminal: leo el snapshot real que la app ya tiene y explico lo que ves. Puedo responder sobre precio y señal de cualquier par listado, estado del radar de pumpeo, dominancia de BTC y USDT, capitalización total, correlaciones entre tus activos, régimen de altseason, contexto de noticias, rendimiento histórico registrado y dimensionamiento de riesgo.",
+        "Con el order flow en vivo también leo microestructura: si hay absorción, icebergs o barridos, quién está tomando el control, dónde están los pisos y techos con su confluencia, y si el posicionamiento está cargado para un squeeze.",
         "También explico conceptos: CVD, footprint, desequilibrios, área de valor, funding, open interest, liquidaciones, beta, R:R y las fases de un pump.",
         "No uso ningún modelo de lenguaje ni envío tus preguntas a terceros, y por eso mismo no invento cifras: si un dato no está en el snapshot, te digo que no está disponible.",
       ].join(" "),
       confidence: "ALTA",
       sources: ["motor local determinista"],
-      followUps: ["Dame un resumen del mercado", "¿Qué es el CVD?", "¿Cómo está USDT.D?"],
+      followUps: ["¿Dónde está el piso más fuerte?", "¿Hay absorción?", "¿Cómo está USDT.D?"],
     }),
   },
   {
@@ -384,6 +403,130 @@ const INTENTS: Intent[] = [
       sources: ["mesa de riesgo"],
       followUps: ["¿Qué es R:R?", "¿Qué es una liquidación?"],
     }),
+  },
+  {
+    id: "order-flow",
+    terms: [
+      "absorcion", "iceberg", "institucional", "institucionales", "ballena",
+      "order flow", "flujo de ordenes", "barrido", "quien manda", "quien domina",
+      "bloques", "ordenes grandes",
+    ],
+    build: (context) => {
+      const flow = context.orderFlow;
+      if (!flow) {
+        return {
+          text: "El panel de order flow no está transmitiendo en este momento, así que no tengo lectura de microestructura. Abrí ORDER FLOW y esperá a que conecte el feed.",
+          confidence: "BAJA",
+          sources: [],
+          followUps: ["¿Qué es la absorción?", "Dame un resumen del mercado"],
+        };
+      }
+      const name = assetName(flow.symbol);
+      if (!flow.institutional.length) {
+        return {
+          text: `En ${name} no hay patrones de tamaño deliberado en la muestra actual. Hace falta flujo suficiente para separar una orden trabajada del ruido normal. Ahora mismo domina ${flow.winner.toLowerCase()}, con delta ${pct(flow.deltaPct)} y libro ${plain(flow.bookImbalancePct, 1)}% del lado bid.`,
+          confidence: "MEDIA",
+          sources: [`Binance ${flow.venue === "futures" ? "Futures" : "Spot"}`],
+          followUps: ["¿Dónde está el piso más fuerte?", "¿Hay squeeze?"],
+        };
+      }
+      const detail = flow.institutional
+        .slice(0, 3)
+        .map(
+          (event) =>
+            `${event.kind} de ${event.side.toLowerCase()} en ${plain(event.price, event.price >= 1000 ? 1 : 4)} por ${cap(event.notional)} (confianza ${event.confidence}/100)`,
+        )
+        .join("; ");
+      return {
+        text: `En ${name} detecto ${flow.institutional.length} patrones: ${detail}. ${flow.institutional[0].detail} Domina ${flow.winner.toLowerCase()} con delta ${pct(flow.deltaPct)}. Recordá que «institucional» describe tamaño y comportamiento, no una identidad: ningún feed público dice quién está detrás.`,
+        confidence: "ALTA",
+        sources: [`Binance ${flow.venue === "futures" ? "Futures" : "Spot"} · ejecuciones y profundidad`],
+        followUps: ["¿Qué es un iceberg?", "¿Dónde está el piso más fuerte?"],
+      };
+    },
+  },
+  {
+    id: "estructura",
+    terms: [
+      "piso", "pisos", "techo", "techos", "soporte", "soportes",
+      "resistencia", "resistencias", "nivel", "niveles", "poc",
+    ],
+    build: (context, question) => {
+      const flow = context.orderFlow;
+      if (!flow || !flow.levels.length) {
+        return {
+          text: flow
+            ? `Todavía no hay niveles con evidencia suficiente en ${assetName(flow.symbol)}. Un nivel entra cuando lo respalda volumen concentrado, liquidez persistente o cúmulos de liquidaciones, no por haber sido tocado una vez.`
+            : "El panel de order flow no está transmitiendo, así que no puedo calcular pisos ni techos.",
+          confidence: "BAJA",
+          sources: [],
+          followUps: ["¿Qué es el área de valor?", "Dame un resumen del mercado"],
+        };
+      }
+      const floors = flow.levels.filter((level) => level.kind === "PISO");
+      const ceilings = flow.levels.filter((level) => level.kind === "TECHO");
+      const describe = (level: StructureLevel) =>
+        `${plain(level.price, level.price >= 1000 ? 1 : 4)} (${pct(level.distancePct)}, fuerza ${level.strength}/100, apoyado en ${level.sources.length} lectura${level.sources.length === 1 ? "" : "s"}: ${level.sources.join(" · ")})`;
+
+      // Answer what was actually asked first: a question about the floor should
+      // not open with the ceiling just because that one scored higher.
+      const asked = normalize(question);
+      const wantsFloor = hasAny(asked, ["piso", "pisos", "soporte", "soportes"]);
+      const wantsCeiling = hasAny(asked, ["techo", "techos", "resistencia", "resistencias"]);
+
+      const floorLine = floors[0]
+        ? `Piso más fuerte: ${describe(floors[0])}.`
+        : "No hay pisos con evidencia suficiente por debajo del precio.";
+      const ceilingLine = ceilings[0]
+        ? `Techo más fuerte: ${describe(ceilings[0])}.`
+        : "No hay techos con evidencia suficiente por encima.";
+
+      const parts =
+        wantsCeiling && !wantsFloor
+          ? [ceilingLine, floorLine]
+          : [floorLine, ceilingLine];
+
+      return {
+        text: `En ${assetName(flow.symbol)}: ${parts.join(" ")} Un nivel vale por la confluencia que lo sostiene, no por lo redondo que sea el número.`,
+        confidence: "ALTA",
+        sources: [`Binance ${flow.venue === "futures" ? "Futures" : "Spot"} · perfil de volumen y libro`],
+        followUps: ["¿Qué es el punto de control?", "¿Hay absorción?"],
+      };
+    },
+  },
+  {
+    id: "squeeze",
+    terms: ["squeeze", "short squeeze", "long squeeze", "liquidaciones", "presion", "posicionamiento"],
+    build: (context) => {
+      const flow = context.orderFlow;
+      if (!flow) {
+        return {
+          text: "Necesito el panel de order flow transmitiendo para leer funding, open interest y liquidaciones.",
+          confidence: "BAJA",
+          sources: [],
+          followUps: ["¿Qué es un squeeze?"],
+        };
+      }
+      const squeeze = flow.squeeze;
+      const factors = squeeze.factors
+        .slice(0, 4)
+        .map((factor) => factor.label)
+        .join("; ");
+      if (squeeze.type === "SIN PRESIÓN") {
+        return {
+          text: `En ${assetName(flow.symbol)} no hay squeeze: ${squeeze.detail}${factors ? ` Lo que sí veo: ${factors}.` : ""}${squeeze.missing.length ? ` Sin dato de ${squeeze.missing.join(", ")}.` : ""} Un solo factor es coincidencia; hacen falta al menos tres alineados.`,
+          confidence: squeeze.missing.length >= 3 ? "BAJA" : "MEDIA",
+          sources: [`Binance ${flow.venue === "futures" ? "Futures" : "Spot"} · derivados`],
+          followUps: ["¿Qué es un squeeze?", "¿Dónde está el techo más fuerte?"],
+        };
+      }
+      return {
+        text: `${assetName(flow.symbol)} muestra ${squeeze.type} con ${squeeze.score}/100 y sesgo ${squeeze.bias.toLowerCase()}. ${squeeze.detail} Factores alineados: ${factors}.${squeeze.missing.length ? ` Sin dato de ${squeeze.missing.join(", ")}.` : ""}`,
+        confidence: "ALTA",
+        sources: [`Binance ${flow.venue === "futures" ? "Futures" : "Spot"} · funding, OI y liquidaciones`],
+        followUps: ["¿Dónde está el techo más fuerte?", "¿Cómo dimensiono el riesgo?"],
+      };
+    },
   },
   {
     id: "senal",

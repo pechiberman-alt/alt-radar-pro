@@ -334,14 +334,30 @@ function forwardFillLiquidity(columns: Float64Array[], times: number[], maximumG
   return persisted;
 }
 
+export type BookmapBrainReadings = {
+  symbol: string;
+  venue: "spot" | "futures";
+  mid: number | null;
+  deltaPct: number | null;
+  cvd: number | null;
+  bookImbalancePct: number | null;
+  winner: string;
+  institutional: ReturnType<typeof detectInstitutional>;
+  squeeze: ReturnType<typeof detectSqueeze>;
+  levels: ReturnType<typeof findStructureLevels>;
+};
+
 export default function LiveBookmap({
   symbols,
   altseason,
   news,
+  onBrainReadings,
 }: {
   symbols: string[];
   altseason: AltseasonContext;
   news: NewsEvent[];
+  /** Publishes the microstructure reading so the assistant can answer about it. */
+  onBrainReadings?: (readings: BookmapBrainReadings) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const framesRef = useRef<Frame[]>([]);
@@ -1592,6 +1608,30 @@ export default function LiveBookmap({
     (sum, row) => sum + row.buy + row.sell,
     0,
   );
+
+  // Publish the reading upward, deferred so the parent is never updated while
+  // this component is still rendering.
+  useEffect(() => {
+    if (!onBrainReadings) return;
+    const timer = window.setTimeout(() => {
+      onBrainReadings({
+        symbol,
+        venue,
+        mid: brainMid || null,
+        deltaPct: delta,
+        cvd,
+        bookImbalancePct: metrics.imbalance,
+        winner,
+        institutional,
+        squeeze,
+        levels: structureLevels,
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    onBrainReadings, symbol, venue, brainMid, delta, cvd,
+    metrics.imbalance, winner, institutional, squeeze, structureLevels,
+  ]);
   const footprintDelta = actualFootprint.reduce(
     (sum, row) => sum + row.buy - row.sell,
     0,

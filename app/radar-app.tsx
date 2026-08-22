@@ -13,7 +13,7 @@ import {
   scoreAssets,
 } from "@/lib/radar";
 import { useDashboardSettings } from "./dashboard-settings";
-import LiveBookmap from "./live-bookmap";
+import LiveBookmap, { type BookmapBrainReadings } from "./live-bookmap";
 import SignalLedger from "./signal-ledger";
 import ScalpingDesk from "./scalping-desk";
 import CompareChart from "./compare-chart";
@@ -496,7 +496,11 @@ export default function RadarApp() {
   const liveReadings = useRef<{
     pumps: PumpReading[];
     correlations: CorrelationInsights | null;
-  }>({ pumps: [], correlations: null });
+    orderFlow: BookmapBrainReadings | null;
+  }>({ pumps: [], correlations: null, orderFlow: null });
+  const handleBrainReadings = useCallback((readings: BookmapBrainReadings) => {
+    liveReadings.current.orderFlow = readings;
+  }, []);
   const handlePumpReadings = useCallback((readings: PumpReading[]) => {
     liveReadings.current.pumps = readings;
   }, []);
@@ -774,6 +778,7 @@ export default function RadarApp() {
       ...assistantBase,
       pumps: liveReadings.current.pumps,
       correlations: liveReadings.current.correlations,
+      orderFlow: liveReadings.current.orderFlow,
     }),
     [assistantBase],
   );
@@ -1082,6 +1087,7 @@ export default function RadarApp() {
             state: altseason.state,
           }}
           news={data.news}
+          onBrainReadings={handleBrainReadings}
         /></div>
 
         <section className="lower-grid" id="scanner">

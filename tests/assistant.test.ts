@@ -73,6 +73,128 @@ const context: AssistantContext = {
   profile: { name: "Trading Pro", horizon: "CORTO", market: "FUTUROS + SPOT" },
 };
 
+const withFlow: AssistantContext = {
+  ...context,
+  orderFlow: {
+    symbol: "BTCUSDT",
+    venue: "futures",
+    mid: 77_060,
+    deltaPct: -4.4,
+    cvd: -19_050,
+    bookImbalancePct: 55.6,
+    winner: "COMPRADORES",
+    institutional: [
+      {
+        kind: "ABSORCIÓN", side: "VENTA", price: 77_063.5, notional: 13_500,
+        confidence: 75,
+        detail: "Agresión compra de 34.0× absorbida sin que el precio atraviese el nivel: alguien está sosteniendo el otro lado.",
+      },
+      {
+        kind: "BLOQUE", side: "COMPRA", price: 77_060.3, notional: 23_300,
+        confidence: 55, detail: "Ejecución individual en el percentil 97 de la ventana.",
+      },
+    ],
+    squeeze: {
+      type: "SHORT SQUEEZE", score: 62, bias: "ALCISTA",
+      factors: [
+        { label: "Funding negativo -0.0400%: los shorts pagan", points: 28 },
+        { label: "Liquidaciones dominadas por shorts (88%)", points: 23 },
+        { label: "Cuentas cargadas en short (0.70×)", points: 18 },
+      ],
+      missing: [],
+      detail: "Posicionamiento corto cargado con presión compradora.",
+    },
+    levels: [
+      {
+        price: 77_057.5, kind: "PISO", strength: 88, distancePct: -0.01,
+        sources: ["Punto de control (mayor volumen)", "Pared BID persistente (48%)"],
+      },
+      {
+        price: 77_240, kind: "TECHO", strength: 44, distancePct: 0.23,
+        sources: ["Cúmulo de liquidaciones"],
+      },
+    ],
+  },
+};
+
+test("reports institutional patterns from the live order flow", () => {
+  const answer = ask("hay absorcion?", withFlow);
+  assert.equal(answer.intent, "order-flow");
+  assert.ok(answer.text.includes("ABSORCIÓN"));
+  assert.ok(answer.text.includes("BTC"));
+  assert.ok(
+    answer.text.includes("no una identidad"),
+    "debe aclarar que institucional no identifica a nadie",
+  );
+});
+
+test("answers where the strongest floor is, with its confluence", () => {
+  const answer = ask("donde esta el piso mas fuerte?", withFlow);
+  assert.equal(answer.intent, "estructura");
+  assert.ok(answer.text.includes("77057.5") || answer.text.includes("77,057") || answer.text.includes("77057"));
+  assert.ok(answer.text.includes("Punto de control"), "debe citar en qué se apoya");
+  assert.ok(answer.text.includes("88/100"));
+});
+
+test("answers the side that was asked about first", () => {
+  const floorFirst = ask("donde esta el piso?", withFlow);
+  assert.ok(
+    floorFirst.text.indexOf("Piso más fuerte") < floorFirst.text.indexOf("Techo más fuerte"),
+    "preguntando por el piso, el piso va primero",
+  );
+  const ceilingFirst = ask("cual es la resistencia?", withFlow);
+  assert.ok(
+    ceilingFirst.text.indexOf("Techo más fuerte") < ceilingFirst.text.indexOf("Piso más fuerte"),
+    "preguntando por la resistencia, el techo va primero",
+  );
+});
+
+test("reports a squeeze with its aligned factors", () => {
+  const answer = ask("hay squeeze?", withFlow);
+  assert.equal(answer.intent, "squeeze");
+  assert.ok(answer.text.includes("SHORT SQUEEZE"));
+  assert.ok(answer.text.includes("62/100"));
+  assert.ok(answer.text.includes("Funding negativo"));
+});
+
+test("without order flow it says so instead of guessing", () => {
+  for (const question of ["hay absorcion?", "donde esta el piso?", "hay squeeze?"]) {
+    const answer = ask(question, context);
+    assert.equal(answer.confidence, "BAJA", `"${question}" no debe sonar seguro sin datos`);
+    assert.ok(
+      /no está transmitiendo|no puedo calcular|Necesito el panel/.test(answer.text),
+      `"${question}" debe declarar la falta de feed: ${answer.text}`,
+    );
+    assert.ok(!/\d+\/100/.test(answer.text), "no debe inventar puntajes");
+  }
+});
+
+test("a quiet order flow reports no patterns rather than inventing them", () => {
+  const quiet: AssistantContext = {
+    ...withFlow,
+    orderFlow: { ...withFlow.orderFlow!, institutional: [], levels: [] },
+  };
+  const flow = ask("hay ordenes institucionales?", quiet);
+  assert.ok(flow.text.includes("no hay patrones"));
+  const levels = ask("donde estan los pisos?", quiet);
+  assert.ok(levels.text.includes("evidencia suficiente"));
+});
+
+test("explains the new microstructure concepts", () => {
+  for (const [question, expected] of [
+    ["que es un iceberg", "Iceberg"],
+    ["que es la absorcion", "Absorción"],
+    ["que es un barrido", "Barrido"],
+    ["que es un short squeeze", "Squeeze"],
+  ] as const) {
+    const answer = ask(question, context);
+    assert.ok(
+      answer.concepts.some((concept) => concept.title.includes(expected)),
+      `"${question}" debía explicar ${expected}`,
+    );
+  }
+});
+
 test("recognises a ticker from the live universe", () => {
   assert.equal(extractSymbol("como esta SOL", market)?.symbol, "SOLUSDT");
   assert.equal(extractSymbol("precio de wld", market)?.symbol, "WLDUSDT");
