@@ -20,7 +20,7 @@ Terminal profesional de inteligencia probabilística para criptomonedas. Combina
 - Consola de analista conversacional: responde por activo, señal, pumpeo, dominancia, correlaciones, riesgo y rendimiento registrado, y explica los conceptos del panel (CVD, footprint, desequilibrios, área de valor, funding, open interest, beta, R:R). Es determinista: la misma pregunta sobre el mismo snapshot devuelve siempre la misma respuesta, cada cifra sale de los paneles y las explicaciones son texto revisado, no generado. Cuando un dato falta lo declara en lugar de completarlo.
 - Automatización de scalping en Cloudflare cada 5 minutos y modelo swing cada 15 minutos, además de sincronización bajo demanda.
 - Alertas visuales, sonido y notificaciones del navegador con cooldown configurable.
-- PWA instalable en Android y escritorio.
+- PWA instalable en Android, escritorio e iPhone. El panel «Descargar la terminal» detecta la plataforma y muestra los pasos que corresponden: en iOS Safari el navegador nunca ofrece el botón de instalación, así que la única vía es Compartir → Añadir a pantalla de inicio y hay que indicarla explícitamente.
 
 ## Datos y transparencia
 
