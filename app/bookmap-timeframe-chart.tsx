@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BRAIN_TIMEFRAMES,
   type BrainTimeframe,
   type MarketVenue,
 } from "@/lib/market-brain";
@@ -42,7 +41,6 @@ type Props = {
   symbol: string;
   venue: MarketVenue;
   timeframe: BrainTimeframe;
-  onTimeframeChange: (timeframe: BrainTimeframe) => void;
 };
 
 const frameLabel: Record<BrainTimeframe, string> = {
@@ -142,7 +140,6 @@ export default function BookmapTimeframeChart({
   symbol,
   venue,
   timeframe,
-  onTimeframeChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -401,19 +398,6 @@ export default function BookmapTimeframeChart({
           <p>MARKET STRUCTURE · KLINES REALES</p>
           <h3>{symbol.replace("USDT", "/USDT")} · Contexto temporal</h3>
           <span>Velas históricas verificables sobre el heatmap de profundidad en vivo</span>
-        </div>
-        <div className="tf-selector" role="tablist" aria-label="Temporalidad del gráfico Bookmap">
-          {BRAIN_TIMEFRAMES.map((frame) => (
-            <button
-              key={frame}
-              role="tab"
-              aria-selected={frame === timeframe}
-              className={frame === timeframe ? "active" : ""}
-              onClick={() => onTimeframeChange(frame)}
-            >
-              {frameLabel[frame]}
-            </button>
-          ))}
         </div>
       </header>
 

@@ -232,17 +232,21 @@ test("wires the zero-token market brain, real timeframes and auditable learning"
 });
 
 test("adds real Bookmap timeframes and horizon performance without fabricated stats", async () => {
-  const [chart, performance, automation, schema] = await Promise.all([
+  const [chart, performance, automation, schema, bookmap] = await Promise.all([
     readFile(new URL("../app/bookmap-timeframe-chart.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/performance/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/automation.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/live-bookmap.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(chart, /MARKET STRUCTURE · KLINES REALES/);
   assert.match(chart, /WIN RATE/);
   assert.match(chart, /PROFIT FACTOR/);
-  assert.match(chart, /BRAIN_TIMEFRAMES\.map/);
+  // The chart no longer renders its own timeframe picker: one control at the
+  // section level drives the heatmap, the chart and the brain together.
+  assert.doesNotMatch(chart, /tf-selector/);
+  assert.match(bookmap, /section-timeframe/);
   assert.match(performance, /COUNT\(return_5m\)/);
   assert.match(performance, /profitFactorInfinite/);
   assert.match(performance, /DATA INSUFICIENTE/);

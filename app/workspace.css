@@ -130,3 +130,51 @@
 small {
   font-size: max(9px, 0.85em);
 }
+
+/* ---- Single section timeframe -------------------------------------------
+   Replaces four separate pickers that all wrote the same state, which read as
+   four independent settings. */
+.section-timeframe {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 11px 22px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: #08100d;
+}
+.section-timeframe > span {
+  font: 9px var(--font-mono);
+  letter-spacing: 1.2px;
+  color: var(--green2);
+  margin-right: 4px;
+}
+.section-timeframe button {
+  background: #0c130f;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 7px 13px;
+  border-radius: 3px;
+  font: 10px var(--font-mono);
+  letter-spacing: .8px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.section-timeframe button:hover { border-color: #35473e; color: var(--text); }
+.section-timeframe button.active {
+  color: var(--green);
+  border-color: #2d6a4d;
+  background: #0c251a;
+  box-shadow: 0 0 14px rgba(57, 242, 154, .1);
+}
+.section-timeframe em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 9px;
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .section-timeframe { padding: 11px 14px; }
+  .section-timeframe em { margin-left: 0; flex-basis: 100%; }
+}

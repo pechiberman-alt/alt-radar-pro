@@ -323,21 +323,7 @@ export default function MarketBrain(props: MarketBrainProps) {
           </span>
         </div>
       </header>
-
-      <div className="brain-timeframes" role="tablist" aria-label="Temporalidad del análisis">
-        {BRAIN_TIMEFRAMES.map((frame) => (
-          <button
-            key={frame}
-            className={frame === timeframe ? "active" : ""}
-            onClick={() => props.onTimeframeChange(frame)}
-          >
-            {frameLabel[frame]}
-          </button>
-        ))}
-        <div className={`brain-feed ${status}`}>
-          <i /> {status === "loading" ? "CALCULANDO" : status === "error" ? "DATA UNAVAILABLE" : "AUTO · 60S"}
-        </div>
-      </div>
+
 
       {status === "error" && !brain ? (
         <div className="brain-unavailable">

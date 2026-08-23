@@ -2125,6 +2125,28 @@ export default function LiveBookmap({
         </div>
       </div>
 
+      {/*
+        One timeframe control for the whole section. The heatmap, the kline
+        chart and the brain always read the same `marketTimeframe`, but each
+        rendered its own picker, so the same switch appeared four times and
+        looked like four independent settings.
+      */}
+      <div className="section-timeframe" role="tablist" aria-label="Temporalidad de la sección">
+        <span>TEMPORALIDAD</span>
+        {(Object.keys(LIQUIDITY_FRAME_LABEL) as BrainTimeframe[]).map((frame) => (
+          <button
+            key={frame}
+            role="tab"
+            aria-selected={marketTimeframe === frame}
+            className={marketTimeframe === frame ? "active" : ""}
+            onClick={() => setMarketTimeframe(frame)}
+          >
+            {frame.toUpperCase()}
+          </button>
+        ))}
+        <em>Gobierna heatmap, gráfico de velas y cerebro</em>
+      </div>
+
       <div className="terminal-commandbar">
         <label className="market-command" htmlFor="bookmap-symbol">
           <span>MERCADO</span>
@@ -2412,26 +2434,12 @@ export default function LiveBookmap({
         symbol={symbol}
         venue={venue}
         timeframe={marketTimeframe}
-        onTimeframeChange={setMarketTimeframe}
       />
 
       <div className="liquidity-horizon-bar">
         <div>
           <span>MAPA DE LIQUIDEZ</span>
           <b>VENTANA {LIQUIDITY_FRAME_LABEL[marketTimeframe]}</b>
-        </div>
-        <div className="liquidity-horizon-tabs" role="tablist" aria-label="Horizonte del mapa de liquidez">
-          {(Object.keys(LIQUIDITY_FRAME_LABEL) as BrainTimeframe[]).map((frame) => (
-            <button
-              key={frame}
-              role="tab"
-              aria-selected={marketTimeframe === frame}
-              className={marketTimeframe === frame ? "active" : ""}
-              onClick={() => setMarketTimeframe(frame)}
-            >
-              {LIQUIDITY_FRAME_LABEL[frame]}
-            </button>
-          ))}
         </div>
         <div className={`liquidity-archive-state ${liquidityArchiveStatus}`}>
           <i />
@@ -2480,17 +2488,6 @@ export default function LiveBookmap({
               {availableSymbols.map((item) => <option value={item} key={item}>{base(item)}/USDT</option>)}
             </select>
           </label>
-          <div className="bookmap-strip-timeframes" role="tablist" aria-label="Temporalidad del heatmap">
-            {(Object.keys(LIQUIDITY_FRAME_LABEL) as BrainTimeframe[]).map((frame) => (
-              <button
-                key={`premium-${frame}`}
-                role="tab"
-                aria-selected={marketTimeframe === frame}
-                className={marketTimeframe === frame ? "active" : ""}
-                onClick={() => setMarketTimeframe(frame)}
-              >{LIQUIDITY_FRAME_LABEL[frame]}</button>
-            ))}
-          </div>
           <button className="bookmap-fullscreen-button" onClick={() => setFullscreenMap((value) => !value)}>{fullscreenMap ? "SALIR" : "PANTALLA COMPLETA"}</button>
           <button className={`bookmap-dom-button ${showMarketSidebar ? "active" : ""}`} onClick={() => setShowMarketSidebar((value) => !value)}>{showMarketSidebar ? "OCULTAR DOM" : "ABRIR DOM"}</button>
         </div>
@@ -2906,6 +2903,8 @@ export default function LiveBookmap({
         altseason={altseason}
         liveLiquidations={liquidations}
         timeframe={marketTimeframe}
+        // The brain's multi-timeframe matrix compares all five at once rather
+        // than duplicating the picker, so it keeps the ability to select.
         onTimeframeChange={setMarketTimeframe}
         onDerivativesChange={setDerivatives}
       />
