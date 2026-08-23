@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cached, clearUpstreamCache } from "../lib/upstream-cache.ts";
+import { cached, clearUpstreamCache, offerCached } from "../lib/upstream-cache.ts";
 
 test("first read loads, second is served from cache", async () => {
   clearUpstreamCache();
@@ -121,4 +121,36 @@ test("a first-time failure reports nothing rather than inventing", async () => {
     throw new Error("sin datos");
   });
   assert.equal(result.value, null);
+});
+
+// ---- client contributions -------------------------------------------------
+
+test("a contribution fills a key the Worker could not fetch itself", async () => {
+  clearUpstreamCache();
+  const stored = offerCached("k", { rows: 5 }, 60_000);
+  assert.equal(stored, true);
+  const read = await cached("k", 60_000, async () => null);
+  assert.deepEqual(read.value, { rows: 5 });
+});
+
+test("a contribution never overwrites a fresher reading", async () => {
+  clearUpstreamCache();
+  await cached("k", 60_000, async () => ({ origen: "worker" }));
+  const stored = offerCached("k", { origen: "cliente" }, 60_000);
+  assert.equal(stored, false, "no debe pisar un dato reciente del origen");
+  const read = await cached("k", 60_000, async () => null);
+  assert.deepEqual(read.value, { origen: "worker" });
+});
+
+test("a contribution is accepted once the held value went stale", async () => {
+  clearUpstreamCache();
+  await cached("k", 1, async () => ({ origen: "viejo" }));
+  await new Promise((resolve) => setTimeout(resolve, 12));
+  assert.equal(offerCached("k", { origen: "cliente" }, 10), true);
+});
+
+test("empty contributions are rejected", () => {
+  clearUpstreamCache();
+  assert.equal(offerCached("k", null, 60_000), false);
+  assert.equal(offerCached("k", undefined, 60_000), false);
 });

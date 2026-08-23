@@ -31,6 +31,30 @@ export function directFetchBlocked() {
   return Date.now() < directBlockedUntil;
 }
 
+/**
+ * Share a successful fetch with the Worker so throttled visitors can read it.
+ * Fire-and-forget: this is a courtesy to other clients, never something the
+ * caller should wait on or fail over.
+ */
+const contributed = new Set<string>();
+
+function contribute(symbol: string, interval: KlineInterval, rows: unknown[]) {
+  const key = `${symbol}:${interval}`;
+  if (contributed.has(key)) return;
+  contributed.add(key);
+  // Only once per key per session, so a long-lived tab does not keep posting.
+  window.setTimeout(() => contributed.delete(key), 60_000);
+  void fetch(
+    `/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rows),
+      keepalive: true,
+    },
+  ).catch(() => undefined);
+}
+
 export async function fetchKlineRows(
   symbol: string,
   interval: KlineInterval,
@@ -45,7 +69,13 @@ export async function fetchKlineRows(
       );
       if (!response.ok) continue;
       const rows = await response.json();
-      if (Array.isArray(rows) && rows.length) return rows;
+      if (Array.isArray(rows) && rows.length) {
+        // Binance refuses Cloudflare's addresses on this endpoint, so the
+        // Worker cannot build this cache itself. A client that succeeded can,
+        // which is what makes the fallback work for clients that are blocked.
+        contribute(symbol, interval, rows);
+        return rows;
+      }
     } catch {
       // Fall through to the next mirror, then to the proxy.
     }

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  compositeBook,
+  currentWalls,
   FOOTPRINT_TARGET_ROWS,
   classifyLargeTrades,
   cumulativeDelta,
@@ -230,4 +232,69 @@ test("large trades need a minimum sample before classifying", () => {
   assert.equal(result.eligible, true);
   assert.ok(result.large.length > 0);
   assert.ok(result.large.every((t) => t.notional >= result.threshold));
+});
+
+// ---- order book -----------------------------------------------------------
+
+const side = (start: number, step: number, qty: number, count: number): [number, number][] =>
+  Array.from({ length: count }, (_, i) => [start + i * step, qty]);
+
+test("composite book keeps the live top and extends with the deep snapshot", () => {
+  const live = { bids: side(100, -0.1, 10, 5), asks: side(100.1, 0.1, 10, 5) };
+  const deep = { bids: side(100, -0.1, 10, 40), asks: side(100.1, 0.1, 10, 40) };
+  const merged = compositeBook(live, deep, 30);
+
+  assert.equal(merged.bids[0][0], live.bids[0][0], "el tope vivo debe mandar");
+  assert.ok(merged.bids.length > live.bids.length, "debe extenderse con la profundidad");
+  assert.ok(merged.bids.length <= 30);
+  for (let i = 1; i < merged.bids.length; i += 1) {
+    assert.ok(merged.bids[i - 1][0] > merged.bids[i][0], "bids descendentes");
+    assert.ok(merged.asks[i - 1][0] < merged.asks[i][0], "asks ascendentes");
+  }
+});
+
+test("composite book falls back cleanly when either feed is empty", () => {
+  const live = { bids: side(100, -0.1, 10, 5), asks: side(100.1, 0.1, 10, 5) };
+  const empty = { bids: [] as [number, number][], asks: [] as [number, number][] };
+  assert.deepEqual(compositeBook(live, empty, 3).bids, live.bids.slice(0, 3));
+  assert.deepEqual(compositeBook(empty, live, 3).asks, live.asks.slice(0, 3));
+  assert.deepEqual(compositeBook(empty, empty, 3), { bids: [], asks: [] });
+});
+
+test("walls need a book with both sides", () => {
+  assert.deepEqual(currentWalls({ bids: [], asks: [] }, []), []);
+});
+
+test("walls are the levels standing out against the book's own typical size", () => {
+  const bids: [number, number][] = [
+    ...side(100, -0.1, 1, 10),
+    [98.5, 400], // the block
+  ];
+  const asks = side(100.1, 0.1, 1, 10);
+  const walls = currentWalls({ bids, asks }, []);
+  assert.ok(walls.length > 0);
+  assert.equal(walls[0].price, 98.5, "el bloque debe encabezar");
+  assert.equal(walls[0].side, "BID");
+  assert.ok(walls[0].strength > 2, "debe destacar sobre la línea base");
+  assert.ok(walls[0].distance < 0, "un bid está por debajo del mid");
+});
+
+test("persistence separates a standing block from one that appeared once", () => {
+  const bids: [number, number][] = [...side(100, -0.1, 1, 10), [98.5, 400]];
+  const asks = side(100.1, 0.1, 1, 10);
+  const book = { bids, asks };
+
+  const absent = currentWalls(book, Array.from({ length: 20 }, () => ({ bids: side(100, -0.1, 1, 10), asks })));
+  assert.equal(absent[0].persistence, 0, "no estuvo en el historial");
+
+  const present = currentWalls(book, Array.from({ length: 20 }, () => book));
+  assert.equal(present[0].persistence, 100, "estuvo en todos los cuadros");
+});
+
+test("wall figures stay finite on a degenerate book", () => {
+  const book = { bids: [[100, 0]] as [number, number][], asks: [[101, 0]] as [number, number][] };
+  for (const wall of currentWalls(book, [])) {
+    assert.ok(Number.isFinite(wall.strength) && Number.isFinite(wall.distance));
+    assert.ok(Number.isFinite(wall.persistence));
+  }
 });

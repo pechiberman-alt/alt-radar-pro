@@ -71,6 +71,24 @@ export async function cached<T>(
   return { value: null, state: "MISS", ageMs: 0 };
 }
 
+/**
+ * Accept a value fetched by a client on the Worker's behalf.
+ *
+ * Some upstream endpoints refuse datacenter addresses, so the Worker cannot
+ * fetch them at all while ordinary visitors can. A contribution is only taken
+ * when nothing fresher is held, which keeps a client from overwriting a good
+ * reading or replacing it with a fabricated one.
+ *
+ * @returns whether the contribution was stored
+ */
+export function offerCached<T>(key: string, value: T, freshMs: number): boolean {
+  if (value === null || value === undefined) return false;
+  const existing = store.get(key);
+  if (existing && Date.now() - existing.at < freshMs) return false;
+  store.set(key, { value, at: Date.now() });
+  return true;
+}
+
 /** Exposed for tests; not used by request handlers. */
 export function clearUpstreamCache() {
   store.clear();

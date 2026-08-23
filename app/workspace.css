@@ -296,3 +296,21 @@ small {
   .key-row { grid-template-columns: 12px 1fr; }
   .key-row span { grid-column: 2; }
 }
+
+/* The heatmap header shows which market is loaded; changing it happens in the
+   one picker in the command bar. */
+.bookmap-current-market {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: 11px var(--font-mono);
+  letter-spacing: .6px;
+  color: var(--text);
+}
+.bookmap-current-market i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}

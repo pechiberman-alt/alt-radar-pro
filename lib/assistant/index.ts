@@ -50,6 +50,18 @@ export type AssistantContext = {
     averageReturn4h: number | null;
   } | null;
   profile?: { name: string; horizon: string; market: string } | null;
+  /**
+   * Dominance measured over time from the app's own recorded snapshots. Free
+   * sources publish only a current value, so this is the one series the
+   * terminal owns.
+   */
+  structureTrend?: {
+    hours: number;
+    samples: number;
+    btcChange: number | null;
+    usdtChange: number | null;
+    totalChangePct: number | null;
+  } | null;
   /** Live microstructure reading from the bookmap, when that panel is running. */
   orderFlow?: {
     symbol: string;
@@ -303,6 +315,50 @@ const INTENTS: Intent[] = [
         confidence: "ALTA",
         sources: [structure.source],
         followUps: ["¿Qué es la dominancia de USDT?", "¿Cómo están las correlaciones?"],
+      };
+    },
+  },
+  {
+    id: "tendencia-dominancia",
+    terms: [
+      "viene subiendo", "esta subiendo", "viene bajando", "esta bajando",
+      "tendencia", "evolucion", "ultimas horas", "ultimos dias", "historico",
+    ],
+    build: (context) => {
+      const trend = context.structureTrend;
+      if (!trend || trend.samples < 2) {
+        return {
+          text: `Todavía no hay suficientes lecturas registradas para hablar de tendencia${trend ? ` (${trend.samples})` : ""}. La app graba una foto de dominancia cada 15 minutos y necesita al menos dos para medir un cambio.`,
+          confidence: "BAJA",
+          sources: ["Snapshots propios · Cloudflare D1"],
+          followUps: ["¿Cómo está la dominancia?", "¿Qué es la dominancia de USDT?"],
+        };
+      }
+
+      const describe = (change: number | null, name: string, invert = false) => {
+        if (change === null) return `${name}: sin serie suficiente.`;
+        if (Math.abs(change) < 0.05) return `${name} lateral (${change >= 0 ? "+" : ""}${change.toFixed(2)} pp).`;
+        const rising = change > 0;
+        const reading = invert
+          ? rising
+            ? "capital saliendo hacia stablecoins"
+            : "capital volviendo al mercado"
+          : rising
+            ? "BTC ganando terreno"
+            : "capital rotando fuera de BTC";
+        return `${name} ${rising ? "subiendo" : "bajando"} ${change >= 0 ? "+" : ""}${change.toFixed(2)} pp: ${reading}.`;
+      };
+
+      const total =
+        trend.totalChangePct === null
+          ? ""
+          : ` La capitalización total varió ${trend.totalChangePct >= 0 ? "+" : ""}${trend.totalChangePct.toFixed(2)}% en el período.`;
+
+      return {
+        text: `Sobre ${trend.samples} lecturas propias de las últimas ${trend.hours}h: ${describe(trend.btcChange, "BTC.D")} ${describe(trend.usdtChange, "USDT.D", true)}${total} Esta serie la construye la app: ninguna fuente gratuita publica el histórico de dominancia.`,
+        confidence: trend.samples >= 12 ? "ALTA" : "MEDIA",
+        sources: ["Snapshots propios · Cloudflare D1"],
+        followUps: ["¿Cómo está la dominancia?", "¿Qué es la dominancia de USDT?"],
       };
     },
   },

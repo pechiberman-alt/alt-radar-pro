@@ -5,7 +5,12 @@ import type { BrainTimeframe } from "@/lib/market-brain";
 import type { DerivativesSnapshot } from "@/lib/market-brain";
 import type { LiquiditySnapshot } from "@/lib/liquidity-history";
 import type { NewsEvent } from "@/lib/radar";
-import { footprintRows, percentile } from "@/lib/order-flow";
+import {
+  compositeBook,
+  currentWalls,
+  footprintRows,
+  percentile,
+} from "@/lib/order-flow";
 import {
   detectInstitutional,
   detectSqueeze,
@@ -232,43 +237,6 @@ function heatColor(intensity: number, alpha = 1) {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
 }
 
-function currentWalls(
-  book: { bids: Level[]; asks: Level[] },
-  frames: Frame[],
-): Wall[] {
-  if (!book.bids.length || !book.asks.length) return [];
-  const mid = (book.bids[0][0] + book.asks[0][0]) / 2;
-  const candidates = [
-    ...book.bids.map(([price, qty]) => ({ side: "BID" as const, price, qty })),
-    ...book.asks.map(([price, qty]) => ({ side: "ASK" as const, price, qty })),
-  ].map((level) => ({ ...level, notional: level.price * level.qty }));
-  const notionals = candidates.map((level) => level.notional);
-  const baseline = Math.max(percentile(notionals, 0.6), 1);
-  const threshold = Math.max(baseline * 2.15, percentile(notionals, 0.82));
-  const history = frames.slice(-60);
-
-  return candidates
-    .filter((level) => level.notional >= threshold)
-    .sort((left, right) => right.notional - left.notional)
-    .slice(0, 6)
-    .map((level) => {
-      const appearances = history.filter((frame) => {
-        const levels = level.side === "BID" ? frame.bids : frame.asks;
-        return levels.some(
-          ([price, qty]) =>
-            Math.abs(price - level.price) <= Math.max(level.price * 1e-8, Number.EPSILON) &&
-            price * qty >= level.notional * 0.4,
-        );
-      }).length;
-      return {
-        ...level,
-        strength: level.notional / baseline,
-        distance: ((level.price / mid) - 1) * 100,
-        persistence: history.length ? (appearances / history.length) * 100 : 0,
-      };
-    });
-}
-
 
 function depthWithCumulative(levels: Level[]) {
   let cumulative = 0;
@@ -277,37 +245,6 @@ function depthWithCumulative(levels: Level[]) {
     cumulative += notional;
     return { price, qty, notional, cumulative };
   });
-}
-
-function compositeBook(
-  live: { bids: Level[]; asks: Level[] },
-  deep: { bids: Level[]; asks: Level[] },
-  limit: number,
-) {
-  if (!deep.bids.length || !deep.asks.length) {
-    return {
-      bids: live.bids.slice(0, limit),
-      asks: live.asks.slice(0, limit),
-    };
-  }
-  if (!live.bids.length || !live.asks.length) {
-    return {
-      bids: deep.bids.slice(0, limit),
-      asks: deep.asks.slice(0, limit),
-    };
-  }
-  const liveBidFloor = live.bids.at(-1)![0];
-  const liveAskCeiling = live.asks.at(-1)![0];
-  return {
-    bids: [
-      ...live.bids,
-      ...deep.bids.filter(([price]) => price < liveBidFloor),
-    ].sort((left, right) => right[0] - left[0]).slice(0, limit),
-    asks: [
-      ...live.asks,
-      ...deep.asks.filter(([price]) => price > liveAskCeiling),
-    ].sort((left, right) => left[0] - right[0]).slice(0, limit),
-  };
 }
 
 function displayFrames(frames: Frame[], maximum = 360) {
@@ -2607,12 +2544,13 @@ export default function LiveBookmap({
             <button aria-label={fullscreenMap ? "Salir de pantalla completa" : "Abrir pantalla completa"} onClick={() => setFullscreenMap((value) => !value)}>{fullscreenMap ? "×" : "⛶"}</button>
           </div>
         </header>
+        {/*
+          The market picker lives once, in the command bar above. A second copy
+          here wrote the same state and, like the timeframe pickers before it,
+          read as an independent setting.
+        */}
         <div className="bookmap-market-strip">
-          <label htmlFor="premium-bookmap-symbol"><i /> MERCADO
-            <select id="premium-bookmap-symbol" value={symbol} onChange={(event) => setSymbol(event.target.value)}>
-              {availableSymbols.map((item) => <option value={item} key={item}>{base(item)}/USDT</option>)}
-            </select>
-          </label>
+          <span className="bookmap-current-market"><i /> {base(symbol)}/USDT</span>
           <button className="bookmap-fullscreen-button" onClick={() => setFullscreenMap((value) => !value)}>{fullscreenMap ? "SALIR" : "PANTALLA COMPLETA"}</button>
           <button className={`bookmap-dom-button ${showMarketSidebar ? "active" : ""}`} onClick={() => setShowMarketSidebar((value) => !value)}>{showMarketSidebar ? "OCULTAR DOM" : "ABRIR DOM"}</button>
         </div>

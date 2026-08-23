@@ -22,16 +22,44 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run lint
+      - run: npm run test:unit
       - run: npm run build
+
+      # The Cloudflare steps need an API token that only the account owner can
+      # create. Without it wrangler fails on every run, which left the badge
+      # permanently red and — worse — made a push look like it deployed when
+      # nothing had. The credential is checked first so the run reports the
+      # truth: verified but not deployed.
+      - name: Check deploy credentials
+        id: creds
+        run: |
+          if [ -n "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Apply signal ledger migrations
+        if: steps.creds.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 migrations apply alt-radar-pro-db --remote --config wrangler.production.jsonc
+
       - name: Deploy to Cloudflare Workers
+        if: steps.creds.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy --config wrangler.production.jsonc
+
+      - name: Report that deployment was skipped
+        if: steps.creds.outputs.ready != 'true'
+        run: |
+          echo "### Verificado, no desplegado" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Lint, tests y build pasaron. El despliegue a Cloudflare se omitió porque falta el secreto \`CLOUDFLARE_API_TOKEN\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Para activarlo: crear un token en https://dash.cloudflare.com/profile/api-tokens con permisos **Workers Scripts: Edit** y **D1: Edit**, y agregarlo con \`gh secret set CLOUDFLARE_API_TOKEN\`." >> "$GITHUB_STEP_SUMMARY"

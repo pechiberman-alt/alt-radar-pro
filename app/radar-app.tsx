@@ -523,6 +523,7 @@ export default function RadarApp() {
   }, []);
   const [structure, setStructure] = useState<MarketStructure | null>(null);
   const [structureError, setStructureError] = useState("");
+  const [structureTrend, setStructureTrend] = useState<AssistantContext["structureTrend"]>(null);
   const { settings, update: updateSettings } = useDashboardSettings();
   const workspace = useWorkspace();
   const profileInterval = TRADING_PROFILES[profile].interval;
@@ -651,10 +652,20 @@ export default function RadarApp() {
           headers: { Accept: "application/json" },
         });
         if (direct.ok) {
-          const parsed = parseCoinGeckoGlobal(await direct.json());
+          const raw = await direct.json();
+          const parsed = parseCoinGeckoGlobal(raw);
           if (parsed) {
             setStructure(parsed);
             setStructureError("");
+            // The scheduled job runs on Cloudflare, which CoinGecko blocks, so
+            // every archived snapshot had USDT.D null. A client that reached it
+            // contributes the reading the cron cannot obtain.
+            void fetch("/api/market-structure", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(raw),
+              keepalive: true,
+            }).catch(() => undefined);
             return;
           }
         }
@@ -672,6 +683,37 @@ export default function RadarApp() {
     };
     const boot = window.setTimeout(load, 200);
     const interval = window.setInterval(load, 120_000);
+    return () => {
+      window.clearTimeout(boot);
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  // Dominance over time, from the snapshots the scheduled job records. It
+  // moves slowly, so once an hour is plenty.
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await fetch("/api/structure-trend?hours=24", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = (await response.json()) as {
+          points?: unknown[];
+          change?: { btc: number | null; usdt: number | null; totalPct: number | null };
+          hours?: number;
+        };
+        setStructureTrend({
+          hours: payload.hours ?? 24,
+          samples: payload.points?.length ?? 0,
+          btcChange: payload.change?.btc ?? null,
+          usdtChange: payload.change?.usdt ?? null,
+          totalChangePct: payload.change?.totalPct ?? null,
+        });
+      } catch {
+        // The assistant reports the absence rather than guessing.
+      }
+    };
+    const boot = window.setTimeout(load, 1_500);
+    const interval = window.setInterval(load, 60 * 60_000);
     return () => {
       window.clearTimeout(boot);
       window.clearInterval(interval);
@@ -786,6 +828,7 @@ export default function RadarApp() {
       },
       risk: { score: risk.score, level: risk.level, killSwitch: risk.killSwitch },
       structure,
+      structureTrend,
       ledger: null,
       profile: {
         name: TRADING_PROFILES[profile].name,
@@ -793,7 +836,7 @@ export default function RadarApp() {
         market: TRADING_PROFILES[profile].market,
       },
     }),
-    [data, scored, altseason, risk, structure, profile],
+    [data, scored, altseason, risk, structure, structureTrend, profile],
   );
 
   const getAssistantContext = useCallback(

@@ -154,3 +154,95 @@ export function classifyLargeTrades(
     large: eligible ? trades.filter((trade) => trade.notional >= threshold) : [],
   };
 }
+
+// ---- Order book -----------------------------------------------------------
+
+export type BookSide = [number, number][];
+
+export type BookWall = {
+  side: "BID" | "ASK";
+  price: number;
+  qty: number;
+  notional: number;
+  /** Size relative to the typical level in the book right now. */
+  strength: number;
+  distance: number;
+  /** Share of recent frames the level appeared in, 0..100. */
+  persistence: number;
+};
+
+/**
+ * Merges the fast shallow feed with the slower deep snapshot.
+ *
+ * The WebSocket gives the top of book at high frequency while the REST call
+ * reaches much further out but arrives seconds apart. Taking only one loses
+ * either depth or freshness, so the live levels win near the touch and the
+ * deep snapshot fills in beyond where the live feed reaches.
+ */
+export function compositeBook(
+  live: { bids: BookSide; asks: BookSide },
+  deep: { bids: BookSide; asks: BookSide },
+  limit: number,
+) {
+  if (!deep.bids.length || !deep.asks.length) {
+    return { bids: live.bids.slice(0, limit), asks: live.asks.slice(0, limit) };
+  }
+  if (!live.bids.length || !live.asks.length) {
+    return { bids: deep.bids.slice(0, limit), asks: deep.asks.slice(0, limit) };
+  }
+  const liveBidFloor = live.bids.at(-1)![0];
+  const liveAskCeiling = live.asks.at(-1)![0];
+  return {
+    bids: [...live.bids, ...deep.bids.filter(([price]) => price < liveBidFloor)]
+      .sort((left, right) => right[0] - left[0])
+      .slice(0, limit),
+    asks: [...live.asks, ...deep.asks.filter(([price]) => price > liveAskCeiling)]
+      .sort((left, right) => left[0] - right[0])
+      .slice(0, limit),
+  };
+}
+
+/**
+ * The largest resting blocks, measured against the book's own typical level
+ * rather than an absolute figure, so it adapts across assets. Persistence
+ * counts how much of the recent history the level survived: a block that keeps
+ * reappearing is a different thing from one that showed up once.
+ */
+export function currentWalls(
+  book: { bids: BookSide; asks: BookSide },
+  history: { bids: BookSide; asks: BookSide }[],
+  limit = 6,
+): BookWall[] {
+  if (!book.bids.length || !book.asks.length) return [];
+  const mid = (book.bids[0][0] + book.asks[0][0]) / 2;
+  const candidates = [
+    ...book.bids.map(([price, qty]) => ({ side: "BID" as const, price, qty })),
+    ...book.asks.map(([price, qty]) => ({ side: "ASK" as const, price, qty })),
+  ].map((level) => ({ ...level, notional: level.price * level.qty }));
+
+  const notionals = candidates.map((level) => level.notional);
+  const baseline = Math.max(percentile(notionals, 0.6), 1);
+  const threshold = Math.max(baseline * 2.15, percentile(notionals, 0.82));
+  const recent = history.slice(-60);
+
+  return candidates
+    .filter((level) => level.notional >= threshold)
+    .sort((left, right) => right.notional - left.notional)
+    .slice(0, limit)
+    .map((level) => {
+      const appearances = recent.filter((frame) => {
+        const levels = level.side === "BID" ? frame.bids : frame.asks;
+        return levels.some(
+          ([price, qty]) =>
+            Math.abs(price - level.price) <= Math.max(level.price * 1e-8, Number.EPSILON) &&
+            price * qty >= level.notional * 0.4,
+        );
+      }).length;
+      return {
+        ...level,
+        strength: level.notional / baseline,
+        distance: (level.price / mid - 1) * 100,
+        persistence: recent.length ? (appearances / recent.length) * 100 : 0,
+      };
+    });
+}
