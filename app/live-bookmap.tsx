@@ -435,6 +435,7 @@ export default function LiveBookmap({
   const [showProfile, setShowProfile] = useState(true);
   const [showLevels, setShowLevels] = useState(true);
   const [showVwap, setShowVwap] = useState(false);
+  const [showPulled, setShowPulled] = useState(true);
   // The brain's readings are drawn on the canvas, which runs outside React's
   // render, so they are mirrored into refs the draw loop can read.
   const structureLevelsRef = useRef<ReturnType<typeof findStructureLevels>>([]);
@@ -1355,10 +1356,67 @@ export default function LiveBookmap({
           context.stroke();
           context.restore();
           context.fillStyle = wall.side === "BID" ? "#4dffad" : "#ff6271";
-          context.font = "bold 7px monospace";
+          context.font = "bold 9px monospace";
           context.textAlign = "right";
           context.fillText(`WALL ${usdLabel(wall.notional)}`, plotRight - 5, yy - 4);
         });
+      }
+
+      /* ---- Pulled liquidity ------------------------------------------------
+       * Size that vanished without anything trading against it.
+       *
+       * The heatmap alone cannot tell the difference between liquidity that
+       * was consumed and liquidity that was cancelled, yet they mean opposite
+       * things: consumed size is real demand met, while size withdrawn as
+       * price approaches is someone who never intended to fill. Comparing each
+       * column against the one before it and excluding buckets where trades
+       * printed isolates the second case.
+       */
+      if (showPulled && gridColumnCount > 2) {
+        const tradedCells = new Set<number>();
+        for (const trade of plottedTrades) {
+          const slot = clamp(
+            Math.floor((trade.x - plotLeft) / gridColumnWidth),
+            0,
+            gridColumnCount - 1,
+          );
+          const row = clamp(
+            Math.floor(((trade.price - low) / (high - low)) * priceBucketCount),
+            0,
+            priceBucketCount - 1,
+          );
+          // Neighbouring rows count as traded: a fill at the edge of a bucket
+          // legitimately draws down the size in the bucket next to it.
+          for (let d = -1; d <= 1; d += 1) {
+            tradedCells.add(slot * priceBucketCount + clamp(row + d, 0, priceBucketCount - 1));
+          }
+        }
+
+        const pullThreshold = heatFloor * 3;
+        context.save();
+        for (let slot = 1; slot < gridColumnCount; slot += 1) {
+          if (gridSamples[slot] === 0) continue;
+          const previous = gridHeat[slot - 1];
+          const current = gridHeat[slot];
+          for (let row = 0; row < priceBucketCount; row += 1) {
+            const before = previous[row];
+            const after = current[row];
+            if (before < pullThreshold) continue;
+            if (after > before * 0.35) continue;
+            if (tradedCells.has(slot * priceBucketCount + row)) continue;
+            const price = low + (row + 0.5) * heatPriceStep;
+            if (price < low || price > high) continue;
+            const share = 1 - after / Math.max(before, Number.EPSILON);
+            context.fillStyle = `rgba(196, 122, 255, ${0.2 + share * 0.5})`;
+            context.fillRect(
+              plotLeft + slot * gridColumnWidth,
+              y(price) - heatRowHeight * 0.5,
+              Math.max(1.4, gridColumnWidth),
+              Math.max(1.2, heatRowHeight),
+            );
+          }
+        }
+        context.restore();
       }
 
       // ---- Volume profile -------------------------------------------------
@@ -1410,7 +1468,7 @@ export default function LiveBookmap({
           context.lineTo(plotRight, yy);
           context.stroke();
           context.fillStyle = "#f2d34a";
-          context.font = "bold 7px monospace";
+          context.font = "bold 9px monospace";
           context.textAlign = "left";
           context.fillText("POC", plotRight - profileWidth - 22, yy + 3);
         }
@@ -1444,8 +1502,48 @@ export default function LiveBookmap({
           context.stroke();
           context.restore();
           const lastVwap = points[points.length - 1].price;
+
+          /* Volume-weighted standard deviation around the VWAP. Price inside
+           * the first band is ordinary business; beyond the second it is
+           * stretched relative to where volume actually traded, which is the
+           * reference a desk uses before calling a move extended. */
+          let weighted = 0;
+          let weight = 0;
+          for (const trade of plottedTrades) {
+            const deviation = trade.price - lastVwap;
+            weighted += deviation * deviation * trade.notional;
+            weight += trade.notional;
+          }
+          const sigma = weight > 0 ? Math.sqrt(weighted / weight) : 0;
+
+          if (sigma > 0) {
+            context.save();
+            for (const [multiple, alpha] of [[1, 0.34], [2, 0.2]] as const) {
+              for (const direction of [1, -1]) {
+                const band = lastVwap + direction * sigma * multiple;
+                if (band < low || band > high) continue;
+                context.strokeStyle = `rgba(140, 160, 255, ${alpha})`;
+                context.lineWidth = 1;
+                context.setLineDash([2, 5]);
+                context.beginPath();
+                context.moveTo(plotLeft, y(band));
+                context.lineTo(plotRight, y(band));
+                context.stroke();
+                context.fillStyle = `rgba(140, 160, 255, ${alpha + 0.34})`;
+                context.font = "9px monospace";
+                context.textAlign = "left";
+                context.fillText(
+                  `${direction > 0 ? "+" : "−"}${multiple}σ`,
+                  plotLeft + 6,
+                  y(band) - 3,
+                );
+              }
+            }
+            context.restore();
+          }
+
           context.fillStyle = "#8ca0ff";
-          context.font = "bold 7px monospace";
+          context.font = "bold 9px monospace";
           context.textAlign = "left";
           context.fillText(`VWAP ${priceLabel(lastVwap)}`, plotLeft + 6, y(lastVwap) - 4);
         }
@@ -1470,7 +1568,7 @@ export default function LiveBookmap({
           context.lineTo(plotRight, yy);
           context.stroke();
           context.fillStyle = isFloor ? "#39f29a" : "#ff5964";
-          context.font = "bold 7px monospace";
+          context.font = "bold 9px monospace";
           context.textAlign = "left";
           context.fillText(
             `${level.kind} ${level.strength}`,
@@ -1534,7 +1632,7 @@ export default function LiveBookmap({
       context.fillText(priceLabel(last.mid), plotRight + (width - plotRight) / 2, lastY + 4);
 
       context.fillStyle = "#65766e";
-      context.font = "8px monospace";
+      context.font = "10px monospace";
       context.textAlign = "center";
       for (let index = 0; index < 4; index += 1) {
         const frameIndex = Math.max(
@@ -1574,7 +1672,7 @@ export default function LiveBookmap({
           context.lineTo(plotRight, zeroY);
           context.stroke();
           context.fillStyle = "#718078";
-          context.font = "8px monospace";
+          context.font = "10px monospace";
           context.textAlign = "left";
           context.fillText("CVD NOTIONAL", 7, cvdTop - 7);
           context.fillStyle = values.at(-1)! >= 0 ? "#4dffad" : "#ff6271";
@@ -1614,7 +1712,7 @@ export default function LiveBookmap({
       context.textAlign = "left";
       context.fillText("ALT RADAR PRO · ORDER FLOW", 10, 13);
       context.fillStyle = "rgba(118, 148, 165, .82)";
-      context.font = "7px monospace";
+      context.font = "9px monospace";
       context.fillText(
         `PROFUNDIDAD OBSERVADA · ${frames.filter((frame) => frame.source === "archive").length} ARCHIVO + ${frames.filter((frame) => frame.source === "live").length} LIVE`,
         10,
@@ -1637,6 +1735,7 @@ export default function LiveBookmap({
     showProfile,
     showLevels,
     showVwap,
+    showPulled,
     liquidityHistory,
     marketTimeframe,
     timeZoom,
@@ -2219,7 +2318,8 @@ export default function LiveBookmap({
           <button className={showWalls ? "enabled" : ""} onClick={() => setShowWalls((value) => !value)}>WALLS</button>
           <button className={showProfile ? "enabled" : ""} onClick={() => setShowProfile((value) => !value)}>PERFIL</button>
           <button className={showLevels ? "enabled" : ""} onClick={() => setShowLevels((value) => !value)}>NIVELES</button>
-          <button className={showVwap ? "enabled" : ""} onClick={() => setShowVwap((value) => !value)}>VWAP</button>
+          <button className={showVwap ? "enabled" : ""} onClick={() => setShowVwap((value) => !value)}>VWAP ±σ</button>
+          <button className={showPulled ? "enabled" : ""} onClick={() => setShowPulled((value) => !value)}>RETIRADA</button>
           <button className={showCvd ? "enabled" : ""} onClick={() => setShowCvd((value) => !value)}>CVD</button>
           <button className={showFootprintNumbers ? "enabled" : ""} onClick={() => setShowFootprintNumbers((value) => !value)}>FOOTPRINT #</button>
         </div>
@@ -2886,7 +2986,8 @@ export default function LiveBookmap({
         {showProfile && <span><i className="poc-mark" /> Perfil de volumen · POC</span>}
         {showLevels && <span><i className="level-mark" /> Piso / techo con su fuerza</span>}
         {showLevels && <span className="marker-legend">◆ iceberg · ▣ absorción · » barrido</span>}
-        {showVwap && <span><i className="vwap-mark" /> VWAP de la ventana</span>}
+        {showVwap && <span><i className="vwap-mark" /> VWAP ±1σ / ±2σ</span>}
+        {showPulled && <span><i className="pulled-mark" /> Liquidez retirada sin ejecutarse</span>}
         <small>
           Binance {venue === "futures" ? "Futures" : "Spot"} · top 20 WebSocket 100 ms + hasta 100 niveles REST 2.5 s · sin órdenes simuladas
         </small>

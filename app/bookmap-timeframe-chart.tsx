@@ -274,7 +274,7 @@ export default function BookmapTimeframeChart({
 
     context.strokeStyle = "rgba(65,116,93,.24)";
     context.lineWidth = 1;
-    context.font = "8px monospace";
+    context.font = "10px monospace";
     context.textAlign = "left";
     for (let line = 0; line <= 5; line += 1) {
       const y = top + ((priceBottom - top) / 5) * line;
@@ -343,7 +343,7 @@ export default function BookmapTimeframeChart({
 
     const labelIndexes = [0, Math.floor(view.candles.length / 3), Math.floor((view.candles.length * 2) / 3), view.candles.length - 1];
     context.fillStyle = "#586c61";
-    context.font = "7px monospace";
+    context.font = "9px monospace";
     labelIndexes.forEach((index) => {
       const date = new Date(view.candles[index].openTime);
       const label = timeframe === "1d"
