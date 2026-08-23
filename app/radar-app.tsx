@@ -24,6 +24,7 @@ import MarketStructurePanel from "./market-structure-panel";
 import AssistantConsole from "./assistant-console";
 import InstallPanel from "./install-panel";
 import SwingDesk from "./swing-desk";
+import { Collapsible, WorkspaceBar, useWorkspace } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
 import type { PumpReading } from "@/lib/pump-radar";
 import type { CorrelationInsights } from "./correlation-watch";
@@ -523,6 +524,7 @@ export default function RadarApp() {
   const [structure, setStructure] = useState<MarketStructure | null>(null);
   const [structureError, setStructureError] = useState("");
   const { settings, update: updateSettings } = useDashboardSettings();
+  const workspace = useWorkspace();
   const profileInterval = TRADING_PROFILES[profile].interval;
 
   const refresh = useCallback(async () => {
@@ -694,7 +696,15 @@ export default function RadarApp() {
 
   const scrollTo = (label: string, id: string) => {
     setTab(label);
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Navigating to a collapsed section opens it first, otherwise the jump
+    // lands on a closed handle and looks like the link is broken.
+    if (workspace.open[id] === false) workspace.toggle(id);
+    window.setTimeout(() => {
+      const target =
+        document.getElementById(id) ??
+        document.querySelector(`[data-section="${id}"]`);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
   };
 
   useEffect(() => {
@@ -857,6 +867,13 @@ export default function RadarApp() {
       <MarketStrip data={data} structure={structure} />
 
       <div className="shell">
+        <WorkspaceBar
+          open={workspace.open}
+          toggle={workspace.toggle}
+          setAll={workspace.setAll}
+          reset={workspace.reset}
+        />
+
         <div className="command-ribbon">
           <div><span>MARKET FEED</span><b>{data.market.length} PARES USDT</b></div>
           <div><span>COBERTURA 1H + 4H</span><b>{multiTimeframeCoverage} ACTIVOS</b></div>
@@ -878,326 +895,354 @@ export default function RadarApp() {
           </div>
         )}
 
+        <Collapsible id="resumen" label="RESUMEN" open={workspace.open["resumen"]} onToggle={workspace.toggle}>
         <section className="hero-grid" id="resumen">
-          <article className="panel alt-panel">
-            <div className="panel-head">
-              <div><p className="eyebrow">CEREBRO DE MERCADO · RÉGIMEN</p><h2>Probabilidad de altseason</h2></div>
-              <span className="status-dot">● CALCULADO</span>
-            </div>
-            <div className="alt-main">
-              <ScoreRing score={altseason.final} label="AJUSTADO" />
-              <div className="alt-state">
-                <span>ESTADO ACTUAL</span>
-                <h3>{altseason.state}</h3>
-                <p>
-                  {altseason.final !== null && altseason.final >= 41
-                    ? "La amplitud de capital se expande más allá de BTC. La confirmación depende de liquidez, tendencia y riesgo."
-                    : "El capital permanece concentrado. No hay confirmación amplia de altcoins."}
-                </p>
-                <div className="score-audit">
-                  <span>TÉCNICO BRUTO <b>{altseason.raw ?? "—"}</b></span>
-                  <span>NOTICIAS / MACRO <b className="negative">{altseason.adjustment}</b></span>
-                  <span>FINAL <b>{altseason.final ?? "—"}</b></span>
-                </div>
+            <article className="panel alt-panel">
+              <div className="panel-head">
+                <div><p className="eyebrow">CEREBRO DE MERCADO · RÉGIMEN</p><h2>Probabilidad de altseason</h2></div>
+                <span className="status-dot">● CALCULADO</span>
               </div>
-            </div>
-            <div className="factor-bars">
-              {altseason.factors.slice(0, 5).map((factor) => (
-                <div key={factor.label}>
-                  <span>{factor.label}</span>
-                  <i><b style={{ width: `${(factor.points / 22) * 100}%` }} /></i>
-                  <em>+{Math.round(factor.points)}</em>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel risk-panel">
-            <div className="panel-head">
-              <div><p className="eyebrow">INTELIGENCIA GLOBAL</p><h2>Riesgo geopolítico</h2></div>
-              <span className={risk.killSwitch ? "badge critical" : "badge"}>{risk.level}</span>
-            </div>
-            <div className="risk-score">
-              <b>{risk.score ?? "—"}</b><span>/100</span>
-              <SparkBars
-                values={data.news.length ? data.news.slice(0, 9).map((news) => news.risk - 50) : [0, 0, 0, 0, 0]}
-              />
-            </div>
-            <div className="risk-scale"><i /><i /><i /><i /><i /></div>
-            <div className="global-intel-meta">
-              <span>● RSS EN VIVO</span>
-              <b>{data.news.length} EVENTOS SIN DUPLICADOS</b>
-            </div>
-            {data.news[0] ? (
-              <a className="headline" href={data.news[0].url} target="_blank" rel="noreferrer">
-                <span>{data.news[0].status}</span>
-                <b>{data.news[0].title}</b>
-                <small>
-                  {data.news[0].source} · {data.news[0].sourceCount ?? 1} FUENTE(S) · RIESGO {data.news[0].risk}
-                </small>
-                <div className="headline-impact">
-                  <i className={data.news[0].btcImpact >= 0 ? "positive" : "negative"}>
-                    BTC {data.news[0].btcImpact > 0 ? "+" : ""}{data.news[0].btcImpact}
-                  </i>
-                  <i className={data.news[0].altImpact >= 0 ? "positive" : "negative"}>
-                    ALTS {data.news[0].altImpact > 0 ? "+" : ""}{data.news[0].altImpact}
-                  </i>
-                </div>
-              </a>
-            ) : (
-              <div className="empty">NOTICIAS NO DISPONIBLES</div>
-            )}
-          </article>
-
-          <article className="panel rotation-panel">
-            <div className="panel-head">
-              <div><p className="eyebrow">FLUJO DE CAPITAL</p><h2>Radar de rotación</h2></div>
-              <span className="phase">FASE {rotationState.phase}</span>
-            </div>
-            <div className="flow">
-              {rotationState.values.map((item, index) => (
-                <div key={item.label} className={item.label === rotationState.leader ? "leader" : ""}>
-                  <span>{item.label}</span><b>{item.value}%</b>{index < 4 && <em>›</em>}
-                </div>
-              ))}
-            </div>
-            <p className="flow-caption">FASE ACTUAL DE ROTACIÓN</p>
-            <h3>BTC <span>→</span> ETH <span>→</span> {rotationState.leader.toUpperCase()}</h3>
-            <small>
-              Inferido del rendimiento transversal de 24H. No representa flujos reales de fondos.
-            </small>
-          </article>
-        </section>
-
-        <section className="signals-section" id="inteligencia">
-          <div className="section-head">
-            <div><p className="eyebrow">MOTOR DE CONFLUENCIA</p><h2>Inteligencia activa</h2></div>
-            <span>
-              {active.length
-                ? `${active.length} CONFIGURACIONES CALIFICADAS`
-                : "SIN SEÑALES DE ALTA CONVICCIÓN"}
-            </span>
-          </div>
-          {active.length ? (
-            <div className="signal-cards">
-              {active.slice(0, 3).map((asset) => (
-                <button
-                  className={asset.riskAdvisory ? "signal-card risk-flagged" : "signal-card"}
-                  key={asset.symbol}
-                  onClick={() => setSelected(asset)}
-                >
-                  <div>
-                    <span className={`signal-pill ${asset.signal.toLowerCase()}`}>{asset.signal}</span>
-                    <span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span>
-                    <small>{assetName(asset.symbol)}/USDT · 15M/1H</small>
-                  </div>
-                  {asset.riskAdvisory && (
-                    <span className="risk-flag">⚠ CONTEXTO MACRO EXTREMO</span>
-                  )}
-                  <strong>{asset.score}<em>/100</em></strong>
+              <div className="alt-main">
+                <ScoreRing score={altseason.final} label="AJUSTADO" />
+                <div className="alt-state">
+                  <span>ESTADO ACTUAL</span>
+                  <h3>{altseason.state}</h3>
                   <p>
-                    {asset.reasons
-                      .filter((reason) => reason.points >= 10)
-                      .slice(0, 4)
-                      .map((reason) => <span key={reason.label}>✓ {reason.label}</span>)}
+                    {altseason.final !== null && altseason.final >= 41
+                      ? "La amplitud de capital se expande más allá de BTC. La confirmación depende de liquidez, tendencia y riesgo."
+                      : "El capital permanece concentrado. No hay confirmación amplia de altcoins."}
                   </p>
-                  <div>
-                    <b>{percentage(asset.change24h)} <small>24H</small></b>
-                    <b>{asset.liquidity} <small>LIQUIDEZ</small></b>
-                    <i>VER TRAZA →</i>
+                  <div className="score-audit">
+                    <span>TÉCNICO BRUTO <b>{altseason.raw ?? "—"}</b></span>
+                    <span>NOTICIAS / MACRO <b className="negative">{altseason.adjustment}</b></span>
+                    <span>FINAL <b>{altseason.final ?? "—"}</b></span>
                   </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="no-signals">
-              <div>◎</div><h3>SIN SEÑALES DE ALTA CONVICCIÓN</h3>
-              <p>El cerebro está monitoreando. No fabricará operaciones sin confirmaciones independientes.</p>
-              {diagnostic.topScore !== null && (
-                <div className="signal-diagnostic">
-                  <p className="diagnostic-title">POR QUÉ NO HAY SEÑALES AHORA</p>
-                  <div className="diagnostic-grid">
-                    <div>
-                      <span>MEJOR CANDIDATO</span>
-                      <b>
-                        {assetName(diagnostic.topSymbol ?? "")} · {diagnostic.topScore}/100
-                      </b>
-                    </div>
-                    <div>
-                      <span>LE FALTA PARA WATCH</span>
-                      <b>{diagnostic.pointsToWatch} PUNTOS</b>
-                    </div>
-                    <div>
-                      <span>COBERTURA 1H + 4H</span>
-                      <b
-                        className={
-                          diagnostic.partialDataPct > 50 ? "negative" : undefined
-                        }
-                      >
-                        {(100 - diagnostic.partialDataPct).toFixed(0)}% DEL UNIVERSO
-                      </b>
-                    </div>
-                  </div>
-                  {diagnostic.blockers.length > 0 && (
-                    <div className="diagnostic-blockers">
-                      {diagnostic.blockers.map((blocker) => (
-                        <span key={blocker.label}>
-                          {blocker.label} <em>{blocker.count}/20</em>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {diagnostic.partialDataPct > 50 && (
-                    <p className="diagnostic-warning">
-                      Más de la mitad del universo no tiene confirmación 1H/4H. Esto es una
-                      limitación de datos, no una lectura de mercado: los scores están
-                      penalizados por información incompleta.
-                    </p>
-                  )}
                 </div>
-              )}
-            </div>
-          )}
-        </section>
+              </div>
+              <div className="factor-bars">
+                {altseason.factors.slice(0, 5).map((factor) => (
+                  <div key={factor.label}>
+                    <span>{factor.label}</span>
+                    <i><b style={{ width: `${(factor.points / 22) * 100}%` }} /></i>
+                    <em>+{Math.round(factor.points)}</em>
+                  </div>
+                ))}
+              </div>
+            </article>
 
-        <ScalpingDesk
-          market={data.market}
-          riskScore={risk.score}
-          killSwitch={risk.killSwitch}
-          altseasonScore={altseason.final}
-          minimumQuoteVolume={settings.minimumQuoteVolume}
-        />
-
-        <PumpRadar
-          market={data.market}
-          minimumQuoteVolume={settings.minimumQuoteVolume}
-          onReadings={handlePumpReadings}
-        />
-
-        <SwingDesk market={data.market} confluence={swingConfluence} />
-
-        <AssistantConsole getContext={getAssistantContext} />
-
-        <RiskDesk profile={profile} setProfile={setProfile} market={data.market} />
-
-        <CompareChart
-          symbols={data.market.map((asset) => asset.symbol)}
-          defaultInterval={profileInterval}
-        />
-
-        <MarketStructurePanel data={structure} error={structureError} />
-
-        <CorrelationWatch
-          defaultInterval={profileInterval}
-          market={data.market}
-          onInsights={handleCorrelationInsights}
-        />
-
-        <div id="order-flow"><LiveBookmap
-          symbols={data.market.map((asset) => asset.symbol)}
-          altseason={{
-            score: altseason.final,
-            raw: altseason.raw,
-            adjustment: altseason.adjustment,
-            state: altseason.state,
-          }}
-          news={data.news}
-          onBrainReadings={handleBrainReadings}
-        /></div>
-
-        <section className="lower-grid" id="scanner">
-          <article className="panel scanner">
-            <div className="panel-head">
-              <div><p className="eyebrow">UNIVERSO BINANCE USDT COMPLETO</p><h2>Escáner probabilístico</h2></div>
-              <div className="scanner-tools">
-                <input
-                  aria-label="Buscar criptomoneda"
-                  placeholder="Buscar BABY, SUI, BTC…"
-                  value={assetSearch}
-                  onChange={(event) => setAssetSearch(event.target.value.toUpperCase())}
+            <article className="panel risk-panel">
+              <div className="panel-head">
+                <div><p className="eyebrow">INTELIGENCIA GLOBAL</p><h2>Riesgo geopolítico</h2></div>
+                <span className={risk.killSwitch ? "badge critical" : "badge"}>{risk.level}</span>
+              </div>
+              <div className="risk-score">
+                <b>{risk.score ?? "—"}</b><span>/100</span>
+                <SparkBars
+                  values={data.news.length ? data.news.slice(0, 9).map((news) => news.risk - 50) : [0, 0, 0, 0, 0]}
                 />
-                <span className="muted">{scored.length} ACTIVOS · EN VIVO</span>
               </div>
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ACTIVO</th><th>PRECIO</th><th>1H</th><th>4H</th><th>24H</th>
-                    <th>VOL 24H</th><th>MOMENTUM</th><th>OI</th><th>FUNDING</th>
-                    <th>SCORE</th><th>DIRECCIÓN</th><th>SEÑAL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scannerRows.map((asset) => (
-                    <tr key={asset.symbol} onClick={() => setSelected(asset)}>
-                      <td><b>{assetName(asset.symbol)}</b><small>/USDT</small></td>
-                      <td>{formatPrice(asset.price)}</td>
-                      <td className={(asset.change1h ?? 0) >= 0 ? "positive" : "negative"}>{percentage(asset.change1h)}</td>
-                      <td className={(asset.change4h ?? 0) >= 0 ? "positive" : "negative"}>{percentage(asset.change4h)}</td>
-                      <td className={asset.change24h >= 0 ? "positive" : "negative"}>{percentage(asset.change24h)}</td>
-                      <td>${compact(asset.quoteVolume)}</td>
-                      <td><SparkBars values={[asset.change24h * 0.3, asset.change4h ?? 0, asset.change1h ?? 0, asset.momentum]} /></td>
-                      <td className="data-na">—</td><td className="data-na">—</td>
-                      <td><div className="mini-score"><i style={{ width: `${asset.score}%` }} /><b>{asset.score}</b></div></td>
-                      <td><span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span></td>
-                      <td>
-                        <span className={`signal-pill ${asset.signal.toLowerCase().replace(" ", "-")}`}>
-                          {asset.extended ? "EXTENDIDO" : asset.signal}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="data-footnote">
-              OI y funding se muestran como “—” cuando el proveedor Spot no los entrega. El sistema
-              no reemplaza datos ausentes con estimaciones.
-            </div>
-          </article>
+              <div className="risk-scale"><i /><i /><i /><i /><i /></div>
+              <div className="global-intel-meta">
+                <span>● RSS EN VIVO</span>
+                <b>{data.news.length} EVENTOS SIN DUPLICADOS</b>
+              </div>
+              {data.news[0] ? (
+                <a className="headline" href={data.news[0].url} target="_blank" rel="noreferrer">
+                  <span>{data.news[0].status}</span>
+                  <b>{data.news[0].title}</b>
+                  <small>
+                    {data.news[0].source} · {data.news[0].sourceCount ?? 1} FUENTE(S) · RIESGO {data.news[0].risk}
+                  </small>
+                  <div className="headline-impact">
+                    <i className={data.news[0].btcImpact >= 0 ? "positive" : "negative"}>
+                      BTC {data.news[0].btcImpact > 0 ? "+" : ""}{data.news[0].btcImpact}
+                    </i>
+                    <i className={data.news[0].altImpact >= 0 ? "positive" : "negative"}>
+                      ALTS {data.news[0].altImpact > 0 ? "+" : ""}{data.news[0].altImpact}
+                    </i>
+                  </div>
+                </a>
+              ) : (
+                <div className="empty">NOTICIAS NO DISPONIBLES</div>
+              )}
+            </article>
 
-          <article className="panel intelligence" id="inteligencia-global">
-            <div className="panel-head">
-              <div>
-                <p className="eyebrow">FLUJO DE EVENTOS CURADO · CAPA SEPARADA</p>
-                <h2>Inteligencia global</h2>
+            <article className="panel rotation-panel">
+              <div className="panel-head">
+                <div><p className="eyebrow">FLUJO DE CAPITAL</p><h2>Radar de rotación</h2></div>
+                <span className="phase">FASE {rotationState.phase}</span>
               </div>
-              <span className={risk.killSwitch ? "badge critical" : "badge"}>
-                {risk.killSwitch ? "RIESGO EXTREMO" : "ALTO + CRÍTICO"}
+              <div className="flow">
+                {rotationState.values.map((item, index) => (
+                  <div key={item.label} className={item.label === rotationState.leader ? "leader" : ""}>
+                    <span>{item.label}</span><b>{item.value}%</b>{index < 4 && <em>›</em>}
+                  </div>
+                ))}
+              </div>
+              <p className="flow-caption">FASE ACTUAL DE ROTACIÓN</p>
+              <h3>BTC <span>→</span> ETH <span>→</span> {rotationState.leader.toUpperCase()}</h3>
+              <small>
+                Inferido del rendimiento transversal de 24H. No representa flujos reales de fondos.
+              </small>
+            </article>
+          </section>
+        </Collapsible>
+
+        <Collapsible id="inteligencia" label="SEÑALES" open={workspace.open["inteligencia"]} onToggle={workspace.toggle}>
+        <section className="signals-section" id="inteligencia">
+            <div className="section-head">
+              <div><p className="eyebrow">MOTOR DE CONFLUENCIA</p><h2>Inteligencia activa</h2></div>
+              <span>
+                {active.length
+                  ? `${active.length} CONFIGURACIONES CALIFICADAS`
+                  : "SIN SEÑALES DE ALTA CONVICCIÓN"}
               </span>
             </div>
-            <p className="intelligence-note">
-              Contexto para interpretar los movimientos que ves en el radar. No bloquea señales
-              ni decide por vos.
-            </p>
-            <div className="news-list">
-              {data.news.slice(0, 7).map((news) => (
-                <a href={news.url} target="_blank" rel="noreferrer" key={news.id}>
-                  <time>{new Date(news.publishedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-                  <div>
-                    <b>{news.title}</b>
-                    <small>{news.region} · {news.status} · {news.sourceCount ?? 1} FUENTE(S)</small>
+            {active.length ? (
+              <div className="signal-cards">
+                {active.slice(0, 3).map((asset) => (
+                  <button
+                    className={asset.riskAdvisory ? "signal-card risk-flagged" : "signal-card"}
+                    key={asset.symbol}
+                    onClick={() => setSelected(asset)}
+                  >
+                    <div>
+                      <span className={`signal-pill ${asset.signal.toLowerCase()}`}>{asset.signal}</span>
+                      <span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span>
+                      <small>{assetName(asset.symbol)}/USDT · 15M/1H</small>
+                    </div>
+                    {asset.riskAdvisory && (
+                      <span className="risk-flag">⚠ CONTEXTO MACRO EXTREMO</span>
+                    )}
+                    <strong>{asset.score}<em>/100</em></strong>
+                    <p>
+                      {asset.reasons
+                        .filter((reason) => reason.points >= 10)
+                        .slice(0, 4)
+                        .map((reason) => <span key={reason.label}>✓ {reason.label}</span>)}
+                    </p>
+                    <div>
+                      <b>{percentage(asset.change24h)} <small>24H</small></b>
+                      <b>{asset.liquidity} <small>LIQUIDEZ</small></b>
+                      <i>VER TRAZA →</i>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="no-signals">
+                <div>◎</div><h3>SIN SEÑALES DE ALTA CONVICCIÓN</h3>
+                <p>El cerebro está monitoreando. No fabricará operaciones sin confirmaciones independientes.</p>
+                {diagnostic.topScore !== null && (
+                  <div className="signal-diagnostic">
+                    <p className="diagnostic-title">POR QUÉ NO HAY SEÑALES AHORA</p>
+                    <div className="diagnostic-grid">
+                      <div>
+                        <span>MEJOR CANDIDATO</span>
+                        <b>
+                          {assetName(diagnostic.topSymbol ?? "")} · {diagnostic.topScore}/100
+                        </b>
+                      </div>
+                      <div>
+                        <span>LE FALTA PARA WATCH</span>
+                        <b>{diagnostic.pointsToWatch} PUNTOS</b>
+                      </div>
+                      <div>
+                        <span>COBERTURA 1H + 4H</span>
+                        <b
+                          className={
+                            diagnostic.partialDataPct > 50 ? "negative" : undefined
+                          }
+                        >
+                          {(100 - diagnostic.partialDataPct).toFixed(0)}% DEL UNIVERSO
+                        </b>
+                      </div>
+                    </div>
+                    {diagnostic.blockers.length > 0 && (
+                      <div className="diagnostic-blockers">
+                        {diagnostic.blockers.map((blocker) => (
+                          <span key={blocker.label}>
+                            {blocker.label} <em>{blocker.count}/20</em>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {diagnostic.partialDataPct > 50 && (
+                      <p className="diagnostic-warning">
+                        Más de la mitad del universo no tiene confirmación 1H/4H. Esto es una
+                        limitación de datos, no una lectura de mercado: los scores están
+                        penalizados por información incompleta.
+                      </p>
+                    )}
                   </div>
-                  <span className={news.risk > 70 ? "hot" : ""}>{news.risk}</span>
-                </a>
-              ))}
-              {!data.news.length && <div className="empty">NOTICIAS GLOBALES NO DISPONIBLES</div>}
-            </div>
-          </article>
-        </section>
+                )}
+              </div>
+            )}
+          </section>
+        </Collapsible>
 
-        <SignalLedger
-          settings={settings}
-          updateSettings={updateSettings}
-          altseason={altseason.final}
-          risk={risk.score}
-          active={active}
-          market={data.market}
-          sources={data.sources}
-        />
+        <Collapsible id="scalping" label="SCALPING" open={workspace.open["scalping"]} onToggle={workspace.toggle}>
+  <ScalpingDesk
+            market={data.market}
+            riskScore={risk.score}
+            killSwitch={risk.killSwitch}
+            altseasonScore={altseason.final}
+            minimumQuoteVolume={settings.minimumQuoteVolume}
+          />
+        </Collapsible>
 
-        <InstallPanel />
+        <Collapsible id="pumpeo" label="PUMPEO" open={workspace.open["pumpeo"]} onToggle={workspace.toggle}>
+  <PumpRadar
+            market={data.market}
+            minimumQuoteVolume={settings.minimumQuoteVolume}
+            onReadings={handlePumpReadings}
+          />
+        </Collapsible>
+
+        <Collapsible id="swing" label="SWING" open={workspace.open["swing"]} onToggle={workspace.toggle}>
+  <SwingDesk market={data.market} confluence={swingConfluence} />
+        </Collapsible>
+
+        <Collapsible id="asistente" label="ANALISTA" open={workspace.open["asistente"]} onToggle={workspace.toggle}>
+  <AssistantConsole getContext={getAssistantContext} />
+        </Collapsible>
+
+        <Collapsible id="riesgo" label="RIESGO" open={workspace.open["riesgo"]} onToggle={workspace.toggle}>
+  <RiskDesk profile={profile} setProfile={setProfile} market={data.market} />
+        </Collapsible>
+
+        <Collapsible id="comparador" label="COMPARAR" open={workspace.open["comparador"]} onToggle={workspace.toggle}>
+  <CompareChart
+            symbols={data.market.map((asset) => asset.symbol)}
+            defaultInterval={profileInterval}
+          />
+        </Collapsible>
+
+        <Collapsible id="estructura" label="DOMINANCIA" open={workspace.open["estructura"]} onToggle={workspace.toggle}>
+  <MarketStructurePanel data={structure} error={structureError} />
+        </Collapsible>
+
+        <Collapsible id="vigilancia" label="CORRELACIONES" open={workspace.open["vigilancia"]} onToggle={workspace.toggle}>
+  <CorrelationWatch
+            defaultInterval={profileInterval}
+            market={data.market}
+            onInsights={handleCorrelationInsights}
+          />
+        </Collapsible>
+
+        <Collapsible id="order-flow" label="ORDER FLOW" open={workspace.open["order-flow"]} onToggle={workspace.toggle}>
+  <div id="order-flow"><LiveBookmap
+            symbols={data.market.map((asset) => asset.symbol)}
+            altseason={{
+              score: altseason.final,
+              raw: altseason.raw,
+              adjustment: altseason.adjustment,
+              state: altseason.state,
+            }}
+            news={data.news}
+            onBrainReadings={handleBrainReadings}
+          /></div>
+        </Collapsible>
+
+        <Collapsible id="scanner" label="ESCÁNER" open={workspace.open["scanner"]} onToggle={workspace.toggle}>
+        <section className="lower-grid" id="scanner">
+            <article className="panel scanner">
+              <div className="panel-head">
+                <div><p className="eyebrow">UNIVERSO BINANCE USDT COMPLETO</p><h2>Escáner probabilístico</h2></div>
+                <div className="scanner-tools">
+                  <input
+                    aria-label="Buscar criptomoneda"
+                    placeholder="Buscar BABY, SUI, BTC…"
+                    value={assetSearch}
+                    onChange={(event) => setAssetSearch(event.target.value.toUpperCase())}
+                  />
+                  <span className="muted">{scored.length} ACTIVOS · EN VIVO</span>
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ACTIVO</th><th>PRECIO</th><th>1H</th><th>4H</th><th>24H</th>
+                      <th>VOL 24H</th><th>MOMENTUM</th><th>OI</th><th>FUNDING</th>
+                      <th>SCORE</th><th>DIRECCIÓN</th><th>SEÑAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scannerRows.map((asset) => (
+                      <tr key={asset.symbol} onClick={() => setSelected(asset)}>
+                        <td><b>{assetName(asset.symbol)}</b><small>/USDT</small></td>
+                        <td>{formatPrice(asset.price)}</td>
+                        <td className={(asset.change1h ?? 0) >= 0 ? "positive" : "negative"}>{percentage(asset.change1h)}</td>
+                        <td className={(asset.change4h ?? 0) >= 0 ? "positive" : "negative"}>{percentage(asset.change4h)}</td>
+                        <td className={asset.change24h >= 0 ? "positive" : "negative"}>{percentage(asset.change24h)}</td>
+                        <td>${compact(asset.quoteVolume)}</td>
+                        <td><SparkBars values={[asset.change24h * 0.3, asset.change4h ?? 0, asset.change1h ?? 0, asset.momentum]} /></td>
+                        <td className="data-na">—</td><td className="data-na">—</td>
+                        <td><div className="mini-score"><i style={{ width: `${asset.score}%` }} /><b>{asset.score}</b></div></td>
+                        <td><span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span></td>
+                        <td>
+                          <span className={`signal-pill ${asset.signal.toLowerCase().replace(" ", "-")}`}>
+                            {asset.extended ? "EXTENDIDO" : asset.signal}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="data-footnote">
+                OI y funding se muestran como “—” cuando el proveedor Spot no los entrega. El sistema
+                no reemplaza datos ausentes con estimaciones.
+              </div>
+            </article>
+
+            <article className="panel intelligence" id="inteligencia-global">
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">FLUJO DE EVENTOS CURADO · CAPA SEPARADA</p>
+                  <h2>Inteligencia global</h2>
+                </div>
+                <span className={risk.killSwitch ? "badge critical" : "badge"}>
+                  {risk.killSwitch ? "RIESGO EXTREMO" : "ALTO + CRÍTICO"}
+                </span>
+              </div>
+              <p className="intelligence-note">
+                Contexto para interpretar los movimientos que ves en el radar. No bloquea señales
+                ni decide por vos.
+              </p>
+              <div className="news-list">
+                {data.news.slice(0, 7).map((news) => (
+                  <a href={news.url} target="_blank" rel="noreferrer" key={news.id}>
+                    <time>{new Date(news.publishedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+                    <div>
+                      <b>{news.title}</b>
+                      <small>{news.region} · {news.status} · {news.sourceCount ?? 1} FUENTE(S)</small>
+                    </div>
+                    <span className={news.risk > 70 ? "hot" : ""}>{news.risk}</span>
+                  </a>
+                ))}
+                {!data.news.length && <div className="empty">NOTICIAS GLOBALES NO DISPONIBLES</div>}
+              </div>
+            </article>
+          </section>
+        </Collapsible>
+
+        <Collapsible id="historial" label="HISTORIAL" open={workspace.open["historial"]} onToggle={workspace.toggle}>
+  <SignalLedger
+            settings={settings}
+            updateSettings={updateSettings}
+            altseason={altseason.final}
+            risk={risk.score}
+            active={active}
+            market={data.market}
+            sources={data.sources}
+          />
+        </Collapsible>
+
+        <Collapsible id="instalar" label="INSTALAR" open={workspace.open["instalar"]} onToggle={workspace.toggle}>
+  <InstallPanel />
+        </Collapsible>
 
         <footer>
           <div className="footer-brand">

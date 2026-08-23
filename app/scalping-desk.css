@@ -123,10 +123,10 @@
 .scalp-radar-list > button:disabled { cursor: default; }
 .scalp-radar-list button > em { color: #405f56; font: 9px var(--font-mono); font-style: normal; }
 .scalp-radar-list button div b { color: #d8eee6; font: 650 13px var(--font-mono); }
-.scalp-radar-list button div b small { color: #506f65; font-size: 8px; }
+.scalp-radar-list button div b small { color: #506f65; font-size: 10px; }
 .scalp-radar-list button div span { display: block; margin-top: 4px; color: #66877d; font: 9px var(--font-mono); }
 .scalp-radar-list button > strong { color: #c7e2d9; font: 650 17px var(--font-mono); }
-.scalp-radar-list button > strong small { font-size: 7px; color: #57756b; }
+.scalp-radar-list button > strong small { font-size: 9px; color: #57756b; }
 .scalp-radar-list button > i { position: absolute; left: 0; bottom: 0; height: 1px; background: var(--scalp-green); opacity: .62; }
 .scalp-radar-list button.setup > i { background: #ffa657; }
 .scalp-radar-list button.no-signal > i { background: #536c65; opacity: .25; }

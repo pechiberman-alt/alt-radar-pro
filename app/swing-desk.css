@@ -1,16 +1,16 @@
 .swing-desk{margin-top:28px}
 .swing-actions{display:flex;align-items:center;gap:10px}
-.swing-actions button{background:#0e1713;border:1px solid #2c493b;color:var(--green);padding:7px 10px;border-radius:3px;font:8px var(--font-mono);letter-spacing:.6px;cursor:pointer}
+.swing-actions button{background:#0e1713;border:1px solid #2c493b;color:var(--green);padding:7px 10px;border-radius:3px;font:10px var(--font-mono);letter-spacing:.6px;cursor:pointer}
 .swing-actions button:disabled{opacity:.55;cursor:default}
 
 .swing-horizons{display:flex;gap:6px;padding:0 22px 14px}
-.swing-horizons button{background:#0c130f;border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:3px;font:8px var(--font-mono);letter-spacing:.6px;cursor:pointer}
+.swing-horizons button{background:#0c130f;border:1px solid var(--line);color:var(--muted);padding:8px 12px;border-radius:3px;font:10px var(--font-mono);letter-spacing:.6px;cursor:pointer}
 .swing-horizons button.active{color:var(--green);border-color:#2d6a4d;background:#0c251a}
 
 .swing-ribbon{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#08100d}
 .swing-ribbon div{padding:10px 14px;border-right:1px solid var(--line)}
 .swing-ribbon div:last-child{border-right:0}
-.swing-ribbon span{display:block;font:7px var(--font-mono);letter-spacing:.7px;color:var(--muted)}
+.swing-ribbon span{display:block;font:9px var(--font-mono);letter-spacing:.7px;color:var(--muted)}
 .swing-ribbon b{display:block;margin-top:4px;font:11px var(--font-mono);font-variant-numeric:tabular-nums}
 
 .swing-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;padding:16px 22px}
@@ -19,31 +19,31 @@
 .swing-card.short{border-left-color:var(--red)}
 .swing-card header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .swing-card header b{font-size:15px}
-.swing-card header small{color:var(--muted);font-size:8px}
-.swing-side{font:7px var(--font-mono);padding:4px 7px;border-radius:3px;border:1px solid}
+.swing-card header small{color:var(--muted);font-size:10px}
+.swing-side{font:9px var(--font-mono);padding:4px 7px;border-radius:3px;border:1px solid}
 .swing-side.long{color:var(--green);border-color:var(--green2);background:#0c2e20}
 .swing-side.short{color:var(--red);border-color:#70343a;background:#2c1116}
-.swing-quality{margin-left:auto;font:7px var(--font-mono);font-style:normal;letter-spacing:.6px;padding:4px 6px;border-radius:3px;border:1px solid #39453f;color:var(--muted)}
+.swing-quality{margin-left:auto;font:9px var(--font-mono);font-style:normal;letter-spacing:.6px;padding:4px 6px;border-radius:3px;border:1px solid #39453f;color:var(--muted)}
 .swing-quality.q-alta-convicción{color:var(--green);border-color:#2d6a4d;background:#0c2419}
 .swing-quality.q-setup{color:var(--amber);border-color:#5c5228}
 
 .swing-score{display:flex;align-items:baseline;gap:6px;margin:12px 0}
 .swing-score strong{font:30px var(--font-mono);letter-spacing:-2px;font-variant-numeric:tabular-nums}
-.swing-score span{font:8px var(--font-mono);color:var(--muted)}
+.swing-score span{font:10px var(--font-mono);color:var(--muted)}
 .swing-score i{margin-left:auto;font:10px var(--font-mono);font-style:normal;color:var(--green);font-variant-numeric:tabular-nums}
 
 .swing-levels{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
 .swing-levels div{background:#0c130f;padding:9px 11px}
-.swing-levels span{display:block;font:6px var(--font-mono);letter-spacing:.5px;color:var(--muted)}
+.swing-levels span{display:block;font:9px var(--font-mono);letter-spacing:.5px;color:var(--muted)}
 .swing-levels b{display:block;margin-top:4px;font:10px var(--font-mono);font-variant-numeric:tabular-nums}
 
 .swing-targets{display:flex;gap:10px;flex-wrap:wrap;margin-top:11px}
-.swing-targets span{font:7px var(--font-mono);color:var(--muted)}
+.swing-targets span{font:9px var(--font-mono);color:var(--muted)}
 .swing-targets b{color:var(--text);font-variant-numeric:tabular-nums}
 
 .swing-reasons,.swing-warnings{display:grid;gap:4px;margin-top:11px}
-.swing-reasons span{font:8px var(--font-mono);color:var(--green);line-height:1.45}
-.swing-warnings span{font:8px var(--font-mono);color:var(--amber);line-height:1.45}
+.swing-reasons span{font:10px var(--font-mono);color:var(--green);line-height:1.45}
+.swing-warnings span{font:10px var(--font-mono);color:var(--amber);line-height:1.45}
 .swing-invalidation{margin:11px 0 0;font-size:9px;line-height:1.5;color:#8c9992}
 
 .swing-empty{text-align:center;border:1px dashed #26362e;border-radius:8px;margin:16px 22px;padding:30px}

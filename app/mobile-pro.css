@@ -43,7 +43,7 @@
   .app-header .brand-mark { width: 38px; height: 38px; flex: 0 0 38px; }
   .app-header .brand > div:last-child { min-width: 0; gap: 4px; }
   .app-header .brand b { overflow: hidden; font-size: 16px; white-space: nowrap; text-overflow: ellipsis; }
-  .app-header .brand span { font-size: 8px; }
+  .app-header .brand span { font-size: 10px; }
   .app-header .brand small { display: none; }
   .app-header .system { flex: 0 0 auto; gap: 6px; }
   .app-header .system > span { display: none; }
@@ -185,7 +185,7 @@
   }
   .scanner tbody tr:active { border-color: rgba(77, 255, 173, .48); background: #102219; }
   .scanner td { display: block; padding: 0; border: 0; font-size: 10px; }
-  .scanner td::before { display: block; margin-bottom: 4px; color: #566b60; font: 6px var(--font-mono); letter-spacing: .8px; }
+  .scanner td::before { display: block; margin-bottom: 4px; color: #566b60; font: 9px var(--font-mono); letter-spacing: .8px; }
   .scanner td:nth-child(1) { grid-column: 1; grid-row: 1; align-self: center; }
   .scanner td:nth-child(1) b { font-size: 15px; }
   .scanner td:nth-child(2) { grid-column: 1; grid-row: 2; }
@@ -290,7 +290,7 @@
     background: rgba(7, 16, 12, .9);
   }
   .ledger-table td { display: block; min-width: 0; padding: 0; border: 0; font-size: 9px; white-space: normal; }
-  .ledger-table td::before { display: block; margin-bottom: 4px; color: #566b60; font: 6px var(--font-mono); letter-spacing: .7px; }
+  .ledger-table td::before { display: block; margin-bottom: 4px; color: #566b60; font: 9px var(--font-mono); letter-spacing: .7px; }
   .ledger-table td:nth-child(1) { grid-column: 1; }
   .ledger-table td:nth-child(1) b { font-size: 14px; }
   .ledger-table td:nth-child(2) { grid-column: 2; }
@@ -338,7 +338,7 @@
   .app-header .brand b { font-size: 14px; }
   .app-header .system button { width: 39px; min-width: 39px; height: 39px; }
   .mobile-nav { left: 5px; right: 5px; }
-  .mobile-nav button small { font-size: 6px; }
+  .mobile-nav button small { font-size: 9px; }
   .score-ring { width: 96px; height: 96px; flex-basis: 96px; }
   .score-ring::before { width: 82px; height: 82px; }
   .factor-bars { grid-template-columns: 1fr; }

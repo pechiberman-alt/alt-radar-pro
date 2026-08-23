@@ -55,7 +55,7 @@ body {
   letter-spacing: 0.9px;
 }
 .macro-advisory > span {
-  font: 8px var(--font-mono);
+  font: 10px var(--font-mono);
   letter-spacing: 0.8px;
   color: #c8b586;
 }
@@ -69,7 +69,7 @@ body {
   grid-column: 1 / -1;
   justify-self: start;
   color: var(--amber);
-  font: 8px var(--font-mono);
+  font: 10px var(--font-mono);
   letter-spacing: 0.8px;
   text-decoration: none;
   border-bottom: 1px solid #7b5f29;
@@ -103,7 +103,7 @@ body {
 .signal-card .risk-flag {
   display: block;
   margin-top: 9px;
-  font: 7px var(--font-mono);
+  font: 9px var(--font-mono);
   letter-spacing: 0.7px;
   color: var(--amber);
 }
@@ -152,7 +152,7 @@ body {
 }
 .diagnostic-title {
   margin: 0 0 11px;
-  font: 8px var(--font-mono);
+  font: 10px var(--font-mono);
   letter-spacing: 1.3px;
   color: var(--green2);
 }
@@ -169,7 +169,7 @@ body {
 }
 .diagnostic-grid span {
   display: block;
-  font: 6px var(--font-mono);
+  font: 9px var(--font-mono);
   letter-spacing: 0.5px;
   color: var(--muted);
 }
@@ -186,7 +186,7 @@ body {
   margin-top: 11px;
 }
 .diagnostic-blockers span {
-  font: 8px var(--font-mono);
+  font: 10px var(--font-mono);
   color: var(--amber);
   border: 1px solid #5c5228;
   border-radius: 3px;
@@ -217,7 +217,7 @@ body {
 .pump-readout span,
 .risk-grid span,
 .correlation-matrix th {
-  font-size: 7px;
+  font-size: 9px;
 }
 
 /* Long-form explanatory copy reads better with a slightly looser measure. */

@@ -1,0 +1,132 @@
+/* Workspace chrome: the bar that indexes every panel and the collapsible
+   wrapper each section sits in. */
+
+.workspace-bar {
+  position: sticky;
+  top: 76px;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #070d0aF2;
+  backdrop-filter: blur(14px);
+}
+
+.ws-title {
+  display: grid;
+  gap: 2px;
+  padding-right: 12px;
+  border-right: 1px solid var(--line);
+}
+.ws-title span {
+  font: 9px var(--font-mono);
+  letter-spacing: 1.3px;
+  color: var(--green2);
+}
+.ws-title b {
+  font: 10px var(--font-mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ws-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.ws-chips button {
+  background: none;
+  border: 1px solid #212e28;
+  color: #5f6f67;
+  padding: 5px 9px;
+  border-radius: 3px;
+  font: 9px var(--font-mono);
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.ws-chips button:hover { color: #a9b5ae; border-color: #35473e; }
+.ws-chips button.on {
+  color: var(--green);
+  border-color: #2d6a4d;
+  background: #0b1f17;
+}
+
+.ws-actions { display: flex; gap: 5px; }
+.ws-actions button {
+  background: #0c130f;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 5px 9px;
+  border-radius: 3px;
+  font: 9px var(--font-mono);
+  letter-spacing: 0.6px;
+  cursor: pointer;
+}
+.ws-actions button:hover { color: var(--text); border-color: #35473e; }
+
+/* ---- Collapsible sections ---------------------------------------------- */
+
+.ws-section { scroll-margin-top: 150px; }
+.ws-section + .ws-section { margin-top: 4px; }
+
+.ws-handle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  margin: 10px 0 0;
+  padding: 11px 14px;
+  background: linear-gradient(180deg, #0c1310, #090e0c);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font: 10px var(--font-mono);
+  letter-spacing: 1.1px;
+  cursor: pointer;
+  text-align: left;
+}
+/* Only closed sections show a handle; an open one is headed by its own panel. */
+.ws-section:not(.open) .ws-handle { display: flex; }
+.ws-handle:hover { border-color: #35473e; color: var(--text); }
+.ws-handle i { font-style: normal; color: var(--green2); }
+.ws-handle span { flex: 1; }
+.ws-handle em {
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  color: var(--green2);
+}
+
+@media (max-width: 900px) {
+  .workspace-bar { top: 68px; gap: 10px; padding: 9px 11px; }
+  .ws-title { border-right: 0; padding-right: 0; }
+  /* flex-basis rather than width: with flex:1 still in play, a percentage
+     width let the chip row be squeezed onto the first line instead of
+     wrapping onto its own. */
+  .ws-chips { order: 3; flex: 1 0 100%; }
+  .ws-actions { margin-left: auto; }
+}
+@media (max-width: 700px) {
+  .workspace-bar {
+    position: static;
+    backdrop-filter: none;
+  }
+  .ws-chips button { padding: 7px 9px; }
+}
+
+/* ---- Typographic floor --------------------------------------------------
+   The terminal aesthetic leaned on 5–8px labels, which sit below comfortable
+   reading on most displays and read as cheap rather than dense. The scale now
+   starts at 9px; `small` still shrinks relative to its parent, so it needs an
+   explicit floor of its own. */
+small {
+  font-size: max(9px, 0.85em);
+}

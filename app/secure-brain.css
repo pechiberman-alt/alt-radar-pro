@@ -20,12 +20,12 @@
 
 .secure-memory > div:first-child span {
   color: #53d9a0;
-  font: 7px var(--font-mono);
+  font: 9px var(--font-mono);
   letter-spacing: 1px;
 }
 
 .secure-memory > div:first-child b {
-  font: 7px var(--font-mono);
+  font: 9px var(--font-mono);
   letter-spacing: .7px;
 }
 
@@ -42,7 +42,7 @@
   padding: 8px;
   background: #09130f;
   color: #617a6f;
-  font: 6px var(--font-mono);
+  font: 9px var(--font-mono);
 }
 
 .secure-memory-stats b {
@@ -50,7 +50,7 @@
   margin-top: 4px;
   overflow: hidden;
   color: #bfd4ca;
-  font-size: 7px;
+  font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -62,7 +62,7 @@
   border: 1px dashed #24503f;
   color: #5fae8b;
   background: #06100c;
-  font: 7px var(--font-mono);
+  font: 9px var(--font-mono);
   text-overflow: ellipsis;
 }
 

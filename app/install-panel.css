@@ -11,7 +11,7 @@
 /* The platform the visitor is actually on is highlighted, so the other two
    sets of instructions stay available without competing for attention. */
 .install-steps>div.active{background:#0c1c16;box-shadow:inset 2px 0 var(--green)}
-.install-steps b{display:block;font:8px var(--font-mono);letter-spacing:.9px;color:var(--muted);margin-bottom:9px}
+.install-steps b{display:block;font:10px var(--font-mono);letter-spacing:.9px;color:var(--muted);margin-bottom:9px}
 .install-steps>div.active b{color:var(--green)}
 .install-steps ol{margin:0;padding-left:16px;display:grid;gap:5px}
 .install-steps li{font-size:10px;line-height:1.5;color:#a9b5ae}
