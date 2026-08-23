@@ -156,6 +156,20 @@ const LIQUIDITY_WINDOW_MS: Record<BrainTimeframe, number> = {
   "1d": 24 * 60 * 60_000,
 };
 
+/**
+ * How long a liquidity observation stays on screen when no newer sample has
+ * arrived. Resting orders persist between snapshots, so a sampling gap should
+ * not punch a hole in the heatmap — but carrying a reading indefinitely would
+ * paint liquidity nobody confirmed, so each timeframe has its own bound.
+ */
+const LIQUIDITY_CARRY_MS: Record<BrainTimeframe, number> = {
+  "5m": 6_000,
+  "15m": 20_000,
+  "1h": 150_000,
+  "4h": 10 * 60_000,
+  "1d": 45 * 60_000,
+};
+
 const LIQUIDITY_FRAME_LABEL: Record<BrainTimeframe, string> = {
   "5m": "5M",
   "15m": "15M",
@@ -1174,13 +1188,8 @@ export default function LiveBookmap({
         frames.map((frame) => frame.time),
         persistenceWindow,
       );
-      const positiveHeatValues = heatColumns.flatMap((column) =>
-        [...column].filter((value) => value > 0),
-      );
-      const heatFloor = Math.max(percentile(positiveHeatValues, 0.18), 1);
-      const heatCeiling = Math.max(percentile(positiveHeatValues, 0.97), heatFloor * 1.01);
       const persistenceAlpha = 0.2;
-      const smoothedHeat = heatColumns.map((column, index) => {
+      const perSampleHeat = heatColumns.map((column, index) => {
         const previous = index ? heatColumns[index - 1] : column;
         const next = index < heatColumns.length - 1 ? heatColumns[index + 1] : column;
         return Float64Array.from(column, (value, row) =>
@@ -1189,6 +1198,72 @@ export default function LiveBookmap({
           next[row] * (persistenceAlpha * 0.35),
         );
       });
+
+      /**
+       * Resample onto a uniform time grid.
+       *
+       * Drawing one column per snapshot made the heatmap's density depend on
+       * how often samples happened to arrive: 1H rendered roughly 24× denser
+       * than 5M, and sparse windows came out as thin stripes separated by gaps.
+       * A fixed grid gives every timeframe the same visual weight, and empty
+       * slots are carried forward — resting liquidity persists between
+       * observations, so a gap in sampling is not a gap in the book.
+       */
+      const gridColumnCount = clamp(Math.floor(plotWidth / 3), 60, 320);
+      const gridColumnMs = observedSpan / gridColumnCount;
+      const gridColumnWidth = plotWidth / gridColumnCount;
+      const gridHeat: Float64Array[] = Array.from(
+        { length: gridColumnCount },
+        () => new Float64Array(priceBucketCount),
+      );
+      const gridSamples = new Array<number>(gridColumnCount).fill(0);
+
+      perSampleHeat.forEach((column, index) => {
+        const slot = clamp(
+          Math.floor((frames[index].time - observedStart) / gridColumnMs),
+          0,
+          gridColumnCount - 1,
+        );
+        const target = gridHeat[slot];
+        for (let row = 0; row < priceBucketCount; row += 1) target[row] += column[row];
+        gridSamples[slot] += 1;
+      });
+
+      // Average within a slot that received several samples, so a burst of
+      // snapshots does not read as more liquidity than a single one.
+      for (let slot = 0; slot < gridColumnCount; slot += 1) {
+        const count = gridSamples[slot];
+        if (count > 1) {
+          const column = gridHeat[slot];
+          for (let row = 0; row < priceBucketCount; row += 1) column[row] /= count;
+        }
+      }
+
+      // Carry the last observation forward across unsampled slots, bounded so a
+      // long outage does not paint liquidity that was never confirmed.
+      const maxCarrySlots = Math.max(
+        1,
+        Math.ceil(LIQUIDITY_CARRY_MS[marketTimeframe] / gridColumnMs),
+      );
+      let carried: Float64Array | null = null;
+      let carryAge = 0;
+      for (let slot = 0; slot < gridColumnCount; slot += 1) {
+        if (gridSamples[slot] > 0) {
+          carried = gridHeat[slot];
+          carryAge = 0;
+          continue;
+        }
+        if (carried && carryAge < maxCarrySlots) {
+          gridHeat[slot] = Float64Array.from(carried);
+          carryAge += 1;
+        }
+      }
+
+      const positiveHeatValues = gridHeat.flatMap((column) =>
+        [...column].filter((value) => value > 0),
+      );
+      const heatFloor = Math.max(percentile(positiveHeatValues, 0.18), 1);
+      const heatCeiling = Math.max(percentile(positiveHeatValues, 0.97), heatFloor * 1.01);
       const plottedTrades = frames.flatMap((frame) => {
         const grouped = new Map<string, Trade>();
         frame.trades.forEach((trade) => {
@@ -1223,17 +1298,12 @@ export default function LiveBookmap({
             : marketTimeframe === "4h"
               ? 90_000
               : 120_000;
-      smoothedHeat.forEach((column, index) => {
-        const frame = frames[index];
-        const x = xForTime(frame.time);
-        const nextFrame = frames[index + 1];
-        const observedColumnMs = nextFrame
-          ? Math.min(nextFrame.time - frame.time, heatSpanLimit)
-          : Math.min(medianSpacing, heatSpanLimit);
-        const heatColumnWidth = Math.max(
-          1.5,
-          (observedColumnMs / observedSpan) * plotWidth + 1.25,
-        );
+
+      // Uniform columns: every slot is the same width, so the picture reads the
+      // same whatever the timeframe.
+      const heatColumnWidth = gridColumnWidth + 0.6;
+      gridHeat.forEach((column, slot) => {
+        const x = plotLeft + slot * gridColumnWidth;
         column.forEach((notional, row) => {
           if (notional <= 0) return;
           const normalized = scale === "log"
