@@ -23,6 +23,7 @@ import RiskDesk from "./risk-desk";
 import MarketStructurePanel from "./market-structure-panel";
 import AssistantConsole from "./assistant-console";
 import InstallPanel from "./install-panel";
+import SwingDesk from "./swing-desk";
 import type { AssistantContext } from "@/lib/assistant/index";
 import type { PumpReading } from "@/lib/pump-radar";
 import type { CorrelationInsights } from "./correlation-watch";
@@ -54,6 +55,7 @@ const NAV_ITEMS = [
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
+  { label: "SWING", mobile: "SWING", icon: "◤", id: "swing" },
   { label: "RIESGO", mobile: "RIESGO", icon: "◎", id: "riesgo" },
   { label: "ANALISTA", mobile: "CHAT", icon: "◈", id: "asistente" },
   { label: "COMPARAR", mobile: "COMP", icon: "⇄", id: "comparador" },
@@ -498,8 +500,19 @@ export default function RadarApp() {
     correlations: CorrelationInsights | null;
     orderFlow: BookmapBrainReadings | null;
   }>({ pumps: [], correlations: null, orderFlow: null });
+  // The swing desk uses the brain's levels as confluence, so those prices are
+  // held in state rather than only in the ref the assistant reads.
+  const [swingConfluence, setSwingConfluence] = useState<number[]>([]);
   const handleBrainReadings = useCallback((readings: BookmapBrainReadings) => {
     liveReadings.current.orderFlow = readings;
+    if (readings.symbol !== "BTCUSDT") return;
+    const prices = readings.levels.map((level) => level.price);
+    setSwingConfluence((current) =>
+      current.length === prices.length &&
+      current.every((value, index) => value === prices[index])
+        ? current
+        : prices,
+    );
   }, []);
   const handlePumpReadings = useCallback((readings: PumpReading[]) => {
     liveReadings.current.pumps = readings;
@@ -1060,6 +1073,8 @@ export default function RadarApp() {
           minimumQuoteVolume={settings.minimumQuoteVolume}
           onReadings={handlePumpReadings}
         />
+
+        <SwingDesk market={data.market} confluence={swingConfluence} />
 
         <AssistantConsole getContext={getAssistantContext} />
 
