@@ -2313,15 +2313,40 @@ export default function LiveBookmap({
             <option value="linear">Lineal</option>
           </select>
         </label>
+        {/*
+          Grouped by what each layer answers, not by when it was added. Eight
+          toggles in one undifferentiated row gave no clue which ones overlap
+          on the canvas and which open their own panel.
+        */}
         <div className="layer-switches" aria-label="Capas visibles">
-          <button className={showTrades ? "enabled" : ""} onClick={() => setShowTrades((value) => !value)}>TRADES</button>
-          <button className={showWalls ? "enabled" : ""} onClick={() => setShowWalls((value) => !value)}>WALLS</button>
-          <button className={showProfile ? "enabled" : ""} onClick={() => setShowProfile((value) => !value)}>PERFIL</button>
-          <button className={showLevels ? "enabled" : ""} onClick={() => setShowLevels((value) => !value)}>NIVELES</button>
-          <button className={showVwap ? "enabled" : ""} onClick={() => setShowVwap((value) => !value)}>VWAP ±σ</button>
-          <button className={showPulled ? "enabled" : ""} onClick={() => setShowPulled((value) => !value)}>RETIRADA</button>
-          <button className={showCvd ? "enabled" : ""} onClick={() => setShowCvd((value) => !value)}>CVD</button>
-          <button className={showFootprintNumbers ? "enabled" : ""} onClick={() => setShowFootprintNumbers((value) => !value)}>FOOTPRINT #</button>
+          <div className="layer-group" data-group="LIQUIDEZ">
+            <button className={showWalls ? "enabled walls" : "walls"} onClick={() => setShowWalls((value) => !value)}>
+              <i /> PAREDES
+            </button>
+            <button className={showPulled ? "enabled pulled" : "pulled"} onClick={() => setShowPulled((value) => !value)}>
+              <i /> RETIRADA
+            </button>
+          </div>
+          <div className="layer-group" data-group="EJECUCIÓN">
+            <button className={showTrades ? "enabled trades" : "trades"} onClick={() => setShowTrades((value) => !value)}>
+              <i /> TRADES
+            </button>
+            <button className={showProfile ? "enabled profile" : "profile"} onClick={() => setShowProfile((value) => !value)}>
+              <i /> PERFIL
+            </button>
+          </div>
+          <div className="layer-group" data-group="ESTRUCTURA">
+            <button className={showLevels ? "enabled levels" : "levels"} onClick={() => setShowLevels((value) => !value)}>
+              <i /> NIVELES
+            </button>
+            <button className={showVwap ? "enabled vwap" : "vwap"} onClick={() => setShowVwap((value) => !value)}>
+              <i /> VWAP ±σ
+            </button>
+          </div>
+          <div className="layer-group" data-group="PANELES">
+            <button className={showCvd ? "enabled" : ""} onClick={() => setShowCvd((value) => !value)}>CVD</button>
+            <button className={showFootprintNumbers ? "enabled" : ""} onClick={() => setShowFootprintNumbers((value) => !value)}>FOOTPRINT</button>
+          </div>
         </div>
       </div>
 
@@ -2992,6 +3017,73 @@ export default function LiveBookmap({
           Binance {venue === "futures" ? "Futures" : "Spot"} · top 20 WebSocket 100 ms + hasta 100 niveles REST 2.5 s · sin órdenes simuladas
         </small>
       </div>
+
+      {/*
+        A reference for what is on the canvas right now. The inline caption
+        wraps into an unreadable run of items once several layers are on, and
+        it cannot say what a colour means beyond a swatch — the distinction
+        between liquidity that was consumed and liquidity that was withdrawn is
+        the whole point of that layer, and a dot cannot carry it.
+      */}
+      <details className="layer-key">
+        <summary>
+          <span>QUÉ ESTOY VIENDO</span>
+          <b>{[showWalls, showPulled, showTrades, showProfile, showLevels, showVwap].filter(Boolean).length} capas activas</b>
+        </summary>
+        <div className="layer-key-grid">
+          <div className="key-row heat">
+            <i />
+            <b>Mapa de calor</b>
+            <span>Liquidez en reposo. Más brillante, más tamaño esperando en ese precio.</span>
+          </div>
+          {showWalls && (
+            <div className="key-row walls">
+              <i />
+              <b>Paredes</b>
+              <span>Los mayores bloques del libro ahora mismo, con su nocional.</span>
+            </div>
+          )}
+          {showPulled && (
+            <div className="key-row pulled">
+              <i />
+              <b>Liquidez retirada</b>
+              <span>
+                Tamaño que desapareció <em>sin que se ejecutara nada contra él</em>: se canceló.
+                Es lo contrario de liquidez consumida, y suele marcar a quien muestra tamaño
+                que no piensa completar.
+              </span>
+            </div>
+          )}
+          {showTrades && (
+            <div className="key-row trades">
+              <i />
+              <b>Ejecuciones</b>
+              <span>Verde compra agresiva, rojo venta agresiva. El tamaño del punto es el nocional.</span>
+            </div>
+          )}
+          {showProfile && (
+            <div className="key-row profile">
+              <i />
+              <b>Perfil de volumen</b>
+              <span>Dónde se operó, no dónde se esperó. La línea amarilla es el POC.</span>
+            </div>
+          )}
+          {showLevels && (
+            <div className="key-row levels">
+              <i />
+              <b>Pisos y techos</b>
+              <span>Grosor proporcional a la evidencia. ◆ iceberg · ▣ absorción · » barrido.</span>
+            </div>
+          )}
+          {showVwap && (
+            <div className="key-row vwap">
+              <i />
+              <b>VWAP ±σ</b>
+              <span>Precio medio ponderado por volumen. Más allá de ±2σ el movimiento está estirado.</span>
+            </div>
+          )}
+        </div>
+      </details>
 
       <MarketBrain
         symbol={symbol}

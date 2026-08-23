@@ -178,3 +178,121 @@ small {
   .section-timeframe { padding: 11px 14px; }
   .section-timeframe em { margin-left: 0; flex-basis: 100%; }
 }
+
+/* ---- Heatmap layer controls ---------------------------------------------
+   Eight toggles in one flat row said nothing about what each layer does or
+   where it draws. They are grouped by the question they answer, and each
+   carries the colour it paints on the canvas so the control and the pixels
+   are recognisably the same thing. */
+.layer-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+}
+.layer-group {
+  display: flex;
+  gap: 5px;
+  position: relative;
+  padding-top: 13px;
+}
+.layer-group::before {
+  content: attr(data-group);
+  position: absolute;
+  top: 0;
+  left: 1px;
+  font: 9px var(--font-mono);
+  letter-spacing: 1.1px;
+  color: #4d5c54;
+}
+.layer-group + .layer-group { padding-left: 14px; border-left: 1px solid var(--line); }
+
+.layer-switches button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0b110e;
+  border: 1px solid var(--line);
+  color: #66756d;
+  padding: 6px 10px;
+  border-radius: 3px;
+  font: 10px var(--font-mono);
+  letter-spacing: .6px;
+  cursor: pointer;
+}
+.layer-switches button:hover { border-color: #35473e; color: var(--text); }
+.layer-switches button i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #2c3831;
+  flex: 0 0 auto;
+}
+.layer-switches button.enabled { color: var(--text); border-color: #35473e; background: #0d1613; }
+
+/* Each layer keeps one colour, in the control and on the canvas. */
+.layer-switches button.walls.enabled i  { background: #4dffad; box-shadow: 0 0 7px #4dffad88; }
+.layer-switches button.pulled.enabled i { background: #c47aff; box-shadow: 0 0 7px #c47aff88; }
+.layer-switches button.trades.enabled i { background: #39f29a; box-shadow: 0 0 7px #39f29a88; }
+.layer-switches button.profile.enabled i{ background: #f2d34a; box-shadow: 0 0 7px #f2d34a88; }
+.layer-switches button.levels.enabled i { background: linear-gradient(90deg, #39f29a, #ff5964); }
+.layer-switches button.vwap.enabled i   { background: #8ca0ff; box-shadow: 0 0 7px #8ca0ff88; }
+
+/* ---- Layer key ---------------------------------------------------------- */
+.layer-key {
+  margin: 0 22px 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0a100d;
+}
+.layer-key summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 15px;
+  cursor: pointer;
+  list-style: none;
+}
+.layer-key summary::-webkit-details-marker { display: none; }
+.layer-key summary span {
+  font: 10px var(--font-mono);
+  letter-spacing: 1.2px;
+  color: var(--green2);
+}
+.layer-key summary b {
+  margin-left: auto;
+  font: 10px var(--font-mono);
+  color: var(--muted);
+}
+.layer-key summary::after { content: "▸"; color: var(--green2); font-size: 10px; }
+.layer-key[open] summary::after { content: "▾"; }
+
+.layer-key-grid { display: grid; gap: 1px; background: var(--line); border-top: 1px solid var(--line); }
+.key-row {
+  display: grid;
+  grid-template-columns: 12px 118px 1fr;
+  gap: 11px;
+  align-items: baseline;
+  background: #0b100e;
+  padding: 11px 15px;
+}
+.key-row i { width: 10px; height: 10px; border-radius: 2px; align-self: center; }
+.key-row b { font: 10px var(--font-mono); letter-spacing: .6px; color: var(--text); }
+.key-row span { font-size: 10px; line-height: 1.55; color: #8c9992; }
+.key-row em { font-style: normal; color: #c47aff; }
+
+.key-row.heat i    { background: linear-gradient(90deg, #1697b8, #f0dc3c, #ff5831); }
+.key-row.walls i   { background: #4dffad; }
+.key-row.pulled i  { background: #c47aff; }
+.key-row.trades i  { background: linear-gradient(90deg, #39f29a, #ff5964); }
+.key-row.profile i { background: #f2d34a; }
+.key-row.levels i  { background: linear-gradient(90deg, #39f29a, #ff5964); }
+.key-row.vwap i    { background: #8ca0ff; }
+
+@media (max-width: 700px) {
+  .layer-switches { gap: 10px; }
+  .layer-group + .layer-group { padding-left: 0; border-left: 0; }
+  .layer-key { margin: 0 14px 14px; }
+  .key-row { grid-template-columns: 12px 1fr; }
+  .key-row span { grid-column: 2; }
+}
