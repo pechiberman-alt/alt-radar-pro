@@ -3,6 +3,8 @@
 // Runtime types generated with workerd@1.20260515.1 2026-05-15 nodejs_compat
 interface __BaseEnv_Env {
 	DB: D1Database;
+	/** AES-GCM key (base64, 32 bytes) for encrypting client Binance credentials at rest. Set via `wrangler secret put ENCRYPTION_KEY`. */
+	ENCRYPTION_KEY: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
