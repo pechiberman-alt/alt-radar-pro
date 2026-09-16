@@ -68,24 +68,6 @@ export type AutomationResult = {
   timestamp: string;
 };
 
-export type BrowserSignalSnapshot = {
-  symbol: string;
-  side: "LONG" | "SHORT";
-  signal: "SETUP" | "TRIGGER";
-  score: number;
-  technicalScore: number;
-  entryPrice: number;
-  reasons: { label: string; points: number }[];
-  penalties: { label: string; points: number }[];
-};
-
-export type BrowserMarketSnapshot = {
-  candidates: BrowserSignalSnapshot[];
-  prices: { symbol: string; price: number }[];
-  altseason: number | null;
-  risk: number | null;
-};
-
 async function fetchJson<T>(url: string, timeout = 7_000): Promise<T> {
   const response = await fetch(url, {
     headers: { Accept: "application/json", "User-Agent": "ALT-RADAR-PRO/2.0" },
@@ -515,149 +497,36 @@ export async function runSignalAutomation(
   };
 }
 
-function validReasons(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .slice(0, 12)
-    .filter(
-      (item): item is { label: string; points: number } =>
-        typeof item?.label === "string" &&
-        item.label.length <= 80 &&
-        typeof item?.points === "number" &&
-        Number.isFinite(item.points) &&
-        item.points >= -30 &&
-        item.points <= 30,
-    )
-    .map((item) => ({ label: item.label, points: item.points }));
-}
 
-export async function captureBrowserSignals(
-  db: D1Database,
-  snapshot: BrowserMarketSnapshot,
-): Promise<AutomationResult> {
+/**
+ * A browser request can no longer write to the track record.
+ *
+ * It used to submit both the candidate signals AND the prices they were graded
+ * against, and the server only checked those two against each other. That meant
+ * anyone could POST a hand-made snapshot — no account, no session — and write
+ * winning signals into the public Win Rate and Profit Factor. Insertions now
+ * come only from the server-side crons (runSignalAutomation every 15 min,
+ * runScalpingAutomation every 5), which fetch their own market data. All a
+ * browser can ask for is this: re-check the open signals against prices the
+ * server fetches itself.
+ */
+export async function syncOpenSignals(db: D1Database): Promise<AutomationResult> {
   await ensureSignalSchema(db);
   const now = new Date();
   const timestamp = now.toISOString();
+  const marketLoad = await loadMarket();
   const prices = new Map(
-    (Array.isArray(snapshot.prices) ? snapshot.prices : [])
-      .slice(0, 1_000)
-      .filter(
-        (item) =>
-          typeof item?.symbol === "string" &&
-          /^[A-Z0-9]{2,24}USDT$/.test(item.symbol) &&
-          typeof item?.price === "number" &&
-          Number.isFinite(item.price) &&
-          item.price > 0,
-      )
-      .map((item) => [item.symbol, item.price] as const),
+    marketLoad.market.map((asset) => [asset.symbol, asset.price] as const),
   );
   const evaluated = await evaluateOpenSignals(db, prices, now);
-  const altseason =
-    typeof snapshot.altseason === "number" && Number.isFinite(snapshot.altseason)
-      ? Math.max(0, Math.min(100, Math.round(snapshot.altseason)))
-      : null;
-  const risk =
-    typeof snapshot.risk === "number" && Number.isFinite(snapshot.risk)
-      ? Math.max(0, Math.min(100, Math.round(snapshot.risk)))
-      : null;
-  const candidates = (Array.isArray(snapshot.candidates) ? snapshot.candidates : [])
-    .slice(0, 8)
-    .filter(
-      (candidate) =>
-        /^[A-Z0-9]{2,24}USDT$/.test(candidate.symbol) &&
-        (candidate.side === "LONG" || candidate.side === "SHORT") &&
-        (candidate.signal === "SETUP" || candidate.signal === "TRIGGER") &&
-        Number.isFinite(candidate.score) &&
-        candidate.score >= 70 &&
-        candidate.score <= 100 &&
-        Number.isFinite(candidate.technicalScore) &&
-        Number.isFinite(candidate.entryPrice) &&
-        candidate.entryPrice > 0 &&
-        prices.has(candidate.symbol),
-    );
-  let inserted = 0;
-
-  for (const candidate of candidates) {
-    const submittedPrice = prices.get(candidate.symbol)!;
-    const priceDistance = Math.abs(submittedPrice / candidate.entryPrice - 1);
-    if (priceDistance > 0.02) continue;
-    const previous = await db
-      .prepare(
-        `SELECT signal, detected_at FROM signal_records
-         WHERE symbol = ?1 AND side = ?2
-         ORDER BY detected_at DESC LIMIT 1`,
-      )
-      .bind(candidate.symbol, candidate.side)
-      .first<{ signal: "SETUP" | "TRIGGER"; detected_at: string }>();
-    const previousAge = previous
-      ? now.getTime() - new Date(previous.detected_at).getTime()
-      : Infinity;
-    const isUpgrade = previous?.signal === "SETUP" && candidate.signal === "TRIGGER";
-    if (previousAge < 60 * 60_000 && !(isUpgrade && previousAge >= 10 * 60_000)) {
-      continue;
-    }
-
-    await db
-      .prepare(
-        `INSERT INTO signal_records (
-          id, symbol, side, signal, score, technical_score, altseason_score,
-          geopolitical_risk, entry_price, source, timeframe, detected_at,
-          status, reasons, penalties, updated_at
-        ) VALUES (
-          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
-          'MONITORING', ?13, ?14, ?12
-        )`,
-      )
-      .bind(
-        crypto.randomUUID(),
-        candidate.symbol,
-        candidate.side,
-        candidate.signal,
-        Math.round(candidate.score),
-        Math.round(candidate.technicalScore),
-        altseason,
-        risk,
-        candidate.entryPrice,
-        "Binance Spot · captura validada en navegador",
-        "15m / 1H / 4H",
-        timestamp,
-        JSON.stringify(validReasons(candidate.reasons)),
-        JSON.stringify(validReasons(candidate.penalties)),
-      )
-      .run();
-    inserted += 1;
-  }
-
-  const summary = {
-    inserted,
-    evaluated,
-    universe: prices.size,
-    mode: "browser-assisted",
-  };
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO automation_state(key, value, updated_at)
-         VALUES (?1, ?2, ?3)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-      )
-      .bind("last_run", timestamp, timestamp),
-    db
-      .prepare(
-        `INSERT INTO automation_state(key, value, updated_at)
-         VALUES (?1, ?2, ?3)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-      )
-      .bind("last_summary", JSON.stringify(summary), timestamp),
-  ]);
 
   return {
     status: "COMPLETED",
-    inserted,
+    inserted: 0,
     evaluated,
     universe: prices.size,
-    altseason,
-    risk,
+    altseason: null,
+    risk: null,
     timestamp,
   };
 }

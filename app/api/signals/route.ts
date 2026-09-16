@@ -1,9 +1,8 @@
 import { env } from "cloudflare:workers";
 import {
-  captureBrowserSignals,
   ensureSignalSchema,
   runSignalAutomation,
-  type BrowserMarketSnapshot,
+  syncOpenSignals,
 } from "@/lib/automation";
 import type {
   LedgerPayload,
@@ -207,23 +206,18 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     if (!env.DB) throw new Error("D1_UNAVAILABLE");
-    let browserSnapshot: BrowserMarketSnapshot | null = null;
+    // "sync" only re-grades open signals against prices the server fetches
+    // itself. Nothing a caller sends can add a record or change an outcome:
+    // every insertion comes from the server-side crons.
+    let syncOnly = false;
     if (request.headers.get("content-type")?.includes("application/json")) {
-      const payload = (await request.json()) as {
+      const payload = (await request.json().catch(() => null)) as {
         mode?: unknown;
-        snapshot?: BrowserMarketSnapshot;
-      };
-      if (payload.mode === "browser" && payload.snapshot) {
-        const requestOrigin = request.headers.get("origin");
-        const expectedOrigin = new URL(request.url).origin;
-        if (requestOrigin && requestOrigin !== expectedOrigin) {
-          return Response.json({ error: "ORIGEN NO AUTORIZADO" }, { status: 403 });
-        }
-        browserSnapshot = payload.snapshot;
-      }
+      } | null;
+      syncOnly = payload?.mode === "sync" || payload?.mode === "browser";
     }
-    const automation = browserSnapshot
-      ? await captureBrowserSignals(env.DB, browserSnapshot)
+    const automation = syncOnly
+      ? await syncOpenSignals(env.DB)
       : await runSignalAutomation(env.DB);
     const ledger = await readLedger();
     return Response.json({ ...ledger, run: automation });

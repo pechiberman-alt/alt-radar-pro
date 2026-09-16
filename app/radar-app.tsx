@@ -1280,7 +1280,6 @@ export default function RadarApp() {
             altseason={altseason.final}
             risk={risk.score}
             active={active}
-            market={data.market}
             sources={data.sources}
           />
         </Collapsible>
