@@ -9,9 +9,11 @@ import { findPivots, type SwingCandle, type SwingPoint } from "./swing-entries.t
  * decided looks meaningful on a chart?
  *
  * No-repaint by construction: a swing leg only exists once both its pivots
- * are confirmed (see findPivots), and every level touch is graded using
- * only candles at or after the candle that touched it. Nothing here is
- * computed with information that would not have existed at the time.
+ * are confirmed by findPivots — which itself needs candles on both sides,
+ * so confirmation lands a few bars after the pivot's own candle, not on
+ * it — and every level touch is graded using only candles strictly after
+ * the candle that touched it. Nothing here is computed with information
+ * that would not have existed at the time.
  */
 
 export const FIB_LEVELS = [0.618, 0.68, 0.786] as const;
@@ -52,7 +54,12 @@ function resolveTrade(
   const risk = Math.abs(entryPrice - stopPrice);
   const horizon = Math.min(candles.length - 1, touchIndex + TIMEOUT_BARS);
 
-  for (let idx = touchIndex; idx <= horizon; idx += 1) {
+  // Starts at touchIndex + 1, not touchIndex: the touch candle's own
+  // high/low only tell us the entry was somewhere inside its range, not
+  // whether stop or target came first within that same bar. Grading begins
+  // on the next candle so nothing here uses movement that may have
+  // happened before the entry was actually reached.
+  for (let idx = touchIndex + 1; idx <= horizon; idx += 1) {
     const candle = candles[idx];
     const hitStop = side === "LONG" ? candle.low <= stopPrice : candle.high >= stopPrice;
     const hitTarget = side === "LONG" ? candle.high >= targetPrice : candle.low <= targetPrice;
@@ -85,12 +92,20 @@ function resolveTrade(
 }
 
 /**
+ * findPivots needs `PIVOT_SPAN` candles on both sides of a bar before it
+ * will confirm it as a pivot — so a pivot at index i is only knowable, in
+ * real time, once the candle at i + PIVOT_SPAN has closed. Trading must
+ * wait for that, not just for the pivot's own candle.
+ */
+const PIVOT_SPAN = 3;
+
+/**
  * Walks the candle series once, chronologically, looking for confirmed
  * swing legs (an alternating pivot low -> high or high -> low) and grading
  * every Fibonacci level touch inside each leg's retracement window.
  */
 export function runFibBacktest(candles: SwingCandle[]): FibOutcome[] {
-  const { highs, lows } = findPivots(candles);
+  const { highs, lows } = findPivots(candles, PIVOT_SPAN);
   const pivots: Pivot[] = [
     ...highs.map((p) => ({ ...p, kind: "high" as const })),
     ...lows.map((p) => ({ ...p, kind: "low" as const })),
@@ -104,12 +119,21 @@ export function runFibBacktest(candles: SwingCandle[]): FibOutcome[] {
     if (a.kind === b.kind) continue; // a leg needs alternating high/low
 
     const side: FibSide = a.kind === "low" ? "LONG" : "SHORT";
-    const origin = a.kind === "low" ? a : b; // swing low
-    const extreme = a.kind === "high" ? a : b; // swing high
-    const legSize = extreme.price - origin.price;
+    // `a` is always the chronologically earlier pivot, `b` the later one —
+    // that ordering holds regardless of side. For a LONG leg that's low
+    // (origin) -> high (extreme); for a SHORT leg it's high (origin) ->
+    // low (extreme). Picking origin/extreme by "which one is the low"
+    // instead of "which one came first" silently swapped them for every
+    // SHORT leg, which made the entry price unreachable before the loop
+    // below ever got to test it.
+    const origin = a;
+    const extreme = b;
+    const legSize = Math.abs(extreme.price - origin.price);
     if (legSize <= 0) continue;
 
-    const confirmedAt = Math.max(a.index, b.index);
+    // The later pivot's own candle isn't enough — it takes PIVOT_SPAN more
+    // candles closing after it before findPivots would have confirmed it.
+    const confirmedAt = Math.max(a.index, b.index) + PIVOT_SPAN;
     const seenLevels = new Set<FibLevel>();
 
     for (let idx = confirmedAt + 1; idx < candles.length; idx += 1) {

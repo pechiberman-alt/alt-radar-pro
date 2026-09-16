@@ -30,6 +30,10 @@ export async function POST(request: Request) {
       );
     }
 
+    // Preflight check: a fast, friendly path for the common case. Not
+    // authoritative on its own — two concurrent registrations for the same
+    // email could both pass this and race to the insert below, so the
+    // UNIQUE constraint on `email` is the real guard (caught below).
     const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ?1")
       .bind(email)
       .first();
@@ -38,11 +42,20 @@ export async function POST(request: Request) {
     }
 
     const { hash, salt } = await hashPassword(password);
-    const inserted = await env.DB.prepare(
-      "INSERT INTO users (email, password_hash, password_salt) VALUES (?1, ?2, ?3) RETURNING id",
-    )
-      .bind(email, hash, salt)
-      .first<{ id: number }>();
+    let inserted: { id: number } | null;
+    try {
+      inserted = await env.DB.prepare(
+        "INSERT INTO users (email, password_hash, password_salt) VALUES (?1, ?2, ?3) RETURNING id",
+      )
+        .bind(email, hash, salt)
+        .first<{ id: number }>();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("UNIQUE constraint failed")) {
+        return Response.json({ error: "Ya existe una cuenta con ese email." }, { status: 409 });
+      }
+      throw error;
+    }
     if (!inserted) throw new Error("INSERT_FAILED");
 
     const session = await createSession(env.DB, inserted.id);
