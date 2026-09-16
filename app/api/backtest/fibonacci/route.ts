@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const symbol = (params.get("symbol") ?? "").toUpperCase();
   const interval = params.get("interval") ?? "1h";
-  const limit = Number(params.get("candles") ?? 1000);
+  const rawLimit = params.get("candles");
+  const limit = rawLimit === null ? 1000 : Number(rawLimit);
 
   if (!/^[A-Z0-9]{2,24}USDT$/.test(symbol)) {
     return NextResponse.json({ error: "SÍMBOLO NO VÁLIDO" }, { status: 400 });
@@ -16,6 +17,12 @@ export async function GET(request: NextRequest) {
   if (!BACKTEST_INTERVALS.has(interval)) {
     return NextResponse.json(
       { error: "INTERVALO NO VÁLIDO", allowed: [...BACKTEST_INTERVALS] },
+      { status: 400 },
+    );
+  }
+  if (!Number.isInteger(limit) || limit < 200 || limit > 1000) {
+    return NextResponse.json(
+      { error: "CANDLES DEBE SER UN ENTERO ENTRE 200 Y 1000" },
       { status: 400 },
     );
   }
