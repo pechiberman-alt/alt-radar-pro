@@ -23,6 +23,7 @@ import RiskDesk from "./risk-desk";
 import MarketStructurePanel from "./market-structure-panel";
 import AssistantConsole from "./assistant-console";
 import InstallPanel from "./install-panel";
+import AccountPanel from "./account-panel";
 import SwingDesk from "./swing-desk";
 import { Collapsible, WorkspaceBar, useWorkspace } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -896,6 +897,7 @@ export default function RadarApp() {
         </nav>
         <div className="system">
           <span className={error ? "offline" : "live"}>● {error ? "DEGRADADO" : "EN VIVO"}</span>
+          <AccountPanel />
           {installPrompt && <button className="install-app" onClick={installApp}>↓ INSTALAR</button>}
           <button
             aria-label="Activar o desactivar sonido"

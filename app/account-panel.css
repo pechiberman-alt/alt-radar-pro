@@ -1,0 +1,54 @@
+.account-trigger{width:auto!important;padding:0 11px;height:29px;color:var(--green);border:1px solid #2c6048!important;border-radius:5px;background:#0c1c15!important;font:10px var(--font-mono);letter-spacing:.9px;cursor:pointer;white-space:nowrap}
+.account-trigger:hover{background:#10291d!important}
+
+.account-drawer{border-left-color:#31483d}
+.account-body{padding-top:6px}
+.account-title{font:19px var(--font-sans)!important;margin:6px 0 16px!important;letter-spacing:-.3px;word-break:break-all}
+
+.account-tabs{display:flex;gap:6px;margin-bottom:18px}
+.account-tabs button{flex:1;background:#0c130f;border:1px solid var(--line);border-radius:4px;padding:9px;color:var(--muted);font:10px var(--font-mono);letter-spacing:1px;cursor:pointer}
+.account-tabs button.active{color:var(--green);border-color:#2d6a4d;background:#0c251a}
+
+.account-form{display:grid;gap:12px}
+.account-form label{display:grid;gap:5px}
+.account-form label span{font:9px var(--font-mono);letter-spacing:1px;color:var(--muted)}
+.account-form input{background:#09110d;border:1px solid #2b4036;color:var(--text);border-radius:4px;padding:11px 10px;font:11px var(--font-mono);outline:none;width:100%}
+.account-form input:focus{border-color:var(--green)}
+
+.account-submit{margin-top:4px;padding:12px;background:#0c2d20;border:1px solid var(--green2);color:var(--green);border-radius:4px;font:10px var(--font-mono);letter-spacing:1.2px;cursor:pointer}
+.account-submit:disabled{opacity:.55;cursor:default}
+.account-ghost{padding:8px 11px;background:none;border:1px solid var(--line);color:var(--muted);border-radius:4px;font:9px var(--font-mono);letter-spacing:1px;cursor:pointer}
+.account-ghost:hover{border-color:#3a4c43;color:var(--text)}
+
+.account-section{font:10px var(--font-mono)!important;letter-spacing:1.4px;color:var(--green2);margin:28px 0 12px!important;padding-top:18px;border-top:1px solid var(--line)}
+
+.account-loading{font:9px var(--font-mono);letter-spacing:1.2px;color:var(--muted);margin:10px 0}
+.account-error{margin:0;padding:10px;background:#321217;border:1px solid #73323a;color:var(--red);font:10px var(--font-mono);line-height:1.5;border-radius:4px}
+.account-warn{margin:6px 0 0;padding:9px;background:#2a2110;border:1px solid #6b5527;color:var(--amber);font:9px var(--font-mono);line-height:1.5;border-radius:4px}
+.account-hint{display:block;font:9px var(--font-mono);color:var(--muted);line-height:1.5}
+.account-notice{margin:0 0 4px;padding:11px;background:#101713;border:1px solid var(--line);color:#9ca8a1;font:10px var(--font-mono);line-height:1.6;border-radius:4px}
+.account-notice b{color:var(--amber)}
+
+.account-actions{display:flex;gap:8px;margin-bottom:14px}
+.account-actions button{flex:1;padding:9px;background:#0c130f;border:1px solid var(--line);color:var(--muted);border-radius:4px;font:9px var(--font-mono);letter-spacing:1px;cursor:pointer}
+.account-actions button:hover{color:var(--text);border-color:#3a4c43}
+.account-actions .danger{color:var(--red);border-color:#5a2b31}
+
+.balance-list{border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.balance-list>div{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #17201c;font:10px var(--font-mono)}
+.balance-list>div:last-child{border-bottom:0}
+.balance-list b{color:var(--text)}
+.balance-list span{text-align:right;color:#b9c5be}
+.balance-list em{font-style:normal;color:var(--amber);font-size:9px}
+
+.history-block{margin-top:22px}
+.history-block h4{margin:0 0 8px;font:9px var(--font-mono);letter-spacing:1.3px;color:var(--muted)}
+.history-block>div{display:grid;grid-template-columns:70px 1fr auto;gap:10px;padding:8px 12px;border-bottom:1px solid #17201c;font:10px var(--font-mono)}
+.history-block span{text-align:right;color:#b9c5be}
+.history-block em{font-style:normal;color:var(--muted);font-size:9px}
+
+@media(max-width:700px){
+  .account-drawer{width:100vw;padding:22px 16px 40px}
+  .account-trigger{padding:0 9px;font-size:9px}
+  .balance-list>div,.history-block>div{grid-template-columns:58px 1fr auto;gap:7px}
+}

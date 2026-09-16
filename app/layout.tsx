@@ -22,6 +22,7 @@ import "./swing-desk.css";
 import "./workspace.css";
 import "./secure-brain.css";
 import "./mobile-pro.css";
+import "./account-panel.css";
 import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 
