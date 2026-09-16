@@ -24,6 +24,7 @@ import "./secure-brain.css";
 import "./mobile-pro.css";
 import "./account-panel.css";
 import "./institutional-desk.css";
+import "./exchange-flows.css";
 import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 
