@@ -142,3 +142,64 @@ test("every route is explicitly dynamic", async () => {
     );
   }
 });
+
+/**
+ * Track-record integrity.
+ *
+ * The signals route used to accept a snapshot of candidates AND the prices they
+ * were graded against, checking only that the two agreed with each other. Any
+ * caller could POST a hand-made payload — no account, no session — and write
+ * winning signals into the public Win Rate and Profit Factor. These pin the
+ * property that closed it: nothing a caller sends can enter the record.
+ */
+
+test("the signals route never inserts from a caller-supplied payload", async () => {
+  const source = await read("signals/route.ts");
+  assert.doesNotMatch(
+    source,
+    /captureBrowserSignals/,
+    "la inserción desde el navegador quedó eliminada: no debe volver",
+  );
+  assert.doesNotMatch(
+    source,
+    /payload\.snapshot|snapshot\?:/,
+    "la ruta no debe volver a leer un snapshot de mercado del cuerpo",
+  );
+  assert.match(
+    source,
+    /syncOpenSignals/,
+    "un POST del navegador sólo puede re-evaluar señales abiertas",
+  );
+});
+
+test("open signals are graded against prices the server fetches itself", async () => {
+  const source = await readFile(
+    new URL("../lib/automation.ts", import.meta.url),
+    "utf8",
+  );
+  const syncAt = source.indexOf("export async function syncOpenSignals");
+  assert.ok(syncAt > -1, "syncOpenSignals debe existir");
+  const body = source.slice(syncAt, source.indexOf("\n}\n", syncAt));
+  assert.match(
+    body,
+    /loadMarket\(\)/,
+    "los precios deben venir del servidor, nunca del cuerpo del request",
+  );
+});
+
+test("the dominance archive corroborates a caller's reading before storing it", async () => {
+  const source = await read("market-structure/route.ts");
+  const corroborateAt = source.indexOf("corroborated(structure)");
+  // The call site, not the import at the top of the file.
+  const archiveAt = source.indexOf("await recordStructureSnapshot(");
+  assert.ok(corroborateAt > -1, "debe corroborarse la lectura del navegador");
+  assert.ok(
+    corroborateAt < archiveAt,
+    "la corroboración debe ocurrir antes de escribir en el archivo histórico",
+  );
+  assert.match(
+    source,
+    /if \(!reference\?\.totalMarketCap[\s\S]*?return false/,
+    "sin fuente de contraste la lectura se rechaza, no se confía",
+  );
+});

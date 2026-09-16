@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LedgerPayload, SignalRecord } from "@/lib/signal-ledger";
-import type { MarketAsset, ScoredAsset } from "@/lib/radar";
+import type { ScoredAsset } from "@/lib/radar";
 import type { DashboardSettings } from "./dashboard-settings";
 
 type Props = {
@@ -11,7 +11,6 @@ type Props = {
   altseason: number | null;
   risk: number | null;
   active: ScoredAsset[];
-  market: MarketAsset[];
   sources: string[];
 };
 
@@ -113,7 +112,6 @@ export default function SignalLedger({
   altseason,
   risk,
   active,
-  market,
   sources,
 }: Props) {
   const [payload, setPayload] = useState(initialPayload);
@@ -124,12 +122,6 @@ export default function SignalLedger({
   const [copied, setCopied] = useState(false);
   const knownIds = useRef<Set<string> | null>(null);
   const lastAlertAt = useRef(0);
-  const marketSnapshot = useRef({ active, market, altseason, risk });
-
-  useEffect(() => {
-    marketSnapshot.current = { active, market, altseason, risk };
-  }, [active, market, altseason, risk]);
-
   const notifyNewRecords = useCallback(
     (records: SignalRecord[]) => {
       if (!knownIds.current) {
@@ -180,39 +172,13 @@ export default function SignalLedger({
   const syncNow = useCallback(async () => {
     setSyncing(true);
     try {
-      const current = marketSnapshot.current;
       const response = await fetch("/api/signals", {
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "browser",
-          snapshot: {
-            candidates: current.active
-              .filter(
-                (asset) =>
-                  (asset.signal === "SETUP" || asset.signal === "TRIGGER") &&
-                  (asset.side === "LONG" || asset.side === "SHORT"),
-              )
-              .slice(0, 8)
-              .map((asset) => ({
-                symbol: asset.symbol,
-                side: asset.side,
-                signal: asset.signal,
-                score: asset.score,
-                technicalScore: asset.technicalScore,
-                entryPrice: asset.price,
-                reasons: asset.reasons,
-                penalties: asset.penalties,
-              })),
-            prices: current.market.map((asset) => ({
-              symbol: asset.symbol,
-              price: asset.price,
-            })),
-            altseason: current.altseason,
-            risk: current.risk,
-          },
-        }),
+        // No snapshot: the server fetches its own prices and grades the open
+        // signals against those. Sending ours would let anyone forge the record.
+        body: JSON.stringify({ mode: "sync" }),
       });
       if (!response.ok) throw new Error();
       const next = (await response.json()) as LedgerPayload;

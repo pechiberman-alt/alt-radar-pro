@@ -54,8 +54,13 @@ async function loadCoinLore(): Promise<MarketStructure | null> {
  * the series could never answer the question it was built for. Visitors are not
  * blocked, so one of them can supply it.
  *
- * This writes to persistent storage, so the payload is bounded on every field
- * and the archive's own ten-minute floor rate-limits how often a snapshot lands.
+ * This writes to persistent storage, and the archive it feeds is the one thing
+ * here a competitor cannot simply fetch, so a caller must not be able to decide
+ * what it says. Range checks alone would let anyone POST plausible-but-invented
+ * dominance. Every reading is therefore corroborated against CoinLore, which
+ * the Worker CAN reach: if the caller's total capitalisation and BTC dominance
+ * match it, the reading is genuine and its stablecoin split — the part no free
+ * server-reachable source publishes — is archived with it.
  */
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -68,6 +73,10 @@ export async function POST(request: NextRequest) {
   const structure = parseCoinGeckoGlobal(body);
   if (!structure || !isPlausible(structure)) {
     return NextResponse.json({ error: "LECTURA NO VÁLIDA" }, { status: 400 });
+  }
+
+  if (!(await corroborated(structure))) {
+    return NextResponse.json({ error: "LECTURA NO CORROBORADA" }, { status: 409 });
   }
 
   // Serve it to other clients straight away, archive it if D1 is available.
@@ -86,6 +95,41 @@ export async function POST(request: NextRequest) {
     { archived, usdt: structure.dominance.usdt },
     { headers: { "Cache-Control": "no-store" } },
   );
+}
+
+/** Total capitalisation may differ this much between the two sources. */
+const TOTAL_TOLERANCE = 0.05;
+/** BTC dominance may differ this many percentage points between them. */
+const DOMINANCE_TOLERANCE_PP = 2;
+
+/**
+ * Checks a caller's reading against CoinLore, the free source the Worker can
+ * reach. An invented payload has to match a live independent source on two
+ * fast-moving numbers to get in, which a caller cannot arrange.
+ *
+ * If CoinLore itself is unreachable there is nothing to check against, so the
+ * reading is refused rather than trusted: a gap in the series is recoverable,
+ * a poisoned one is not.
+ */
+async function corroborated(structure: MarketStructure): Promise<boolean> {
+  const { value: reference } = await cached<MarketStructure>(
+    "market-structure:corroboration",
+    CACHE_TTL_MS,
+    loadCoinLore,
+    STALE_WINDOW_MS,
+  );
+  if (!reference?.totalMarketCap || !structure.totalMarketCap) return false;
+
+  const totalDrift =
+    Math.abs(structure.totalMarketCap / reference.totalMarketCap - 1);
+  if (totalDrift > TOTAL_TOLERANCE) return false;
+
+  if (reference.dominance.btc !== null && structure.dominance.btc !== null) {
+    const btcDrift = Math.abs(structure.dominance.btc - reference.dominance.btc);
+    if (btcDrift > DOMINANCE_TOLERANCE_PP) return false;
+  }
+
+  return true;
 }
 
 /**
