@@ -23,6 +23,7 @@ import "./workspace.css";
 import "./secure-brain.css";
 import "./mobile-pro.css";
 import "./account-panel.css";
+import "./institutional-desk.css";
 import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 
