@@ -24,6 +24,7 @@ import MarketStructurePanel from "./market-structure-panel";
 import AssistantConsole from "./assistant-console";
 import InstallPanel from "./install-panel";
 import AccountPanel from "./account-panel";
+import InstitutionalDesk from "./institutional-desk";
 import SwingDesk from "./swing-desk";
 import { Collapsible, WorkspaceBar, useWorkspace } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -57,6 +58,7 @@ const NAV_ITEMS = [
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
+  { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "SWING", mobile: "SWING", icon: "◤", id: "swing" },
   { label: "RIESGO", mobile: "RIESGO", icon: "◎", id: "riesgo" },
   { label: "ANALISTA", mobile: "CHAT", icon: "◈", id: "asistente" },
@@ -1142,6 +1144,10 @@ export default function RadarApp() {
             minimumQuoteVolume={settings.minimumQuoteVolume}
             onReadings={handlePumpReadings}
           />
+        </Collapsible>
+
+        <Collapsible id="institucional" label="INSTITUCIONAL" open={workspace.open["institucional"]} onToggle={workspace.toggle}>
+          <InstitutionalDesk />
         </Collapsible>
 
         <Collapsible id="swing" label="SWING" open={workspace.open["swing"]} onToggle={workspace.toggle}>
