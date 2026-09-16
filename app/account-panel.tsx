@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type SessionUser = { id: number; email: string };
 
@@ -21,6 +22,10 @@ type Portfolio = {
 /** `null` = no linked account, `undefined` = not loaded yet. */
 type PortfolioState = Portfolio | null | undefined;
 
+/** A failed session lookup is not the same as a confirmed signed-out user:
+ *  showing the login form on a network blip would be a lie about the state. */
+type SessionState = "loading" | "ready" | "error";
+
 const amount = (value: string) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return value;
@@ -37,20 +42,50 @@ const readError = async (response: Response, fallback: string) => {
 export default function AccountPanel() {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<SessionState>("loading");
+  const [expired, setExpired] = useState(false);
+  const [sessionKey, setSessionKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
     fetch("/api/auth/me")
-      .then((response) => response.json() as Promise<{ user: SessionUser | null }>)
-      .then((body) => {
-        if (alive) setUser(body.user ?? null);
+      .then(async (response) => {
+        if (!alive) return;
+        if (!response.ok) {
+          setStatus("error");
+          return;
+        }
+        const body = (await response.json()) as { user: SessionUser | null };
+        setUser(body.user ?? null);
+        setStatus("ready");
       })
-      .catch(() => undefined)
-      .finally(() => alive && setReady(true));
+      .catch(() => alive && setStatus("error"));
     return () => {
       alive = false;
     };
+  }, [sessionKey]);
+
+  const retrySession = useCallback(() => {
+    setStatus("loading");
+    setSessionKey((key) => key + 1);
+  }, []);
+
+  const signedIn = useCallback((next: SessionUser) => {
+    setExpired(false);
+    setUser(next);
+    setStatus("ready");
+  }, []);
+
+  const signedOut = useCallback(() => {
+    setUser(null);
+    setStatus("ready");
+  }, []);
+
+  /** Session died server-side while the drawer was open. */
+  const sessionExpired = useCallback(() => {
+    setUser(null);
+    setStatus("ready");
+    setExpired(true);
   }, []);
 
   useEffect(() => {
@@ -60,6 +95,8 @@ export default function AccountPanel() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  const label = status === "ready" && user ? user.email.split("@")[0].slice(0, 12) : null;
+
   return (
     <>
       <button
@@ -67,30 +104,57 @@ export default function AccountPanel() {
         onClick={() => setOpen(true)}
         aria-label={user ? `Cuenta de ${user.email}` : "Ingresar a tu cuenta"}
       >
-        {ready && user ? user.email.split("@")[0].slice(0, 12).toUpperCase() : "INGRESAR"}
+        {/* Not a <span>: the mobile header hides spans inside .system. */}
+        <b className="account-trigger-wide">{label ? label.toUpperCase() : "INGRESAR"}</b>
+        <i className="account-trigger-slim" aria-hidden="true">
+          {label ? "◉" : "→"}
+        </i>
       </button>
 
-      {open && (
-        <div className="overlay">
-          <aside className="drawer account-drawer" aria-label="Panel de cuenta">
-            <button className="close" onClick={() => setOpen(false)} aria-label="Cerrar">
-              ×
-            </button>
-            {!ready ? (
-              <p className="account-loading">CARGANDO SESIÓN…</p>
-            ) : user ? (
-              <AccountHome user={user} onSignedOut={() => setUser(null)} />
-            ) : (
-              <AuthForms onSignedIn={setUser} />
-            )}
-          </aside>
-        </div>
-      )}
+      {/* Portalled to <body>: the drawer is fixed-position, and leaving it
+          inside .system lets the header's own button/span rules reshape and
+          hide the controls and balances inside it. */}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="overlay">
+            <aside className="drawer account-drawer" aria-label="Panel de cuenta">
+              <button className="close" onClick={() => setOpen(false)} aria-label="Cerrar">
+                ×
+              </button>
+              {status === "loading" ? (
+                <p className="account-loading">CARGANDO SESIÓN…</p>
+              ) : status === "error" ? (
+                <div className="account-body">
+                  <p className="account-error">No se pudo verificar tu sesión.</p>
+                  <button className="account-submit" onClick={retrySession}>
+                    REINTENTAR
+                  </button>
+                </div>
+              ) : user ? (
+                <AccountHome
+                  user={user}
+                  onSignedOut={signedOut}
+                  onSessionExpired={sessionExpired}
+                />
+              ) : (
+                <AuthForms onSignedIn={signedIn} expired={expired} />
+              )}
+            </aside>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
 
-function AuthForms({ onSignedIn }: { onSignedIn: (user: SessionUser) => void }) {
+function AuthForms({
+  onSignedIn,
+  expired,
+}: {
+  onSignedIn: (user: SessionUser) => void;
+  expired: boolean;
+}) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -112,10 +176,14 @@ function AuthForms({ onSignedIn }: { onSignedIn: (user: SessionUser) => void }) 
         setError(message === "EMAIL_INVALIDO" ? "Ese email no es válido." : message);
         return;
       }
-      const me = (await fetch("/api/auth/me").then((r) => r.json())) as {
-        user: SessionUser | null;
-      };
-      if (me.user) onSignedIn(me.user);
+      const me = await fetch("/api/auth/me");
+      if (!me.ok) {
+        setError("Entraste, pero no se pudo leer la sesión. Recargá la página.");
+        return;
+      }
+      const body = (await me.json()) as { user: SessionUser | null };
+      if (body.user) onSignedIn(body.user);
+      else setError("Entraste, pero no se pudo leer la sesión. Recargá la página.");
     } catch {
       setError("Sin conexión con el servidor.");
     } finally {
@@ -126,9 +194,9 @@ function AuthForms({ onSignedIn }: { onSignedIn: (user: SessionUser) => void }) 
   return (
     <div className="account-body">
       <p className="eyebrow">ACCESO DE CLIENTE</p>
-      <h2 className="account-title">
-        {mode === "login" ? "Ingresar" : "Crear cuenta"}
-      </h2>
+      <h2 className="account-title">{mode === "login" ? "Ingresar" : "Crear cuenta"}</h2>
+
+      {expired && <p className="account-warn">Tu sesión venció. Volvé a ingresar.</p>}
 
       <div className="account-tabs">
         <button
@@ -188,17 +256,32 @@ function AuthForms({ onSignedIn }: { onSignedIn: (user: SessionUser) => void }) 
   );
 }
 
-function AccountHome({ user, onSignedOut }: { user: SessionUser; onSignedOut: () => void }) {
+function AccountHome({
+  user,
+  onSignedOut,
+  onSessionExpired,
+}: {
+  user: SessionUser;
+  onSignedOut: () => void;
+  onSessionExpired: () => void;
+}) {
   const [portfolio, setPortfolio] = useState<PortfolioState>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const [pending, setPending] = useState<"signout" | "unlink" | null>(null);
 
   useEffect(() => {
     let alive = true;
     fetch("/api/binance/portfolio")
       .then(async (response) => {
         if (!alive) return;
+        // The session died server-side — send the user back to the login form
+        // instead of showing a stale "active account" header.
+        if (response.status === 401) {
+          onSessionExpired();
+          return;
+        }
         // 404 is the "no linked account yet" case, not a failure.
         if (response.status === 404) {
           setPortfolio(null);
@@ -215,7 +298,7 @@ function AccountHome({ user, onSignedOut }: { user: SessionUser; onSignedOut: ()
     return () => {
       alive = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, onSessionExpired]);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -224,21 +307,53 @@ function AccountHome({ user, onSignedOut }: { user: SessionUser; onSignedOut: ()
   }, []);
 
   const signOut = async () => {
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    onSignedOut();
+    setPending("signout");
+    setError(null);
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) {
+        // Claiming "signed out" while the server token is still valid would be
+        // a security lie — say it failed and let the user retry.
+        setError(await readError(response, "No se pudo cerrar la sesión. Reintentá."));
+        return;
+      }
+      onSignedOut();
+    } catch {
+      setError("Sin conexión: la sesión sigue abierta. Reintentá.");
+    } finally {
+      setPending(null);
+    }
   };
 
   const unlink = async () => {
-    await fetch("/api/binance/link", { method: "DELETE" }).catch(() => undefined);
-    setPortfolio(null);
+    setPending("unlink");
+    setError(null);
+    try {
+      const response = await fetch("/api/binance/link", { method: "DELETE" });
+      if (response.status === 401) {
+        onSessionExpired();
+        return;
+      }
+      if (!response.ok) {
+        // Same reasoning: never show the linking form as if the keys were
+        // removed when the server still holds them.
+        setError(await readError(response, "No se pudo desvincular. Reintentá."));
+        return;
+      }
+      setPortfolio(null);
+    } catch {
+      setError("Sin conexión: las claves siguen vinculadas. Reintentá.");
+    } finally {
+      setPending(null);
+    }
   };
 
   return (
     <div className="account-body">
       <p className="eyebrow">CUENTA ACTIVA</p>
       <h2 className="account-title">{user.email}</h2>
-      <button className="account-ghost" onClick={signOut}>
-        CERRAR SESIÓN
+      <button className="account-ghost" onClick={signOut} disabled={pending !== null}>
+        {pending === "signout" ? "CERRANDO…" : "CERRAR SESIÓN"}
       </button>
 
       <h3 className="account-section">BINANCE · SOLO LECTURA</h3>
@@ -251,9 +366,11 @@ function AccountHome({ user, onSignedOut }: { user: SessionUser; onSignedOut: ()
       {!loading && portfolio && (
         <>
           <div className="account-actions">
-            <button onClick={reload}>ACTUALIZAR</button>
-            <button className="danger" onClick={unlink}>
-              DESVINCULAR
+            <button onClick={reload} disabled={pending !== null}>
+              ACTUALIZAR
+            </button>
+            <button className="danger" onClick={unlink} disabled={pending !== null}>
+              {pending === "unlink" ? "DESVINCULANDO…" : "DESVINCULAR"}
             </button>
           </div>
 
