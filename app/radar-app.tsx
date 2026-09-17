@@ -60,15 +60,15 @@ const NAV_ITEMS = [
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
+  { label: "LIQUIDACIONES", mobile: "MAPA", icon: "▨", id: "liquidaciones" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
-  { label: "LIQUIDACIONES", mobile: "MAPA", icon: "▨", id: "liquidaciones" },
   { label: "SWING", mobile: "SWING", icon: "◤", id: "swing" },
   { label: "RIESGO", mobile: "RIESGO", icon: "◎", id: "riesgo" },
   { label: "ANALISTA", mobile: "CHAT", icon: "◈", id: "asistente" },
   { label: "COMPARAR", mobile: "COMP", icon: "⇄", id: "comparador" },
   { label: "VIGILANCIA", mobile: "WATCH", icon: "◈", id: "vigilancia" },
-  { label: "ORDER FLOW", mobile: "MAPA", icon: "▦", id: "order-flow" },
+  { label: "ORDER FLOW", mobile: "FLOW", icon: "▦", id: "order-flow" },
   { label: "HISTORIAL", mobile: "DATOS", icon: "≡", id: "historial" },
 ] as const;
 

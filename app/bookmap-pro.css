@@ -85,6 +85,12 @@
   background: #030907;
 }
 .chart-stage { position: relative; min-width: 0; height: 620px; overflow: hidden; background: #030a08; }
+/* Everything positioned against the canvas — badges, legend, tooltip — is
+   scoped to this wrapper rather than to chart-stage as a whole, so their
+   hand-tuned offsets measure from the canvas's own top edge regardless of
+   how tall the controls above it are (floating over the canvas on desktop,
+   taking real space above it on mobile — see mobile-pro.css). */
+.chart-canvas-area { position: relative; }
 .orderflow-terminal .pro-bookmap-canvas { display: block; width: 100%; height: 620px; cursor: crosshair; touch-action: pan-y; }
 .chart-live-badge {
   position: absolute; top: 10px; right: 98px; display: flex; align-items: center; gap: 5px;
