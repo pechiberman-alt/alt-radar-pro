@@ -70,24 +70,37 @@
     right: 8px;
     bottom: max(7px, env(safe-area-inset-bottom));
     z-index: 80;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    /* This bar carries 14 sections, not the 5 it was built for. A fixed
+       5-column grid gave every extra section nowhere to go — LIQUIDACIONES,
+       RESERVAS and INSTITUCIONAL among them, unreachable from a phone no
+       matter how the page above scrolled. It scrolls horizontally now, like
+       any bottom tab bar built for more items than fit on one screen. */
+    display: flex;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
     height: 62px;
     margin: 0;
-    padding: 5px;
+    padding: 5px 20px 5px 5px;
     gap: 2px;
     border: 1px solid rgba(104, 181, 144, .24);
     border-radius: 17px;
     background: rgba(5, 14, 10, .94);
     box-shadow: 0 18px 55px rgba(0, 0, 0, .72), inset 0 1px rgba(255, 255, 255, .035);
     backdrop-filter: blur(24px) saturate(145%);
+    /* A right-edge fade hints that the bar keeps going, the same way a
+       carousel or a horizontally-scrolling menu signals more content. */
+    mask-image: linear-gradient(90deg, #000 calc(100% - 30px), transparent);
   }
+  .mobile-nav::-webkit-scrollbar { display: none; }
   .mobile-nav button {
     position: relative;
     display: grid;
     place-content: center;
     justify-items: center;
-    min-width: 0;
+    flex: 0 0 auto;
+    width: 64px;
     min-height: 50px;
     padding: 2px 1px;
     gap: 3px;
@@ -96,6 +109,7 @@
     background: transparent;
     color: #687f74;
     cursor: pointer;
+    scroll-snap-align: start;
   }
   .mobile-nav button span { font: 18px/1 var(--font-mono); }
   .mobile-nav button small { font: 600 7px/1 var(--font-mono); letter-spacing: .65px; }
@@ -371,25 +385,33 @@
     border-inline: 0;
     box-shadow: none;
   }
-  /* With the controls no longer floating, these overlays no longer need to
-     dodge them. */
-  .orderflow-terminal .interactive-chart .chart-live-badge,
-  .orderflow-terminal .interactive-chart .liquidity-coverage-warning {
-    top: 8px;
+  /* A right-edge fade signals there's more to scroll to, rather than letting
+     the last button read as cut off mid-word. */
+  .orderflow-terminal .chart-viewport-controls {
+    mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
   }
+  /* Live badge, coverage warning, legend and tooltip live in chart-canvas-area
+     now (see live-bookmap.tsx and bookmap-pro.css), which starts exactly
+     where the canvas does — their existing top/bottom offsets already work
+     unmodified whether the controls above float (desktop) or sit in flow
+     (here). Nothing to override for them on this breakpoint any more. */
 
-  .gesture-pointer { display: none; }
-  .chart-gesture-help {
-    left: 8px;
-    right: 8px;
-    bottom: 6px;
-    text-align: center;
-  }
+  /* chart-stage carried a fixed height sized for the canvas alone, because
+     the controls used to float over it rather than taking their own space.
+     Now that the controls sit above the canvas in normal flow, that fixed
+     height is too short for both — the bottom of the canvas was clipping
+     under chart-stage's own overflow:hidden. Auto lets the box grow to fit
+     controls + canvas instead of a number that has to be hand-recalculated
+     every time the controls' height changes. The canvas itself keeps its
+     own explicit height from bookmap-pro.css — only its container changes. */
+  .orderflow-terminal .chart-stage { height: auto; }
 }
 
-/* Touch help only shows where touch is the actual input. */
-.gesture-touch { display: none; }
+/* Pinch and drag need no on-screen caption — every chart app on a touchscreen
+   already works this way, and explaining it permanently is the kind of
+   clutter a reference-quality terminal doesn't have. The wheel/shift text
+   stays for a mouse, where the shortcut isn't otherwise discoverable. */
 @media (pointer: coarse) {
-  .gesture-pointer { display: none; }
-  .gesture-touch { display: inline; }
+  .chart-gesture-help { display: none; }
 }
+

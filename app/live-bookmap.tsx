@@ -2600,37 +2600,49 @@ export default function LiveBookmap({
             onDoubleClick={followLive}
             onKeyDown={handleChartKeyDown}
           />
-          <div className="chart-live-badge"><i /> {LIQUIDITY_FRAME_LABEL[marketTimeframe]} · LIVE DEPTH</div>
-          {liquidityCoverage.minutes < LIQUIDITY_WINDOW_MS[marketTimeframe] / 60_000 && (
-            <div className="liquidity-coverage-warning">
-              ACUMULANDO {LIQUIDITY_FRAME_LABEL[marketTimeframe]} · DISPONIBLE {Math.round(liquidityCoverage.minutes)} MIN
-            </div>
-          )}
-          <div className="chart-legend-overlay premium-heat-legend">
-            <b>INTENSIDAD</b><span>BAJA</span><i /><span>ALTA</span><em>ÓRDENES LÍMITE OBSERVADAS · NO ES LIQUIDACIÓN</em>
-          </div>
-          {/* A phone has no wheel and no shift key, so the pointer version of
-              this help was instructions for hardware the reader doesn't have.
-              Both are rendered and CSS picks the one that applies. */}
-          <div id="bookmap-gesture-help" className="chart-gesture-help">
-            <span className="gesture-pointer">
-              RUEDA: ZOOM TIEMPO · SHIFT+RUEDA: PRECIO · ARRASTRAR: MOVER · DOBLE CLIC: LIVE
-            </span>
-            <span className="gesture-touch">
-              PINZA: ZOOM · ARRASTRAR: MOVER · DOBLE TOQUE: LIVE
-            </span>
-          </div>
-          {showFootprintNumbers && (
-            <div className="chart-footprint-numbers" aria-label="Footprint numérico de ejecuciones reales">
-              <header>
-                <div><span>FOOTPRINT</span><b>BID × ASK</b></div>
-                <small>USD EJECUTADO</small>
-              </header>
-              <div className="chart-footprint-summary">
-                <span>Δ <b className={footprintDelta >= 0 ? "positive" : "negative"}>{footprintDelta >= 0 ? "+" : "−"}{footprintNumber(footprintDelta)}</b></span>
-                <span>POC <b>{footprintPoc ? priceLabel(footprintPoc.price) : "—"}</b></span>
-                <span>IMB <b>{stackedImbalances}</b></span>
+          {/*
+            On a phone the viewport controls above sit in normal document
+            flow instead of floating over the canvas (see mobile-pro.css),
+            so they push everything below them down. Every one of these
+            overlays is positioned absolute against its nearest positioned
+            ancestor — before this wrapper existed that was the whole
+            chart-stage, header controls included, so pushing the controls
+            into flow left the overlays' hand-tuned offsets measuring from
+            the wrong edge and landing on top of the controls instead of the
+            canvas. Scoping them to a wrapper that starts exactly where the
+            canvas starts restores their original, correct offsets on both
+            mobile and desktop without re-tuning a single number.
+          */}
+          <div className="chart-canvas-area">
+            <div className="chart-live-badge"><i /> {LIQUIDITY_FRAME_LABEL[marketTimeframe]} · LIVE DEPTH</div>
+            {liquidityCoverage.minutes < LIQUIDITY_WINDOW_MS[marketTimeframe] / 60_000 && (
+              <div className="liquidity-coverage-warning">
+                ACUMULANDO {LIQUIDITY_FRAME_LABEL[marketTimeframe]} · DISPONIBLE {Math.round(liquidityCoverage.minutes)} MIN
               </div>
+            )}
+            <div className="chart-legend-overlay premium-heat-legend">
+              <b>INTENSIDAD</b><span>BAJA</span><i /><span>ALTA</span><em>ÓRDENES LÍMITE OBSERVADAS · NO ES LIQUIDACIÓN</em>
+            </div>
+            {/* Pinch-to-zoom and drag-to-pan need no caption on a touchscreen
+                — every chart app on a phone works this way already, and a
+                permanent banner explaining it is exactly the kind of
+                clutter a reference-quality terminal doesn't have. The
+                wheel/shift instructions stay for a mouse, where the
+                shortcut genuinely isn't obvious. */}
+            <div id="bookmap-gesture-help" className="chart-gesture-help">
+              RUEDA: ZOOM TIEMPO · SHIFT+RUEDA: PRECIO · ARRASTRAR: MOVER · DOBLE CLIC: LIVE
+            </div>
+            {showFootprintNumbers && (
+              <div className="chart-footprint-numbers" aria-label="Footprint numérico de ejecuciones reales">
+                <header>
+                  <div><span>FOOTPRINT</span><b>BID × ASK</b></div>
+                  <small>USD EJECUTADO</small>
+                </header>
+                <div className="chart-footprint-summary">
+                  <span>Δ <b className={footprintDelta >= 0 ? "positive" : "negative"}>{footprintDelta >= 0 ? "+" : "−"}{footprintNumber(footprintDelta)}</b></span>
+                  <span>POC <b>{footprintPoc ? priceLabel(footprintPoc.price) : "—"}</b></span>
+                  <span>IMB <b>{stackedImbalances}</b></span>
+                </div>
               <div className="chart-footprint-head"><span>BID</span><b>PRECIO</b><span>ASK</span><em>Δ</em></div>
               <div className="chart-footprint-body">
                 {actualFootprint.slice(0, 10).map((row) => {
@@ -2672,6 +2684,7 @@ export default function LiveBookmap({
               <small>LIQ. {usdLabel(hover.liquidity)}</small>
             </div>
           )}
+          </div>
         </div>
 
         {showMarketSidebar && <aside className="market-sidebar pro-sidebar">
