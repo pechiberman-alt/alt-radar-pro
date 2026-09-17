@@ -31,8 +31,18 @@ test("volume profile spreads a candle's volume across every bin it touches, not 
   const profile = buildVolumeProfile([candle(1, 100, 103, 300)], 1);
   // Range [100,103) touches bins 100, 101, 102 — three bins, not one.
   assert.equal(profile.size, 3);
-  const total = [...profile.values()].reduce((sum, value) => sum + value, 0);
+  const total = [...profile.values()].reduce((sum, bin) => sum + bin.volume, 0);
   assert.ok(Math.abs(total - 300) < 1e-6, "el volumen total se conserva");
+});
+
+test("a bin remembers the earliest candle that put volume there", () => {
+  // Same price range touched on candle 0 and again on candle 5; the zone came
+  // into existence at 0, so that is when the chart should start drawing it.
+  const profile = buildVolumeProfile(
+    [candle(0, 100, 101, 50), candle(5, 100, 101, 50)],
+    1,
+  );
+  assert.equal(profile.get(100)?.firstIndex, 0);
 });
 
 test("a doji or zero-volume candle is skipped, not dumped on one bin", () => {
@@ -127,4 +137,22 @@ test("the method and its assumptions are declared on every result", () => {
   const heatmap = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
   assert.match(heatmap?.method ?? "", /no liquidaciones confirmadas/);
   assert.match(heatmap?.assumptions ?? "", /5x/);
+});
+
+test("a zone carries the candle index it formed at, so the chart can draw it in time", () => {
+  // Volume only on the last few candles: every projected zone should start
+  // late in the lookback, not at the beginning of the chart.
+  const candles = [
+    ...Array.from({ length: 40 }, (_, i) => candle(i, 100_000, 100_010, 0)),
+    ...Array.from({ length: 10 }, (_, i) => candle(40 + i, 104_900, 105_000, 200)),
+  ];
+  const heatmap = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
+  assert.ok(heatmap);
+  assert.equal(heatmap.profileCandles, 50);
+  for (const bucket of heatmap.buckets) {
+    assert.ok(
+      bucket.formedAt >= 40,
+      `una zona sin volumen previo no puede existir antes de la vela 40 (formedAt=${bucket.formedAt})`,
+    );
+  }
 });

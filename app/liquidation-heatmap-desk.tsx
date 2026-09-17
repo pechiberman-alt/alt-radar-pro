@@ -41,12 +41,13 @@ const priceLabel = (price: number) =>
     : price.toLocaleString("es-AR", { maximumFractionDigits: price >= 1 ? 2 : 6 });
 
 const CHART_W = 1000;
-const CHART_H = 560;
-const MARGIN = { top: 16, right: 78, bottom: 34, left: 10 };
+const CHART_H = 580;
+const MARGIN = { top: 14, right: 86, bottom: 30, left: 8 };
 const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-/** How far the densest possible heat bar reaches into the chart from the right edge. */
-const MAX_BAR_FRACTION = 0.62;
+/** Right-hand strip where every zone renders its full weight as a profile bar,
+ *  so zones that formed recently are still readable next to older ones. */
+const PROFILE_W = 132;
 
 export default function LiquidationHeatmapDesk() {
   const [symbol, setSymbol] = useState("BTCUSDT");
@@ -106,15 +107,26 @@ export default function LiquidationHeatmapDesk() {
 
     const y = (price: number) => MARGIN.top + (1 - (price - lo) / (hi - lo)) * PLOT_H;
 
-    const candleAreaW = PLOT_W * (1 - MAX_BAR_FRACTION * 0.6);
+    // Candles fill the plot minus the profile strip, so the chart uses its
+    // whole width instead of crowding into one side.
+    const candleAreaW = PLOT_W - PROFILE_W;
     const slot = candleAreaW / candles.length;
-    const bodyW = Math.max(1.5, Math.min(7, slot * 0.62));
+    const bodyW = Math.max(1.5, Math.min(7, slot * 0.66));
     const x = (index: number) => MARGIN.left + slot * index + slot / 2;
 
     const peakIntensity = Math.max(...heatmap.buckets.map((b) => b.intensity), 1);
-    const barMaxW = PLOT_W * MAX_BAR_FRACTION;
 
-    return { candles, heatmap, y, x, bodyW, peakIntensity, barMaxW, lo, hi };
+    // A zone's formedAt indexes the volume-profile lookback, which is longer
+    // than the candle window drawn here. Map it proportionally and clamp, so a
+    // zone older than the visible window starts at the left edge rather than
+    // off-screen.
+    const zoneStartX = (formedAt: number) => {
+      const fraction = heatmap.profileCandles > 1 ? formedAt / (heatmap.profileCandles - 1) : 0;
+      const visibleFraction = Math.max(0, Math.min(1, (fraction - (1 - candles.length / heatmap.profileCandles)) / (candles.length / heatmap.profileCandles)));
+      return MARGIN.left + visibleFraction * candleAreaW;
+    };
+
+    return { candles, heatmap, y, x, bodyW, peakIntensity, zoneStartX, candleAreaW, lo, hi };
   }, [data]);
 
   const priceTicks = useMemo(() => {
@@ -228,23 +240,43 @@ export default function LiquidationHeatmapDesk() {
                 />
               ))}
 
+              {/* Each zone is drawn twice: a horizontal span running from where
+                  it formed to the right edge — the level existed from that
+                  moment on — and a profile bar in the right strip carrying its
+                  full weight, so a zone formed recently is still comparable to
+                  an old one. */}
               {layout.heatmap.buckets.map((bucket) => {
-                const barW = (bucket.intensity / layout.peakIntensity) * layout.barMaxW;
-                if (barW < 1) return null;
                 const yPos = layout.y(bucket.price);
+                const startX = layout.zoneStartX(bucket.formedAt);
+                const endX = MARGIN.left + layout.candleAreaW;
+                const relative = bucket.intensity / layout.peakIntensity;
+                const thickness = Math.max(1, relative * 5);
+                const barW = relative * PROFILE_W;
                 return (
-                  <rect
+                  <g
                     key={bucket.price}
-                    x={CHART_W - MARGIN.right - barW}
-                    y={yPos - 1.4}
-                    width={barW}
-                    height={2.8}
-                    fill={intensityColor(bucket.intensity, 0.85)}
                     onMouseEnter={() => setHovered(bucket)}
                     onMouseLeave={() =>
                       setHovered((current) => (current === bucket ? null : current))
                     }
-                  />
+                  >
+                    {endX > startX && (
+                      <rect
+                        x={startX}
+                        y={yPos - thickness / 2}
+                        width={endX - startX}
+                        height={thickness}
+                        fill={intensityColor(bucket.intensity, 0.2 + relative * 0.45)}
+                      />
+                    )}
+                    <rect
+                      x={endX}
+                      y={yPos - thickness / 2}
+                      width={Math.max(1, barW)}
+                      height={thickness}
+                      fill={intensityColor(bucket.intensity, 0.92)}
+                    />
+                  </g>
                 );
               })}
 

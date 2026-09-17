@@ -27,16 +27,20 @@
 .liq-bias-price span{display:block;font:8px var(--font-mono);letter-spacing:1px;color:var(--muted)}
 .liq-bias-price b{font:16px var(--font-mono);color:var(--text)}
 
-.liq-chart-wrap{position:relative;border:1px solid var(--line);border-radius:5px;background:radial-gradient(circle at 78% 20%,#0e1a15 0,#070c0a 60%);overflow:hidden}
+.liq-chart-wrap{position:relative;border:1px solid var(--line);border-radius:5px;background:linear-gradient(180deg,#080f0c,#050908);overflow:hidden}
+/* The price scale gets its own strip, the way a trading terminal reads: the
+   numbers sit on a panel rather than floating over the plot. */
+.liq-chart-wrap:after{content:"";position:absolute;top:0;bottom:0;right:0;width:86px;background:#070d0b;border-left:1px solid var(--line);pointer-events:none;z-index:0}
+.liq-svg{position:relative;z-index:1}
 .liq-svg{display:block;width:100%;height:auto}
-.liq-grid{stroke:#152019;stroke-width:1}
+.liq-grid{stroke:#111a16;stroke-width:1}
 .liq-wick-up,.liq-wick-down{stroke-width:1.3}
 .liq-wick-up{stroke:var(--green)}
 .liq-wick-down{stroke:var(--red)}
 .liq-candle-up{fill:var(--green)}
 .liq-candle-down{fill:var(--red)}
 .liq-price-line{stroke:var(--amber);stroke-width:1;stroke-dasharray:4 3}
-.liq-axis-label{font:9px var(--font-mono);fill:#7c8a83}
+.liq-axis-label{font:10px var(--font-mono);fill:#8e9c94}
 .liq-axis-x{text-anchor:middle}
 
 .liq-price-badge{position:absolute;right:2px;transform:translateY(-50%);background:var(--amber);color:#241a05;font:10px var(--font-mono);font-weight:700;padding:3px 7px;border-radius:3px;pointer-events:none}
@@ -56,6 +60,11 @@
 .liq-method b{color:#b9c5be}
 
 @media(max-width:700px){
+  /* Taller on a phone: the map is read vertically by price, so height is the
+     dimension that carries the information here, not width. */
+  .liq-chart-wrap{min-height:440px}
+  .liq-svg{height:440px}
+  .liq-chart-wrap:after{width:72px}
   .liq-bias{grid-template-columns:1fr;gap:12px}
   .liq-bias-price{text-align:left}
   .liq-controls{flex-direction:column;align-items:flex-start}
