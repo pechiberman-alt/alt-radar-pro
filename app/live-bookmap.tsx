@@ -2609,8 +2609,16 @@ export default function LiveBookmap({
           <div className="chart-legend-overlay premium-heat-legend">
             <b>INTENSIDAD</b><span>BAJA</span><i /><span>ALTA</span><em>ÓRDENES LÍMITE OBSERVADAS · NO ES LIQUIDACIÓN</em>
           </div>
+          {/* A phone has no wheel and no shift key, so the pointer version of
+              this help was instructions for hardware the reader doesn't have.
+              Both are rendered and CSS picks the one that applies. */}
           <div id="bookmap-gesture-help" className="chart-gesture-help">
-            RUEDA: ZOOM TIEMPO · SHIFT+RUEDA: PRECIO · ARRASTRAR: MOVER · PINZA: ZOOM · DOBLE TOQUE: LIVE
+            <span className="gesture-pointer">
+              RUEDA: ZOOM TIEMPO · SHIFT+RUEDA: PRECIO · ARRASTRAR: MOVER · DOBLE CLIC: LIVE
+            </span>
+            <span className="gesture-touch">
+              PINZA: ZOOM · ARRASTRAR: MOVER · DOBLE TOQUE: LIVE
+            </span>
           </div>
           {showFootprintNumbers && (
             <div className="chart-footprint-numbers" aria-label="Footprint numérico de ejecuciones reales">

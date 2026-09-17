@@ -349,3 +349,47 @@
   .app-header { background: rgba(3, 8, 6, .97); }
   .mobile-nav { bottom: max(5px, env(safe-area-inset-bottom)); }
 }
+
+/* ---------------------------------------------------------------------------
+   Order-flow chart on a phone.
+
+   The viewport controls were absolutely positioned over the top of the chart
+   stage, which on a narrow screen put them on top of the panel heading — the
+   heading lost, and the controls themselves ran under the price scale. They
+   sit in normal flow here instead: nothing overlaps, and the chart keeps its
+   full height below them.
+   --------------------------------------------------------------------------- */
+@media (max-width: 700px) {
+  .orderflow-terminal .chart-viewport-controls {
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    width: 100%;
+    margin: 0 0 6px;
+    border-radius: 0;
+    border-inline: 0;
+    box-shadow: none;
+  }
+  /* With the controls no longer floating, these overlays no longer need to
+     dodge them. */
+  .orderflow-terminal .interactive-chart .chart-live-badge,
+  .orderflow-terminal .interactive-chart .liquidity-coverage-warning {
+    top: 8px;
+  }
+
+  .gesture-pointer { display: none; }
+  .chart-gesture-help {
+    left: 8px;
+    right: 8px;
+    bottom: 6px;
+    text-align: center;
+  }
+}
+
+/* Touch help only shows where touch is the actual input. */
+.gesture-touch { display: none; }
+@media (pointer: coarse) {
+  .gesture-pointer { display: none; }
+  .gesture-touch { display: inline; }
+}

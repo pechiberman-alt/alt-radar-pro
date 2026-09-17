@@ -66,12 +66,23 @@ export type HeatBucket = {
   shortDensity: number;
   /** 0–100, normalised against the busiest bucket in the whole map. */
   intensity: number;
+  /**
+   * Index of the earliest candle whose volume feeds this zone. A liquidation
+   * level does not exist before the positions behind it were opened, so the
+   * chart draws each zone starting here rather than as a bar pinned to the
+   * right edge — which is both truer to how the level came to exist and how a
+   * reader expects to see it laid out against the candles.
+   */
+  formedAt: number;
 };
 
 export type LiquidationHeatmap = {
   symbol: string;
   currentPrice: number;
   binSize: number;
+  /** How many candles fed the volume profile, so `formedAt` can be read as a
+   *  fraction of the lookback regardless of how many candles the chart draws. */
+  profileCandles: number;
   buckets: HeatBucket[];
   /** Densest bucket above price — where a rally would find the most short-liquidation fuel. */
   topZoneAbove: HeatBucket | null;
@@ -92,17 +103,24 @@ function chooseBinSize(price: number): number {
   return Math.max(magnitude, 1e-8);
 }
 
+/**
+ * Volume per price bin, plus the index of the earliest candle that put volume
+ * there — the chart needs to know when a level came into existence, not only
+ * how heavy it is.
+ */
+export type ProfileBin = { volume: number; firstIndex: number };
+
 export function buildVolumeProfile(
   candles: SwingCandle[],
   binSize: number,
-): Map<number, number> {
-  const profile = new Map<number, number>();
-  for (const candle of candles) {
+): Map<number, ProfileBin> {
+  const profile = new Map<number, ProfileBin>();
+  candles.forEach((candle, candleIndex) => {
     const { low, high, volume } = candle;
     if (!(high > low) || !(volume > 0)) {
       // A doji or a zero-volume gap has nowhere meaningful to spread across;
       // skip it rather than dump its volume on one arbitrary bin.
-      continue;
+      return;
     }
     const firstBin = Math.floor(low / binSize);
     const lastBin = Math.floor(high / binSize);
@@ -113,9 +131,15 @@ export function buildVolumeProfile(
       const overlap = Math.max(0, binHigh - binLow);
       if (overlap <= 0) continue;
       const share = volume * (overlap / span);
-      profile.set(bin, (profile.get(bin) ?? 0) + share);
+      const existing = profile.get(bin);
+      if (existing) {
+        existing.volume += share;
+        existing.firstIndex = Math.min(existing.firstIndex, candleIndex);
+      } else {
+        profile.set(bin, { volume: share, firstIndex: candleIndex });
+      }
     }
-  }
+  });
   return profile;
 }
 
@@ -133,23 +157,27 @@ export function buildLiquidationHeatmap(
 
   const lowBound = currentPrice * (1 - priceRangePct);
   const highBound = currentPrice * (1 + priceRangePct);
-  const density = new Map<number, { long: number; short: number }>();
+  const density = new Map<number, { long: number; short: number; formedAt: number }>();
 
-  const addDensity = (price: number, long: number, short: number) => {
+  const addDensity = (price: number, long: number, short: number, formedAt: number) => {
     if (price < lowBound || price > highBound) return;
     const bin = Math.round(price / binSize);
-    const existing = density.get(bin) ?? { long: 0, short: 0 };
-    existing.long += long;
-    existing.short += short;
-    density.set(bin, existing);
+    const existing = density.get(bin);
+    if (existing) {
+      existing.long += long;
+      existing.short += short;
+      existing.formedAt = Math.min(existing.formedAt, formedAt);
+    } else {
+      density.set(bin, { long, short, formedAt });
+    }
   };
 
-  for (const [entryBin, volume] of volumeProfile) {
+  for (const [entryBin, bin] of volumeProfile) {
     const entryPrice = (entryBin + 0.5) * binSize;
     for (const tier of LEVERAGE_TIERS) {
-      const weighted = volume * tier.weight;
-      addDensity(longLiquidationPrice(entryPrice, tier.leverage), weighted, 0);
-      addDensity(shortLiquidationPrice(entryPrice, tier.leverage), 0, weighted);
+      const weighted = bin.volume * tier.weight;
+      addDensity(longLiquidationPrice(entryPrice, tier.leverage), weighted, 0, bin.firstIndex);
+      addDensity(shortLiquidationPrice(entryPrice, tier.leverage), 0, weighted, bin.firstIndex);
     }
   }
 
@@ -165,6 +193,7 @@ export function buildLiquidationHeatmap(
       longDensity: entry.long,
       shortDensity: entry.short,
       intensity: peak > 0 ? ((entry.long + entry.short) / peak) * 100 : 0,
+      formedAt: entry.formedAt,
     }))
     .sort((a, b) => a.price - b.price);
 
@@ -209,6 +238,7 @@ export function buildLiquidationHeatmap(
     symbol,
     currentPrice,
     binSize,
+    profileCandles: candles.length,
     buckets,
     topZoneAbove,
     topZoneBelow,
