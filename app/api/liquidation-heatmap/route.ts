@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { fetchHistoricalCandles } from "@/lib/klines-history";
 import { buildLiquidationHeatmap } from "@/lib/liquidation-heatmap";
 
@@ -14,10 +14,16 @@ const PROFILES: Record<string, { interval: string; limit: number }> = {
   "1d": { interval: "1d", limit: 365 }, // ~1 year
 };
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const symbol = (url.searchParams.get("symbol") || "BTCUSDT").toUpperCase();
-  const timeframe = url.searchParams.get("timeframe") || "1h";
+export async function GET(request: NextRequest) {
+  // Every other route in this project reads its query string via
+  // `request.nextUrl.searchParams`, never via `new URL(request.url)` — the
+  // one route that did (this one) came back "NO DISPONIBLE" for every real
+  // request once deployed. Matching the established, already-proven pattern
+  // here rather than guessing further at why the other one failed only in
+  // production, where it can't be reproduced directly.
+  const params = request.nextUrl.searchParams;
+  const symbol = (params.get("symbol") || "BTCUSDT").toUpperCase();
+  const timeframe = params.get("timeframe") || "1h";
 
   if (!SYMBOLS.has(symbol)) {
     return NextResponse.json({ error: "SÍMBOLO NO SOPORTADO" }, { status: 400 });
