@@ -1,10 +1,68 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { HeatBucket, LiquidationHeatmap } from "@/lib/liquidation-heatmap";
+import {
+  buildLiquidationHeatmap,
+  type HeatBucket,
+  type LiquidationHeatmap,
+} from "@/lib/liquidation-heatmap";
+import { parseSwingKlines } from "@/lib/swing-entries";
 
 type DisplayCandle = { time: number; open: number; high: number; low: number; close: number };
 type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; timeframe: string };
+
+/**
+ * Candles come from the browser, and the map is built here rather than on the
+ * Worker.
+ *
+ * Binance blocks datacenter addresses on the klines endpoint — api/klines.ts
+ * documents this, and it is why that route exists with a browser-contribution
+ * fallback at all. The server-side version of this panel therefore returned
+ * "SIN DATOS SUFICIENTES" on every single request in production while working
+ * perfectly in local tests, because a test machine is not a datacenter IP.
+ *
+ * Visitors on ordinary connections are not blocked, so the fetch happens here,
+ * the same way the comparison, correlation and market-brain panels already do
+ * it. buildLiquidationHeatmap is pure arithmetic with no server dependency, so
+ * it runs the same in both places.
+ */
+const BROWSER_BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
+
+/** Candles per timeframe for the volume profile that feeds the map. */
+const LOOKBACK: Record<string, number> = { "15m": 500, "1h": 500, "4h": 500, "1d": 365 };
+
+async function loadRows(symbol: string, interval: string, limit: number, signal: AbortSignal) {
+  const path = `/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`;
+  for (const base of BROWSER_BASES) {
+    try {
+      const response = await fetch(`${base}${path}`, { signal });
+      if (!response.ok) continue;
+      const rows = await response.json();
+      if (Array.isArray(rows) && rows.length) {
+        // Hand the series to the Worker so a rate-limited visitor still gets a
+        // map — the same contribution mechanism /api/klines already runs on.
+        void fetch(`/api/klines?symbol=${symbol}&interval=${interval}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(rows.slice(-500)),
+        }).catch(() => undefined);
+        return rows;
+      }
+    } catch {
+      // Try the next mirror, then the Worker.
+    }
+  }
+
+  // This visitor is throttled or offline: fall back to whatever the Worker has,
+  // which may be a series another visitor contributed.
+  const proxied = await fetch(
+    `/api/klines?symbol=${symbol}&interval=${interval}&limit=500`,
+    { signal, cache: "no-store" },
+  );
+  if (!proxied.ok) return null;
+  const rows = await proxied.json();
+  return Array.isArray(rows) && rows.length ? rows : null;
+}
 
 const SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
 const TIMEFRAMES: { id: string; label: string }[] = [
@@ -73,23 +131,61 @@ export default function LiquidationHeatmapDesk() {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     let alive = true;
-    fetch(`/api/liquidation-heatmap?symbol=${symbol}&timeframe=${timeframe}`, {
-      cache: "no-store",
-    })
-      .then(async (response) => {
+
+    (async () => {
+      try {
+        const interval = timeframe === "1d" ? "1d" : timeframe;
+        const rows = await loadRows(
+          symbol,
+          interval,
+          LOOKBACK[timeframe] ?? 500,
+          controller.signal,
+        );
         if (!alive) return;
-        if (!response.ok) {
+        if (!rows) {
           setError("MAPA NO DISPONIBLE");
           setData(null);
           return;
         }
-        setData((await response.json()) as ApiResponse);
-      })
-      .catch(() => alive && setError("MAPA NO DISPONIBLE"))
-      .finally(() => alive && setLoading(false));
+
+        const candles = parseSwingKlines(rows);
+        if (candles.length < 20) {
+          setError("SIN VELAS SUFICIENTES");
+          setData(null);
+          return;
+        }
+
+        const currentPrice = candles.at(-1)!.close;
+        const heatmap = buildLiquidationHeatmap(symbol, candles, currentPrice);
+        if (!heatmap) {
+          setError("MAPA NO DISPONIBLE");
+          setData(null);
+          return;
+        }
+
+        setData({
+          heatmap,
+          candles: candles.slice(-90).map((candle) => ({
+            time: candle.openTime,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+          })),
+          timeframe,
+        });
+      } catch {
+        if (alive) setError("MAPA NO DISPONIBLE");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
     return () => {
       alive = false;
+      controller.abort();
     };
   }, [symbol, timeframe]);
 
