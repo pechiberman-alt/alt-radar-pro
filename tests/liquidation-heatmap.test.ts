@@ -275,3 +275,86 @@ test("the legacy numeric third argument still means priceRangePct", () => {
   assert.ok(legacy && explicit);
   assert.equal(legacy.buckets.length, explicit.buckets.length);
 });
+
+/* ── v3: decaimiento temporal y escala por open interest ── */
+
+test("decay makes recent activity outweigh identical older activity", () => {
+  // Same volume at two bands: one early in the window, one at the end. With
+  // decay on, the recent band must dominate; without it, they tie.
+  const candles = [
+    ...Array.from({ length: 40 }, (_, i) => candle(i, 94_900, 95_100, 100)),
+    ...Array.from({ length: 40 }, (_, i) => candle(40 + i, 105_000, 105_200, 100)),
+  ];
+
+  const flat = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
+  const decayed = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, {
+    halfLifeCandles: 10,
+  });
+  assert.ok(flat && decayed);
+
+  assert.equal(flat.halfLifeCandles, null);
+  assert.equal(decayed.halfLifeCandles, 10);
+
+  const share = (map: NonNullable<typeof decayed>) => {
+    const aboveFuel = map.buckets
+      .filter((b) => b.price > 100_000)
+      .reduce((sum, b) => sum + b.shortDensity, 0);
+    const belowFuel = map.buckets
+      .filter((b) => b.price < 100_000)
+      .reduce((sum, b) => sum + b.longDensity, 0);
+    return aboveFuel / (aboveFuel + belowFuel);
+  };
+
+  assert.ok(
+    share(decayed) > share(flat),
+    "con decaimiento la banda reciente (arriba) debe pesar relativamente más",
+  );
+  assert.match(decayed.method, /cada 10 velas/);
+});
+
+test("decay still applies to candles that fall back to volume", () => {
+  // OI missing everywhere: the fallback path must decay too, or old volume
+  // would quietly outrank recent OI-backed activity.
+  const candles = Array.from({ length: 30 }, (_, i) => candle(i, 104_900, 105_100, 100));
+  const decayed = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, {
+    halfLifeCandles: 5,
+    oiDeltaByIndex: candles.map(() => null),
+  });
+  assert.ok(decayed);
+  assert.equal(decayed.oiWeightedCandles, 0);
+  assert.ok(decayed.buckets.length > 0, "el fallback por volumen sigue produciendo mapa");
+});
+
+test("buckets carry a dollar figure only when total open interest is supplied", () => {
+  const candles = Array.from({ length: 20 }, (_, i) => candle(i, 104_900, 105_100, 200));
+
+  const unscaled = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
+  assert.ok(unscaled);
+  assert.equal(unscaled.totalOpenInterestUsd, null);
+  for (const bucket of unscaled.buckets) {
+    assert.equal(bucket.notionalUsd, null, "sin OI total no se inventa un monto");
+  }
+
+  const oiUsd = 12_000_000_000;
+  const scaled = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, {
+    totalOpenInterestUsd: oiUsd,
+  });
+  assert.ok(scaled);
+  assert.equal(scaled.totalOpenInterestUsd, oiUsd);
+  const summed = scaled.buckets.reduce((sum, b) => sum + (b.notionalUsd ?? 0), 0);
+  assert.ok(
+    Math.abs(summed - oiUsd) < oiUsd * 1e-6,
+    `los montos deben repartir exactamente el OI total (sumaron ${summed})`,
+  );
+  assert.match(scaled.method, /open interest total actual/);
+});
+
+test("a non-positive open interest total is ignored rather than producing zero dollars", () => {
+  const candles = Array.from({ length: 12 }, (_, i) => candle(i, 104_900, 105_100, 150));
+  const map = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, {
+    totalOpenInterestUsd: 0,
+  });
+  assert.ok(map);
+  assert.equal(map.totalOpenInterestUsd, null);
+  assert.equal(map.buckets[0]?.notionalUsd, null);
+});

@@ -85,3 +85,19 @@
 @media(max-width:700px){
   .liq-upgrades{grid-template-columns:1fr;gap:6px}
 }
+
+.liq-zones{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.liq-zones>div{display:grid;gap:3px;padding:11px 13px;background:#0a110d;border:1px solid var(--line);border-radius:4px}
+.liq-zones>div.up{border-left:2px solid var(--green)}
+.liq-zones>div.down{border-left:2px solid var(--red)}
+.liq-zones span{font:8px var(--font-mono);letter-spacing:1px;color:var(--muted)}
+.liq-zones b{font:16px var(--font-mono);color:var(--text)}
+.liq-zones b.none{font-size:11px;color:var(--muted)}
+.liq-zones em{font-style:normal;font:9px var(--font-mono);color:var(--green2)}
+.liq-zones>div.down em{color:#c8737d}
+.liq-tooltip-usd{font:13px var(--font-mono)!important;color:var(--amber)!important}
+
+@media(max-width:700px){
+  .liq-zones{grid-template-columns:1fr;gap:6px}
+  .liq-zones b{font-size:14px}
+}
