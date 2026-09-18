@@ -346,45 +346,12 @@ export default function LiquidationHeatmapDesk() {
         </span>
       </div>
 
-      {/* Stated before a single bar renders — this is never confirmed data. */}
-      <div className="liq-lag">
-        <b>ESTIMACIÓN, NO LIQUIDACIONES CONFIRMADAS</b>
-        <span>
-          Ningún exchange publica el apalancamiento real de cada posición, así que ninguna
-          herramienta —ni las pagas— puede mostrarte clusters reales. Este mapa proyecta dónde
-          liquidaría una posición abierta en cada nivel, bajo una distribución asumida de
-          apalancamientos. Es un modelo estándar del sector, no una medición: tratalo como zonas de
-          interés, no como niveles garantizados.
-        </span>
-      </div>
-
-      {/* Three things this engine does that the naive version of this chart
-          does not — stated where the reader can check them, since they are the
-          difference between a plausible-looking picture and a defensible one. */}
-      <div className="liq-upgrades">
-        <div>
-          <b>POSICIONES ABIERTAS, NO OPERADAS</b>
-          <span>
-            Donde hay datos de open interest, el peso de cada nivel es el alta real de contratos, no
-            el volumen. El volumen cuenta abrir y cerrar como dos eventos aunque no quede nada
-            abierto.
-          </span>
-        </div>
-        <div>
-          <b>ZONAS YA BARRIDAS SE DESCARTAN</b>
-          <span>
-            Si el precio ya atravesó un nivel después de que se formó, esa posición ya se liquidó.
-            Dejarla en el mapa sería mostrar combustible que no existe.
-          </span>
-        </div>
-        <div>
-          <b>MARGEN REAL DE BINANCE</b>
-          <span>
-            BTC y ETH usan la tasa de mantenimiento publicada por Binance para el primer tramo, no
-            un número redondo. El resto usa un estimado, y el panel lo aclara abajo.
-          </span>
-        </div>
-      </div>
+      {/* One line up top so nobody reads a single bar as fact; the full
+          explanation sits under the chart, where it does not push the map
+          itself off a phone screen. */}
+      <p className="liq-flag">
+        <b>MODELO ESTIMADO</b> · ningún exchange publica el apalancamiento real de cada posición
+      </p>
 
       <div className="liq-controls">
         <div className="liq-symbols">
@@ -587,6 +554,46 @@ export default function LiquidationHeatmapDesk() {
               Densidad de liquidación (verde → rojo)
             </span>
           </div>
+
+      {/* Stated before a single bar renders — this is never confirmed data. */}
+      <div className="liq-lag">
+        <b>ESTIMACIÓN, NO LIQUIDACIONES CONFIRMADAS</b>
+        <span>
+          Ningún exchange publica el apalancamiento real de cada posición, así que ninguna
+          herramienta —ni las pagas— puede mostrarte clusters reales. Este mapa proyecta dónde
+          liquidaría una posición abierta en cada nivel, bajo una distribución asumida de
+          apalancamientos. Es un modelo estándar del sector, no una medición: tratalo como zonas de
+          interés, no como niveles garantizados.
+        </span>
+      </div>
+
+      {/* Three things this engine does that the naive version of this chart
+          does not — stated where the reader can check them, since they are the
+          difference between a plausible-looking picture and a defensible one. */}
+      <div className="liq-upgrades">
+        <div>
+          <b>POSICIONES ABIERTAS, NO OPERADAS</b>
+          <span>
+            Donde hay datos de open interest, el peso de cada nivel es el alta real de contratos, no
+            el volumen. El volumen cuenta abrir y cerrar como dos eventos aunque no quede nada
+            abierto.
+          </span>
+        </div>
+        <div>
+          <b>ZONAS YA BARRIDAS SE DESCARTAN</b>
+          <span>
+            Si el precio ya atravesó un nivel después de que se formó, esa posición ya se liquidó.
+            Dejarla en el mapa sería mostrar combustible que no existe.
+          </span>
+        </div>
+        <div>
+          <b>MARGEN REAL DE BINANCE</b>
+          <span>
+            BTC y ETH usan la tasa de mantenimiento publicada por Binance para el primer tramo, no
+            un número redondo. El resto usa un estimado, y el panel lo aclara abajo.
+          </span>
+        </div>
+      </div>
 
           <p className="liq-method">
             <b>Cómo se calcula.</b> {data.heatmap.method} {data.heatmap.assumptions}

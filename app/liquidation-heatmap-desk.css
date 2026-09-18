@@ -1,10 +1,13 @@
 .liq-desk{display:block}
 
-.liq-lag{display:grid;gap:4px;margin:14px 0 16px;padding:12px 14px;background:#141207;border:1px solid #5c4a1c;border-left:3px solid var(--amber);border-radius:4px}
+.liq-flag{margin:12px 0 12px;padding:8px 11px;background:#141207;border:1px solid #5c4a1c;border-left:3px solid var(--amber);border-radius:4px;font:9px var(--font-mono);line-height:1.6;color:#a8a294}
+.liq-flag b{color:var(--amber);letter-spacing:1px}
+
+.liq-lag{display:grid;gap:4px;margin:20px 0 0;padding:12px 14px;background:#141207;border:1px solid #5c4a1c;border-left:3px solid var(--amber);border-radius:4px}
 .liq-lag b{font:9px var(--font-mono);letter-spacing:1.2px;color:var(--amber)}
 .liq-lag span{font:10px var(--font-mono);line-height:1.65;color:#a8a294}
 
-.liq-controls{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.liq-controls{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .liq-symbols,.liq-timeframes{display:flex;gap:5px}
 .liq-symbols button,.liq-timeframes button{background:#0c130f;border:1px solid var(--line);border-radius:3px;padding:7px 11px;color:var(--muted);font:10px var(--font-mono);cursor:pointer}
 .liq-symbols button.active,.liq-timeframes button.active{color:var(--green);border-color:#2d6a4d;background:#0c251a}
@@ -14,7 +17,7 @@
 .liq-empty b{font:11px var(--font-mono);letter-spacing:1.2px;color:var(--red)}
 .liq-empty span{font:10px var(--font-mono);color:var(--muted)}
 
-.liq-bias{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;padding:16px 18px;margin-bottom:16px;border:1px solid var(--line);border-radius:5px;background:linear-gradient(180deg,#0b120e,#080d0b)}
+.liq-bias{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;padding:14px 16px;margin-bottom:12px;border:1px solid var(--line);border-radius:5px;background:linear-gradient(180deg,#0b120e,#080d0b)}
 .liq-bias>div:first-child span{font:9px var(--font-mono);letter-spacing:1.3px;color:var(--muted)}
 .liq-bias h3{margin:6px 0 7px!important;font:19px var(--font-sans)!important;letter-spacing:-.3px}
 .liq-bias p{margin:0;font:10px var(--font-mono);line-height:1.6;color:#9aa7a0;max-width:56ch}
@@ -62,8 +65,10 @@
 @media(max-width:700px){
   /* Taller on a phone: the map is read vertically by price, so height is the
      dimension that carries the information here, not width. */
-  .liq-chart-wrap{min-height:440px}
-  .liq-svg{height:440px}
+  /* The map is the point of this panel: on a phone it gets real height
+     rather than a letterbox strip, since it is read vertically by price. */
+  .liq-chart-wrap{min-height:520px}
+  .liq-svg{height:520px}
   .liq-chart-wrap:after{width:72px}
   .liq-bias{grid-template-columns:1fr;gap:12px}
   .liq-bias-price{text-align:left}
@@ -72,7 +77,7 @@
   .liq-legend{flex-wrap:wrap;gap:10px 16px}
 }
 
-.liq-upgrades{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.liq-upgrades{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .liq-upgrades>div{display:grid;gap:4px;padding:11px 12px;background:#0a110d;border:1px solid var(--line);border-left:2px solid var(--green2);border-radius:4px}
 .liq-upgrades b{font:8px var(--font-mono);letter-spacing:1.1px;color:var(--green)}
 .liq-upgrades span{font:9px var(--font-mono);line-height:1.65;color:#8e9c94}
