@@ -453,3 +453,85 @@ export function buildLiquidationHeatmap(
     assumptions: `Apalancamientos considerados: ${tiers.map((t) => `${t.leverage}x`).join(", ")} (${tierLabel}). Margen de mantenimiento: ${(mmr * 100).toFixed(2)}% ${TIER1_MAINTENANCE_MARGIN_RATE[symbol] ? "(tasa real de Binance, tramo 1)" : "(estimado, sin tabla oficial confirmada para este símbolo)"}.`,
   };
 }
+
+/**
+ * Confluence between a swing level and a liquidation cluster.
+ *
+ * A dense zone on its own says where forced orders would land. A prior swing
+ * high or low on its own says where the market already turned. Where the two
+ * coincide is the level worth naming: resting stop orders from the swing sit
+ * in the same place as the projected liquidations, so a move that reaches it
+ * has two sources of fuel rather than one.
+ *
+ * This is a structural observation about the two inputs, not a prediction —
+ * the same caveat that governs the rest of this module.
+ */
+export type KeyLevel = {
+  price: number;
+  kind: "TECHO" | "PISO";
+  /** 0–100 intensity of the liquidation cluster sitting at this level. */
+  intensity: number;
+  notionalUsd: number | null;
+  /** How many separate swing points landed in this band. */
+  touches: number;
+  note: string;
+};
+
+export function findKeyLevels(
+  heatmap: LiquidationHeatmap,
+  pivotHighs: { price: number }[],
+  pivotLows: { price: number }[],
+  /** How close a pivot must be to a cluster to count as the same level. */
+  tolerancePct = 0.004,
+): KeyLevel[] {
+  if (!heatmap.buckets.length) return [];
+
+  // Only clusters with real weight can anchor a key level; a faint bucket
+  // near a pivot is a coincidence, not a confluence.
+  const strong = heatmap.buckets.filter((bucket) => bucket.intensity >= 25);
+  if (!strong.length) return [];
+
+  const levels: KeyLevel[] = [];
+  const seen: number[] = [];
+
+  const consider = (pivots: { price: number }[], kind: KeyLevel["kind"]) => {
+    for (const pivot of pivots) {
+      const tolerance = pivot.price * tolerancePct;
+      const match = strong.find((bucket) => Math.abs(bucket.price - pivot.price) <= tolerance);
+      if (!match) continue;
+
+      // Collapse pivots that describe the same band into one level, counting
+      // the touches — a level tested three times matters more than one tested
+      // once, and listing it three times would just be noise.
+      const existing = levels.find(
+        (level) => level.kind === kind && Math.abs(level.price - match.price) <= tolerance,
+      );
+      if (existing) {
+        existing.touches += 1;
+        continue;
+      }
+      if (seen.some((price) => Math.abs(price - match.price) <= tolerance)) continue;
+      seen.push(match.price);
+
+      levels.push({
+        price: match.price,
+        kind,
+        intensity: match.intensity,
+        notionalUsd: match.notionalUsd,
+        touches: 1,
+        note:
+          kind === "TECHO"
+            ? "Máximo previo con liquidaciones de cortos en el mismo nivel: los stops de quien vendió ahí y las liquidaciones proyectadas coinciden."
+            : "Mínimo previo con liquidaciones de largos en el mismo nivel: los stops de quien compró ahí y las liquidaciones proyectadas coinciden.",
+      });
+    }
+  };
+
+  consider(pivotHighs, "TECHO");
+  consider(pivotLows, "PISO");
+
+  // Strongest first: intensity, then how many times the level was tested.
+  return levels
+    .sort((a, b) => b.intensity * (1 + b.touches * 0.2) - a.intensity * (1 + a.touches * 0.2))
+    .slice(0, 6);
+}

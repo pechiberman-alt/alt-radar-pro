@@ -358,3 +358,56 @@ test("a non-positive open interest total is ignored rather than producing zero d
   assert.equal(map.totalOpenInterestUsd, null);
   assert.equal(map.buckets[0]?.notionalUsd, null);
 });
+
+/* ── v4: niveles clave por confluencia ── */
+
+test("a pivot on top of a dense cluster becomes a key level", async () => {
+  const { findKeyLevels } = await import("../lib/liquidation-heatmap.ts");
+  const candles = Array.from({ length: 20 }, (_, i) => candle(i, 104_900, 105_100, 300));
+  const heatmap = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
+  assert.ok(heatmap);
+
+  const densest = [...heatmap.buckets].sort((a, b) => b.intensity - a.intensity)[0];
+  const levels = findKeyLevels(heatmap, [{ price: densest.price }], []);
+  assert.equal(levels.length, 1);
+  assert.equal(levels[0].kind, "TECHO");
+  assert.ok(Math.abs(levels[0].price - densest.price) < densest.price * 0.005);
+});
+
+test("a pivot far from any cluster is not a key level", async () => {
+  const { findKeyLevels } = await import("../lib/liquidation-heatmap.ts");
+  const candles = Array.from({ length: 20 }, (_, i) => candle(i, 104_900, 105_100, 300));
+  const heatmap = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
+  assert.ok(heatmap);
+  // A price nowhere near the projected levels.
+  assert.deepEqual(findKeyLevels(heatmap, [{ price: 99_999_999 }], []), []);
+});
+
+test("repeated pivots at one band count as touches instead of duplicate levels", async () => {
+  const { findKeyLevels } = await import("../lib/liquidation-heatmap.ts");
+  const candles = Array.from({ length: 20 }, (_, i) => candle(i, 104_900, 105_100, 300));
+  const heatmap = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
+  assert.ok(heatmap);
+
+  const densest = [...heatmap.buckets].sort((a, b) => b.intensity - a.intensity)[0];
+  const levels = findKeyLevels(
+    heatmap,
+    [{ price: densest.price }, { price: densest.price * 1.0005 }, { price: densest.price * 0.9997 }],
+    [],
+  );
+  assert.equal(levels.length, 1, "un mismo nivel no se lista tres veces");
+  assert.equal(levels[0].touches, 3);
+});
+
+test("an empty heatmap yields no key levels rather than throwing", async () => {
+  const { findKeyLevels } = await import("../lib/liquidation-heatmap.ts");
+  const empty = {
+    ...(buildLiquidationHeatmap(
+      "BTCUSDT",
+      Array.from({ length: 10 }, (_, i) => candle(i, 104_900, 105_100, 100)),
+      100_000,
+    ) as NonNullable<ReturnType<typeof buildLiquidationHeatmap>>),
+    buckets: [],
+  };
+  assert.deepEqual(findKeyLevels(empty, [{ price: 100_000 }], [{ price: 99_000 }]), []);
+});

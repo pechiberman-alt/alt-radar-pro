@@ -134,3 +134,19 @@
   .liq-magnet-label{font-size:13px}
   .liq-axis-label{font-size:12px}
 }
+
+.liq-zoom{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:6px}
+.liq-zoom button{width:34px;height:30px;background:#0c130f;border:1px solid var(--line);border-radius:4px;color:var(--green);font:15px var(--font-mono);line-height:1;cursor:pointer}
+.liq-zoom button:hover:not(:disabled){border-color:#2d6a4d;background:#0c251a}
+.liq-zoom button:disabled{opacity:.35;cursor:default}
+.liq-zoom span{font:9px var(--font-mono);color:var(--muted);min-width:64px;text-align:right}
+
+.liq-keys{margin-top:14px;padding:12px 13px;background:#0a110d;border:1px solid var(--line);border-radius:4px}
+.liq-keys h4{margin:0 0 6px;font:9px var(--font-mono);letter-spacing:1.3px;color:var(--green2)}
+.liq-keys-why{margin:0 0 10px;font:9px var(--font-mono);line-height:1.65;color:var(--muted)}
+.liq-keys>div{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid #16201b;font:11px var(--font-mono)}
+.liq-keys>div b{font:8px var(--font-mono);letter-spacing:1px}
+.liq-keys>div.techo b{color:var(--red)}
+.liq-keys>div.piso b{color:var(--green)}
+.liq-keys u{text-decoration:none;color:var(--text)}
+.liq-keys em{font-style:normal;font-size:9px;color:var(--muted);text-align:right}
