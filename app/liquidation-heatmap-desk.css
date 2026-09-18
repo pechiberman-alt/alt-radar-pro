@@ -95,6 +95,10 @@
 .liq-zones>div.down em{color:#c8737d}
 .liq-tooltip-usd{font:13px var(--font-mono)!important;color:var(--amber)!important}
 
+@media(max-width:480px){
+  .liq-pinch{display:none!important}
+}
+
 @media(max-width:700px){
   .liq-zones{grid-template-columns:1fr;gap:6px}
   .liq-zones b{font-size:14px}
@@ -135,11 +139,15 @@
   .liq-axis-label{font-size:12px}
 }
 
-.liq-zoom{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:6px}
-.liq-zoom button{width:34px;height:30px;background:#0c130f;border:1px solid var(--line);border-radius:4px;color:var(--green);font:15px var(--font-mono);line-height:1;cursor:pointer}
+/* The buttons must never be pushed off-screen by the label beside them: they
+   keep a fixed size and the text takes whatever is left, truncating if it has
+   to. Before this, the label grew with the timestamp and shoved the "+" past
+   the right edge on a phone. */
+.liq-zoom{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:6px;width:100%;min-width:0}
+.liq-zoom button{flex:0 0 auto;width:38px;height:32px;background:#0c130f;border:1px solid var(--line);border-radius:4px;color:var(--green);font:15px var(--font-mono);line-height:1;cursor:pointer}
 .liq-zoom button:hover:not(:disabled){border-color:#2d6a4d;background:#0c251a}
 .liq-zoom button:disabled{opacity:.35;cursor:default}
-.liq-zoom span{font:9px var(--font-mono);color:var(--muted);min-width:64px;text-align:right}
+.liq-zoom span{flex:1 1 auto;min-width:0;font:9px var(--font-mono);color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .liq-keys{margin-top:14px;padding:12px 13px;background:#0a110d;border:1px solid var(--line);border-radius:4px}
 .liq-keys h4{margin:0 0 6px;font:9px var(--font-mono);letter-spacing:1.3px;color:var(--green2)}
@@ -165,7 +173,20 @@
    listing pinch-zoom here would hand it back to the browser, which is the
    thing being prevented. */
 .liq-chart-wrap{touch-action:pan-y}
-.liq-zoom span{min-width:auto}
+
 .liq-pinch{display:none;font-style:normal;margin-left:6px;color:#5d6b64}
 @media (pointer: coarse){ .liq-pinch{display:inline} }
 .liq-updated{font-style:normal;margin-left:6px;color:var(--green2)}
+
+/* ── Overflow guards ──
+   Same failure mode as the zoom row, caught before it shipped: a grid or flex
+   child defaults to min-width:auto, so long content pushes the container wider
+   than the screen instead of wrapping or truncating. */
+.liq-legend{flex-wrap:wrap;min-width:0}
+.liq-legend span{min-width:0}
+.liq-bias,.liq-bias>div,.liq-zones>div,.liq-keys>div{min-width:0}
+.liq-bias p{max-width:100%}
+.liq-zones b,.liq-zones em,.liq-keys u{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.liq-desk,.liq-summary,.liq-controls{min-width:0;max-width:100%}
+/* Nothing in the panel may force a horizontal scrollbar on the page. */
+.liq-desk{overflow-x:hidden}
