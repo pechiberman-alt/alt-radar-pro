@@ -30,12 +30,11 @@
 .liq-bias-price span{display:block;font:8px var(--font-mono);letter-spacing:1px;color:var(--muted)}
 .liq-bias-price b{font:16px var(--font-mono);color:var(--text)}
 
-.liq-chart-wrap{position:relative;border:1px solid var(--line);border-radius:5px;background:linear-gradient(180deg,#080f0c,#050908);overflow:hidden}
+.liq-chart-wrap{position:relative;height:60vh;min-height:400px;max-height:640px;border:1px solid var(--line);border-radius:5px;background:linear-gradient(180deg,#080f0c,#050908);overflow:hidden}
 /* The price scale gets its own strip, the way a trading terminal reads: the
    numbers sit on a panel rather than floating over the plot. */
 .liq-chart-wrap:after{content:"";position:absolute;top:0;bottom:0;right:0;width:86px;background:#070d0b;border-left:1px solid var(--line);pointer-events:none;z-index:0}
-.liq-svg{position:relative;z-index:1}
-.liq-svg{display:block;width:100%;height:auto}
+.liq-svg{position:relative;z-index:1;display:block;width:100%;height:100%}
 .liq-grid{stroke:#111a16;stroke-width:1}
 .liq-wick-up,.liq-wick-down{stroke-width:1.6}
 .liq-wick-up{stroke:var(--green)}
@@ -67,8 +66,7 @@
      dimension that carries the information here, not width. */
   /* The map is the point of this panel: on a phone it gets real height
      rather than a letterbox strip, since it is read vertically by price. */
-  .liq-chart-wrap{min-height:520px}
-  .liq-svg{height:520px}
+  .liq-chart-wrap{height:62vh;min-height:380px;max-height:620px}
   .liq-chart-wrap:after{width:72px}
   .liq-bias{grid-template-columns:1fr;gap:12px}
   .liq-bias-price{text-align:left}
@@ -119,8 +117,7 @@
   .liq-summary .liq-bias{margin-bottom:0;height:100%}
   .liq-summary .liq-zones{grid-template-columns:1fr;margin-bottom:0;align-content:stretch}
   .liq-summary .liq-zones>div{align-content:center}
-  .liq-chart-wrap{min-height:560px}
-  .liq-svg{height:560px}
+  .liq-chart-wrap{height:60vh;min-height:460px;max-height:680px}
   .liq-controls{margin-bottom:14px}
 }
 
@@ -128,14 +125,12 @@
 @media (min-width: 1400px){
   .liq-summary{grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) minmax(0,1fr)}
   .liq-summary .liq-zones{display:contents}
-  .liq-chart-wrap{min-height:620px}
-  .liq-svg{height:620px}
+  .liq-chart-wrap{height:64vh;min-height:520px;max-height:780px}
 }
 
 /* Phone: chart keeps real height, but the frame no longer carries dead bands. */
 @media (max-width:700px){
-  .liq-chart-wrap{min-height:430px}
-  .liq-svg{height:430px}
+  .liq-chart-wrap{height:62vh;min-height:380px;max-height:620px}
   .liq-magnet-label{font-size:13px}
   .liq-axis-label{font-size:12px}
 }
