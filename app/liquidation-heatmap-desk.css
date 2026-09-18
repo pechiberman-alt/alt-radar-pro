@@ -30,19 +30,19 @@
 .liq-bias-price span{display:block;font:8px var(--font-mono);letter-spacing:1px;color:var(--muted)}
 .liq-bias-price b{font:16px var(--font-mono);color:var(--text)}
 
-.liq-chart-wrap{position:relative;height:60vh;min-height:400px;max-height:640px;border:1px solid var(--line);border-radius:5px;background:linear-gradient(180deg,#080f0c,#050908);overflow:hidden}
+.liq-chart-wrap{position:relative;height:60vh;min-height:400px;max-height:640px;border:1px solid var(--line);border-radius:5px;background:linear-gradient(180deg,#0d1613,#0a110e);overflow:hidden}
 /* The price scale gets its own strip, the way a trading terminal reads: the
    numbers sit on a panel rather than floating over the plot. */
-.liq-chart-wrap:after{content:"";position:absolute;top:0;bottom:0;right:0;width:86px;background:#070d0b;border-left:1px solid var(--line);pointer-events:none;z-index:0}
+.liq-chart-wrap:after{content:"";position:absolute;top:0;bottom:0;right:0;width:86px;background:#0b1310;border-left:1px solid var(--line);pointer-events:none;z-index:0}
 .liq-svg{position:relative;z-index:1;display:block;width:100%;height:100%}
-.liq-grid{stroke:#111a16;stroke-width:1}
+.liq-grid{stroke:#1b2822;stroke-width:1}
 .liq-wick-up,.liq-wick-down{stroke-width:1.6}
 .liq-wick-up{stroke:var(--green)}
 .liq-wick-down{stroke:var(--red)}
 .liq-candle-up{fill:var(--green)}
 .liq-candle-down{fill:var(--red)}
 .liq-price-line{stroke:var(--amber);stroke-width:1;stroke-dasharray:4 3}
-.liq-axis-label{font:10px var(--font-mono);fill:#8e9c94}
+.liq-axis-label{font:10px var(--font-mono);fill:#a8b8b0}
 .liq-axis-x{text-anchor:middle}
 
 .liq-price-badge{position:absolute;right:2px;transform:translateY(-50%);background:var(--amber);color:#241a05;font:10px var(--font-mono);font-weight:700;padding:3px 7px;border-radius:3px;pointer-events:none}
@@ -150,3 +150,12 @@
 .liq-keys>div.piso b{color:var(--green)}
 .liq-keys u{text-decoration:none;color:var(--text)}
 .liq-keys em{font-style:normal;font-size:9px;color:var(--muted);text-align:right}
+
+/* With ~30 pairs the row must scroll cleanly under a thumb, and the active
+   chip has to stay findable once it is off-screen. */
+.liq-symbols{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;scrollbar-width:thin;-webkit-overflow-scrolling:touch;padding-bottom:4px;max-width:100%}
+.liq-symbols::-webkit-scrollbar{height:4px}
+.liq-symbols::-webkit-scrollbar-thumb{background:#24352c;border-radius:2px}
+.liq-symbols button{flex:0 0 auto;scroll-snap-align:start}
+.liq-symbols button.active{position:sticky;left:0;z-index:2;box-shadow:0 0 0 3px #060b09}
+.liq-controls{align-items:flex-start}

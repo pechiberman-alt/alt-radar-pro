@@ -69,10 +69,27 @@ const OI_PERIOD: Record<string, string | null> = {
 };
 
 async function loadRows(symbol: string, interval: string, limit: number, signal: AbortSignal) {
-  const path = `/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`;
+  const query = `symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`;
+
+  // Futures first, for two reasons. This map is entirely about futures
+  // positions, so futures candles are the right series to project from. And
+  // several liquid perpetuals — the 1000PEPE / 1000SHIB style contracts —
+  // have no spot pair at all, so a spot-only fetch would simply fail for them
+  // now that the selector offers the whole top-30.
+  for (const base of FUTURES_BASES) {
+    try {
+      const response = await fetch(`${base}/fapi/v1/klines?${query}`, { signal });
+      if (!response.ok) continue;
+      const rows = await response.json();
+      if (Array.isArray(rows) && rows.length) return rows;
+    } catch {
+      // Next mirror.
+    }
+  }
+
   for (const base of BROWSER_BASES) {
     try {
-      const response = await fetch(`${base}${path}`, { signal });
+      const response = await fetch(`${base}/api/v3/klines?${query}`, { signal });
       if (!response.ok) continue;
       const rows = await response.json();
       if (Array.isArray(rows) && rows.length) {
@@ -178,7 +195,47 @@ async function loadOiDelta(
   return null;
 }
 
-const SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
+/** Shown until the live ranking arrives, and as the fallback if it fails. */
+const FALLBACK_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
+/** How many pairs to offer. Enough to cover what actually trades, few enough
+ *  that the row stays scannable rather than becoming a wall of tickers. */
+const SYMBOL_COUNT = 30;
+
+/**
+ * The most-traded USDT perpetuals, by real 24h quote volume.
+ *
+ * A hardcoded list goes stale — the pairs that matter in an altseason are not
+ * the ones that mattered when the list was written. This ranks them from
+ * Binance itself, so the selector always offers what is actually liquid, and
+ * only perpetuals, since the whole map depends on futures data.
+ */
+async function loadTopSymbols(signal: AbortSignal): Promise<string[] | null> {
+  for (const base of FUTURES_BASES) {
+    try {
+      const response = await fetch(`${base}/fapi/v1/ticker/24hr`, { signal });
+      if (!response.ok) continue;
+      const rows = (await response.json()) as unknown;
+      if (!Array.isArray(rows)) continue;
+      const ranked = rows
+        .map((row) => row as { symbol?: unknown; quoteVolume?: unknown })
+        .filter(
+          (row): row is { symbol: string; quoteVolume: string } =>
+            typeof row.symbol === "string" &&
+            row.symbol.endsWith("USDT") &&
+            // Leveraged tokens and index products are not pairs a trader maps.
+            !/(UP|DOWN|BEAR|BULL)USDT$/.test(row.symbol) &&
+            Number.isFinite(Number(row.quoteVolume)),
+        )
+        .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+        .slice(0, SYMBOL_COUNT)
+        .map((row) => row.symbol);
+      if (ranked.length >= 5) return ranked;
+    } catch {
+      // Next mirror; the fallback list keeps the panel usable either way.
+    }
+  }
+  return null;
+}
 const TIMEFRAMES: { id: string; label: string }[] = [
   { id: "15m", label: "15M" },
   { id: "1h", label: "1H" },
@@ -242,6 +299,17 @@ export default function LiquidationHeatmapDesk() {
   const [hovered, setHovered] = useState<HeatBucket | null>(null);
   /** Visible candle count. Fewer candles = zoomed in. */
   const [visibleCandles, setVisibleCandles] = useState(70);
+  const [symbols, setSymbols] = useState<string[]>(FALLBACK_SYMBOLS);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadTopSymbols(controller.signal)
+      .then((ranked) => {
+        if (ranked) setSymbols(ranked);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
   const [box, setBox] = useState(DEFAULT_BOX);
   const observerRef = useRef<ResizeObserver | null>(null);
 
@@ -549,8 +617,13 @@ export default function LiquidationHeatmapDesk() {
 
       <div className="liq-controls">
         <div className="liq-symbols">
-          {SYMBOLS.map((s) => (
-            <button key={s} className={s === symbol ? "active" : ""} onClick={() => selectSymbol(s)}>
+          {symbols.map((s) => (
+            <button
+              key={s}
+              className={s === symbol ? "active" : ""}
+              onClick={() => selectSymbol(s)}
+              title={s}
+            >
               {s.replace("USDT", "")}
             </button>
           ))}
@@ -697,7 +770,7 @@ export default function LiquidationHeatmapDesk() {
                         y={yPos - thickness / 2}
                         width={endX - startX}
                         height={thickness}
-                        fill={intensityColor(zone.intensity, 0.06 + relative * 0.22)}
+                        fill={intensityColor(zone.intensity, 0.16 + relative * 0.44)}
                       />
                     )}
                     <rect
@@ -705,7 +778,7 @@ export default function LiquidationHeatmapDesk() {
                       y={yPos - thickness / 2}
                       width={barW}
                       height={thickness}
-                      fill={intensityColor(zone.intensity, 0.9)}
+                      fill={intensityColor(zone.intensity, 1)}
                     />
                   </g>
                 );
