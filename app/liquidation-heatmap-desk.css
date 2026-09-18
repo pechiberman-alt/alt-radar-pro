@@ -159,3 +159,12 @@
 .liq-symbols button{flex:0 0 auto;scroll-snap-align:start}
 .liq-symbols button.active{position:sticky;left:0;z-index:2;box-shadow:0 0 0 3px #060b09}
 .liq-controls{align-items:flex-start}
+
+/* The chart owns pinch gestures. `pan-y` keeps one-finger vertical scrolling
+   working over the chart, while leaving two-finger pinch to the handler —
+   listing pinch-zoom here would hand it back to the browser, which is the
+   thing being prevented. */
+.liq-chart-wrap{touch-action:pan-y}
+.liq-zoom span{min-width:auto}
+.liq-pinch{display:none;font-style:normal;margin-left:6px;color:#5d6b64}
+@media (pointer: coarse){ .liq-pinch{display:inline} }

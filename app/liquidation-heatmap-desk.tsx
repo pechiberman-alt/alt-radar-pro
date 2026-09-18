@@ -364,8 +364,47 @@ export default function LiquidationHeatmapDesk() {
 
   const MIN_VISIBLE = 25;
   const MAX_VISIBLE = 220;
-  const zoomIn = () => setVisibleCandles((n) => Math.max(MIN_VISIBLE, Math.round(n / 1.5)));
-  const zoomOut = () => setVisibleCandles((n) => Math.min(MAX_VISIBLE, Math.round(n * 1.5)));
+  const clampVisible = (n: number) => Math.max(MIN_VISIBLE, Math.min(MAX_VISIBLE, Math.round(n)));
+  const zoomIn = () => setVisibleCandles((n) => clampVisible(n / 1.5));
+  const zoomOut = () => setVisibleCandles((n) => clampVisible(n * 1.5));
+
+  /**
+   * Pinch to zoom, and a two-finger-free drag to zoom on devices or hands
+   * that find pinching awkward.
+   *
+   * The gesture state lives in a ref rather than state: it changes on every
+   * touchmove, and re-rendering the whole chart at that rate would make the
+   * gesture feel heavy. Only the resulting candle count goes through state.
+   */
+  const gesture = useRef<{ distance: number; candles: number } | null>(null);
+
+  const touchDistance = (touches: React.TouchList) => {
+    const [a, b] = [touches[0], touches[1]];
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  };
+
+  const onTouchStart = (event: React.TouchEvent) => {
+    if (event.touches.length !== 2) return;
+    gesture.current = {
+      distance: touchDistance(event.touches),
+      candles: visibleCandles,
+    };
+  };
+
+  const onTouchMove = (event: React.TouchEvent) => {
+    if (event.touches.length !== 2 || !gesture.current) return;
+    const distance = touchDistance(event.touches);
+    if (distance < 20 || gesture.current.distance < 20) return;
+    // Fingers apart = zoom in = fewer candles, hence the inverse ratio.
+    const ratio = gesture.current.distance / distance;
+    setVisibleCandles(clampVisible(gesture.current.candles * ratio));
+    // Stop the browser turning the pinch into a page zoom mid-gesture.
+    if (event.cancelable) event.preventDefault();
+  };
+
+  const onTouchEnd = () => {
+    gesture.current = null;
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -589,11 +628,18 @@ export default function LiquidationHeatmapDesk() {
 
   const dateTicks = useMemo(() => {
     if (!layout) return [];
-    const { candles, x } = layout;
-    const step = Math.max(1, Math.floor(candles.length / 5));
+    const { candles, x, candleAreaW } = layout;
+    // Space ticks by pixels, not by candle count. Five fixed ticks meant the
+    // labels ran into each other on a phone — "16/09, 09:00" is wide, and at
+    // 47 candles across ~300px they overlapped into an unreadable smear.
+    const labelW = 74;
+    const maxTicks = Math.max(2, Math.floor(candleAreaW / labelW));
+    const step = Math.max(1, Math.ceil(candles.length / maxTicks));
     return candles
-      .map((c, i) => ({ time: c.time, xPos: x(i) }))
-      .filter((_, i) => i % step === 0);
+      .map((c, i) => ({ time: c.time, xPos: x(i), index: i }))
+      .filter((tick) => tick.index % step === 0)
+      // Drop a final tick that would collide with the profile strip.
+      .filter((tick) => tick.xPos < candleAreaW - labelW / 2);
   }, [layout]);
 
   return (
@@ -708,13 +754,22 @@ export default function LiquidationHeatmapDesk() {
             <button onClick={zoomOut} disabled={visibleCandles >= MAX_VISIBLE} aria-label="Alejar">
               −
             </button>
-            <span>{visibleCandles} velas</span>
+            <span>
+              {visibleCandles} velas<i className="liq-pinch">· pellizcá para ampliar</i>
+            </span>
             <button onClick={zoomIn} disabled={visibleCandles <= MIN_VISIBLE} aria-label="Acercar">
               +
             </button>
           </div>
 
-          <div className="liq-chart-wrap" ref={chartRef}>
+          <div
+            className="liq-chart-wrap"
+            ref={chartRef}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            onTouchCancel={onTouchEnd}
+          >
             <svg
               viewBox={`0 0 ${box.width} ${box.height}`}
               className="liq-svg"
@@ -764,13 +819,19 @@ export default function LiquidationHeatmapDesk() {
                       setHovered((current) => (current?.price === zone.price ? null : current))
                     }
                   >
-                    {endX > startX && (
+                    {/* Only strong zones get the long horizontal band. Drawing
+                        one for every row stacked dozens of translucent bars on
+                        top of each other until the area filled in as a murky
+                        slab — which is exactly what looked "dark" and hid the
+                        structure. Weaker rows still appear, in the profile bar
+                        on the right, where comparing them is the point. */}
+                    {endX > startX && zone.intensity >= 45 && (
                       <rect
                         x={startX}
                         y={yPos - thickness / 2}
                         width={endX - startX}
                         height={thickness}
-                        fill={intensityColor(zone.intensity, 0.16 + relative * 0.44)}
+                        fill={intensityColor(zone.intensity, 0.12 + relative * 0.3)}
                       />
                     )}
                     <rect
@@ -865,13 +926,9 @@ export default function LiquidationHeatmapDesk() {
                         day: "2-digit",
                         month: "2-digit",
                       })
-                    : new Date(tick.time).toLocaleString("es-AR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false,
-                      })}
+                    : `${new Date(tick.time).getDate()}/${
+                        new Date(tick.time).getMonth() + 1
+                      } ${String(new Date(tick.time).getHours()).padStart(2, "0")}h`}
                 </text>
               ))}
             </svg>
