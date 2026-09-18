@@ -1,39 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { buildUnlockBoard, type TokenUnlock, type UnlockBoard } from "@/lib/token-unlocks";
+import {
+  buildOverhangBoard,
+  type OverhangBoard,
+  type SupplyOverhang,
+} from "@/lib/token-unlocks";
 
 const FALLBACK_WATCHLIST = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
 
 const usd = (value: number) => {
   if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(0)}M`;
   if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
   return `$${value.toFixed(0)}`;
 };
 
-const when = (unlock: TokenUnlock) => {
-  if (unlock.daysAway === 0) return "hoy";
-  if (unlock.daysAway === 1) return "mañana";
-  return `en ${unlock.daysAway} días`;
-};
-
-/** Dilution bands. A 1% unlock is routine; past 5% it is a supply event. */
-const weight = (unlock: TokenUnlock) => {
-  if (unlock.pctOfMcap === null) return "";
-  if (unlock.pctOfMcap >= 5) return "alto";
-  if (unlock.pctOfMcap >= 1.5) return "medio";
+/** How hard the remaining supply weighs against today's float. */
+const band = (ratio: number) => {
+  if (ratio >= 1) return "alto";
+  if (ratio >= 0.35) return "medio";
   return "bajo";
 };
 
+const bandLabel = (ratio: number) => {
+  if (ratio >= 1) return "PUEDE MÁS QUE DUPLICAR EL FLOTANTE";
+  if (ratio >= 0.35) return "DILUCIÓN RELEVANTE PENDIENTE";
+  return "POCA OFERTA PENDIENTE";
+};
+
 export default function UnlockDesk({ watchlist }: { watchlist?: string[] }) {
-  const [board, setBoard] = useState<UnlockBoard | null>(null);
+  const [board, setBoard] = useState<OverhangBoard | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
-  // A stable key for the effect: the array identity changes on every parent
-  // render even when the pairs are the same, which would refetch endlessly.
   const symbolKey = (watchlist?.length ? watchlist : FALLBACK_WATCHLIST).join(",");
 
   useEffect(() => {
@@ -42,27 +43,26 @@ export default function UnlockDesk({ watchlist }: { watchlist?: string[] }) {
 
     (async () => {
       try {
-        // Through the Worker, not direct: DefiLlama does not reliably send
-        // CORS headers, so a browser fetch is blocked before our code runs.
-        // The reserves panel already proves the Worker can reach this host.
-        const response = await fetch("/api/token-unlocks", {
-          signal: controller.signal,
-          cache: "no-store",
-        });
+        // From the browser: CoinGecko blocks datacenter addresses, the same
+        // reason api/klines exists. A visitor's own connection is not blocked.
+        const response = await fetch(
+          "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false",
+          { signal: controller.signal },
+        );
         if (!alive) return;
         if (!response.ok) {
-          setError("CALENDARIO NO DISPONIBLE");
+          setError("OFERTA PENDIENTE NO DISPONIBLE");
           return;
         }
-        const built = buildUnlockBoard(await response.json(), symbolKey.split(","));
+        const built = buildOverhangBoard(await response.json(), symbolKey.split(","));
         if (!alive) return;
         if (!built) {
-          setError("SIN DESBLOQUEOS PRÓXIMOS");
+          setError("OFERTA PENDIENTE NO DISPONIBLE");
           return;
         }
         setBoard(built);
       } catch {
-        if (alive) setError("CALENDARIO NO DISPONIBLE");
+        if (alive) setError("OFERTA PENDIENTE NO DISPONIBLE");
       } finally {
         if (alive) setLoading(false);
       }
@@ -74,27 +74,39 @@ export default function UnlockDesk({ watchlist }: { watchlist?: string[] }) {
     };
   }, [symbolKey]);
 
-  const rows = board ? (showAll ? board.upcoming.slice(0, 40) : board.watched) : [];
+  const rows: SupplyOverhang[] = board
+    ? showAll
+      ? board.ranked.slice(0, 25)
+      : board.watched
+    : [];
 
   return (
     <section className="panel unlock-desk" id="desbloqueos">
       <div className="panel-head">
         <div>
-          <p className="eyebrow">DESBLOQUEOS · OFERTA PROGRAMADA</p>
-          <h2>Qué supply entra al mercado</h2>
+          <p className="eyebrow">OFERTA PENDIENTE · DILUCIÓN POR VENIR</p>
+          <h2>Cuánto supply falta que entre</h2>
         </div>
         <span className={error ? "badge critical" : "badge"}>
-          {loading ? "CARGANDO…" : error ? "NO DISPONIBLE" : `${board?.projectsScanned ?? 0} PROYECTOS`}
+          {loading ? "CARGANDO…" : error ? "NO DISPONIBLE" : `${board?.scanned ?? 0} TOKENS`}
         </span>
       </div>
 
       <p className="unlock-premise">
-        Los fondos que entran en rondas privadas compran a un precio que el mercado no ve, y esos
-        tokens se liberan por calendario. Cada desbloqueo pone oferta en manos con un costo muy por
-        debajo del precio actual. Es de lo poco del futuro que está escrito de antemano.
+        La diferencia entre lo que circula y el total es todo lo que todavía se le debe a fondos,
+        equipo y tesorería. Comparada con la capitalización de hoy, dice cuánto puede diluirse el
+        precio cuando esa oferta llegue. Un token con el 80% sin circular carga ese peso aunque no
+        se sepa la fecha.
       </p>
 
-      {loading && <p className="unlock-loading">LEYENDO CALENDARIO…</p>}
+      {/* Said openly rather than implied: the dated calendar is not free. */}
+      <p className="unlock-scope">
+        <b>Esto mide tamaño, no fecha.</b> El calendario con fechas exactas de cada desbloqueo sólo
+        lo publican proveedores de pago. Lo que sí es verificable gratis es cuánta oferta falta, y
+        es lo que se muestra acá.
+      </p>
+
+      {loading && <p className="unlock-loading">LEYENDO OFERTA…</p>}
       {error && !loading && (
         <div className="unlock-empty">
           <b>{error}</b>
@@ -109,43 +121,36 @@ export default function UnlockDesk({ watchlist }: { watchlist?: string[] }) {
               TUS PARES ({board.watched.length})
             </button>
             <button className={showAll ? "active" : ""} onClick={() => setShowAll(true)}>
-              TODO EL MERCADO ({board.upcoming.length})
+              MAYOR DILUCIÓN ({board.ranked.length})
             </button>
           </div>
 
           {rows.length === 0 ? (
             <div className="unlock-empty">
-              <b>SIN DESBLOQUEOS EN TUS PARES</b>
-              <span>
-                Ninguno de los pares que seguís tiene un desbloqueo programado en los próximos 60
-                días. Mirá el mercado completo para ver dónde sí los hay.
-              </span>
+              <b>SIN DATOS DE TUS PARES</b>
+              <span>Mirá el ranking general para ver dónde pesa la oferta pendiente.</span>
             </div>
           ) : (
             <div className="unlock-list">
-              {rows.map((unlock) => (
+              {rows.map((row) => (
                 <div
-                  key={`${unlock.name}-${unlock.date}`}
-                  className={`${unlock.onWatchlist ? "watched" : ""} w-${weight(unlock)}`}
+                  key={row.symbol}
+                  className={`${row.onWatchlist ? "watched" : ""} w-${band(row.overhangRatio)}`}
                 >
                   <div className="unlock-who">
-                    <b>{unlock.symbol ?? unlock.name}</b>
-                    <em>{unlock.name}</em>
+                    <b>{row.symbol}</b>
+                    <em>{row.name}</em>
                   </div>
                   <div className="unlock-when">
-                    <b>{when(unlock)}</b>
-                    <em>{new Date(unlock.date).toLocaleDateString("es-AR")}</em>
+                    <b>{row.unlockedPct.toFixed(0)}%</b>
+                    <em>ya circula</em>
                   </div>
                   <div className="unlock-size">
-                    <b>{unlock.valueUsd !== null ? usd(unlock.valueUsd) : "—"}</b>
-                    <em>
-                      {unlock.pctOfMcap !== null
-                        ? `${unlock.pctOfMcap.toFixed(2)}% del cap`
-                        : "tamaño no publicado"}
-                    </em>
+                    <b>{usd(row.lockedValueUsd)}</b>
+                    <em>{row.overhangRatio.toFixed(2)}× el cap actual</em>
                   </div>
-                  <span className={`unlock-audience a-${unlock.audience.toLowerCase()}`}>
-                    {unlock.audience}
+                  <span className={`unlock-audience a-${band(row.overhangRatio)}`}>
+                    {bandLabel(row.overhangRatio)}
                   </span>
                 </div>
               ))}
@@ -153,9 +158,9 @@ export default function UnlockDesk({ watchlist }: { watchlist?: string[] }) {
           )}
 
           <p className="unlock-caveat">
-            <b>Cómo leerlo.</b> {board.caveat} Un desbloqueo para inversores o equipo pesa más que
-            uno de ecosistema: esos tenedores suelen estar muy arriba en ganancia y con mandato de
-            realizarla. Fuente: {board.source}.
+            <b>Cómo leerlo.</b> {board.caveat} Un ratio de 1,00× significa que la oferta pendiente
+            vale tanto como todo lo que circula hoy: si entra, el flotante se duplica. Fuente:{" "}
+            {board.source}.
           </p>
         </>
       )}

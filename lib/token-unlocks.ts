@@ -1,181 +1,142 @@
 /**
- * Upcoming token unlocks: supply that is contractually scheduled to become
- * sellable, and who receives it.
+ * Supply overhang: how much of each token still has to reach the market.
  *
- * WHY THIS BELONGS IN A TRADING TERMINAL
+ * WHY THIS AND NOT THE UNLOCK CALENDAR
  *
- * When a venture fund backs a project it buys in a private round, often at a
- * fraction of the listed price, and those tokens vest over months or years.
- * Each unlock puts supply into hands whose cost basis is far below the market
- * — the clearest scheduled sell pressure that exists in this market, and one
- * of the few things about the future that is known in advance rather than
- * guessed at.
+ * The dated calendar — "12% of APT unlocks on the 14th" — is the thing every
+ * trader wants, and every provider that has it charges for it: CryptoRank and
+ * Messari gate it behind paid and Enterprise plans, DefiLlama's is on its Pro
+ * tier, and CoinGecko, CoinMarketCap and Coinpaprika do not carry it at all.
+ * The tools that read it free do so by rendering the page in a browser, which
+ * a Worker cannot do.
  *
- * WHAT IT IS AND IS NOT
+ * So rather than leave a panel promising data it cannot get, this measures the
+ * part that IS free and verifiable: the gap between circulating supply and
+ * total supply. That gap is every token still owed to investors, team and
+ * treasury — the same supply the calendar schedules, counted rather than
+ * dated.
  *
- * A schedule is not a forecast. An unlock is supply becoming *able* to move,
- * not supply that *will* move: recipients may hold, may have hedged already,
- * and the market may have priced it in well before the date. Treat a large
- * unlock as a reason to check a position, not as a signal by itself. The
- * panel says so where the reader sees it.
+ * WHAT IT ANSWERS AND WHAT IT DOES NOT
  *
- * Source: DefiLlama's public emissions data — free, no key.
+ * It answers "how much dilution is still coming, and what is it worth at
+ * today's price". It does NOT answer "when". A token with 80% still locked
+ * carries that weight whether the next tranche lands next week or in 2028,
+ * and this cannot tell you which — the panel says so plainly instead of
+ * implying a timeline it does not have.
  */
 
-const EMISSIONS_URL = "https://api.llama.fi/emissions";
+const MARKETS_URL =
+  "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false";
 
-/** Who the supply goes to, which is what decides how much it matters. */
-export type UnlockAudience = "INVERSORES" | "EQUIPO" | "ECOSISTEMA" | "OTROS";
-
-export type TokenUnlock = {
-  /** Project name as published. */
+export type SupplyOverhang = {
+  symbol: string;
   name: string;
-  /** Ticker, uppercased, when the source provides one. */
-  symbol: string | null;
-  /** Unix ms of the scheduled event. */
-  date: number;
-  /** Days from now, rounded down. */
-  daysAway: number;
-  /** Tokens released at this event, when known. */
-  tokens: number | null;
-  /** Value at the current price, when both are known. */
-  valueUsd: number | null;
-  /** Share of market cap this unlock represents — the dilution that matters
-   *  more than the raw dollar figure, since a big number on a big cap is not
-   *  the same event as the same number on a small one. */
-  pctOfMcap: number | null;
-  audience: UnlockAudience;
-  /** True when this lands on a symbol the reader actually trades. */
+  priceUsd: number;
+  marketCapUsd: number;
+  circulating: number;
+  total: number;
+  /** Share of total supply already in circulation. */
+  unlockedPct: number;
+  /** Tokens still to come. */
+  lockedTokens: number;
+  /** What that locked supply is worth at today's price — the dilution ahead. */
+  lockedValueUsd: number;
+  /** Locked value as a multiple of current market cap: 1.0 means the float
+   *  could double. This is the number that actually ranks risk. */
+  overhangRatio: number;
   onWatchlist: boolean;
 };
 
-const num = (value: unknown): number | null =>
-  typeof value === "number" && Number.isFinite(value) ? value : null;
-
-const text = (value: unknown): string | null =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
-
-/**
- * Classify the recipient.
- *
- * Insider and investor supply is the sell pressure worth watching: those
- * holders are usually far in profit and have a mandate to realise it.
- * Ecosystem and community allocations behave differently, so they are kept
- * separate rather than lumped into one scary number.
- */
-export function classifyAudience(raw: unknown): UnlockAudience {
-  const label = (text(raw) ?? "").toLowerCase();
-  if (/invest|investor|vc|private|seed|strategic|backer/.test(label)) return "INVERSORES";
-  if (/team|insider|founder|advis|core|contributor/.test(label)) return "EQUIPO";
-  if (/ecosystem|community|treasury|airdrop|reward|incentive|public|liquidity/.test(label))
-    return "ECOSISTEMA";
-  return "OTROS";
-}
-
-type RawEntry = Record<string, unknown>;
-
-/** Pulls the next scheduled event out of one project's record.
- *
- *  The upstream shape is not contractual and has changed before, so every
- *  field is probed across the spellings it has used rather than assumed. A
- *  record that yields no usable date is skipped, not defaulted — an invented
- *  date on a sell-pressure calendar would be worse than a missing row. */
-export function parseUnlock(entry: unknown, now: number, watchlist: Set<string>): TokenUnlock | null {
-  if (typeof entry !== "object" || entry === null) return null;
-  const row = entry as RawEntry;
-
-  const name = text(row.name) ?? text(row.protocol) ?? text(row.gecko_id);
-  if (!name) return null;
-
-  const symbol = (text(row.token) ?? text(row.symbol) ?? text(row.tSymbol))?.toUpperCase() ?? null;
-
-  const event = (row.nextEvent ?? row.upcomingEvent ?? null) as RawEntry | null;
-  const rawDate =
-    num(row.nextEventDate) ??
-    num(event?.date) ??
-    num(event?.timestamp) ??
-    num(row.nextUnlockDate);
-  if (rawDate === null) return null;
-
-  // Upstream mixes seconds and milliseconds depending on the field.
-  const date = rawDate > 1e12 ? rawDate : rawDate * 1000;
-  if (!Number.isFinite(date) || date < now) return null;
-
-  const tokens = num(event?.toUnlock) ?? num(row.toUnlock) ?? num(event?.amount);
-  const price = num(row.tPrice) ?? num(row.price);
-  const mcap = num(row.mcap) ?? num(row.marketCap);
-  const valueUsd = tokens !== null && price !== null ? tokens * price : null;
-  const pctOfMcap =
-    valueUsd !== null && mcap !== null && mcap > 0 ? (valueUsd / mcap) * 100 : null;
-
-  return {
-    name,
-    symbol,
-    date,
-    daysAway: Math.max(0, Math.floor((date - now) / 86_400_000)),
-    tokens,
-    valueUsd,
-    pctOfMcap,
-    audience: classifyAudience(event?.category ?? event?.description ?? row.category),
-    onWatchlist: symbol !== null && watchlist.has(symbol),
-  };
-}
-
-export type UnlockBoard = {
+export type OverhangBoard = {
   generatedAt: number;
-  /** Everything ahead, soonest first. */
-  upcoming: TokenUnlock[];
-  /** Unlocks landing on symbols the reader trades — the actionable subset. */
-  watched: TokenUnlock[];
-  /** How many projects the source covered, so thin data is visible as thin. */
-  projectsScanned: number;
+  /** Heaviest overhang first. */
+  ranked: SupplyOverhang[];
+  watched: SupplyOverhang[];
+  scanned: number;
   source: string;
   caveat: string;
 };
 
-export function buildUnlockBoard(
+const num = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+
+export function parseOverhang(entry: unknown, watchlist: Set<string>): SupplyOverhang | null {
+  if (typeof entry !== "object" || entry === null) return null;
+  const row = entry as Record<string, unknown>;
+
+  const symbol = typeof row.symbol === "string" ? row.symbol.toUpperCase() : null;
+  const name = typeof row.name === "string" ? row.name : null;
+  const priceUsd = num(row.current_price);
+  const marketCapUsd = num(row.market_cap);
+  const circulating = num(row.circulating_supply);
+  // max_supply is the hard cap where one exists; total_supply is what has been
+  // minted. The relevant ceiling is the larger of the two that is known —
+  // using only one understates tokens that mint beyond current total.
+  const total = Math.max(num(row.total_supply) ?? 0, num(row.max_supply) ?? 0) || null;
+
+  if (!symbol || !name || !priceUsd || !marketCapUsd || !circulating || !total) return null;
+  // Reported circulating above total happens on bad data; it is not a
+  // negative overhang, it is a record to skip.
+  if (circulating > total) return null;
+
+  const lockedTokens = total - circulating;
+  const lockedValueUsd = lockedTokens * priceUsd;
+
+  return {
+    symbol,
+    name,
+    priceUsd,
+    marketCapUsd,
+    circulating,
+    total,
+    unlockedPct: (circulating / total) * 100,
+    lockedTokens,
+    lockedValueUsd,
+    overhangRatio: lockedValueUsd / marketCapUsd,
+    onWatchlist: watchlist.has(symbol),
+  };
+}
+
+export function buildOverhangBoard(
   payload: unknown,
   watchlistSymbols: string[],
   now = Date.now(),
-  horizonDays = 60,
-): UnlockBoard | null {
+): OverhangBoard | null {
   if (!Array.isArray(payload)) return null;
 
-  // Watchlist symbols arrive as trading pairs (BTCUSDT); unlocks are keyed by
-  // the bare asset, and Binance's 1000X contracts refer to the same token.
   const watchlist = new Set(
     watchlistSymbols
       .map((pair) => pair.replace(/USDT$/, "").replace(/^1000+/, "").toUpperCase())
       .filter(Boolean),
   );
 
-  const horizon = now + horizonDays * 86_400_000;
-  const upcoming = payload
-    .map((entry) => parseUnlock(entry, now, watchlist))
-    .filter((unlock): unlock is TokenUnlock => unlock !== null && unlock.date <= horizon)
-    .sort((a, b) => a.date - b.date);
+  const parsed = payload
+    .map((entry) => parseOverhang(entry, watchlist))
+    .filter((row): row is SupplyOverhang => row !== null);
 
-  if (!upcoming.length) return null;
+  if (!parsed.length) return null;
+
+  const ranked = [...parsed].sort((a, b) => b.overhangRatio - a.overhangRatio);
 
   return {
     generatedAt: now,
-    upcoming,
-    watched: upcoming.filter((unlock) => unlock.onWatchlist),
-    projectsScanned: payload.length,
-    source: "DefiLlama · datos públicos de emisiones",
+    ranked,
+    watched: ranked.filter((row) => row.onWatchlist),
+    scanned: parsed.length,
+    source: "CoinGecko · oferta circulante y total",
     caveat:
-      "Un desbloqueo es oferta que queda habilitada para venderse, no oferta que se vaya a vender. El calendario es un hecho; la reacción del precio no.",
+      "Esto mide cuánta dilución falta, no cuándo llega. El calendario con fechas exactas sólo lo publican proveedores de pago; esta es la parte que sí es verificable gratis.",
   };
 }
 
-export async function loadUnlockBoard(
+export async function loadOverhangBoard(
   watchlistSymbols: string[],
   now = Date.now(),
-): Promise<UnlockBoard | null> {
-  const response = await fetch(EMISSIONS_URL, {
+): Promise<OverhangBoard | null> {
+  const response = await fetch(MARKETS_URL, {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(12_000),
   });
   if (!response.ok) return null;
-  return buildUnlockBoard(await response.json(), watchlistSymbols, now);
+  return buildOverhangBoard(await response.json(), watchlistSymbols, now);
 }
