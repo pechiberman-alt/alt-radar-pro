@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildLiquidationHeatmap,
+  findKeyLevels,
   type HeatBucket,
   type LiquidationHeatmap,
 } from "@/lib/liquidation-heatmap";
-import { parseSwingKlines } from "@/lib/swing-entries";
+import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
 
 type DisplayCandle = { time: number; open: number; high: number; low: number; close: number };
 type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; timeframe: string };
@@ -229,6 +230,8 @@ const priceLabel = (price: number) =>
  * on both screens rather than being tuned for one of them.
  */
 const DEFAULT_BOX = { width: 1000, height: 470 };
+/** Candles kept for display; zoom picks a tail of these without refetching. */
+const MAX_DISPLAY_CANDLES = 220;
 const MARGIN = { top: 12, right: 78, bottom: 28, left: 10 };
 export default function LiquidationHeatmapDesk() {
   const [symbol, setSymbol] = useState("BTCUSDT");
@@ -237,25 +240,42 @@ export default function LiquidationHeatmapDesk() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState<HeatBucket | null>(null);
-  const chartRef = useRef<HTMLDivElement | null>(null);
+  /** Visible candle count. Fewer candles = zoomed in. */
+  const [visibleCandles, setVisibleCandles] = useState(70);
   const [box, setBox] = useState(DEFAULT_BOX);
+  const observerRef = useRef<ResizeObserver | null>(null);
 
-  // Draw at the container's real size so the SVG never has to be letterboxed.
-  useEffect(() => {
-    const node = chartRef.current;
+  /**
+   * Callback ref, not useEffect.
+   *
+   * The chart container only exists once data has loaded, so an effect with an
+   * empty dependency list ran while the node was still null, bailed out, and
+   * never fired again — leaving the canvas stuck at its default size and
+   * letterboxed exactly as before. A callback ref runs when the node actually
+   * attaches, which is the only moment there is anything to measure.
+   */
+  const chartRef = (node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
     if (!node || typeof ResizeObserver === "undefined") return;
+    const apply = (width: number, height: number) => {
+      if (width < 10 || height < 10) return;
+      setBox((current) =>
+        Math.abs(current.width - width) < 1 && Math.abs(current.height - height) < 1
+          ? current
+          : { width, height },
+      );
+    };
+    apply(node.clientWidth, node.clientHeight);
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
-      if (!rect || rect.width < 10 || rect.height < 10) return;
-      setBox((current) =>
-        Math.abs(current.width - rect.width) < 1 && Math.abs(current.height - rect.height) < 1
-          ? current
-          : { width: rect.width, height: rect.height },
-      );
+      if (rect) apply(rect.width, rect.height);
     });
     observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+    observerRef.current = observer;
+  };
 
   // Loading/error reset lives here, in the handlers that change symbol or
   // timeframe, rather than at the top of the effect below — so the state
@@ -264,13 +284,20 @@ export default function LiquidationHeatmapDesk() {
   const selectSymbol = (next: string) => {
     setLoading(true);
     setError("");
+    setVisibleCandles(70);
     setSymbol(next);
   };
   const selectTimeframe = (next: string) => {
     setLoading(true);
     setError("");
+    setVisibleCandles(70);
     setTimeframe(next);
   };
+
+  const MIN_VISIBLE = 25;
+  const MAX_VISIBLE = 220;
+  const zoomIn = () => setVisibleCandles((n) => Math.max(MIN_VISIBLE, Math.round(n / 1.5)));
+  const zoomOut = () => setVisibleCandles((n) => Math.min(MAX_VISIBLE, Math.round(n * 1.5)));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -328,7 +355,7 @@ export default function LiquidationHeatmapDesk() {
 
         setData({
           heatmap,
-          candles: candles.slice(-70).map((candle) => ({
+          candles: candles.slice(-MAX_DISPLAY_CANDLES).map((candle) => ({
             time: candle.openTime,
             open: candle.open,
             high: candle.high,
@@ -352,7 +379,9 @@ export default function LiquidationHeatmapDesk() {
 
   const layout = useMemo(() => {
     if (!data || !data.candles.length) return null;
-    const { candles, heatmap } = data;
+    const { heatmap } = data;
+    const candles = data.candles.slice(-visibleCandles);
+    if (!candles.length) return null;
 
     const plotW = box.width - MARGIN.left - MARGIN.right;
     const plotH = box.height - MARGIN.top - MARGIN.bottom;
@@ -461,7 +490,24 @@ export default function LiquidationHeatmapDesk() {
       .sort((a, b) => a.price - b.price);
 
     return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT };
-  }, [data, box]);
+  }, [data, box, visibleCandles]);
+
+  const keyLevels = useMemo(() => {
+    if (!layout) return [];
+    // Pivots come from the candles actually on screen, so the levels named
+    // are ones the reader can see being tested.
+    const swing = layout.candles.map((candle) => ({
+      openTime: candle.time,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: 0,
+      quoteVolume: 0,
+    }));
+    const { highs, lows } = findPivots(swing, 3);
+    return findKeyLevels(layout.heatmap, highs, lows);
+  }, [layout]);
 
   const priceTicks = useMemo(() => {
     if (!layout) return [];
@@ -583,6 +629,16 @@ export default function LiquidationHeatmapDesk() {
               )}
             </div>
           </div>
+          </div>
+
+          <div className="liq-zoom">
+            <button onClick={zoomOut} disabled={visibleCandles >= MAX_VISIBLE} aria-label="Alejar">
+              −
+            </button>
+            <span>{visibleCandles} velas</span>
+            <button onClick={zoomIn} disabled={visibleCandles <= MIN_VISIBLE} aria-label="Acercar">
+              +
+            </button>
           </div>
 
           <div className="liq-chart-wrap" ref={chartRef}>
@@ -769,6 +825,26 @@ export default function LiquidationHeatmapDesk() {
               </div>
             )}
           </div>
+
+          {keyLevels.length > 0 && (
+            <div className="liq-keys">
+              <h4>PUNTOS CLAVE · ESTRUCTURA + LIQUIDACIÓN</h4>
+              <p className="liq-keys-why">
+                Niveles donde un máximo o mínimo previo cae sobre una zona densa: los stops de quien
+                operó ahí y las liquidaciones proyectadas coinciden en el mismo precio.
+              </p>
+              {keyLevels.map((level) => (
+                <div key={`${level.kind}-${level.price}`} className={level.kind === "TECHO" ? "techo" : "piso"}>
+                  <b>{level.kind}</b>
+                  <u>${priceLabel(level.price)}</u>
+                  <em>
+                    {level.touches > 1 ? `${level.touches} toques · ` : ""}
+                    {level.notionalUsd !== null ? usd(level.notionalUsd) : `${level.intensity.toFixed(0)}/100`}
+                  </em>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="liq-legend">
             <span>
