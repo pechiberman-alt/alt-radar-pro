@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildLiquidationHeatmap,
   type HeatBucket,
@@ -218,15 +218,18 @@ const priceLabel = (price: number) =>
     ? price.toLocaleString("es-AR", { maximumFractionDigits: 0 })
     : price.toLocaleString("es-AR", { maximumFractionDigits: price >= 1 ? 2 : 6 });
 
-const CHART_W = 1000;
-const CHART_H = 470;
-const MARGIN = { top: 10, right: 82, bottom: 26, left: 8 };
-const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-/** Right-hand strip where every zone renders its full weight as a profile bar,
- *  so zones that formed recently are still readable next to older ones. */
-const PROFILE_W = 104;
-
+/**
+ * The canvas is measured, not fixed.
+ *
+ * A hard-coded viewBox has one aspect ratio; a phone's panel is nearly square
+ * and a laptop's is wide. With preserveAspectRatio the browser fits the
+ * drawing to the width and centres it, which left thick dead bands above and
+ * below the chart on a phone. Measuring the container and drawing at exactly
+ * its size removes that entirely, and is what makes one chart genuinely work
+ * on both screens rather than being tuned for one of them.
+ */
+const DEFAULT_BOX = { width: 1000, height: 470 };
+const MARGIN = { top: 12, right: 78, bottom: 28, left: 10 };
 export default function LiquidationHeatmapDesk() {
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [timeframe, setTimeframe] = useState("1h");
@@ -234,6 +237,25 @@ export default function LiquidationHeatmapDesk() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState<HeatBucket | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const [box, setBox] = useState(DEFAULT_BOX);
+
+  // Draw at the container's real size so the SVG never has to be letterboxed.
+  useEffect(() => {
+    const node = chartRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (!rect || rect.width < 10 || rect.height < 10) return;
+      setBox((current) =>
+        Math.abs(current.width - rect.width) < 1 && Math.abs(current.height - rect.height) < 1
+          ? current
+          : { width: rect.width, height: rect.height },
+      );
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   // Loading/error reset lives here, in the handlers that change symbol or
   // timeframe, rather than at the top of the effect below — so the state
@@ -332,6 +354,13 @@ export default function LiquidationHeatmapDesk() {
     if (!data || !data.candles.length) return null;
     const { candles, heatmap } = data;
 
+    const plotW = box.width - MARGIN.left - MARGIN.right;
+    const plotH = box.height - MARGIN.top - MARGIN.bottom;
+    if (plotW < 80 || plotH < 80) return null;
+    // The profile strip scales with width instead of eating a fixed 104px of
+    // a narrow phone, where that was a quarter of the whole chart.
+    const profileW = Math.max(52, Math.min(120, box.width * 0.13));
+
     // Scale to cover BOTH the traded range and the two magnet zones the
     // cards above call out. Scaling to candles alone left those zones off
     // the chart entirely — the panel was naming levels the reader could not
@@ -356,11 +385,11 @@ export default function LiquidationHeatmapDesk() {
     const lo = Math.max(0, wantLo - headroom);
     const hi = wantHi + headroom;
 
-    const y = (price: number) => MARGIN.top + (1 - (price - lo) / (hi - lo)) * PLOT_H;
+    const y = (price: number) => MARGIN.top + (1 - (price - lo) / (hi - lo)) * plotH;
 
     // Candles fill the plot minus the profile strip, so the chart uses its
     // whole width instead of crowding into one side.
-    const candleAreaW = PLOT_W - PROFILE_W;
+    const candleAreaW = plotW - profileW;
     const slot = candleAreaW / candles.length;
     const bodyW = Math.max(2.5, Math.min(9, slot * 0.7));
     const x = (index: number) => MARGIN.left + slot * index + slot / 2;
@@ -394,7 +423,7 @@ export default function LiquidationHeatmapDesk() {
      * distinct from its neighbour at this zoom.
      */
     const ROW_HEIGHT = 3.2;
-    const rowCount = Math.max(40, Math.floor(PLOT_H / ROW_HEIGHT));
+    const rowCount = Math.max(40, Math.floor(plotH / ROW_HEIGHT));
     const rows = new Map<
       number,
       { longDensity: number; shortDensity: number; notionalUsd: number; formedAt: number; price: number }
@@ -431,8 +460,8 @@ export default function LiquidationHeatmapDesk() {
       .filter((zone) => zone.intensity >= 6)
       .sort((a, b) => a.price - b.price);
 
-    return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, lo, hi, zones, rowHeight: ROW_HEIGHT };
-  }, [data]);
+    return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT };
+  }, [data, box]);
 
   const priceTicks = useMemo(() => {
     if (!layout) return [];
@@ -556,9 +585,9 @@ export default function LiquidationHeatmapDesk() {
           </div>
           </div>
 
-          <div className="liq-chart-wrap">
+          <div className="liq-chart-wrap" ref={chartRef}>
             <svg
-              viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+              viewBox={`0 0 ${box.width} ${box.height}`}
               className="liq-svg"
               role="img"
               aria-label="Mapa de liquidaciones estimado"
@@ -567,7 +596,7 @@ export default function LiquidationHeatmapDesk() {
                 <line
                   key={tick.price}
                   x1={MARGIN.left}
-                  x2={CHART_W - MARGIN.right}
+                  x2={box.width - MARGIN.right}
                   y1={tick.yPos}
                   y2={tick.yPos}
                   className="liq-grid"
@@ -589,7 +618,7 @@ export default function LiquidationHeatmapDesk() {
                 const endX = MARGIN.left + layout.candleAreaW;
                 const relative = zone.intensity / 100;
                 const thickness = Math.max(1.2, relative * layout.rowHeight);
-                const barW = Math.max(2, relative * PROFILE_W);
+                const barW = Math.max(2, relative * layout.profileW);
                 const asBucket = {
                   price: zone.price,
                   longDensity: zone.longDensity,
@@ -653,7 +682,7 @@ export default function LiquidationHeatmapDesk() {
 
               <line
                 x1={MARGIN.left}
-                x2={CHART_W - MARGIN.right}
+                x2={box.width - MARGIN.right}
                 y1={layout.y(data.heatmap.currentPrice)}
                 y2={layout.y(data.heatmap.currentPrice)}
                 className="liq-price-line"
@@ -668,7 +697,7 @@ export default function LiquidationHeatmapDesk() {
                   <g key={cls}>
                     <line
                       x1={MARGIN.left}
-                      x2={CHART_W - MARGIN.right}
+                      x2={box.width - MARGIN.right}
                       y1={layout.y(zone.price)}
                       y2={layout.y(zone.price)}
                       className={`liq-magnet-line ${cls}`}
@@ -688,7 +717,7 @@ export default function LiquidationHeatmapDesk() {
               {priceTicks.map((tick) => (
                 <text
                   key={tick.price}
-                  x={CHART_W - MARGIN.right + 8}
+                  x={box.width - MARGIN.right + 8}
                   y={tick.yPos + 3}
                   className="liq-axis-label"
                 >
@@ -699,20 +728,28 @@ export default function LiquidationHeatmapDesk() {
                 <text
                   key={tick.time}
                   x={tick.xPos}
-                  y={CHART_H - 12}
+                  y={box.height - 10}
                   className="liq-axis-label liq-axis-x"
                 >
-                  {new Date(tick.time).toLocaleDateString("es-AR", {
-                    day: "2-digit",
-                    month: "2-digit",
-                  })}
+                  {timeframe === "1d"
+                    ? new Date(tick.time).toLocaleDateString("es-AR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                      })
+                    : new Date(tick.time).toLocaleString("es-AR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      })}
                 </text>
               ))}
             </svg>
 
             <div
               className="liq-price-badge"
-              style={{ top: `${(layout.y(data.heatmap.currentPrice) / CHART_H) * 100}%` }}
+              style={{ top: `${(layout.y(data.heatmap.currentPrice) / box.height) * 100}%` }}
             >
               ${priceLabel(data.heatmap.currentPrice)}
             </div>
