@@ -1,102 +1,98 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  buildUnlockBoard,
-  classifyAudience,
-  parseUnlock,
-} from "../lib/token-unlocks.ts";
+import { buildOverhangBoard, parseOverhang } from "../lib/token-unlocks.ts";
 
-const NOW = Date.UTC(2026, 8, 18);
-const inDays = (n: number) => NOW + n * 86_400_000;
-
-const entry = (patch: Record<string, unknown> = {}) => ({
+const coin = (patch: Record<string, unknown> = {}) => ({
+  symbol: "ej",
   name: "Ejemplo",
-  token: "EJ",
-  tPrice: 2,
-  mcap: 1_000_000_000,
-  nextEvent: { date: inDays(10) / 1000, toUnlock: 5_000_000, category: "investors" },
+  current_price: 2,
+  market_cap: 200_000_000,
+  circulating_supply: 100_000_000,
+  total_supply: 400_000_000,
+  max_supply: null,
   ...patch,
 });
 
-test("recipient categories map to the groups that behave differently", () => {
-  assert.equal(classifyAudience("investors"), "INVERSORES");
-  assert.equal(classifyAudience("Private Sale"), "INVERSORES");
-  assert.equal(classifyAudience("team"), "EQUIPO");
-  assert.equal(classifyAudience("Core Contributors"), "EQUIPO");
-  assert.equal(classifyAudience("ecosystem incentives"), "ECOSISTEMA");
-  assert.equal(classifyAudience("airdrop"), "ECOSISTEMA");
-  assert.equal(classifyAudience(undefined), "OTROS");
+test("overhang is the locked supply valued at today's price", () => {
+  const row = parseOverhang(coin(), new Set());
+  assert.ok(row);
+  assert.equal(row.symbol, "EJ");
+  assert.equal(row.lockedTokens, 300_000_000);
+  assert.equal(row.lockedValueUsd, 600_000_000);
+  assert.equal(row.unlockedPct, 25);
+  // 600M of locked value against a 200M cap: the float could triple.
+  assert.equal(row.overhangRatio, 3);
 });
 
-test("an unlock is parsed with its dilution relative to market cap", () => {
-  const unlock = parseUnlock(entry(), NOW, new Set());
-  assert.ok(unlock);
-  assert.equal(unlock.symbol, "EJ");
-  assert.equal(unlock.daysAway, 10);
-  assert.equal(unlock.valueUsd, 10_000_000);
-  // 10M of a 1B cap is 1%.
-  assert.ok(Math.abs((unlock.pctOfMcap ?? 0) - 1) < 1e-9);
-  assert.equal(unlock.audience, "INVERSORES");
-});
-
-test("seconds and milliseconds timestamps both resolve to the same date", () => {
-  const seconds = parseUnlock(entry({ nextEvent: { date: inDays(5) / 1000 } }), NOW, new Set());
-  const millis = parseUnlock(entry({ nextEvent: { date: inDays(5) } }), NOW, new Set());
-  assert.equal(seconds?.date, millis?.date);
-});
-
-test("a record with no usable date is skipped rather than defaulted", () => {
-  // Inventing a date on a sell-pressure calendar would be worse than a gap.
-  assert.equal(parseUnlock(entry({ nextEvent: {} }), NOW, new Set()), null);
-  assert.equal(parseUnlock({ name: "Sin fecha" }, NOW, new Set()), null);
-  assert.equal(parseUnlock(null, NOW, new Set()), null);
-});
-
-test("events already past are not listed as upcoming", () => {
-  assert.equal(parseUnlock(entry({ nextEvent: { date: inDays(-3) / 1000 } }), NOW, new Set()), null);
-});
-
-test("watchlist matching strips the pair suffix and Binance's 1000x prefix", () => {
-  const board = buildUnlockBoard(
-    [entry({ token: "PEPE" }), entry({ token: "SOL" }), entry({ token: "ZZZ" })],
-    ["1000PEPEUSDT", "SOLUSDT"],
-    NOW,
+test("the ceiling is the larger of total and max supply", () => {
+  // A token that can still mint beyond its current total: using total alone
+  // would understate what is coming.
+  const row = parseOverhang(
+    coin({ total_supply: 400_000_000, max_supply: 1_000_000_000 }),
+    new Set(),
   );
-  assert.ok(board);
-  assert.deepEqual(
-    board.watched.map((u) => u.symbol).sort(),
-    ["PEPE", "SOL"],
-  );
-  assert.equal(board.upcoming.length, 3, "los demás siguen listados, sólo no están marcados");
+  assert.equal(row?.total, 1_000_000_000);
+  assert.equal(row?.lockedTokens, 900_000_000);
 });
 
-test("unlocks are ordered soonest first and bounded by the horizon", () => {
-  const board = buildUnlockBoard(
-    [
-      entry({ token: "A", nextEvent: { date: inDays(40) / 1000, toUnlock: 1 } }),
-      entry({ token: "B", nextEvent: { date: inDays(2) / 1000, toUnlock: 1 } }),
-      entry({ token: "C", nextEvent: { date: inDays(400) / 1000, toUnlock: 1 } }),
-    ],
-    [],
-    NOW,
+test("a fully circulating token shows no overhang rather than a negative one", () => {
+  const row = parseOverhang(
+    coin({ circulating_supply: 400_000_000, total_supply: 400_000_000 }),
+    new Set(),
   );
-  assert.ok(board);
-  assert.deepEqual(board.upcoming.map((u) => u.symbol), ["B", "A"]);
-  assert.equal(board.projectsScanned, 3, "se informa el total escaneado, no sólo lo que entró");
+  assert.equal(row?.lockedTokens, 0);
+  assert.equal(row?.overhangRatio, 0);
 });
 
-test("a payload that is not a list, or has nothing ahead, yields nothing", () => {
-  assert.equal(buildUnlockBoard({ error: "pro plan required" }, [], NOW), null);
-  assert.equal(buildUnlockBoard([], [], NOW), null);
+test("circulating reported above total is skipped as bad data", () => {
+  // This happens upstream; it is not a negative overhang.
   assert.equal(
-    buildUnlockBoard([entry({ nextEvent: { date: inDays(-1) / 1000 } })], [], NOW),
+    parseOverhang(coin({ circulating_supply: 500_000_000, total_supply: 400_000_000 }), new Set()),
     null,
   );
 });
 
-test("missing price or cap degrades to nulls instead of fake figures", () => {
-  const noPrice = parseUnlock(entry({ tPrice: undefined }), NOW, new Set());
-  assert.equal(noPrice?.valueUsd, null);
-  assert.equal(noPrice?.pctOfMcap, null);
-  assert.equal(noPrice?.tokens, 5_000_000, "lo que sí se sabe se conserva");
+test("records missing any figure the maths needs are skipped, not defaulted", () => {
+  assert.equal(parseOverhang(coin({ current_price: null }), new Set()), null);
+  assert.equal(parseOverhang(coin({ circulating_supply: 0 }), new Set()), null);
+  assert.equal(parseOverhang(coin({ total_supply: null, max_supply: null }), new Set()), null);
+  assert.equal(parseOverhang(coin({ market_cap: null }), new Set()), null);
+  assert.equal(parseOverhang(null, new Set()), null);
+});
+
+test("the board ranks by overhang ratio, not by raw locked value", () => {
+  // A huge locked value on a huge cap dilutes less than a modest one on a
+  // small cap; ranking by dollars would put them in the wrong order.
+  const board = buildOverhangBoard(
+    [
+      coin({ symbol: "big", market_cap: 100_000_000_000, circulating_supply: 90_000_000, total_supply: 100_000_000 }),
+      coin({ symbol: "small", market_cap: 10_000_000, circulating_supply: 10_000_000, total_supply: 100_000_000 }),
+    ],
+    [],
+  );
+  assert.ok(board);
+  assert.equal(board.ranked[0].symbol, "SMALL");
+});
+
+test("watchlist matching strips the pair suffix and the 1000x prefix", () => {
+  const board = buildOverhangBoard(
+    [coin({ symbol: "pepe" }), coin({ symbol: "sol" }), coin({ symbol: "zzz" })],
+    ["1000PEPEUSDT", "SOLUSDT"],
+  );
+  assert.deepEqual(
+    board?.watched.map((r) => r.symbol).sort(),
+    ["PEPE", "SOL"],
+  );
+  assert.equal(board?.ranked.length, 3, "los demás siguen listados");
+});
+
+test("a payload that is not a list, or has nothing usable, yields nothing", () => {
+  assert.equal(buildOverhangBoard({ error: "rate limited" }, []), null);
+  assert.equal(buildOverhangBoard([], []), null);
+  assert.equal(buildOverhangBoard([coin({ current_price: null })], []), null);
+});
+
+test("the board states that it measures size, not timing", () => {
+  const board = buildOverhangBoard([coin()], []);
+  assert.match(board?.caveat ?? "", /no cuándo llega/);
 });

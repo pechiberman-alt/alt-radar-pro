@@ -26,10 +26,12 @@
 .unlock-size b{color:#b9c5be}
 
 .unlock-audience{font:7px var(--font-mono);letter-spacing:.8px;padding:3px 6px;border-radius:3px;white-space:nowrap}
-.unlock-audience.a-inversores{background:#321217;color:var(--red)}
-.unlock-audience.a-equipo{background:#2a2110;color:var(--amber)}
-.unlock-audience.a-ecosistema{background:#0c1c15;color:var(--green2)}
-.unlock-audience.a-otros{background:#121916;color:var(--muted)}
+.unlock-audience.a-alto{background:#321217;color:var(--red)}
+.unlock-audience.a-medio{background:#2a2110;color:var(--amber)}
+.unlock-audience.a-bajo{background:#0c1c15;color:var(--green2)}
+
+.unlock-scope{margin:0 0 14px;padding:10px 12px;background:#141207;border:1px solid #5c4a1c;border-left:3px solid var(--amber);border-radius:4px;font:9px var(--font-mono);line-height:1.7;color:#a8a294}
+.unlock-scope b{color:var(--amber)}
 
 .unlock-caveat{margin-top:16px;padding:12px 14px;background:#0a0f0c;border:1px solid var(--line);border-radius:4px;font:9px var(--font-mono);line-height:1.8;color:var(--muted)}
 .unlock-caveat b{color:#b9c5be}

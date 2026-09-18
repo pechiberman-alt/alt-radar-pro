@@ -63,7 +63,7 @@ const NAV_ITEMS = [
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
   { label: "LIQUIDACIONES", mobile: "MAPA", icon: "▨", id: "liquidaciones" },
-  { label: "DESBLOQUEOS", mobile: "UNLOCK", icon: "◷", id: "desbloqueos" },
+  { label: "OFERTA PENDIENTE", mobile: "OFERTA", icon: "◷", id: "desbloqueos" },
   { label: "FLUJO POR ACTIVO", mobile: "FLUJO", icon: "⇉", id: "flujo-activos" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
@@ -1170,7 +1170,7 @@ export default function RadarApp() {
           <AssetFlowDesk />
         </Collapsible>
 
-        <Collapsible id="desbloqueos" label="DESBLOQUEOS" open={workspace.open["desbloqueos"]} onToggle={workspace.toggle}>
+        <Collapsible id="desbloqueos" label="OFERTA PENDIENTE" open={workspace.open["desbloqueos"]} onToggle={workspace.toggle}>
           <UnlockDesk />
         </Collapsible>
 
