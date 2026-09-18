@@ -190,3 +190,4 @@
 .liq-desk,.liq-summary,.liq-controls{min-width:0;max-width:100%}
 /* Nothing in the panel may force a horizontal scrollbar on the page. */
 .liq-desk{overflow-x:hidden}
+.liq-zoom .liq-reset{font-size:13px}
