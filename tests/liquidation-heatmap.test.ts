@@ -3,7 +3,10 @@ import test from "node:test";
 import {
   buildLiquidationHeatmap,
   buildVolumeProfile,
-  LEVERAGE_TIERS,
+  DEFAULT_LEVERAGE_TIERS,
+  leverageTiersFor,
+  MAJOR_LEVERAGE_TIERS,
+  maintenanceMarginRateFor,
 } from "../lib/liquidation-heatmap.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
 
@@ -22,16 +25,21 @@ const candle = (
   quoteVolume: volume * ((low + high) / 2),
 });
 
-test("leverage tier weights sum to 1, so the density total isn't silently scaled", () => {
-  const sum = LEVERAGE_TIERS.reduce((total, tier) => total + tier.weight, 0);
-  assert.ok(Math.abs(sum - 1) < 1e-9, `pesan ${sum}, deberían sumar 1`);
+test("every leverage distribution sums to 1, so density totals aren't silently scaled", () => {
+  for (const [name, tiers] of [
+    ["MAJOR", MAJOR_LEVERAGE_TIERS],
+    ["DEFAULT", DEFAULT_LEVERAGE_TIERS],
+  ] as const) {
+    const sum = tiers.reduce((total, tier) => total + tier.weight, 0);
+    assert.ok(Math.abs(sum - 1) < 1e-9, `${name} pesa ${sum}, debería sumar 1`);
+  }
 });
 
 test("volume profile spreads a candle's volume across every bin it touches, not just one", () => {
   const profile = buildVolumeProfile([candle(1, 100, 103, 300)], 1);
   // Range [100,103) touches bins 100, 101, 102 — three bins, not one.
   assert.equal(profile.size, 3);
-  const total = [...profile.values()].reduce((sum, bin) => sum + bin.volume, 0);
+  const total = [...profile.values()].reduce((sum, bin) => sum + bin.weight, 0);
   assert.ok(Math.abs(total - 300) < 1e-6, "el volumen total se conserva");
 });
 
@@ -116,9 +124,14 @@ test("intensity is normalised so the busiest bucket always reads 100", () => {
 });
 
 test("buckets never fall outside the requested price range", () => {
-  const candles = Array.from({ length: 25 }, (_, i) => candle(i, 60_000, 140_000, 80));
+  // Candles confined to a narrow band: levels projected outside that band were
+  // never traded through, so they survive the swept-zone filter and there is
+  // something left to range-check. (Candles spanning the whole range would
+  // sweep every level and correctly leave an empty map.)
+  const candles = Array.from({ length: 25 }, (_, i) => candle(i, 99_500, 100_500, 80));
   const heatmap = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, 0.1);
   assert.ok(heatmap);
+  assert.ok(heatmap.buckets.length > 0);
   for (const bucket of heatmap.buckets) {
     assert.ok(bucket.price >= 90_000 && bucket.price <= 110_000);
   }
@@ -155,4 +168,110 @@ test("a zone carries the candle index it formed at, so the chart can draw it in 
       `una zona sin volumen previo no puede existir antes de la vela 40 (formedAt=${bucket.formedAt})`,
     );
   }
+});
+
+/* ── v2: zonas barridas, open interest, y calibración por símbolo ── */
+
+test("a level price traded through after it formed is dropped, not left as fuel", () => {
+  // Positions open in a tight band, then price sweeps far below and returns.
+  // The sweep candle carries no volume of its own, so it only moves price
+  // without opening new positions — otherwise it would seed fresh levels down
+  // there and muddy what this test is measuring.
+  const opened = Array.from({ length: 10 }, (_, i) => candle(i, 99_900, 100_100, 100));
+  const swept = [candle(10, 80_000, 100_100, 0)];
+  const back = Array.from({ length: 5 }, (_, i) => candle(11 + i, 99_900, 100_100, 100));
+
+  const withoutSweep = buildLiquidationHeatmap("BTCUSDT", [...opened, ...back], 100_000);
+  const withSweep = buildLiquidationHeatmap("BTCUSDT", [...opened, ...swept, ...back], 100_000);
+  assert.ok(withoutSweep && withSweep);
+
+  const fuelBelow = (map: NonNullable<typeof withSweep>) =>
+    map.buckets
+      .filter((bucket) => bucket.price < 99_900 && bucket.price > 80_000)
+      .reduce((sum, bucket) => sum + bucket.longDensity, 0);
+
+  assert.ok(fuelBelow(withoutSweep) > 0, "sin barrido debe haber combustible debajo");
+  assert.equal(
+    fuelBelow(withSweep),
+    0,
+    "tras el barrido esas posiciones ya se liquidaron: no pueden seguir contando",
+  );
+});
+
+test("a level that formed only AFTER the sweep survives it", () => {
+  // Order matters: the sweep happens first, then positions open. Those new
+  // positions have not been touched, so their levels must remain.
+  const swept = [candle(0, 80_000, 100_100, 100)];
+  const opened = Array.from({ length: 10 }, (_, i) => candle(1 + i, 99_900, 100_100, 100));
+  const heatmap = buildLiquidationHeatmap("BTCUSDT", [...swept, ...opened], 100_000);
+  assert.ok(heatmap);
+  const fuelBelow = heatmap.buckets
+    .filter((bucket) => bucket.price < 99_000 && bucket.price > 80_000)
+    .reduce((sum, bucket) => sum + bucket.longDensity, 0);
+  assert.ok(fuelBelow > 0, "posiciones abiertas despues del barrido siguen vivas");
+});
+
+test("positive open-interest change replaces volume as the weight when supplied", () => {
+  // Two bands with identical volume, but OI only grew at the upper one — so
+  // only the upper band represents positions that actually opened.
+  const candles = [
+    ...Array.from({ length: 6 }, (_, i) => candle(i, 95_000, 95_200, 500)),
+    ...Array.from({ length: 6 }, (_, i) => candle(6 + i, 105_000, 105_200, 500)),
+  ];
+  const oiDeltaByIndex = [0, 0, 0, 0, 0, 0, 900, 900, 900, 900, 900, 900];
+
+  const byVolume = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
+  const byOi = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, { oiDeltaByIndex });
+  assert.ok(byVolume && byOi);
+
+  assert.equal(byOi.oiWeightedCandles, 12);
+  assert.equal(byVolume.oiWeightedCandles, 0);
+  assert.match(byOi.method, /open interest/);
+  // With the lower band contributing nothing, the map must lean the other way.
+  assert.notEqual(byOi.bias, byVolume.bias);
+});
+
+test("a candle with no OI datapoint falls back to its own volume, not to zero", () => {
+  const candles = Array.from({ length: 8 }, (_, i) => candle(i, 104_900, 105_100, 300));
+  // Only half the window has OI coverage, as happens past Binance's retention.
+  const oiDeltaByIndex = [null, null, null, null, 400, 400, 400, 400];
+  const heatmap = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, { oiDeltaByIndex });
+  assert.ok(heatmap);
+  assert.equal(heatmap.oiWeightedCandles, 4);
+  assert.ok(heatmap.buckets.length > 0, "las velas sin OI siguen aportando por volumen");
+  assert.match(heatmap.method, /4 de 8 velas/);
+});
+
+test("BTC and ETH use Binance's real tier-1 maintenance margin, alts use the labelled estimate", () => {
+  assert.equal(maintenanceMarginRateFor("BTCUSDT"), 0.004);
+  assert.equal(maintenanceMarginRateFor("ETHUSDT"), 0.0065);
+  assert.equal(maintenanceMarginRateFor("SOLUSDT"), 0.005);
+
+  const candles = Array.from({ length: 10 }, (_, i) => candle(i, 104_900, 105_100, 200));
+  const btc = buildLiquidationHeatmap("BTCUSDT", candles, 100_000);
+  const sol = buildLiquidationHeatmap("SOLUSDT", candles, 100_000);
+  assert.match(btc?.assumptions ?? "", /tasa real de Binance/);
+  assert.match(sol?.assumptions ?? "", /estimado/);
+});
+
+test("majors get the recalibrated leverage mix, other symbols keep the conservative one", () => {
+  assert.equal(leverageTiersFor("BTCUSDT"), MAJOR_LEVERAGE_TIERS);
+  assert.equal(leverageTiersFor("SOLUSDT"), DEFAULT_LEVERAGE_TIERS);
+
+  const majorHigh = MAJOR_LEVERAGE_TIERS.filter((t) => t.leverage >= 20).reduce(
+    (sum, t) => sum + t.weight,
+    0,
+  );
+  // Binance disclosed that over 80% of its futures traders used 20x or more.
+  assert.ok(majorHigh > 0.8, `los tramos altos pesan ${majorHigh}, deberían superar 0.8`);
+  const hundredX = MAJOR_LEVERAGE_TIERS.find((t) => t.leverage === 100)?.weight ?? 0;
+  assert.ok(hundredX >= 0.15, "Binance reporto ~20% de usuarios en 100x o mas");
+});
+
+test("the legacy numeric third argument still means priceRangePct", () => {
+  const candles = Array.from({ length: 12 }, (_, i) => candle(i, 99_500, 100_500, 90));
+  const legacy = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, 0.1);
+  const explicit = buildLiquidationHeatmap("BTCUSDT", candles, 100_000, { priceRangePct: 0.1 });
+  assert.ok(legacy && explicit);
+  assert.equal(legacy.buckets.length, explicit.buckets.length);
 });

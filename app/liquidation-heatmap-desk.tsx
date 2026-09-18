@@ -28,8 +28,30 @@ type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; time
  */
 const BROWSER_BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
 
-/** Candles per timeframe for the volume profile that feeds the map. */
+/** Futures hosts, for open interest. Same mirror list market-brain already uses. */
+const FUTURES_BASES = [
+  "https://fapi.binance.com",
+  "https://fapi1.binance.com",
+  "https://fapi2.binance.com",
+];
+
+/** Candles per timeframe for the activity profile that feeds the map. */
 const LOOKBACK: Record<string, number> = { "15m": 500, "1h": 500, "4h": 500, "1d": 365 };
+
+/**
+ * Binance's open-interest history endpoint takes its own period names and,
+ * critically, only retains about 30 days of history — and caps a single call
+ * at 500 rows. Daily candles therefore get no OI coverage at all, and the
+ * shorter frames get partial coverage. That is fine: the engine falls back to
+ * volume per-candle wherever OI is missing, and reports how much of the map
+ * came from which source.
+ */
+const OI_PERIOD: Record<string, string | null> = {
+  "15m": "15m",
+  "1h": "1h",
+  "4h": "4h",
+  "1d": null,
+};
 
 async function loadRows(symbol: string, interval: string, limit: number, signal: AbortSignal) {
   const path = `/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`;
@@ -62,6 +84,61 @@ async function loadRows(symbol: string, interval: string, limit: number, signal:
   if (!proxied.ok) return null;
   const rows = await proxied.json();
   return Array.isArray(rows) && rows.length ? rows : null;
+}
+
+/**
+ * Per-candle change in open interest, aligned by candle open time.
+ *
+ * Volume counts a position opening and closing as two events; open interest
+ * counts only what is still held. A rise in OI on a candle means contracts
+ * were opened at that price — the thing this map is actually trying to find.
+ * Returns null on any failure so the engine simply keeps using volume.
+ */
+async function loadOiDelta(
+  symbol: string,
+  timeframe: string,
+  candleOpenTimes: number[],
+  signal: AbortSignal,
+): Promise<(number | null)[] | null> {
+  const period = OI_PERIOD[timeframe];
+  if (!period) return null;
+
+  const path = `/futures/data/openInterestHist?symbol=${encodeURIComponent(symbol)}&period=${period}&limit=500`;
+  for (const base of FUTURES_BASES) {
+    try {
+      const response = await fetch(`${base}${path}`, { signal });
+      if (!response.ok) continue;
+      const rows = (await response.json()) as unknown;
+      if (!Array.isArray(rows) || rows.length < 2) continue;
+
+      const byTime = new Map<number, number>();
+      for (const row of rows) {
+        const entry = row as { timestamp?: unknown; sumOpenInterest?: unknown };
+        const time = Number(entry.timestamp);
+        const oi = Number(entry.sumOpenInterest);
+        if (Number.isFinite(time) && Number.isFinite(oi)) byTime.set(time, oi);
+      }
+      if (byTime.size < 2) continue;
+
+      // Align to the candles we actually drew, by open time. A candle with no
+      // OI row, or whose predecessor has none, gets null and falls back.
+      const sorted = [...byTime.keys()].sort((a, b) => a - b);
+      const previousOf = new Map<number, number>();
+      for (let i = 1; i < sorted.length; i += 1) previousOf.set(sorted[i], sorted[i - 1]);
+
+      return candleOpenTimes.map((time) => {
+        const current = byTime.get(time);
+        const previousTime = previousOf.get(time);
+        if (current === undefined || previousTime === undefined) return null;
+        const previous = byTime.get(previousTime);
+        if (previous === undefined) return null;
+        return current - previous;
+      });
+    } catch {
+      // Next mirror; if all fail, the engine uses volume.
+    }
+  }
+  return null;
 }
 
 const SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
@@ -158,7 +235,20 @@ export default function LiquidationHeatmapDesk() {
         }
 
         const currentPrice = candles.at(-1)!.close;
-        const heatmap = buildLiquidationHeatmap(symbol, candles, currentPrice);
+        // Open interest is a strictly better weight than volume, but it is
+        // futures-only and short-retention — so it is fetched separately and
+        // the engine degrades to volume wherever it is missing.
+        const oiDeltaByIndex = await loadOiDelta(
+          symbol,
+          timeframe,
+          candles.map((candle) => candle.openTime),
+          controller.signal,
+        );
+        if (!alive) return;
+
+        const heatmap = buildLiquidationHeatmap(symbol, candles, currentPrice, {
+          oiDeltaByIndex: oiDeltaByIndex ?? undefined,
+        });
         if (!heatmap) {
           setError("MAPA NO DISPONIBLE");
           setData(null);
@@ -260,11 +350,40 @@ export default function LiquidationHeatmapDesk() {
       <div className="liq-lag">
         <b>ESTIMACIÓN, NO LIQUIDACIONES CONFIRMADAS</b>
         <span>
-          Ningún exchange publica el apalancamiento real de cada posición. Este mapa toma dónde se
-          operó (perfil de volumen) y proyecta dónde liquidaría esa posición bajo una distribución
-          asumida de apalancamientos. Es un modelo estándar del sector, no una medición — tratalo
-          como zonas de interés, no como niveles garantizados.
+          Ningún exchange publica el apalancamiento real de cada posición, así que ninguna
+          herramienta —ni las pagas— puede mostrarte clusters reales. Este mapa proyecta dónde
+          liquidaría una posición abierta en cada nivel, bajo una distribución asumida de
+          apalancamientos. Es un modelo estándar del sector, no una medición: tratalo como zonas de
+          interés, no como niveles garantizados.
         </span>
+      </div>
+
+      {/* Three things this engine does that the naive version of this chart
+          does not — stated where the reader can check them, since they are the
+          difference between a plausible-looking picture and a defensible one. */}
+      <div className="liq-upgrades">
+        <div>
+          <b>POSICIONES ABIERTAS, NO OPERADAS</b>
+          <span>
+            Donde hay datos de open interest, el peso de cada nivel es el alta real de contratos, no
+            el volumen. El volumen cuenta abrir y cerrar como dos eventos aunque no quede nada
+            abierto.
+          </span>
+        </div>
+        <div>
+          <b>ZONAS YA BARRIDAS SE DESCARTAN</b>
+          <span>
+            Si el precio ya atravesó un nivel después de que se formó, esa posición ya se liquidó.
+            Dejarla en el mapa sería mostrar combustible que no existe.
+          </span>
+        </div>
+        <div>
+          <b>MARGEN REAL DE BINANCE</b>
+          <span>
+            BTC y ETH usan la tasa de mantenimiento publicada por Binance para el primer tramo, no
+            un número redondo. El resto usa un estimado, y el panel lo aclara abajo.
+          </span>
+        </div>
       </div>
 
       <div className="liq-controls">
