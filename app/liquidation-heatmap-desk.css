@@ -168,3 +168,4 @@
 .liq-zoom span{min-width:auto}
 .liq-pinch{display:none;font-style:normal;margin-left:6px;color:#5d6b64}
 @media (pointer: coarse){ .liq-pinch{display:inline} }
+.liq-updated{font-style:normal;margin-left:6px;color:var(--green2)}
