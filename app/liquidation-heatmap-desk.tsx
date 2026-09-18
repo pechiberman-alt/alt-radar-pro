@@ -219,8 +219,8 @@ const priceLabel = (price: number) =>
     : price.toLocaleString("es-AR", { maximumFractionDigits: price >= 1 ? 2 : 6 });
 
 const CHART_W = 1000;
-const CHART_H = 580;
-const MARGIN = { top: 14, right: 86, bottom: 30, left: 8 };
+const CHART_H = 470;
+const MARGIN = { top: 10, right: 82, bottom: 26, left: 8 };
 const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 /** Right-hand strip where every zone renders its full weight as a profile bar,
@@ -332,18 +332,29 @@ export default function LiquidationHeatmapDesk() {
     if (!data || !data.candles.length) return null;
     const { candles, heatmap } = data;
 
-    // Scale to the traded range, not to the full spread of projected levels.
-    // The engine projects ±22% around price; letting that set the axis
-    // squashed the candles into a thin band in the middle with dead space
-    // above and below. Zones outside the visible window still exist — they
-    // are simply off-chart, the way any charting tool handles them.
+    // Scale to cover BOTH the traded range and the two magnet zones the
+    // cards above call out. Scaling to candles alone left those zones off
+    // the chart entirely — the panel was naming levels the reader could not
+    // see, which is worse than not naming them. The span is still capped so
+    // a far-away zone cannot squash the candles into a sliver: past the cap
+    // the zone is simply outside the window, as in any charting tool.
     const candleHighs = candles.map((c) => c.high);
     const candleLows = candles.map((c) => c.low);
     const tradedHi = Math.max(...candleHighs);
     const tradedLo = Math.min(...candleLows);
-    const headroom = (tradedHi - tradedLo) * 0.35;
-    const lo = Math.max(0, tradedLo - headroom);
-    const hi = tradedHi + headroom;
+
+    const zonePrices = [heatmap.topZoneAbove?.price, heatmap.topZoneBelow?.price].filter(
+      (price): price is number => typeof price === "number",
+    );
+    const MAX_SPAN = 0.09; // ±9% of price is as far as the window will stretch.
+    const capHi = heatmap.currentPrice * (1 + MAX_SPAN);
+    const capLo = heatmap.currentPrice * (1 - MAX_SPAN);
+    const wantHi = Math.max(tradedHi, ...zonePrices.filter((p) => p <= capHi));
+    const wantLo = Math.min(tradedLo, ...zonePrices.filter((p) => p >= capLo));
+
+    const headroom = (wantHi - wantLo) * 0.06;
+    const lo = Math.max(0, wantLo - headroom);
+    const hi = wantHi + headroom;
 
     const y = (price: number) => MARGIN.top + (1 - (price - lo) / (hi - lo)) * PLOT_H;
 
@@ -492,6 +503,7 @@ export default function LiquidationHeatmapDesk() {
 
       {data && layout && (
         <>
+          <div className="liq-summary">
           <div
             className={`liq-bias b-${
               data.heatmap.bias.includes("ALZA")
@@ -541,6 +553,7 @@ export default function LiquidationHeatmapDesk() {
                 <b className="none">sin zona activa</b>
               )}
             </div>
+          </div>
           </div>
 
           <div className="liq-chart-wrap">
@@ -645,6 +658,32 @@ export default function LiquidationHeatmapDesk() {
                 y2={layout.y(data.heatmap.currentPrice)}
                 className="liq-price-line"
               />
+
+              {/* The same two levels the cards name, drawn where they sit. */}
+              {[
+                { zone: data.heatmap.topZoneAbove, cls: "up", label: "IMÁN ↑" },
+                { zone: data.heatmap.topZoneBelow, cls: "down", label: "IMÁN ↓" },
+              ].map(({ zone, cls, label }) =>
+                zone && zone.price >= layout.lo && zone.price <= layout.hi ? (
+                  <g key={cls}>
+                    <line
+                      x1={MARGIN.left}
+                      x2={CHART_W - MARGIN.right}
+                      y1={layout.y(zone.price)}
+                      y2={layout.y(zone.price)}
+                      className={`liq-magnet-line ${cls}`}
+                    />
+                    <text
+                      x={MARGIN.left + 6}
+                      y={layout.y(zone.price) - 5}
+                      className={`liq-magnet-label ${cls}`}
+                    >
+                      {label} {priceLabel(zone.price)}
+                      {zone.notionalUsd !== null ? ` · ${usd(zone.notionalUsd)}` : ""}
+                    </text>
+                  </g>
+                ) : null,
+              )}
 
               {priceTicks.map((tick) => (
                 <text
