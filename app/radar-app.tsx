@@ -27,6 +27,7 @@ import AccountPanel from "./account-panel";
 import InstitutionalDesk from "./institutional-desk";
 import ExchangeFlowDesk from "./exchange-flows";
 import LiquidationHeatmapDesk from "./liquidation-heatmap-desk";
+import UnlockDesk from "./unlock-desk";
 import SwingDesk from "./swing-desk";
 import { Collapsible, WorkspaceBar, useWorkspace } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -61,6 +62,7 @@ const NAV_ITEMS = [
   { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
   { label: "LIQUIDACIONES", mobile: "MAPA", icon: "▨", id: "liquidaciones" },
+  { label: "DESBLOQUEOS", mobile: "UNLOCK", icon: "◷", id: "desbloqueos" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
   { label: "SWING", mobile: "SWING", icon: "◤", id: "swing" },
@@ -1160,6 +1162,10 @@ export default function RadarApp() {
 
         <Collapsible id="liquidaciones" label="LIQUIDACIONES" open={workspace.open["liquidaciones"]} onToggle={workspace.toggle}>
           <LiquidationHeatmapDesk />
+        </Collapsible>
+
+        <Collapsible id="desbloqueos" label="DESBLOQUEOS" open={workspace.open["desbloqueos"]} onToggle={workspace.toggle}>
+          <UnlockDesk />
         </Collapsible>
 
         <Collapsible id="swing" label="SWING" open={workspace.open["swing"]} onToggle={workspace.toggle}>
