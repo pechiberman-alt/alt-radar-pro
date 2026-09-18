@@ -296,6 +296,23 @@ export default function LiquidationHeatmapDesk() {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  /**
+   * Keep the map current without a manual reload.
+   *
+   * The cadence follows the timeframe: a 15m map has nothing new to say every
+   * ten seconds, and hammering Binance for a chart nobody is watching that
+   * closely wastes someone else's rate limit. Refreshes are silent — no
+   * spinner — so a zoom or a read is never interrupted by the panel blanking
+   * out under the reader.
+   */
+  useEffect(() => {
+    const period = timeframe === "15m" ? 60_000 : timeframe === "1h" ? 120_000 : 300_000;
+    const id = setInterval(() => setRefreshKey((key) => key + 1), period);
+    return () => clearInterval(id);
+  }, [timeframe]);
   const [hovered, setHovered] = useState<HeatBucket | null>(null);
   /** Visible candle count. Fewer candles = zoomed in. */
   const [visibleCandles, setVisibleCandles] = useState(70);
@@ -349,15 +366,22 @@ export default function LiquidationHeatmapDesk() {
   // timeframe, rather than at the top of the effect below — so the state
   // update that shows the spinner happens in the same tick as the click,
   // not as a synchronous set-state-in-effect firing right after render.
+  // Changing pair or timeframe is a fresh load, not a refresh: clear the old
+  // map so a failure can't leave BTC's chart on screen under an ETH label,
+  // and reset the refresh counter so that load is allowed to report errors.
   const selectSymbol = (next: string) => {
     setLoading(true);
     setError("");
+    setData(null);
+    setRefreshKey(0);
     setVisibleCandles(70);
     setSymbol(next);
   };
   const selectTimeframe = (next: string) => {
     setLoading(true);
     setError("");
+    setData(null);
+    setRefreshKey(0);
     setVisibleCandles(70);
     setTimeframe(next);
   };
@@ -410,6 +434,17 @@ export default function LiquidationHeatmapDesk() {
     const controller = new AbortController();
     let alive = true;
 
+    // A silent auto-refresh must never blank out a map the reader is looking
+    // at. On a background refresh a transient failure is ignored and the last
+    // good map stays on screen; only the first load for a symbol reports an
+    // error, because then there is nothing to keep.
+    const isRefresh = refreshKey > 0;
+    const fail = (message: string) => {
+      if (isRefresh) return;
+      setError(message);
+      setData(null);
+    };
+
     (async () => {
       try {
         const interval = timeframe === "1d" ? "1d" : timeframe;
@@ -421,15 +456,13 @@ export default function LiquidationHeatmapDesk() {
         );
         if (!alive) return;
         if (!rows) {
-          setError("MAPA NO DISPONIBLE");
-          setData(null);
+          fail("MAPA NO DISPONIBLE");
           return;
         }
 
         const candles = parseSwingKlines(rows);
         if (candles.length < 20) {
-          setError("SIN VELAS SUFICIENTES");
-          setData(null);
+          fail("SIN VELAS SUFICIENTES");
           return;
         }
 
@@ -455,11 +488,11 @@ export default function LiquidationHeatmapDesk() {
             openContracts !== null ? openContracts * currentPrice : undefined,
         });
         if (!heatmap) {
-          setError("MAPA NO DISPONIBLE");
-          setData(null);
+          fail("MAPA NO DISPONIBLE");
           return;
         }
 
+        setUpdatedAt(Date.now());
         setData({
           heatmap,
           candles: candles.slice(-MAX_DISPLAY_CANDLES).map((candle) => ({
@@ -472,7 +505,7 @@ export default function LiquidationHeatmapDesk() {
           timeframe,
         });
       } catch {
-        if (alive) setError("MAPA NO DISPONIBLE");
+        if (alive) fail("MAPA NO DISPONIBLE");
       } finally {
         if (alive) setLoading(false);
       }
@@ -482,7 +515,7 @@ export default function LiquidationHeatmapDesk() {
       alive = false;
       controller.abort();
     };
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, refreshKey]);
 
   const layout = useMemo(() => {
     if (!data || !data.candles.length) return null;
@@ -591,9 +624,29 @@ export default function LiquidationHeatmapDesk() {
     const rowPeak = Math.max(...visibleZones.map((z) => z.total), 1);
     // Drop the faintest rows outright: at very low intensity they add noise,
     // not information, and keeping them is what produced a wash of colour.
-    const zones = visibleZones
+    const scored = visibleZones
       .map((zone) => ({ ...zone, intensity: (zone.total / rowPeak) * 100 }))
-      .filter((zone) => zone.intensity >= 6)
+      .filter((zone) => zone.intensity >= 6);
+
+    /**
+     * Only the heaviest handful of rows may draw a long horizontal band.
+     *
+     * Filtering by intensity alone did not fix the murky slab: inside a dense
+     * cluster nearly every row is intense, so nearly every row still drew a
+     * band and they stacked into a solid block again. Bounding the COUNT is
+     * what actually guarantees separated lines, regardless of how the
+     * intensities happen to be distributed.
+     */
+    const BAND_LIMIT = 12;
+    const banded = new Set(
+      [...scored]
+        .sort((a, b) => b.intensity - a.intensity)
+        .slice(0, BAND_LIMIT)
+        .map((zone) => zone.price),
+    );
+
+    const zones = scored
+      .map((zone) => ({ ...zone, banded: banded.has(zone.price) }))
       .sort((a, b) => a.price - b.price);
 
     return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT };
@@ -755,7 +808,18 @@ export default function LiquidationHeatmapDesk() {
               −
             </button>
             <span>
-              {visibleCandles} velas<i className="liq-pinch">· pellizcá para ampliar</i>
+              {visibleCandles} velas
+              {updatedAt !== null && (
+                <i className="liq-updated">
+                  · {new Date(updatedAt).toLocaleTimeString("es-AR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: false,
+                  })}
+                </i>
+              )}
+              <i className="liq-pinch">· pellizcá para ampliar</i>
             </span>
             <button onClick={zoomIn} disabled={visibleCandles <= MIN_VISIBLE} aria-label="Acercar">
               +
@@ -825,7 +889,7 @@ export default function LiquidationHeatmapDesk() {
                         slab — which is exactly what looked "dark" and hid the
                         structure. Weaker rows still appear, in the profile bar
                         on the right, where comparing them is the point. */}
-                    {endX > startX && zone.intensity >= 45 && (
+                    {endX > startX && zone.banded && (
                       <rect
                         x={startX}
                         y={yPos - thickness / 2}
