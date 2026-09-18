@@ -37,7 +37,7 @@
 .liq-svg{position:relative;z-index:1}
 .liq-svg{display:block;width:100%;height:auto}
 .liq-grid{stroke:#111a16;stroke-width:1}
-.liq-wick-up,.liq-wick-down{stroke-width:1.3}
+.liq-wick-up,.liq-wick-down{stroke-width:1.6}
 .liq-wick-up{stroke:var(--green)}
 .liq-wick-down{stroke:var(--red)}
 .liq-candle-up{fill:var(--green)}
