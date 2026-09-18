@@ -316,6 +316,17 @@ export default function LiquidationHeatmapDesk() {
   const [hovered, setHovered] = useState<HeatBucket | null>(null);
   /** Visible candle count. Fewer candles = zoomed in. */
   const [visibleCandles, setVisibleCandles] = useState(70);
+  /**
+   * Price-axis view. `scale` multiplies the automatic span (below 1 zooms in);
+   * `center` overrides the automatic mid-price so the reader can travel up
+   * into the liquidity that sits above the traded range, or down below it.
+   * Null center means "follow the data", which is the default and what the
+   * reset button returns to.
+   */
+  const [priceView, setPriceView] = useState<{ scale: number; center: number | null }>({
+    scale: 1,
+    center: null,
+  });
   const [symbols, setSymbols] = useState<string[]>(FALLBACK_SYMBOLS);
 
   useEffect(() => {
@@ -389,6 +400,13 @@ export default function LiquidationHeatmapDesk() {
   const MIN_VISIBLE = 25;
   const MAX_VISIBLE = 220;
   const clampVisible = (n: number) => Math.max(MIN_VISIBLE, Math.min(MAX_VISIBLE, Math.round(n)));
+  const MIN_PRICE_SCALE = 0.12;
+  const MAX_PRICE_SCALE = 2.2;
+  const clampScale = (v: number) => Math.max(MIN_PRICE_SCALE, Math.min(MAX_PRICE_SCALE, v));
+  const resetView = () => {
+    setVisibleCandles(70);
+    setPriceView({ scale: 1, center: null });
+  };
   const zoomIn = () => setVisibleCandles((n) => clampVisible(n / 1.5));
   const zoomOut = () => setVisibleCandles((n) => clampVisible(n * 1.5));
 
@@ -400,29 +418,68 @@ export default function LiquidationHeatmapDesk() {
    * touchmove, and re-rendering the whole chart at that rate would make the
    * gesture feel heavy. Only the resulting candle count goes through state.
    */
-  const gesture = useRef<{ distance: number; candles: number } | null>(null);
-
-  const touchDistance = (touches: React.TouchList) => {
-    const [a, b] = [touches[0], touches[1]];
-    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-  };
+  const gesture = useRef<{
+    dx: number;
+    dy: number;
+    midY: number;
+    candles: number;
+    scale: number;
+    center: number;
+    span: number;
+  } | null>(null);
+  /** Latest price window, so a gesture can pan in price units, not pixels. */
+  const priceWindow = useRef<{ lo: number; hi: number; height: number }>({
+    lo: 0,
+    hi: 0,
+    height: 1,
+  });
 
   const onTouchStart = (event: React.TouchEvent) => {
     if (event.touches.length !== 2) return;
+    const [a, b] = [event.touches[0], event.touches[1]];
+    const { lo, hi } = priceWindow.current;
     gesture.current = {
-      distance: touchDistance(event.touches),
+      dx: Math.abs(a.clientX - b.clientX),
+      dy: Math.abs(a.clientY - b.clientY),
+      midY: (a.clientY + b.clientY) / 2,
       candles: visibleCandles,
+      scale: priceView.scale,
+      center: priceView.center ?? (lo + hi) / 2,
+      span: hi - lo,
     };
   };
 
   const onTouchMove = (event: React.TouchEvent) => {
     if (event.touches.length !== 2 || !gesture.current) return;
-    const distance = touchDistance(event.touches);
-    if (distance < 20 || gesture.current.distance < 20) return;
-    // Fingers apart = zoom in = fewer candles, hence the inverse ratio.
-    const ratio = gesture.current.distance / distance;
-    setVisibleCandles(clampVisible(gesture.current.candles * ratio));
-    // Stop the browser turning the pinch into a page zoom mid-gesture.
+    const [a, b] = [event.touches[0], event.touches[1]];
+    const start = gesture.current;
+
+    const dx = Math.abs(a.clientX - b.clientX);
+    const dy = Math.abs(a.clientY - b.clientY);
+    const midY = (a.clientY + b.clientY) / 2;
+
+    // Which axis the fingers are actually working decides what gets zoomed.
+    // A pinch that is mostly vertical means "show me more price", which is
+    // how a reader travels up into the liquidity above the candles; a mostly
+    // horizontal one means "show me more time".
+    const movedX = Math.abs(dx - start.dx);
+    const movedY = Math.abs(dy - start.dy);
+
+    if (movedY > movedX && start.dy > 20 && dy > 20) {
+      setPriceView((view) => ({ ...view, scale: clampScale(start.scale * (start.dy / dy)) }));
+    } else if (start.dx > 20 && dx > 20) {
+      setVisibleCandles(clampVisible(start.candles * (start.dx / dx)));
+    }
+
+    // Dragging both fingers together travels along the price axis. Converting
+    // the pixel movement through the current window keeps the chart tracking
+    // the fingers instead of drifting at a different rate as zoom changes.
+    const pannedPx = midY - start.midY;
+    if (Math.abs(pannedPx) > 2 && priceWindow.current.height > 0) {
+      const perPixel = start.span / priceWindow.current.height;
+      setPriceView((view) => ({ ...view, center: start.center + pannedPx * perPixel }));
+    }
+
     if (event.cancelable) event.preventDefault();
   };
 
@@ -551,8 +608,17 @@ export default function LiquidationHeatmapDesk() {
     const wantLo = Math.min(tradedLo, ...zonePrices.filter((p) => p >= capLo));
 
     const headroom = (wantHi - wantLo) * 0.06;
-    const lo = Math.max(0, wantLo - headroom);
-    const hi = wantHi + headroom;
+    const autoLo = Math.max(0, wantLo - headroom);
+    const autoHi = wantHi + headroom;
+
+    // The reader's price view overrides the automatic window: zooming in
+    // narrows the span, and panning moves the centre so the liquidity above
+    // or below the traded range can be brought into frame.
+    const autoCentre = (autoLo + autoHi) / 2;
+    const centre = priceView.center ?? autoCentre;
+    const span = Math.max(1e-8, (autoHi - autoLo) * priceView.scale);
+    const lo = Math.max(0, centre - span / 2);
+    const hi = centre + span / 2;
 
     const y = (price: number) => MARGIN.top + (1 - (price - lo) / (hi - lo)) * plotH;
 
@@ -650,7 +716,16 @@ export default function LiquidationHeatmapDesk() {
       .sort((a, b) => a.price - b.price);
 
     return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT };
-  }, [data, box, visibleCandles]);
+  }, [data, box, visibleCandles, priceView]);
+
+  // Keep the gesture's view of the price window in step with what is drawn.
+  // In an effect, not during render: writing a ref while rendering is a side
+  // effect in the render path, and React is right to flag it.
+  useEffect(() => {
+    if (layout) {
+      priceWindow.current = { lo: layout.lo, hi: layout.hi, height: layout.plotH };
+    }
+  }, [layout]);
 
   const keyLevels = useMemo(() => {
     if (!layout) return [];
@@ -807,6 +882,17 @@ export default function LiquidationHeatmapDesk() {
             <button onClick={zoomOut} disabled={visibleCandles >= MAX_VISIBLE} aria-label="Alejar">
               −
             </button>
+            {/* Panning in price can take the reader somewhere with nothing on
+                screen; this is the way back without reloading. */}
+            <button
+              className="liq-reset"
+              onClick={resetView}
+              disabled={visibleCandles === 70 && priceView.scale === 1 && priceView.center === null}
+              aria-label="Volver a la vista automática"
+              title="Vista automática"
+            >
+              ⟳
+            </button>
             <span>
               {visibleCandles} velas
               {updatedAt !== null && (
@@ -820,7 +906,7 @@ export default function LiquidationHeatmapDesk() {
                   })}
                 </i>
               )}
-              <i className="liq-pinch">· pellizcá para ampliar</i>
+              <i className="liq-pinch">· pellizcá ↕ precio ↔ tiempo</i>
             </span>
             <button onClick={zoomIn} disabled={visibleCandles <= MIN_VISIBLE} aria-label="Acercar">
               +
