@@ -101,3 +101,41 @@
   .liq-zones{grid-template-columns:1fr;gap:6px}
   .liq-zones b{font-size:14px}
 }
+
+/* Magnet levels drawn on the chart, matching the cards above it. */
+.liq-magnet-line{stroke-width:1;stroke-dasharray:6 4;opacity:.75}
+.liq-magnet-line.up{stroke:var(--green)}
+.liq-magnet-line.down{stroke:var(--red)}
+.liq-magnet-label{font:10px var(--font-mono);letter-spacing:.4px}
+.liq-magnet-label.up{fill:var(--green)}
+.liq-magnet-label.down{fill:var(--red)}
+
+/* ── Wide screens: the panel stops being a phone column ──
+   On a laptop the bias reading and both magnet cards sit on one row, so the
+   chart starts near the top of the viewport instead of below three stacked
+   blocks, and the chart itself gets the height a desktop screen affords. */
+@media (min-width: 1000px){
+  .liq-summary{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:10px;align-items:stretch}
+  .liq-summary .liq-bias{margin-bottom:0;height:100%}
+  .liq-summary .liq-zones{grid-template-columns:1fr;margin-bottom:0;align-content:stretch}
+  .liq-summary .liq-zones>div{align-content:center}
+  .liq-chart-wrap{min-height:560px}
+  .liq-svg{height:560px}
+  .liq-controls{margin-bottom:14px}
+}
+
+/* Very wide: three across, chart taller still. */
+@media (min-width: 1400px){
+  .liq-summary{grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) minmax(0,1fr)}
+  .liq-summary .liq-zones{display:contents}
+  .liq-chart-wrap{min-height:620px}
+  .liq-svg{height:620px}
+}
+
+/* Phone: chart keeps real height, but the frame no longer carries dead bands. */
+@media (max-width:700px){
+  .liq-chart-wrap{min-height:430px}
+  .liq-svg{height:430px}
+  .liq-magnet-label{font-size:13px}
+  .liq-axis-label{font-size:12px}
+}
