@@ -132,6 +132,10 @@ export type HeatBucket = {
   shortDensity: number;
   /** 0–100, normalised against the busiest surviving bucket in the whole map. */
   intensity: number;
+  /** This bucket's share of total open interest in quote currency, when the
+   *  caller supplied that total. Null when it did not — the panel then shows
+   *  intensity alone rather than inventing a dollar figure. */
+  notionalUsd: number | null;
   /**
    * Index of the earliest candle whose activity feeds this zone. A
    * liquidation level does not exist before the positions behind it were
@@ -148,6 +152,11 @@ export type LiquidationHeatmap = {
   /** How many candles fed the activity profile, so `formedAt` can be read as
    *  a fraction of the lookback regardless of how many candles the chart draws. */
   profileCandles: number;
+  /** Half-life in candles actually applied to older activity, or null when
+   *  decay was disabled. */
+  halfLifeCandles: number | null;
+  /** Total open interest in quote currency used to scale buckets, if given. */
+  totalOpenInterestUsd: number | null;
   /** How many of those candles were weighted by real open-interest change
    *  rather than the volume fallback — surfaced so the method note can say
    *  honestly how much of the map is the better proxy. */
@@ -231,6 +240,29 @@ export type LiquidationHeatmapOptions = {
    * candle, which is v1's exact behaviour.
    */
   oiDeltaByIndex?: (number | null)[];
+  /**
+   * How many candles it takes for a position's assumed survival to halve.
+   *
+   * Without this, every candle in the lookback counts as though its positions
+   * were still open today, which is plainly false: leveraged perpetual
+   * positions turn over fast (a published study of BitMEX found ~3.5% of
+   * longs were force-liquidated *daily*), and funding costs penalise holding.
+   * Vendors approximate the same effect by offering discrete lookback windows;
+   * this is the continuous version, which degrades old activity smoothly
+   * instead of cutting it off at an arbitrary edge.
+   *
+   * Omit to disable decay entirely (every candle weighted equally).
+   */
+  halfLifeCandles?: number;
+  /**
+   * Total open interest in quote currency (contracts × price), from
+   * /fapi/v1/openInterest. When supplied, each bucket also reports its share
+   * of that figure as `notionalUsd`, which turns an abstract 0–100 intensity
+   * into "about this many dollars of positions sit here". The split is
+   * proportional, so it inherits every assumption above — it is a scaled
+   * estimate, not a measured amount.
+   */
+  totalOpenInterestUsd?: number;
 };
 
 export function buildLiquidationHeatmap(
@@ -248,12 +280,23 @@ export function buildLiquidationHeatmap(
 
   const binSize = chooseBinSize(currentPrice);
   const oiDelta = opts.oiDeltaByIndex;
+  const halfLife = opts.halfLifeCandles && opts.halfLifeCandles > 0 ? opts.halfLifeCandles : null;
+  const lastIndex = candles.length - 1;
+  // Older activity is discounted toward zero rather than counted in full:
+  // those positions have had more time to be closed, stopped out, or
+  // liquidated already.
+  const survival = (index: number) =>
+    halfLife === null ? 1 : 0.5 ** ((lastIndex - index) / halfLife);
+
   let oiWeightedCandles = 0;
-  const activityProfile = buildVolumeProfile(candles, binSize, (_candle, index) => {
+  const activityProfile = buildVolumeProfile(candles, binSize, (candle, index) => {
     const delta = oiDelta?.[index];
-    if (delta === undefined || delta === null) return null;
+    if (delta === undefined || delta === null) {
+      // No OI datapoint: fall back to this candle's volume, but still decay it.
+      return halfLife === null ? null : candle.volume * survival(index);
+    }
     oiWeightedCandles += 1;
-    return Math.max(0, delta);
+    return Math.max(0, delta) * survival(index);
   });
   if (activityProfile.size === 0) return null;
 
@@ -313,14 +356,30 @@ export function buildLiquidationHeatmap(
     ...[...density.values()].map((entry) => entry.long + entry.short),
   );
 
+  const totalDensity = [...density.values()].reduce(
+    (sum, entry) => sum + entry.long + entry.short,
+    0,
+  );
+  const openInterestUsd =
+    opts.totalOpenInterestUsd && opts.totalOpenInterestUsd > 0
+      ? opts.totalOpenInterestUsd
+      : null;
+
   const buckets: HeatBucket[] = [...density.entries()]
-    .map(([bin, entry]) => ({
-      price: bin * binSize,
-      longDensity: entry.long,
-      shortDensity: entry.short,
-      intensity: peak > 0 ? ((entry.long + entry.short) / peak) * 100 : 0,
-      formedAt: entry.formedAt,
-    }))
+    .map(([bin, entry]) => {
+      const weight = entry.long + entry.short;
+      return {
+        price: bin * binSize,
+        longDensity: entry.long,
+        shortDensity: entry.short,
+        intensity: peak > 0 ? (weight / peak) * 100 : 0,
+        notionalUsd:
+          openInterestUsd !== null && totalDensity > 0
+            ? (weight / totalDensity) * openInterestUsd
+            : null,
+        formedAt: entry.formedAt,
+      };
+    })
     .sort((a, b) => a.price - b.price);
 
   const above = buckets.filter((bucket) => bucket.price > currentPrice);
@@ -367,12 +426,22 @@ export function buildLiquidationHeatmap(
     oiWeightedCandles > 0
       ? `${oiWeightedCandles} de ${candles.length} velas usan cambio real de open interest en vez de volumen`
       : "sin cobertura de open interest en esta ventana — usando volumen para todas las velas";
+  const decayNote =
+    halfLife === null
+      ? "Sin decaimiento: toda la ventana pesa igual."
+      : `La actividad se descuenta con el tiempo: cada ${halfLife} velas hacia atrás vale la mitad, porque esas posiciones tuvieron más tiempo de cerrarse.`;
+  const scaleNote =
+    openInterestUsd !== null
+      ? ` Los montos en dólares son el reparto proporcional del open interest total actual (${(openInterestUsd / 1e9).toFixed(2)}B USD), no posiciones medidas una por una.`
+      : "";
 
   return {
     symbol,
     currentPrice,
     binSize,
     profileCandles: candles.length,
+    halfLifeCandles: halfLife,
+    totalOpenInterestUsd: openInterestUsd,
     oiWeightedCandles,
     buckets,
     topZoneAbove,
@@ -380,7 +449,7 @@ export function buildLiquidationHeatmap(
     bias,
     biasNote,
     method:
-      `Actividad por nivel de precio (${oiCoverage}) proyectada a través de una distribución asumida de apalancamientos, no liquidaciones confirmadas. Los niveles ya atravesados por el precio se descartan: esa posición ya se habría liquidado y cerrado.`,
+      `Actividad por nivel de precio (${oiCoverage}) proyectada a través de una distribución asumida de apalancamientos, no liquidaciones confirmadas. Los niveles ya atravesados por el precio se descartan: esa posición ya se habría liquidado y cerrado. ${decayNote}${scaleNote}`,
     assumptions: `Apalancamientos considerados: ${tiers.map((t) => `${t.leverage}x`).join(", ")} (${tierLabel}). Margen de mantenimiento: ${(mmr * 100).toFixed(2)}% ${TIER1_MAINTENANCE_MARGIN_RATE[symbol] ? "(tasa real de Binance, tramo 1)" : "(estimado, sin tabla oficial confirmada para este símbolo)"}.`,
   };
 }

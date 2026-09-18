@@ -46,6 +46,20 @@ const LOOKBACK: Record<string, number> = { "15m": 500, "1h": 500, "4h": 500, "1d
  * volume per-candle wherever OI is missing, and reports how much of the map
  * came from which source.
  */
+/**
+ * Half-life in candles, chosen so each timeframe discounts activity on a
+ * comparable real-time scale (~2 days). Leveraged perpetual positions turn
+ * over fast — a published study of BitMEX found roughly 3.5% of longs were
+ * force-liquidated every single day — so treating month-old activity as
+ * still-open would overstate the map badly.
+ */
+const HALF_LIFE_CANDLES: Record<string, number> = {
+  "15m": 192,
+  "1h": 48,
+  "4h": 12,
+  "1d": 3,
+};
+
 const OI_PERIOD: Record<string, string | null> = {
   "15m": "15m",
   "1h": "1h",
@@ -94,6 +108,28 @@ async function loadRows(symbol: string, interval: string, limit: number, signal:
  * were opened at that price — the thing this map is actually trying to find.
  * Returns null on any failure so the engine simply keeps using volume.
  */
+/**
+ * Current total open interest, in contracts. Multiplied by price it gives the
+ * notional the whole map is scaled against, which turns an abstract intensity
+ * into an amount a reader can weigh. Null on any failure — the panel then
+ * shows intensity alone rather than a made-up figure.
+ */
+async function loadOpenInterest(symbol: string, signal: AbortSignal): Promise<number | null> {
+  const path = `/fapi/v1/openInterest?symbol=${encodeURIComponent(symbol)}`;
+  for (const base of FUTURES_BASES) {
+    try {
+      const response = await fetch(`${base}${path}`, { signal });
+      if (!response.ok) continue;
+      const body = (await response.json()) as { openInterest?: unknown };
+      const contracts = Number(body.openInterest);
+      if (Number.isFinite(contracts) && contracts > 0) return contracts;
+    } catch {
+      // Next mirror; if all fail the map simply has no dollar scale.
+    }
+  }
+  return null;
+}
+
 async function loadOiDelta(
   symbol: string,
   timeframe: string,
@@ -170,6 +206,13 @@ function intensityColor(intensity: number, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+const usd = (value: number) => {
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+};
+
 const priceLabel = (price: number) =>
   price >= 1000
     ? price.toLocaleString("es-AR", { maximumFractionDigits: 0 })
@@ -238,16 +281,22 @@ export default function LiquidationHeatmapDesk() {
         // Open interest is a strictly better weight than volume, but it is
         // futures-only and short-retention — so it is fetched separately and
         // the engine degrades to volume wherever it is missing.
-        const oiDeltaByIndex = await loadOiDelta(
-          symbol,
-          timeframe,
-          candles.map((candle) => candle.openTime),
-          controller.signal,
-        );
+        const [oiDeltaByIndex, openContracts] = await Promise.all([
+          loadOiDelta(
+            symbol,
+            timeframe,
+            candles.map((candle) => candle.openTime),
+            controller.signal,
+          ),
+          loadOpenInterest(symbol, controller.signal),
+        ]);
         if (!alive) return;
 
         const heatmap = buildLiquidationHeatmap(symbol, candles, currentPrice, {
           oiDeltaByIndex: oiDeltaByIndex ?? undefined,
+          halfLifeCandles: HALF_LIFE_CANDLES[timeframe],
+          totalOpenInterestUsd:
+            openContracts !== null ? openContracts * currentPrice : undefined,
         });
         if (!heatmap) {
           setError("MAPA NO DISPONIBLE");
@@ -404,6 +453,37 @@ export default function LiquidationHeatmapDesk() {
             </div>
           </div>
 
+          {/* The two levels a reader actually acts on, named outright instead
+              of left to be eyeballed off the chart. */}
+          <div className="liq-zones">
+            <div className="up">
+              <span>ZONA IMÁN ARRIBA · LIQUIDA CORTOS</span>
+              {data.heatmap.topZoneAbove ? (
+                <>
+                  <b>${priceLabel(data.heatmap.topZoneAbove.price)}</b>
+                  {data.heatmap.topZoneAbove.notionalUsd !== null && (
+                    <em>{usd(data.heatmap.topZoneAbove.notionalUsd)} estimados</em>
+                  )}
+                </>
+              ) : (
+                <b className="none">sin zona activa</b>
+              )}
+            </div>
+            <div className="down">
+              <span>ZONA IMÁN ABAJO · LIQUIDA LARGOS</span>
+              {data.heatmap.topZoneBelow ? (
+                <>
+                  <b>${priceLabel(data.heatmap.topZoneBelow.price)}</b>
+                  {data.heatmap.topZoneBelow.notionalUsd !== null && (
+                    <em>{usd(data.heatmap.topZoneBelow.notionalUsd)} estimados</em>
+                  )}
+                </>
+              ) : (
+                <b className="none">sin zona activa</b>
+              )}
+            </div>
+          </div>
+
           <div className="liq-chart-wrap">
             <svg
               viewBox={`0 0 ${CHART_W} ${CHART_H}`}
@@ -534,6 +614,9 @@ export default function LiquidationHeatmapDesk() {
                   <span>liquidación de shorts si sube hasta acá</span>
                 ) : (
                   <span>liquidación de longs si baja hasta acá</span>
+                )}
+                {hovered.notionalUsd !== null && (
+                  <b className="liq-tooltip-usd">{usd(hovered.notionalUsd)}</b>
                 )}
                 <small>intensidad {hovered.intensity.toFixed(0)}/100</small>
               </div>
