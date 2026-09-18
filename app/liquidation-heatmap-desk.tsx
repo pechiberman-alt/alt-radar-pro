@@ -225,7 +225,7 @@ const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 /** Right-hand strip where every zone renders its full weight as a profile bar,
  *  so zones that formed recently are still readable next to older ones. */
-const PROFILE_W = 132;
+const PROFILE_W = 104;
 
 export default function LiquidationHeatmapDesk() {
   const [symbol, setSymbol] = useState("BTCUSDT");
@@ -306,7 +306,7 @@ export default function LiquidationHeatmapDesk() {
 
         setData({
           heatmap,
-          candles: candles.slice(-90).map((candle) => ({
+          candles: candles.slice(-70).map((candle) => ({
             time: candle.openTime,
             open: candle.open,
             high: candle.high,
@@ -332,13 +332,18 @@ export default function LiquidationHeatmapDesk() {
     if (!data || !data.candles.length) return null;
     const { candles, heatmap } = data;
 
-    const bucketPrices = heatmap.buckets.map((b) => b.price);
-    const candlePrices = candles.flatMap((c) => [c.high, c.low]);
-    const minPrice = Math.min(...bucketPrices, ...candlePrices);
-    const maxPrice = Math.max(...bucketPrices, ...candlePrices);
-    const pad = (maxPrice - minPrice) * 0.04;
-    const lo = minPrice - pad;
-    const hi = maxPrice + pad;
+    // Scale to the traded range, not to the full spread of projected levels.
+    // The engine projects ±22% around price; letting that set the axis
+    // squashed the candles into a thin band in the middle with dead space
+    // above and below. Zones outside the visible window still exist — they
+    // are simply off-chart, the way any charting tool handles them.
+    const candleHighs = candles.map((c) => c.high);
+    const candleLows = candles.map((c) => c.low);
+    const tradedHi = Math.max(...candleHighs);
+    const tradedLo = Math.min(...candleLows);
+    const headroom = (tradedHi - tradedLo) * 0.35;
+    const lo = Math.max(0, tradedLo - headroom);
+    const hi = tradedHi + headroom;
 
     const y = (price: number) => MARGIN.top + (1 - (price - lo) / (hi - lo)) * PLOT_H;
 
@@ -346,22 +351,76 @@ export default function LiquidationHeatmapDesk() {
     // whole width instead of crowding into one side.
     const candleAreaW = PLOT_W - PROFILE_W;
     const slot = candleAreaW / candles.length;
-    const bodyW = Math.max(1.5, Math.min(7, slot * 0.66));
+    const bodyW = Math.max(2.5, Math.min(9, slot * 0.7));
     const x = (index: number) => MARGIN.left + slot * index + slot / 2;
 
-    const peakIntensity = Math.max(...heatmap.buckets.map((b) => b.intensity), 1);
-
-    // A zone's formedAt indexes the volume-profile lookback, which is longer
-    // than the candle window drawn here. Map it proportionally and clamp, so a
+    // A zone's formedAt indexes the activity lookback, which is longer than
+    // the candle window drawn here. Map it proportionally and clamp, so a
     // zone older than the visible window starts at the left edge rather than
     // off-screen.
     const zoneStartX = (formedAt: number) => {
       const fraction = heatmap.profileCandles > 1 ? formedAt / (heatmap.profileCandles - 1) : 0;
-      const visibleFraction = Math.max(0, Math.min(1, (fraction - (1 - candles.length / heatmap.profileCandles)) / (candles.length / heatmap.profileCandles)));
+      const visibleFraction = Math.max(
+        0,
+        Math.min(
+          1,
+          (fraction - (1 - candles.length / heatmap.profileCandles)) /
+            (candles.length / heatmap.profileCandles),
+        ),
+      );
       return MARGIN.left + visibleFraction * candleAreaW;
     };
 
-    return { candles, heatmap, y, x, bodyW, peakIntensity, zoneStartX, candleAreaW, lo, hi };
+    /**
+     * Collapse the engine's thousands of fine-grained buckets into the number
+     * of rows the chart can actually resolve.
+     *
+     * The engine bins BTC at ~10 USD, so a ±22% projection is ~3,000 buckets
+     * competing for ~520px — at a 1px minimum each they overlapped into solid
+     * slabs of colour that hid both the structure and the candles. Summing
+     * them into one row per visible band is what makes discrete levels legible,
+     * and it is also more honest: a 10 USD bucket was never meaningfully
+     * distinct from its neighbour at this zoom.
+     */
+    const ROW_HEIGHT = 3.2;
+    const rowCount = Math.max(40, Math.floor(PLOT_H / ROW_HEIGHT));
+    const rows = new Map<
+      number,
+      { longDensity: number; shortDensity: number; notionalUsd: number; formedAt: number; price: number }
+    >();
+    for (const bucket of heatmap.buckets) {
+      if (bucket.price < lo || bucket.price > hi) continue;
+      const row = Math.floor(((bucket.price - lo) / (hi - lo)) * rowCount);
+      const existing = rows.get(row);
+      if (existing) {
+        existing.longDensity += bucket.longDensity;
+        existing.shortDensity += bucket.shortDensity;
+        existing.notionalUsd += bucket.notionalUsd ?? 0;
+        existing.formedAt = Math.min(existing.formedAt, bucket.formedAt);
+      } else {
+        rows.set(row, {
+          longDensity: bucket.longDensity,
+          shortDensity: bucket.shortDensity,
+          notionalUsd: bucket.notionalUsd ?? 0,
+          formedAt: bucket.formedAt,
+          price: bucket.price,
+        });
+      }
+    }
+
+    const visibleZones = [...rows.values()].map((row) => ({
+      ...row,
+      total: row.longDensity + row.shortDensity,
+    }));
+    const rowPeak = Math.max(...visibleZones.map((z) => z.total), 1);
+    // Drop the faintest rows outright: at very low intensity they add noise,
+    // not information, and keeping them is what produced a wash of colour.
+    const zones = visibleZones
+      .map((zone) => ({ ...zone, intensity: (zone.total / rowPeak) * 100 }))
+      .filter((zone) => zone.intensity >= 6)
+      .sort((a, b) => a.price - b.price);
+
+    return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, lo, hi, zones, rowHeight: ROW_HEIGHT };
   }, [data]);
 
   const priceTicks = useMemo(() => {
@@ -502,24 +561,36 @@ export default function LiquidationHeatmapDesk() {
                 />
               ))}
 
-              {/* Each zone is drawn twice: a horizontal span running from where
-                  it formed to the right edge — the level existed from that
-                  moment on — and a profile bar in the right strip carrying its
-                  full weight, so a zone formed recently is still comparable to
-                  an old one. */}
-              {layout.heatmap.buckets.map((bucket) => {
-                const yPos = layout.y(bucket.price);
-                const startX = layout.zoneStartX(bucket.formedAt);
+              {/* Each zone is drawn twice: a horizontal span running from
+                  where it formed to the right edge — the level existed from
+                  that moment on — and a profile bar in the right strip
+                  carrying its weight, so a zone formed recently is still
+                  comparable to an old one.
+
+                  Spans are deliberately faint and thin: they are context for
+                  the candles, not the subject. The profile bar on the right
+                  is where intensity is meant to be read. */}
+              {layout.zones.map((zone) => {
+                const yPos = layout.y(zone.price);
+                const startX = layout.zoneStartX(zone.formedAt);
                 const endX = MARGIN.left + layout.candleAreaW;
-                const relative = bucket.intensity / layout.peakIntensity;
-                const thickness = Math.max(1, relative * 5);
-                const barW = relative * PROFILE_W;
+                const relative = zone.intensity / 100;
+                const thickness = Math.max(1.2, relative * layout.rowHeight);
+                const barW = Math.max(2, relative * PROFILE_W);
+                const asBucket = {
+                  price: zone.price,
+                  longDensity: zone.longDensity,
+                  shortDensity: zone.shortDensity,
+                  intensity: zone.intensity,
+                  notionalUsd: zone.notionalUsd > 0 ? zone.notionalUsd : null,
+                  formedAt: zone.formedAt,
+                };
                 return (
                   <g
-                    key={bucket.price}
-                    onMouseEnter={() => setHovered(bucket)}
+                    key={zone.price}
+                    onMouseEnter={() => setHovered(asBucket)}
                     onMouseLeave={() =>
-                      setHovered((current) => (current === bucket ? null : current))
+                      setHovered((current) => (current?.price === zone.price ? null : current))
                     }
                   >
                     {endX > startX && (
@@ -528,15 +599,15 @@ export default function LiquidationHeatmapDesk() {
                         y={yPos - thickness / 2}
                         width={endX - startX}
                         height={thickness}
-                        fill={intensityColor(bucket.intensity, 0.2 + relative * 0.45)}
+                        fill={intensityColor(zone.intensity, 0.06 + relative * 0.22)}
                       />
                     )}
                     <rect
                       x={endX}
                       y={yPos - thickness / 2}
-                      width={Math.max(1, barW)}
+                      width={barW}
                       height={thickness}
-                      fill={intensityColor(bucket.intensity, 0.92)}
+                      fill={intensityColor(zone.intensity, 0.9)}
                     />
                   </g>
                 );
