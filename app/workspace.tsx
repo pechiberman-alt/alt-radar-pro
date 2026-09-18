@@ -24,6 +24,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   { id: "scalping", label: "SCALPING", primary: false },
   { id: "pumpeo", label: "PUMPEO", primary: true },
   { id: "liquidaciones", label: "LIQUIDACIONES", primary: true },
+  { id: "desbloqueos", label: "DESBLOQUEOS", primary: true },
   { id: "institucional", label: "INSTITUCIONAL", primary: true },
   { id: "reservas", label: "RESERVAS", primary: true },
   { id: "swing", label: "SWING", primary: true },

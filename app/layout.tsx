@@ -26,6 +26,7 @@ import "./account-panel.css";
 import "./institutional-desk.css";
 import "./exchange-flows.css";
 import "./liquidation-heatmap-desk.css";
+import "./unlock-desk.css";
 import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 

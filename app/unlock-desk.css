@@ -1,0 +1,40 @@
+.unlock-desk{display:block;min-width:0;overflow-x:hidden}
+
+.unlock-premise{margin:14px 0 16px;padding:12px 14px;background:#0b120e;border:1px solid var(--line);border-left:3px solid var(--green2);border-radius:4px;font:10px var(--font-mono);line-height:1.7;color:#9aa7a0}
+
+.unlock-loading{font:9px var(--font-mono);letter-spacing:1.2px;color:var(--muted);padding:22px 0;text-align:center}
+.unlock-empty{display:grid;gap:5px;padding:24px;text-align:center;border:1px solid var(--line);border-radius:4px}
+.unlock-empty b{font:11px var(--font-mono);letter-spacing:1.2px;color:var(--amber)}
+.unlock-empty span{font:10px var(--font-mono);line-height:1.6;color:var(--muted)}
+
+.unlock-tabs{display:flex;gap:6px;margin-bottom:12px}
+.unlock-tabs button{flex:1;min-width:0;background:#0c130f;border:1px solid var(--line);border-radius:4px;padding:9px;color:var(--muted);font:9px var(--font-mono);letter-spacing:.8px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unlock-tabs button.active{color:var(--green);border-color:#2d6a4d;background:#0c251a}
+
+.unlock-list{display:grid;gap:7px}
+.unlock-list>div{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.1fr) auto;gap:10px;align-items:center;padding:10px 12px;background:#0a110d;border:1px solid var(--line);border-radius:4px;min-width:0}
+/* A pair the reader actually trades earns the highlight; the rest is context. */
+.unlock-list>div.watched{border-color:#2d6a4d;background:#0b1b14}
+/* Dilution, not dollar size, sets the alarm level. */
+.unlock-list>div.w-alto{border-left:3px solid var(--red)}
+.unlock-list>div.w-medio{border-left:3px solid var(--amber)}
+.unlock-list>div.w-bajo{border-left:3px solid var(--line)}
+
+.unlock-who,.unlock-when,.unlock-size{display:grid;gap:2px;min-width:0}
+.unlock-list b{font:12px var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unlock-list em{font-style:normal;font:8px var(--font-mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unlock-size b{color:#b9c5be}
+
+.unlock-audience{font:7px var(--font-mono);letter-spacing:.8px;padding:3px 6px;border-radius:3px;white-space:nowrap}
+.unlock-audience.a-inversores{background:#321217;color:var(--red)}
+.unlock-audience.a-equipo{background:#2a2110;color:var(--amber)}
+.unlock-audience.a-ecosistema{background:#0c1c15;color:var(--green2)}
+.unlock-audience.a-otros{background:#121916;color:var(--muted)}
+
+.unlock-caveat{margin-top:16px;padding:12px 14px;background:#0a0f0c;border:1px solid var(--line);border-radius:4px;font:9px var(--font-mono);line-height:1.8;color:var(--muted)}
+.unlock-caveat b{color:#b9c5be}
+
+@media(max-width:700px){
+  .unlock-list>div{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 10px}
+  .unlock-audience{grid-column:1/-1;justify-self:start}
+}
