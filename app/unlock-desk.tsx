@@ -42,10 +42,12 @@ export default function UnlockDesk({ watchlist }: { watchlist?: string[] }) {
 
     (async () => {
       try {
-        // Fetched from the browser for the same reason the heatmap is: the
-        // Worker's own address is blocked by several of these upstreams.
-        const response = await fetch("https://api.llama.fi/emissions", {
+        // Through the Worker, not direct: DefiLlama does not reliably send
+        // CORS headers, so a browser fetch is blocked before our code runs.
+        // The reserves panel already proves the Worker can reach this host.
+        const response = await fetch("/api/token-unlocks", {
           signal: controller.signal,
+          cache: "no-store",
         });
         if (!alive) return;
         if (!response.ok) {
