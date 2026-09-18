@@ -811,11 +811,12 @@ export default function LiquidationHeatmapDesk() {
               {visibleCandles} velas
               {updatedAt !== null && (
                 <i className="liq-updated">
-                  · {new Date(updatedAt).toLocaleTimeString("es-AR", {
+                  {/* No forced 24h and no seconds: the phone's own clock
+                      format is the one the reader recognises, and the second
+                      hand only made the label longer. */}
+                  · {new Date(updatedAt).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
-                    second: "2-digit",
-                    hour12: false,
                   })}
                 </i>
               )}
