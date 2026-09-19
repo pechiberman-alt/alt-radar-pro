@@ -1,0 +1,40 @@
+
+/* ── Señales abiertas con objetivo y riesgo ── */
+.asig{margin:18px 0;padding:14px;background:#0a110d;border:1px solid var(--line);border-radius:5px;min-width:0}
+.asig-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.asig-head h4{margin:0;font:10px var(--font-mono);letter-spacing:1.3px;color:var(--green2)}
+.asig-head span{font:9px var(--font-mono);color:var(--muted);white-space:nowrap}
+.asig-why{margin:0 0 12px;font:9px var(--font-mono);line-height:1.7;color:var(--muted)}
+.asig-none{margin:0;padding:14px;text-align:center;font:9px var(--font-mono);line-height:1.6;color:var(--muted);border:1px solid var(--line);border-radius:4px}
+
+.asig-list{display:grid;gap:8px}
+.asig-list>div{padding:11px 12px;background:#0b130f;border:1px solid var(--line);border-radius:4px;min-width:0}
+.asig-list>div.v-favor{border-left:3px solid var(--green)}
+.asig-list>div.v-contra{border-left:3px solid var(--red)}
+.asig-list>div.v-neutro,.asig-list>div.v-mapa{border-left:3px solid var(--line)}
+
+.asig-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;min-width:0}
+.asig-top b{font:13px var(--font-mono);color:var(--text)}
+.asig-top em,.asig-top u{font-style:normal;text-decoration:none;font:9px var(--font-mono);color:var(--muted)}
+.asig-verdict{font-style:normal;margin-left:auto;font:8px var(--font-mono);letter-spacing:.8px;padding:3px 7px;border-radius:3px;white-space:nowrap}
+.asig-verdict.v-favor{background:#0c251a;color:var(--green)}
+.asig-verdict.v-contra{background:#321217;color:var(--red)}
+.asig-verdict.v-neutro,.asig-verdict.v-mapa{background:#121916;color:var(--muted)}
+
+.asig-levels{display:grid;grid-template-columns:1fr 1fr 62px;gap:10px;min-width:0}
+.asig-levels>div{display:grid;gap:2px;min-width:0}
+.asig-levels span{font:8px var(--font-mono);letter-spacing:.9px;color:var(--muted)}
+.asig-levels b{font:13px var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asig-levels b.none{font-size:10px;color:var(--muted)}
+.asig-levels em{font-style:normal;font:8px var(--font-mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asig-levels .t b{color:var(--green)}
+.asig-levels .r b{color:var(--red)}
+.asig-levels .rr{text-align:right}
+
+.asig-note{margin:9px 0 0;font:9px var(--font-mono);line-height:1.65;color:#8e9c94}
+
+@media(max-width:700px){
+  .asig-levels{grid-template-columns:1fr 1fr;gap:8px}
+  .asig-levels .rr{grid-column:1/-1;text-align:left}
+  .asig-verdict{margin-left:0}
+}
