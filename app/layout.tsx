@@ -29,6 +29,7 @@ import "./liquidation-heatmap-desk.css";
 import "./unlock-desk.css";
 import "./asset-flows.css";
 import "./big-trades-desk.css";
+import "./zones-desk.css";
 import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 
