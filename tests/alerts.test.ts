@@ -43,7 +43,7 @@ test("the same condition does not re-fire on every refresh", () => {
 
 test("priority floor keeps the quiet tier out of notifications", () => {
   const state = createDeliveryState();
-  const informative = zoneAlert("BTCUSDT", "DEMANDA", 98_000, 98_500, 1, 0, NOW);
+  const informative = zoneAlert("BTCUSDT", "DEMANDA", 98_000, 98_500, ["1h"], 0, { rate: null, sample: 0 }, NOW);
   assert.equal(informative.priority, "INFORMATIVA");
   assert.deepEqual(
     selectDeliverable([informative], prefs({ minimumPriority: "IMPORTANTE" }), state, NOW),
@@ -70,20 +70,20 @@ test("a muted category is never delivered regardless of priority", () => {
 test("category cooldown suppresses a second alert of the same kind", () => {
   const state = createDeliveryState();
   // Two different zones, so ids differ — only the cooldown can stop the second.
-  const first = zoneAlert("BTCUSDT", "DEMANDA", 98_000, 98_500, 2, 1, NOW);
-  const second = zoneAlert("ETHUSDT", "DEMANDA", 2_400, 2_420, 2, 1, NOW + 60_000);
+  const first = zoneAlert("BTCUSDT", "DEMANDA", 98_000, 98_500, ["4h", "1h"], 1, { rate: 0.7, sample: 10 }, NOW);
+  const second = zoneAlert("ETHUSDT", "DEMANDA", 2_400, 2_420, ["4h", "1h"], 1, { rate: 0.7, sample: 10 }, NOW + 60_000);
   assert.equal(selectDeliverable([first], prefs(), state, NOW).length, 1);
   assert.equal(selectDeliverable([second], prefs(), state, NOW + 60_000).length, 0);
 });
 
 test("a critical alert overrides its category cooldown", () => {
   const state = createDeliveryState();
-  const routine = signalAlert("BTCUSDT", "LONG", 70, "s1", NOW);
+  const routine = signalAlert("BTCUSDT", "LONG", 70, "s1", "1h", NOW);
   assert.equal(routine.priority, "IMPORTANTE");
   assert.equal(selectDeliverable([routine], prefs(), state, NOW).length, 1);
 
   // Same category a minute later, but this one is critical.
-  const urgent = signalAlert("ETHUSDT", "SHORT", 88, "s2", NOW + 60_000);
+  const urgent = signalAlert("ETHUSDT", "SHORT", 88, "s2", "1h", NOW + 60_000);
   assert.equal(urgent.priority, "CRITICA");
   assert.equal(selectDeliverable([urgent], prefs(), state, NOW + 60_000).length, 1);
 });
@@ -92,7 +92,7 @@ test("when a cooldown lets one through, it is the most important one", () => {
   const state = createDeliveryState();
   const batch = [
     targetAlert("BTCUSDT", 104_000, 0.4, "s1", NOW),
-    signalAlert("ETHUSDT", "LONG", 90, "s2", NOW),
+    signalAlert("ETHUSDT", "LONG", 90, "s2", "1h", NOW),
   ];
   const out = selectDeliverable(batch, prefs(), state, NOW);
   assert.equal(out[0].priority, "CRITICA", "la crítica va primero, no la que se evaluó antes");
@@ -104,9 +104,9 @@ test("conviction decides whether a signal is worth interrupting for", () => {
 });
 
 test("a zone with confluence or a passed test outranks a fresh single-frame one", () => {
-  assert.equal(zoneAlert("BTCUSDT", "DEMANDA", 1, 2, 2, 0).priority, "IMPORTANTE");
-  assert.equal(zoneAlert("BTCUSDT", "DEMANDA", 1, 2, 1, 1).priority, "IMPORTANTE");
-  assert.equal(zoneAlert("BTCUSDT", "DEMANDA", 1, 2, 1, 0).priority, "INFORMATIVA");
+  assert.equal(zoneAlert("BTCUSDT", "DEMANDA", 1, 2, ["4h", "1h"], 0, { rate: null, sample: 0 }).priority, "IMPORTANTE");
+  assert.equal(zoneAlert("BTCUSDT", "DEMANDA", 1, 2, ["1h"], 1, { rate: null, sample: 0 }).priority, "IMPORTANTE");
+  assert.equal(zoneAlert("BTCUSDT", "DEMANDA", 1, 2, ["1h"], 0, { rate: null, sample: 0 }).priority, "INFORMATIVA");
 });
 
 test("a flow alert is keyed per day, so a regime does not alert hourly", () => {
@@ -123,4 +123,49 @@ test("risk alerts are keyed by level, not by time", () => {
   assert.equal(a.id, b.id);
   const otherLevel = riskAlert("BTCUSDT", 97_000, 0.5, "s1", NOW);
   assert.notEqual(a.id, otherLevel.id);
+});
+
+/* ── evidence phrasing ── */
+
+test("a rate is never phrased without its sample size", async () => {
+  const { describeEvidence } = await import("../lib/alerts.ts");
+  const text = describeEvidence({ rate: 0.72, sample: 25, timeframes: ["4h", "1h"] });
+  assert.match(text ?? "", /72%/);
+  assert.match(text ?? "", /25 casos/);
+  assert.match(text ?? "", /4h · 1h/);
+});
+
+test("a thin sample is labelled so it cannot read as a track record", async () => {
+  const { describeEvidence } = await import("../lib/alerts.ts");
+  const text = describeEvidence({ rate: 1, sample: 2, timeframes: ["1h"] });
+  assert.match(text ?? "", /100%/);
+  assert.match(text ?? "", /muestra mínima/, "100% sobre dos casos no es un historial");
+});
+
+test("no resolved cases says so instead of showing a rate", async () => {
+  const { describeEvidence } = await import("../lib/alerts.ts");
+  assert.match(
+    describeEvidence({ rate: null, sample: 0, timeframes: ["4h"] }) ?? "",
+    /sin casos resueltos/,
+  );
+  assert.equal(describeEvidence(undefined), null);
+});
+
+test("zone alerts carry the timeframes that confirmed them", async () => {
+  const { zoneAlert } = await import("../lib/alerts.ts");
+  const alert = zoneAlert("BTCUSDT", "DEMANDA", 98_000, 98_500, ["4h", "1h"], 2, {
+    rate: 0.8,
+    sample: 15,
+  });
+  assert.deepEqual(alert.evidence?.timeframes, ["4h", "1h"]);
+  assert.equal(alert.evidence?.rate, 0.8);
+  assert.match(alert.body, /80% en 15 casos/);
+});
+
+test("the Fibonacci alert reports its frame and depth but claims no rate", async () => {
+  const { fibAlert } = await import("../lib/alerts.ts");
+  const alert = fibAlert("BTCUSDT", "LONG", 0.618, "1h", 64.2);
+  assert.match(alert.body, /64\.2%/);
+  assert.match(alert.body, /Marco 1h/);
+  assert.equal(alert.evidence?.rate, null, "el backtest mide otra muestra: unirlas sería insinuar un vínculo que los datos no sostienen");
 });

@@ -7,6 +7,7 @@ import { loadRows } from "@/lib/market-fetch";
 import { parseSwingKlines } from "@/lib/swing-entries";
 import {
   CATEGORY_COOLDOWN_MINUTES,
+  describeEvidence,
   fibAlert,
   zoneAlert,
   createDeliveryState,
@@ -75,14 +76,21 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
           const currentPrice = series[series.length - 1].candles.at(-1)!.close;
           const board = buildMtfZones(series, currentPrice);
           if (board?.standingIn) {
+            const zone = board.standingIn;
+            // The rate that belongs with this alert is the one for the
+            // coarsest timeframe that confirmed it — that is the frame the
+            // level is really defined on.
+            const frame = zone.confluence[0] ?? zone.timeframe;
+            const stats = board.stats.find((entry) => entry.timeframe === frame)?.stats;
             found.push(
               zoneAlert(
                 symbol,
-                board.standingIn.kind,
-                board.standingIn.low,
-                board.standingIn.high,
-                board.standingIn.confluence.length,
-                board.standingIn.tests,
+                zone.kind,
+                zone.low,
+                zone.high,
+                zone.confluence,
+                zone.tests,
+                { rate: stats?.holdRate ?? null, sample: stats?.tested ?? 0 },
               ),
             );
           }
@@ -90,7 +98,9 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
           const hourly = series.find((entry) => entry.timeframe === "1h");
           const fib = hourly ? readFibZone(hourly.candles) : null;
           if (fib?.inZone && fib.nearest) {
-            found.push(fibAlert(symbol, fib.side, fib.nearest.ratio));
+            found.push(
+              fibAlert(symbol, fib.side, fib.nearest.ratio, "1h", fib.retracement * 100),
+            );
           }
         } catch {
           // One symbol failing must not silence the others.
@@ -265,6 +275,23 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
               <div className="alerts-body">
                 <b>{alert.title}</b>
                 <span>{alert.body}</span>
+                {alert.evidence && describeEvidence(alert.evidence) && (
+                  <small className="alerts-evidence">
+                    {alert.evidence.timeframes.length > 0 && (
+                      <i>{alert.evidence.timeframes.join(" · ")}</i>
+                    )}
+                    {alert.evidence.rate !== null && alert.evidence.sample > 0 && (
+                      <b className={alert.evidence.sample < 8 ? "thin" : ""}>
+                        {Math.round(alert.evidence.rate * 100)}%
+                        <em>
+                          en {alert.evidence.sample}{" "}
+                          {alert.evidence.sample === 1 ? "caso" : "casos"}
+                          {alert.evidence.sample < 8 ? " · muestra mínima" : ""}
+                        </em>
+                      </b>
+                    )}
+                  </small>
+                )}
               </div>
             </div>
           ))}

@@ -47,3 +47,10 @@
   .alerts-feed>div{grid-template-columns:1fr}
   .alerts-meta{display:flex;gap:8px}
 }
+
+/* The rate never appears without its sample beside it. */
+.alerts-evidence{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:3px;min-width:0}
+.alerts-evidence i{font-style:normal;font:8px var(--font-mono);letter-spacing:.6px;color:var(--green2);padding:2px 5px;background:#0c1c15;border-radius:3px}
+.alerts-evidence>b{display:flex;align-items:baseline;gap:5px;font:11px var(--font-mono);color:var(--green)}
+.alerts-evidence>b.thin{color:var(--amber)}
+.alerts-evidence em{font-style:normal;font:8px var(--font-mono);color:var(--muted)}
