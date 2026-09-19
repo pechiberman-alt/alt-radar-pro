@@ -7,6 +7,7 @@ import {
   type HeatBucket,
   type LiquidationHeatmap,
 } from "@/lib/liquidation-heatmap";
+import { findOrderBlocks, type OrderBlock } from "@/lib/order-blocks";
 import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
 import {
   FALLBACK_SYMBOLS,
@@ -527,6 +528,24 @@ export default function LiquidationHeatmapDesk() {
     }
   }, [layout]);
 
+  const orderBlocks = useMemo<OrderBlock[]>(() => {
+    if (!layout) return [];
+    // Detected over the visible window so a block always has the candles
+    // that formed it on screen beside it.
+    const swing = layout.candles.map((candle) => ({
+      openTime: candle.time,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      volume: 1,
+      quoteVolume: 0,
+    }));
+    return findOrderBlocks(swing).filter(
+      (block) => block.high >= layout.lo && block.low <= layout.hi,
+    );
+  }, [layout]);
+
   const keyLevels = useMemo(() => {
     if (!layout) return [];
     // Pivots come from the candles actually on screen, so the levels named
@@ -796,6 +815,47 @@ export default function LiquidationHeatmapDesk() {
                 );
               })}
 
+              {/* Order blocks sit behind the candles: they are context the
+                  price action is read against, not marks on top of it. Drawn
+                  from where the block formed to the right edge, because the
+                  level exists from that candle onward. */}
+              {orderBlocks.map((block) => {
+                const top = layout.y(block.high);
+                const bottom = layout.y(block.low);
+                const height = Math.max(2, bottom - top);
+                const startX = layout.zoneStartX(
+                  Math.round((block.index / Math.max(1, layout.candles.length - 1)) *
+                    Math.max(1, layout.heatmap.profileCandles - 1)),
+                );
+                const bullish = block.side === "ALCISTA";
+                return (
+                  <g key={`ob-${block.index}`}>
+                    <rect
+                      x={startX}
+                      y={top}
+                      width={Math.max(4, MARGIN.left + layout.candleAreaW - startX)}
+                      height={height}
+                      className={bullish ? "liq-ob up" : "liq-ob down"}
+                      opacity={0.1 + (block.strength / 100) * 0.16}
+                    />
+                    <line
+                      x1={startX}
+                      x2={MARGIN.left + layout.candleAreaW}
+                      y1={top + height / 2}
+                      y2={top + height / 2}
+                      className={bullish ? "liq-ob-mid up" : "liq-ob-mid down"}
+                    />
+                    <text
+                      x={startX + 5}
+                      y={top - 3}
+                      className={bullish ? "liq-ob-label up" : "liq-ob-label down"}
+                    >
+                      OB {bullish ? "↑" : "↓"} {priceLabel(block.mid)}
+                    </text>
+                  </g>
+                );
+              })}
+
               {layout.candles.map((candle, i) => {
                 const xPos = layout.x(i);
                 const up = candle.close >= candle.open;
@@ -939,6 +999,10 @@ export default function LiquidationHeatmapDesk() {
             <span>
               <i className="heat" />
               Densidad de liquidación (verde → rojo)
+            </span>
+            <span>
+              <i className="ob" />
+              Order block sin mitigar
             </span>
           </div>
 

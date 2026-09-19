@@ -191,3 +191,15 @@
 /* Nothing in the panel may force a horizontal scrollbar on the page. */
 .liq-desk{overflow-x:hidden}
 .liq-zoom .liq-reset{font-size:13px}
+
+/* Order blocks: context behind the price action, not marks on top of it. */
+.liq-ob.up{fill:var(--green)}
+.liq-ob.down{fill:var(--red)}
+.liq-ob-mid{stroke-width:1;stroke-dasharray:2 4;opacity:.55}
+.liq-ob-mid.up{stroke:var(--green)}
+.liq-ob-mid.down{stroke:var(--red)}
+.liq-ob-label{font:9px var(--font-mono);letter-spacing:.3px;opacity:.85}
+.liq-ob-label.up{fill:var(--green)}
+.liq-ob-label.down{fill:var(--red)}
+@media(max-width:700px){ .liq-ob-label{font-size:11px} }
+.liq-legend i.ob{background:linear-gradient(90deg,rgba(57,242,154,.45),rgba(255,89,100,.45));border:1px dashed #3d5a4d}
