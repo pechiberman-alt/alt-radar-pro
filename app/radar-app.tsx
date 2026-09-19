@@ -30,6 +30,7 @@ import LiquidationHeatmapDesk from "./liquidation-heatmap-desk";
 import UnlockDesk from "./unlock-desk";
 import AssetFlowDesk from "./asset-flows";
 import BigTradesDesk from "./big-trades-desk";
+import ZonesDesk from "./zones-desk";
 import SwingDesk from "./swing-desk";
 import { Collapsible, WorkspaceBar, useWorkspace } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -67,6 +68,7 @@ const NAV_ITEMS = [
   { label: "OFERTA PENDIENTE", mobile: "OFERTA", icon: "◷", id: "desbloqueos" },
   { label: "FLUJO POR ACTIVO", mobile: "FLUJO", icon: "⇉", id: "flujo-activos" },
   { label: "ÓRDENES GRANDES", mobile: "GRANDES", icon: "◆", id: "ordenes-grandes" },
+  { label: "ZONAS MTF", mobile: "ZONAS", icon: "▭", id: "zonas" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
   { label: "SWING", mobile: "SWING", icon: "◤", id: "swing" },
@@ -1166,6 +1168,10 @@ export default function RadarApp() {
 
         <Collapsible id="liquidaciones" label="LIQUIDACIONES" open={workspace.open["liquidaciones"]} onToggle={workspace.toggle}>
           <LiquidationHeatmapDesk />
+        </Collapsible>
+
+        <Collapsible id="zonas" label="ZONAS MTF" open={workspace.open["zonas"]} onToggle={workspace.toggle}>
+          <ZonesDesk />
         </Collapsible>
 
         <Collapsible id="ordenes-grandes" label="ÓRDENES GRANDES" open={workspace.open["ordenes-grandes"]} onToggle={workspace.toggle}>
