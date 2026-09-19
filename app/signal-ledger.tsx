@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LedgerPayload, SignalRecord } from "@/lib/signal-ledger";
+import ActiveSignals from "./active-signals";
 import type { ScoredAsset } from "@/lib/radar";
 import type { DashboardSettings } from "./dashboard-settings";
 
@@ -459,6 +460,10 @@ export default function SignalLedger({
       </div>
 
       <div className="ledger-table-wrap">
+        <ActiveSignals
+          records={payload.records}
+          notificationsEnabled={settings.notifications}
+        />
         <table className="ledger-table">
           <thead>
             <tr>
