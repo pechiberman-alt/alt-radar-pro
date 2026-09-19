@@ -26,6 +26,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   { id: "liquidaciones", label: "LIQUIDACIONES", primary: true },
   { id: "desbloqueos", label: "OFERTA PENDIENTE", primary: true },
   { id: "flujo-activos", label: "FLUJO POR ACTIVO", primary: true },
+  { id: "ordenes-grandes", label: "ÓRDENES GRANDES", primary: true },
   { id: "institucional", label: "INSTITUCIONAL", primary: true },
   { id: "reservas", label: "RESERVAS", primary: true },
   { id: "swing", label: "SWING", primary: true },

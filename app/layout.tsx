@@ -28,6 +28,7 @@ import "./exchange-flows.css";
 import "./liquidation-heatmap-desk.css";
 import "./unlock-desk.css";
 import "./asset-flows.css";
+import "./big-trades-desk.css";
 import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 
