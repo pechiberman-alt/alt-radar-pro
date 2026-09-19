@@ -28,6 +28,24 @@
 export type AlertPriority = "CRITICA" | "IMPORTANTE" | "INFORMATIVA";
 export type AlertCategory = "SEÑAL" | "RIESGO" | "ZONA" | "LIQUIDACIÓN" | "FLUJO";
 
+/**
+ * Evidence attached to an alert.
+ *
+ * Deliberately not called a probability. `rate` is the share of comparable
+ * cases that resolved in favour IN THE DATA THE PANEL MEASURED, and `sample`
+ * is how many cases that was. The two always travel together: a rate without
+ * its sample invites reading 100% over two cases as certainty, which is the
+ * easiest way for a tool like this to mislead someone.
+ */
+export type AlertEvidence = {
+  /** 0–1 share of comparable cases that held. */
+  rate: number | null;
+  /** How many resolved cases the rate is computed from. */
+  sample: number;
+  /** Timeframes the condition was confirmed on. */
+  timeframes: string[];
+};
+
 export type Alert = {
   /** Stable across refreshes for the same underlying condition. */
   id: string;
@@ -37,7 +55,25 @@ export type Alert = {
   title: string;
   body: string;
   at: number;
+  evidence?: AlertEvidence;
 };
+
+/** Phrasing for a rate, honest about what a thin sample can support. */
+export function describeEvidence(evidence: AlertEvidence | undefined): string | null {
+  if (!evidence) return null;
+  const frames = evidence.timeframes.length ? evidence.timeframes.join(" · ") : null;
+
+  if (evidence.rate === null || evidence.sample === 0) {
+    return frames ? `${frames} · sin casos resueltos todavía` : "sin casos resueltos todavía";
+  }
+
+  const pct = `${Math.round(evidence.rate * 100)}%`;
+  const base = `${pct} en ${evidence.sample} ${evidence.sample === 1 ? "caso" : "casos"}`;
+  // Under this, the number is arithmetic, not evidence — say so rather than
+  // let a reader treat it as a track record.
+  const qualified = evidence.sample < 8 ? `${base} (muestra mínima)` : base;
+  return frames ? `${frames} · ${qualified}` : qualified;
+}
 
 const PRIORITY_RANK: Record<AlertPriority, number> = {
   CRITICA: 3,
@@ -136,6 +172,7 @@ export function signalAlert(
   side: string,
   score: number,
   signalId: string,
+  timeframe = "",
   at = Date.now(),
 ): Alert {
   return {
@@ -146,8 +183,9 @@ export function signalAlert(
     category: "SEÑAL",
     symbol,
     title: `${symbol} · señal ${side}`,
-    body: `Puntaje ${score}/100. Abrí el historial para ver objetivo y riesgo.`,
+    body: `Convicción ${score}%. Abrí el historial para ver objetivo y riesgo.`,
     at,
+    evidence: { rate: score / 100, sample: 0, timeframes: [timeframe] },
   };
 }
 
@@ -194,10 +232,13 @@ export function zoneAlert(
   kind: string,
   low: number,
   high: number,
-  confluence: number,
+  timeframes: string[],
   tests: number,
+  evidence: { rate: number | null; sample: number },
   at = Date.now(),
 ): Alert {
+  const confluence = timeframes.length;
+  const detail = describeEvidence({ ...evidence, timeframes });
   return {
     id: `zone-${symbol}-${kind}-${low}`,
     // Two timeframes agreeing, or a zone that already held a test, is a
@@ -206,8 +247,9 @@ export function zoneAlert(
     category: "ZONA",
     symbol,
     title: `${symbol} · entró en zona de ${kind.toLowerCase()}`,
-    body: `Rango ${low}–${high}${confluence > 1 ? `, confirmada en ${confluence} marcos` : ""}${tests > 0 ? `, aguantó ${tests} ${tests === 1 ? "test" : "tests"}` : ", sin testear"}.`,
+    body: `Rango ${low}–${high}. ${tests > 0 ? `Aguantó ${tests} ${tests === 1 ? "test" : "tests"}.` : "Sin testear."}${detail ? ` Zonas de este tipo: ${detail}.` : ""}`,
     at,
+    evidence: { ...evidence, timeframes },
   };
 }
 
@@ -215,6 +257,8 @@ export function fibAlert(
   symbol: string,
   side: string,
   nearestRatio: number,
+  timeframe: string,
+  retracementPct: number,
   at = Date.now(),
 ): Alert {
   return {
@@ -223,8 +267,12 @@ export function fibAlert(
     category: "ZONA",
     symbol,
     title: `${symbol} · zona ${side === "LONG" ? "de compra" : "de venta"} Fibonacci`,
-    body: `El precio entró en la banda de retroceso, cerca del ${nearestRatio}.`,
+    body: `Retroceso ${retracementPct.toFixed(1)}% del tramo, cerca del ${nearestRatio}. Marco ${timeframe}.`,
     at,
+    // No rate here on purpose: the Fibonacci backtest measures level
+    // performance over a different sample than this live reading, and pairing
+    // them would imply a link the data does not support.
+    evidence: { rate: null, sample: 0, timeframes: [timeframe] },
   };
 }
 
