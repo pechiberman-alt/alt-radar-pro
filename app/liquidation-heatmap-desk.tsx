@@ -7,6 +7,8 @@ import {
   type HeatBucket,
   type LiquidationHeatmap,
 } from "@/lib/liquidation-heatmap";
+import { findFairValueGaps, type FairValueGap } from "@/lib/fair-value-gaps";
+import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
 import { findOrderBlocks, type OrderBlock } from "@/lib/order-blocks";
 import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
 import {
@@ -546,6 +548,34 @@ export default function LiquidationHeatmapDesk() {
     );
   }, [layout]);
 
+  const swingView = useMemo(
+    () =>
+      layout
+        ? layout.candles.map((candle) => ({
+            openTime: candle.time,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+            volume: 1,
+            quoteVolume: 0,
+          }))
+        : [],
+    [layout],
+  );
+
+  const gaps = useMemo<FairValueGap[]>(() => {
+    if (!layout || !swingView.length) return [];
+    return findFairValueGaps(swingView).filter(
+      (gap) => gap.high >= layout.lo && gap.low <= layout.hi,
+    );
+  }, [layout, swingView]);
+
+  const fibZone = useMemo<FibZoneState | null>(
+    () => (swingView.length ? readFibZone(swingView) : null),
+    [swingView],
+  );
+
   const keyLevels = useMemo(() => {
     if (!layout) return [];
     // Pivots come from the candles actually on screen, so the levels named
@@ -644,6 +674,24 @@ export default function LiquidationHeatmapDesk() {
 
       {data && layout && (
         <>
+          {/* Called out above the chart, not left to be spotted: being in
+              the retracement band is the condition the reader asked to see. */}
+          {fibZone?.inZone && (
+            <div className={`liq-fibflag ${fibZone.side === "LONG" ? "buy" : "sell"}`}>
+              <b>
+                {fibZone.side === "LONG" ? "ZONA DE COMPRA" : "ZONA DE VENTA"} · FIBONACCI{" "}
+                {fibZone.levels.map((l) => l.ratio).join(" / ")}
+              </b>
+              <span>{fibZone.note}</span>
+              {fibZone.nearest && (
+                <small>
+                  Nivel más cercano: {fibZone.nearest.ratio} en {priceLabel(fibZone.nearest.price)}{" "}
+                  ({fibZone.nearest.distancePct.toFixed(2)}% de distancia)
+                </small>
+              )}
+            </div>
+          )}
+
           <div className="liq-summary">
           <div
             className={`liq-bias b-${
@@ -814,6 +862,59 @@ export default function LiquidationHeatmapDesk() {
                   </g>
                 );
               })}
+
+              {/* The Fibonacci band sits furthest back: it is the widest
+                  piece of context, and everything else is read inside it. */}
+              {fibZone && fibZone.zoneHigh >= layout.lo && fibZone.zoneLow <= layout.hi && (
+                <g>
+                  <rect
+                    x={MARGIN.left}
+                    y={layout.y(fibZone.zoneHigh)}
+                    width={layout.candleAreaW}
+                    height={Math.max(2, layout.y(fibZone.zoneLow) - layout.y(fibZone.zoneHigh))}
+                    className={fibZone.inZone ? "liq-fib active" : "liq-fib"}
+                  />
+                  {fibZone.levels.map((level) => (
+                    <g key={level.ratio}>
+                      <line
+                        x1={MARGIN.left}
+                        x2={MARGIN.left + layout.candleAreaW}
+                        y1={layout.y(level.price)}
+                        y2={layout.y(level.price)}
+                        className="liq-fib-line"
+                      />
+                      <text
+                        x={MARGIN.left + layout.candleAreaW - 4}
+                        y={layout.y(level.price) - 3}
+                        className="liq-fib-label"
+                      >
+                        {level.ratio}
+                      </text>
+                    </g>
+                  ))}
+                </g>
+              )}
+
+              {/* Gaps: bands price crossed without trading both sides. */}
+              {gaps.map((gap) => (
+                <g key={`fvg-${gap.index}`}>
+                  <rect
+                    x={MARGIN.left}
+                    y={layout.y(gap.high)}
+                    width={layout.candleAreaW}
+                    height={Math.max(1.5, layout.y(gap.low) - layout.y(gap.high))}
+                    className={gap.side === "ALCISTA" ? "liq-fvg up" : "liq-fvg down"}
+                    opacity={0.08 + (gap.quality / 100) * 0.14}
+                  />
+                  <text
+                    x={MARGIN.left + 4}
+                    y={layout.y(gap.high) - 2}
+                    className={gap.side === "ALCISTA" ? "liq-fvg-label up" : "liq-fvg-label down"}
+                  >
+                    {gap.kind}
+                  </text>
+                </g>
+              ))}
 
               {/* Order blocks sit behind the candles: they are context the
                   price action is read against, not marks on top of it. Drawn
@@ -1003,6 +1104,14 @@ export default function LiquidationHeatmapDesk() {
             <span>
               <i className="ob" />
               Order block sin mitigar
+            </span>
+            <span>
+              <i className="fvg" />
+              FVG / IFVG
+            </span>
+            <span>
+              <i className="fib" />
+              Banda Fibonacci
             </span>
           </div>
 
