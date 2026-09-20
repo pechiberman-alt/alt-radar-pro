@@ -48,6 +48,9 @@ export type FairValueGap = {
   filledPct: number;
   /** 0–100 quality ranking — not a success rate. */
   quality: number;
+  /** Notional volume of the three candles that left the gap. What moved
+   *  through here — separate from `quality`, which is about the gap's shape. */
+  volumeUsd: number;
   ageCandles: number;
 };
 
@@ -94,6 +97,7 @@ export function findFairValueGaps(
   // i is the middle candle; the gap is between i-1 and i+1.
   for (let i = 16; i < candles.length - 1; i += 1) {
     const before = candles[i - 1];
+    const middle = candles[i];
     const after = candles[i + 1];
     const range = averageRange(candles, i);
     if (!(range > 0)) continue;
@@ -157,6 +161,13 @@ export function findFairValueGaps(
       ),
     );
 
+    // The three candles' notional — the actual size of the move that left
+    // the gap, not just how many price units wide it is.
+    const volumeUsd =
+      before.volume * ((before.high + before.low) / 2) +
+      middle.volume * ((middle.high + middle.low) / 2) +
+      after.volume * ((after.high + after.low) / 2);
+
     found.push({
       kind,
       side,
@@ -168,6 +179,7 @@ export function findFairValueGaps(
       size,
       filledPct,
       quality,
+      volumeUsd,
       ageCandles,
     });
   }
@@ -182,4 +194,117 @@ export function findFairValueGaps(
   }
 
   return distinct.slice(0, limit).sort((a, b) => b.mid - a.mid);
+}
+
+export type ZoneStats = {
+  tested: number;
+  held: number;
+  holdRate: number | null;
+  confidence: "SIN MUESTRA" | "MUESTRA MÍNIMA" | "MUESTRA RAZONABLE";
+};
+
+export type GapStats = {
+  /** A plain gap's own reliability: tested, did it stay unfilled-through? */
+  fvg: ZoneStats;
+  /** An inverted gap's reliability AFTER inverting: tested again, did the
+   *  new role hold, or did price break back through it a second time? */
+  ifvg: ZoneStats;
+};
+
+function statsOf(resolved: { held: boolean }[]): ZoneStats {
+  const tested = resolved.length;
+  const held = resolved.filter((r) => r.held).length;
+  const confidence: ZoneStats["confidence"] =
+    tested === 0 ? "SIN MUESTRA" : tested < 8 ? "MUESTRA MÍNIMA" : "MUESTRA RAZONABLE";
+  return { tested, held, holdRate: tested > 0 ? held / tested : null, confidence };
+}
+
+/**
+ * Observed reliability of gaps and their inversions, across the whole
+ * series — not just the ones currently shown on the map.
+ *
+ * These are two different questions, kept apart on purpose. A plain FVG's
+ * reliability is: once tested, did it stay a gap (never inverted)? An
+ * IFVG's reliability is a question that only exists AFTER an inversion: once
+ * an inverted gap is itself tested, does its new role — support that was
+ * resistance, or the reverse — hold, or does price break through it again?
+ * Answering the second with the first's sample would silently swap what the
+ * number is about.
+ *
+ * Not a probability. A count from the candles in front of it, sample size
+ * attached.
+ */
+export function gapStats(candles: SwingCandle[], options: GapOptions = {}): GapStats {
+  const empty: ZoneStats = { tested: 0, held: 0, holdRate: null, confidence: "SIN MUESTRA" };
+  const minSize = options.minSize ?? 0.35;
+  if (candles.length < 30) return { fvg: empty, ifvg: empty };
+
+  const last = candles.length - 1;
+  const fvgOutcomes: { held: boolean }[] = [];
+  const ifvgOutcomes: { held: boolean }[] = [];
+
+  for (let i = 16; i < candles.length - 1; i += 1) {
+    const before = candles[i - 1];
+    const after = candles[i + 1];
+    const range = averageRange(candles, i);
+    if (!(range > 0)) continue;
+
+    const bullish = after.low > before.high;
+    const bearish = after.high < before.low;
+    if (!bullish && !bearish) continue;
+
+    const low = bullish ? before.high : after.high;
+    const high = bullish ? after.low : before.low;
+    const height = high - low;
+    if (!(height > 0) || height / range < minSize) continue;
+
+    // Walk forward once, noting the moment of inversion (if any) and testing
+    // both lifecycles from the same pass.
+    let touchedBeforeInvert = false;
+    let invertedAt: number | null = null;
+    for (let j = i + 2; j <= last; j += 1) {
+      const candle = candles[j];
+      const touching = candle.low <= high && candle.high >= low;
+      if (touching) touchedBeforeInvert = true;
+      const brokeThrough = bullish ? candle.close < low : candle.close > high;
+      if (brokeThrough) {
+        invertedAt = j;
+        break;
+      }
+    }
+
+    if (invertedAt === null) {
+      // Never inverted: resolved as a plain FVG only if it was ever tested.
+      if (touchedBeforeInvert) fvgOutcomes.push({ held: true });
+      continue;
+    }
+    // It inverted, which is itself the FVG failing to hold as a gap — but
+    // only counts toward the FVG rate if it had actually been tested first;
+    // an untouched gap that a later candle simply closed straight through
+    // is the same "never resolved" case as an untouched one that survived.
+    if (touchedBeforeInvert) fvgOutcomes.push({ held: false });
+
+    // Second lifecycle: the inverted level, tested on its own terms.
+    const invertedLow = low;
+    const invertedHigh = high;
+    let touchedAfterInvert = false;
+    let brokenAgain = false;
+    for (let k = invertedAt + 1; k <= last; k += 1) {
+      const candle = candles[k];
+      const touching = candle.low <= invertedHigh && candle.high >= invertedLow;
+      if (touching) touchedAfterInvert = true;
+      // The inverted role is the opposite side of the original: a bullish
+      // gap that flipped now acts as resistance, broken by a close back above.
+      const rebroken = bullish ? candle.close > invertedHigh : candle.close < invertedLow;
+      if (rebroken) {
+        brokenAgain = true;
+        break;
+      }
+    }
+    if (touchedAfterInvert || brokenAgain) {
+      ifvgOutcomes.push({ held: !brokenAgain });
+    }
+  }
+
+  return { fvg: statsOf(fvgOutcomes), ifvg: statsOf(ifvgOutcomes) };
 }

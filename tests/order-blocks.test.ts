@@ -135,3 +135,74 @@ test("a stricter displacement threshold filters more aggressively", () => {
   assert.ok(loose.length > 0);
   assert.deepEqual(strict, [], "el umbral se respeta, no se ignora");
 });
+
+/* ── volumen y confianza observada ── */
+
+test("an order block carries the origin candle's real notional volume", () => {
+  const blocks = findOrderBlocks(bullishScenario());
+  assert.equal(blocks.length, 1);
+  // Origin candle: open 1000 close 995 high 1001 low 994, volume 400.
+  const expected = 400 * ((1001 + 994) / 2);
+  assert.ok(Math.abs(blocks[0].volumeUsd - expected) < 1, `esperado ~${expected}, dio ${blocks[0].volumeUsd}`);
+});
+
+// This file's own `flat` alternates up/down candles, which are themselves
+// valid order-block origins — fine for the earlier tests, which only assert
+// on ONE specific candidate, but wrong for a scenario meant to isolate a
+// single outcome. `dojis` is directionless (open === close) for that reason.
+const dojis = (count: number, price: number, from: number) =>
+  Array.from({ length: count }, (_, i) => candle(from + i, price, price, { high: price + 1, low: price - 1 }));
+
+// impulseWindow defaults to 4, so this fills all four continuation candles —
+// an earlier version left two of them for the caller to supply as "the later
+// touch", which the detector then absorbed as part of the impulse itself
+// instead of treating them as a post-formation test.
+function demandOb(base: number, from: number) {
+  return [
+    candle(from, base, base - 5, { high: base + 1, low: base - 7, volume: 400 }),
+    candle(from + 1, base - 5, base + 20, { high: base + 22, low: base - 6 }),
+    candle(from + 2, base + 20, base + 30, { high: base + 32, low: base + 19 }),
+    candle(from + 3, base + 30, base + 35, { high: base + 37, low: base + 29 }),
+    candle(from + 4, base + 35, base + 40, { high: base + 42, low: base + 34 }),
+  ];
+}
+
+test("orderBlockStats scans the whole series, not just the untouched survivors", async () => {
+  const { orderBlockStats } = await import("../lib/order-blocks.ts");
+  // A block that formed, got touched, and held (price left without closing
+  // beyond it) — findOrderBlocks would have dropped this from the live map
+  // entirely, but the stat still needs to see it to measure anything.
+  const data = [
+    ...dojis(25, 1000, 0),
+    ...demandOb(1000, 25), // occupies indices 25–29
+    candle(30, 1040, 998, { high: 1041, low: 996 }), // re-enters the zone
+    candle(31, 998, 1050, { high: 1052, low: 997 }), // leaves without closing below 993
+    ...dojis(10, 1050, 32),
+  ];
+  assert.equal(findOrderBlocks(data).length, 0, "el mapa en vivo lo descarta al primer toque");
+  const stats = orderBlockStats(data);
+  assert.equal(stats.tested, 1, "la estadística sí lo ve, con otra definición de aguante");
+  assert.equal(stats.held, 1);
+});
+
+test("a block that closed beyond its zone counts as tested and not held", async () => {
+  const { orderBlockStats } = await import("../lib/order-blocks.ts");
+  const data = [
+    ...dojis(25, 1000, 0),
+    ...demandOb(1000, 25), // occupies indices 25–29
+    candle(30, 1040, 985, { high: 1041, low: 983 }), // closes below the zone
+    ...dojis(11, 985, 31),
+  ];
+  const stats = orderBlockStats(data);
+  assert.equal(stats.tested, 1);
+  assert.equal(stats.held, 0);
+  assert.equal(stats.holdRate, 0);
+});
+
+test("a block never revisited is not counted — its outcome is still open", async () => {
+  const { orderBlockStats } = await import("../lib/order-blocks.ts");
+  const stats = orderBlockStats([...dojis(25, 1000, 0), ...demandOb(1000, 25), ...dojis(15, 1050, 30)]);
+  assert.equal(stats.tested, 0);
+  assert.equal(stats.holdRate, null);
+  assert.equal(stats.confidence, "SIN MUESTRA");
+});

@@ -7,9 +7,9 @@ import {
   type HeatBucket,
   type LiquidationHeatmap,
 } from "@/lib/liquidation-heatmap";
-import { findFairValueGaps, type FairValueGap } from "@/lib/fair-value-gaps";
+import { findFairValueGaps, gapStats, type FairValueGap, type GapStats } from "@/lib/fair-value-gaps";
 import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
-import { findOrderBlocks, type OrderBlock } from "@/lib/order-blocks";
+import { findOrderBlocks, orderBlockStats, type OrderBlock, type ZoneStats } from "@/lib/order-blocks";
 import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
 import {
   FALLBACK_SYMBOLS,
@@ -21,7 +21,14 @@ import {
   TIMEFRAME_ORDER,
 } from "@/lib/market-fetch";
 
-type DisplayCandle = { time: number; open: number; high: number; low: number; close: number };
+type DisplayCandle = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
 type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; timeframe: string };
 
 /**
@@ -67,6 +74,23 @@ const usd = (value: number) => {
   if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
   if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
   return `$${value.toFixed(0)}`;
+};
+
+const shortUsd = (value: number) => {
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+};
+
+/** "62% · 21 casos" style, or a plain admission when there is nothing to
+ *  report — a rate never appears without the sample it came from. */
+const confidenceLabel = (stats: ZoneStats | null) => {
+  if (!stats || stats.holdRate === null) return "sin muestra todavía";
+  const pct = Math.round(stats.holdRate * 100);
+  return stats.tested < 8
+    ? `${pct}% en ${stats.tested} casos (muestra mínima)`
+    : `${pct}% en ${stats.tested} casos`;
 };
 
 const priceLabel = (price: number) =>
@@ -353,6 +377,11 @@ export default function LiquidationHeatmapDesk() {
             high: candle.high,
             low: candle.low,
             close: candle.close,
+            // Real volume, not a placeholder — order blocks and gaps need it
+            // to report anything about size. It was dropped here before,
+            // which silently made every order block's volume reading
+            // meaningless (see the fix in lib/order-blocks.ts).
+            volume: candle.volume,
           })),
           timeframe,
         });
@@ -549,8 +578,8 @@ export default function LiquidationHeatmapDesk() {
             high: candle.high,
             low: candle.low,
             close: candle.close,
-            volume: 1,
-            quoteVolume: 0,
+            volume: candle.volume,
+            quoteVolume: candle.volume * candle.close,
           }))
         : [],
     [layout],
@@ -562,6 +591,18 @@ export default function LiquidationHeatmapDesk() {
       (gap) => gap.high >= layout.lo && gap.low <= layout.hi,
     );
   }, [layout, swingView]);
+
+  // Computed once per load over the full series in view — not per zone, and
+  // not a probability: a count of what actually happened in these candles,
+  // with the sample size that makes the number readable honestly.
+  const gapConfidence = useMemo<GapStats | null>(
+    () => (swingView.length ? gapStats(swingView) : null),
+    [swingView],
+  );
+  const obConfidence = useMemo<ZoneStats | null>(
+    () => (swingView.length ? orderBlockStats(swingView) : null),
+    [swingView],
+  );
 
   const fibZone = useMemo<FibZoneState | null>(
     () => (swingView.length ? readFibZone(swingView) : null),
@@ -903,7 +944,8 @@ export default function LiquidationHeatmapDesk() {
                     y={layout.y(gap.high) - 2}
                     className={gap.side === "ALCISTA" ? "liq-fvg-label up" : "liq-fvg-label down"}
                   >
-                    {gap.kind}
+                    {gap.kind} · {shortUsd(gap.volumeUsd)} ·{" "}
+                    {confidenceLabel(gap.kind === "IFVG" ? (gapConfidence?.ifvg ?? null) : (gapConfidence?.fvg ?? null))}
                   </text>
                 </g>
               ))}
@@ -943,7 +985,8 @@ export default function LiquidationHeatmapDesk() {
                       y={top - 3}
                       className={bullish ? "liq-ob-label up" : "liq-ob-label down"}
                     >
-                      OB {bullish ? "↑" : "↓"} {priceLabel(block.mid)}
+                      OB {bullish ? "↑" : "↓"} {priceLabel(block.mid)} · {shortUsd(block.volumeUsd)} ·{" "}
+                      {confidenceLabel(obConfidence)}
                     </text>
                   </g>
                 );
@@ -1157,6 +1200,15 @@ export default function LiquidationHeatmapDesk() {
 
           <p className="liq-method">
             <b>Cómo se calcula.</b> {data.heatmap.method} {data.heatmap.assumptions}
+          </p>
+
+          <p className="liq-method">
+            <b>Qué es el % que aparece junto a OB, FVG e IFVG.</b> No es una probabilidad: es cuántas
+            veces esa clase de nivel se puso a prueba en las velas que estás viendo, y cuántas de
+            esas pruebas aguantó. Con menos de 8 casos se marca como muestra mínima — un 100% sobre
+            dos casos no es un historial. Un FVG y su IFVG miden cosas distintas: el FVG mide si el
+            hueco original aguantó sin invertirse; el IFVG mide, una vez invertido, si ese nuevo rol
+            aguantó una segunda prueba. Por eso pueden dar porcentajes distintos.
           </p>
         </>
       )}
