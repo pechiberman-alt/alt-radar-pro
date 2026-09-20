@@ -194,6 +194,7 @@
 
 /* Order blocks: context behind the price action, not marks on top of it. */
 .liq-ob.up{fill:var(--green)}
+/* Context behind the candles, so it must never dominate them. */
 .liq-ob.down{fill:var(--red)}
 .liq-ob-mid{stroke-width:1;stroke-dasharray:2 4;opacity:.55}
 .liq-ob-mid.up{stroke:var(--green)}
@@ -236,3 +237,24 @@
 .liq-timeframes::-webkit-scrollbar-thumb{background:#24352c;border-radius:2px}
 .liq-timeframes button{flex:0 0 auto}
 .liq-timeframes button.active{position:sticky;left:0;z-index:2;box-shadow:0 0 0 3px #060b09}
+
+/* ── Niveles detectados ──
+   The detail that used to be crammed into chart captions. One row each, so a
+   long line is readable and nothing overlaps. */
+.liq-levels{margin-top:14px;padding:12px 13px;background:#0a110d;border:1px solid var(--line);border-radius:4px;min-width:0}
+.liq-levels h4{margin:0 0 9px;font:9px var(--font-mono);letter-spacing:1.2px;color:var(--green2)}
+.liq-levels-list{display:grid;gap:3px;max-height:260px;overflow-y:auto}
+.liq-levels-list>div{display:grid;grid-template-columns:52px minmax(0,1fr) 62px minmax(0,1.5fr);gap:9px;align-items:baseline;padding:6px 0;border-top:1px solid #16201b;font:10px var(--font-mono);min-width:0}
+.liq-levels-list>div:first-child{border-top:0}
+.lv-kind{font-size:9px;letter-spacing:.6px}
+.liq-levels-list>div.up .lv-kind{color:var(--green)}
+.liq-levels-list>div.down .lv-kind{color:var(--red)}
+.lv-price{text-decoration:none;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lv-vol{color:#b9c5be;text-align:right;white-space:nowrap}
+.lv-conf{font-style:normal;font-size:8px;color:var(--green2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lv-conf.thin{color:var(--amber)}
+
+@media(max-width:700px){
+  .liq-levels-list>div{grid-template-columns:46px minmax(0,1fr) 56px;gap:4px 8px}
+  .lv-conf{grid-column:1/-1;text-align:left;font-size:9px}
+}
