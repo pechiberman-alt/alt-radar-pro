@@ -42,10 +42,22 @@ const PRIORITIES: { id: AlertPriority; label: string; hint: string }[] = [
  *  costs three candle fetches, and monitoring thirty pairs would spend the
  *  reader's rate limit to produce alerts about pairs they do not trade. */
 const WATCHED = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
+
+/** Public half of the VAPID pair. Public by design — it identifies the sender
+ *  to the push service and is meant to ship in the client. */
+const VAPID_PUBLIC =
+  "BAogyihF-Aut41_tnAEe1oxqAwTPYZQl_eWAgBvruFeZb1riABC3Nes1bu2NIkNg3bodTcUye_CgVhCmIAGOclY";
+
+const toBytes = (base64: string) => {
+  const padded = base64.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+};
 const FRAMES = ["4h", "1h", "15m"];
 
 export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
   const [detected, setDetected] = useState<Alert[]>([]);
+  const [pushState, setPushState] = useState<"off" | "on" | "working" | "unavailable">("off");
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -159,6 +171,71 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending, detected, prefs, permission]);
 
+  // Reflect whatever subscription the browser already holds, so the button
+  // never offers to enable something that is already on.
+  useEffect(() => {
+    (async () => {
+      if (typeof navigator === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setPushState("unavailable");
+        return;
+      }
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const existing = await registration.pushManager.getSubscription();
+        setPushState(existing ? "on" : "off");
+      } catch {
+        setPushState("unavailable");
+      }
+    })();
+  }, []);
+
+  const togglePush = useCallback(async () => {
+    setPushState("working");
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+
+      if (existing) {
+        // Remove the row first: unsubscribing locally while the server still
+        // holds the endpoint would keep sending to a dead subscription.
+        await fetch(`/api/push/subscribe?endpoint=${encodeURIComponent(existing.endpoint)}`, {
+          method: "DELETE",
+        }).catch(() => undefined);
+        await existing.unsubscribe();
+        setPushState("off");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      setPermission(permission);
+      if (permission !== "granted") {
+        setPushState("off");
+        return;
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: toBytes(VAPID_PUBLIC) as BufferSource,
+      });
+      const response = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription.toJSON()),
+      });
+      if (!response.ok) {
+        // Keeping the local subscription while the server has no record of it
+        // would show the feature as on while nothing could ever arrive.
+        await subscription.unsubscribe().catch(() => undefined);
+        setPushState("off");
+        return;
+      }
+      setPushState("on");
+      setPrefs((current) => ({ ...current, enabled: true }));
+    } catch {
+      setPushState("off");
+    }
+  }, []);
+
   const toggleCategory = (id: AlertCategory) =>
     setPrefs((current) => ({
       ...current,
@@ -196,7 +273,26 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
         </div>
       )}
 
-      {permission !== "granted" && permission !== "unsupported" && (
+      {pushState !== "unavailable" && (
+        <button
+          className={`alerts-push ${pushState === "on" ? "on" : ""}`}
+          onClick={togglePush}
+          disabled={pushState === "working"}
+        >
+          {pushState === "working"
+            ? "CONFIGURANDO…"
+            : pushState === "on"
+              ? "AVISOS CON LA APP CERRADA · ACTIVOS"
+              : "RECIBIR AVISOS CON LA APP CERRADA"}
+          <em>
+            {pushState === "on"
+              ? "Te llegan al teléfono aunque no tengas la página abierta, como un mensaje. Tocá para desactivar."
+              : "Como los de una app de mensajes: llegan aunque el navegador esté cerrado. Instalá el sitio en la pantalla de inicio para que funcione mejor."}
+          </em>
+        </button>
+      )}
+
+      {permission !== "granted" && permission !== "unsupported" && pushState !== "on" && (
         <button className="alerts-permission" onClick={askPermission}>
           ACTIVAR NOTIFICACIONES
           <em>El navegador va a pedirte permiso. Sin eso ninguna web puede avisarte.</em>
