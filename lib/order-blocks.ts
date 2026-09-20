@@ -50,6 +50,9 @@ export type OrderBlock = {
   displacement: number;
   /** Volume of the origin candle over the local average. */
   volumeRatio: number;
+  /** Origin candle's notional volume, price × base volume. What "volumen"
+   *  means on a chart — the ratio above is for scoring, this is for reading. */
+  volumeUsd: number;
   /** 0–100, combining displacement, volume and freshness. */
   strength: number;
   /** How many candles ago it formed. */
@@ -162,6 +165,7 @@ export function findOrderBlocks(
       candles.slice(Math.max(0, i - 20), i).map((c) => c.volume),
     );
     const volumeRatio = localVolume > 0 ? candle.volume / localVolume : 1;
+    const volumeUsd = candle.volume * ((candle.high + candle.low) / 2);
 
     const ageCandles = last - i;
     // Freshness decays across the visible history: an untouched block from
@@ -186,6 +190,7 @@ export function findOrderBlocks(
       time: candle.openTime,
       displacement,
       volumeRatio,
+      volumeUsd,
       strength,
       ageCandles,
     });
@@ -202,4 +207,94 @@ export function findOrderBlocks(
   }
 
   return distinct.slice(0, limit).sort((a, b) => b.mid - a.mid);
+}
+
+export type ZoneStats = {
+  tested: number;
+  held: number;
+  holdRate: number | null;
+  confidence: "SIN MUESTRA" | "MUESTRA MÍNIMA" | "MUESTRA RAZONABLE";
+};
+
+/**
+ * Observed hold rate across every order block candidate the series
+ * produced — not just the untouched ones the live map shows.
+ *
+ * "Held" is one specific, stated thing here: price re-entered the zone at
+ * least once and never closed beyond its far side. That is deliberately
+ * looser than the live map's own display rule, which drops a block the
+ * instant it is touched at all — the right rule for what to keep drawing,
+ * but the wrong one for measuring whether a touch tends to work. This scans
+ * independently so the two questions stay separate: what to show, and how
+ * often the underlying idea holds up when tested.
+ *
+ * This is not a probability. It is a count from the candles in front of it,
+ * and the sample size travels with it for exactly that reason.
+ */
+export function orderBlockStats(
+  candles: SwingCandle[],
+  options: OrderBlockOptions = {},
+): ZoneStats {
+  const empty: ZoneStats = { tested: 0, held: 0, holdRate: null, confidence: "SIN MUESTRA" };
+  const minDisplacement = options.minDisplacement ?? 1.8;
+  const impulseWindow = options.impulseWindow ?? 4;
+  if (candles.length < 40) return empty;
+
+  const last = candles.length - 1;
+  let tested = 0;
+  let held = 0;
+
+  for (let i = 20; i < candles.length - impulseWindow - 1; i += 1) {
+    const candle = candles[i];
+    const bullishBlock = candle.close < candle.open;
+    const bearishBlock = candle.close > candle.open;
+    if (!bullishBlock && !bearishBlock) continue;
+
+    const range = averageRange(candles, i);
+    if (!(range > 0)) continue;
+    if (Math.abs(candle.close - candle.open) > range * 3) continue;
+
+    const impulse = candles.slice(i + 1, i + 1 + impulseWindow);
+    if (!impulse.length) continue;
+
+    const move = bullishBlock
+      ? Math.max(...impulse.map((c) => c.high)) - candle.low
+      : candle.high - Math.min(...impulse.map((c) => c.low));
+    if (move / range < minDisplacement) continue;
+
+    const priorWindow = candles.slice(Math.max(0, i - 20), i);
+    const priorHigh = Math.max(...priorWindow.map((c) => c.high));
+    const priorLow = Math.min(...priorWindow.map((c) => c.low));
+    const broke = bullishBlock
+      ? Math.max(...impulse.map((c) => c.high)) > priorHigh
+      : Math.min(...impulse.map((c) => c.low)) < priorLow;
+    if (!broke) continue;
+
+    const low = Math.min(candle.open, candle.close, candle.low);
+    const high = Math.max(candle.open, candle.close, candle.high);
+    const touches = (c: SwingCandle) => c.low <= high && c.high >= low;
+
+    let touched = false;
+    let closedBeyond = false;
+    for (let j = i + 1 + impulseWindow; j <= last; j += 1) {
+      const c = candles[j];
+      if (touches(c)) touched = true;
+      const beyond = bullishBlock ? c.close < low : c.close > high;
+      if (beyond) {
+        closedBeyond = true;
+        break;
+      }
+    }
+
+    // Never revisited at all: an open outcome, not a resolved one — deciding
+    // it either way would be a guess.
+    if (!touched && !closedBeyond) continue;
+
+    tested += 1;
+    if (!closedBeyond) held += 1;
+  }
+
+  const confidence: ZoneStats["confidence"] =
+    tested === 0 ? "SIN MUESTRA" : tested < 8 ? "MUESTRA MÍNIMA" : "MUESTRA RAZONABLE";
+  return { tested, held, holdRate: tested > 0 ? held / tested : null, confidence };
 }
