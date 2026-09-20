@@ -31,6 +31,7 @@ import UnlockDesk from "./unlock-desk";
 import AssetFlowDesk from "./asset-flows";
 import BigTradesDesk from "./big-trades-desk";
 import ZonesDesk from "./zones-desk";
+import PressureDesk from "./pressure-desk";
 import AlertCenter from "./alert-center";
 import AlertToasts from "./alert-toasts";
 import SwingDesk from "./swing-desk";
@@ -71,6 +72,7 @@ const NAV_ITEMS = [
   { label: "FLUJO POR ACTIVO", mobile: "FLUJO", icon: "⇉", id: "flujo-activos" },
   { label: "ÓRDENES GRANDES", mobile: "GRANDES", icon: "◆", id: "ordenes-grandes" },
   { label: "ZONAS MTF", mobile: "ZONAS", icon: "▭", id: "zonas" },
+  { label: "PRESIÓN", mobile: "PRESIÓN", icon: "◌", id: "presion" },
   { label: "ALERTAS", mobile: "AVISOS", icon: "◈", id: "alertas" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
@@ -1176,6 +1178,10 @@ export default function RadarApp() {
 
         <Collapsible id="alertas" label="ALERTAS" open={workspace.open["alertas"]} onToggle={workspace.toggle}>
           <AlertCenter />
+        </Collapsible>
+
+        <Collapsible id="presion" label="PRESIÓN" open={workspace.open["presion"]} onToggle={workspace.toggle}>
+          <PressureDesk />
         </Collapsible>
 
         <Collapsible id="zonas" label="ZONAS MTF" open={workspace.open["zonas"]} onToggle={workspace.toggle}>
