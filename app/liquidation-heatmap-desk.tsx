@@ -13,12 +13,12 @@ import { findOrderBlocks, type OrderBlock } from "@/lib/order-blocks";
 import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
 import {
   FALLBACK_SYMBOLS,
-  HALF_LIFE_CANDLES,
-  LOOKBACK,
   loadOiDelta,
   loadOpenInterest,
   loadRows,
   loadTopSymbols,
+  timeframeConfig,
+  TIMEFRAME_ORDER,
 } from "@/lib/market-fetch";
 
 type DisplayCandle = { time: number; open: number; high: number; low: number; close: number };
@@ -39,12 +39,7 @@ type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; time
  * it. buildLiquidationHeatmap is pure arithmetic with no server dependency, so
  * it runs the same in both places.
  */
-const TIMEFRAMES: { id: string; label: string }[] = [
-  { id: "15m", label: "15M" },
-  { id: "1h", label: "1H" },
-  { id: "4h", label: "4H" },
-  { id: "1d", label: "1D" },
-];
+const FRAME_OPTIONS = TIMEFRAME_ORDER.map((id) => ({ id, label: timeframeConfig(id).label }));
 
 /** Green → amber → red, matching the app's own tokens rather than a stock
  *  colormap, so a dense cluster reads with the same alarm colour as
@@ -307,13 +302,9 @@ export default function LiquidationHeatmapDesk() {
 
     (async () => {
       try {
-        const interval = timeframe === "1d" ? "1d" : timeframe;
-        const rows = await loadRows(
-          symbol,
-          interval,
-          LOOKBACK[timeframe] ?? 500,
-          controller.signal,
-        );
+        const interval = timeframe;
+        const config = timeframeConfig(timeframe);
+        const rows = await loadRows(symbol, interval, config.lookback, controller.signal);
         if (!alive) return;
         if (!rows) {
           fail("MAPA NO DISPONIBLE");
@@ -343,7 +334,8 @@ export default function LiquidationHeatmapDesk() {
 
         const heatmap = buildLiquidationHeatmap(symbol, candles, currentPrice, {
           oiDeltaByIndex: oiDeltaByIndex ?? undefined,
-          halfLifeCandles: HALF_LIFE_CANDLES[timeframe],
+          halfLifeCandles: config.halfLife,
+          priceRangePct: config.priceRange,
           totalOpenInterestUsd:
             openContracts !== null ? openContracts * currentPrice : undefined,
         });
@@ -652,7 +644,7 @@ export default function LiquidationHeatmapDesk() {
           ))}
         </div>
         <div className="liq-timeframes">
-          {TIMEFRAMES.map((tf) => (
+          {FRAME_OPTIONS.map((tf) => (
             <button
               key={tf.id}
               className={tf.id === timeframe ? "active" : ""}
@@ -1033,14 +1025,22 @@ export default function LiquidationHeatmapDesk() {
                   y={box.height - 10}
                   className="liq-axis-label liq-axis-x"
                 >
-                  {timeframe === "1d"
-                    ? new Date(tick.time).toLocaleDateString("es-AR", {
-                        day: "2-digit",
-                        month: "2-digit",
+                  {/* Minute frames need the minute; multi-day frames would be
+                      lying to show an hour at all. */}
+                  {timeframe === "1m" || timeframe === "5m"
+                    ? new Date(tick.time).toLocaleTimeString("es-AR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
                       })
-                    : `${new Date(tick.time).getDate()}/${
-                        new Date(tick.time).getMonth() + 1
-                      } ${String(new Date(tick.time).getHours()).padStart(2, "0")}h`}
+                    : timeframe === "1d" || timeframe === "3d" || timeframe === "1w"
+                      ? new Date(tick.time).toLocaleDateString("es-AR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                        })
+                      : `${new Date(tick.time).getDate()}/${
+                          new Date(tick.time).getMonth() + 1
+                        } ${String(new Date(tick.time).getHours()).padStart(2, "0")}h`}
                 </text>
               ))}
             </svg>

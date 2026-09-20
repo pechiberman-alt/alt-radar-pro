@@ -228,3 +228,11 @@
 .liq-fibflag small{font:9px var(--font-mono);color:var(--muted)}
 .liq-legend i.fvg{background:linear-gradient(90deg,rgba(57,242,154,.3),rgba(255,89,100,.3))}
 .liq-legend i.fib{background:rgba(244,184,74,.3);border:1px dashed rgba(244,184,74,.6)}
+
+/* Ten frames no longer fit a phone row, so it scrolls like the pair selector
+   and the active chip stays anchored where it can be found. */
+.liq-timeframes{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;padding-bottom:4px;max-width:100%;min-width:0}
+.liq-timeframes::-webkit-scrollbar{height:4px}
+.liq-timeframes::-webkit-scrollbar-thumb{background:#24352c;border-radius:2px}
+.liq-timeframes button{flex:0 0 auto}
+.liq-timeframes button.active{position:sticky;left:0;z-index:2;box-shadow:0 0 0 3px #060b09}

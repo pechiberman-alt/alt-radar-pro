@@ -173,12 +173,28 @@ export type LiquidationHeatmap = {
   assumptions: string;
 };
 
-/** Bin width as a fraction of price — finer near typical BTC/ETH tick spacing
- *  than it needs to be for alts, but stable and simple across symbols. */
-function chooseBinSize(price: number): number {
-  const raw = price * 0.001;
+/**
+ * Bin width, scaled so the number of bins stays bounded however wide the
+ * projection is.
+ *
+ * A fixed fraction of price works on a ±8% intraday window and falls apart on
+ * a ±60% weekly one: the same width would produce thousands of bins, costing
+ * time without adding resolution anyone can see — the chart collapses them
+ * into rows anyway. The width is therefore derived from the span being
+ * covered, then snapped to a round number so bin edges land on prices a
+ * reader recognises rather than on arbitrary fractions.
+ */
+function chooseBinSize(price: number, priceRangePct: number): number {
+  /** Target count across the whole projected span. Beyond this, extra bins
+   *  are merged by the UI before anyone sees them. */
+  const TARGET_BINS = 1800;
+  const span = price * priceRangePct * 2;
+  const raw = Math.max(span / TARGET_BINS, price * 1e-6);
   const magnitude = 10 ** Math.floor(Math.log10(raw));
-  return Math.max(magnitude, 1e-8);
+  // Snap up to 1, 2 or 5 times the magnitude — the steps a price ladder uses.
+  const normalised = raw / magnitude;
+  const step = normalised <= 1 ? 1 : normalised <= 2 ? 2 : normalised <= 5 ? 5 : 10;
+  return Math.max(magnitude * step, 1e-8);
 }
 
 /**
@@ -278,7 +294,7 @@ export function buildLiquidationHeatmap(
 
   if (!candles.length || !(currentPrice > 0)) return null;
 
-  const binSize = chooseBinSize(currentPrice);
+  const binSize = chooseBinSize(currentPrice, priceRangePct);
   const oiDelta = opts.oiDeltaByIndex;
   const halfLife = opts.halfLifeCandles && opts.halfLifeCandles > 0 ? opts.halfLifeCandles : null;
   const lastIndex = candles.length - 1;
