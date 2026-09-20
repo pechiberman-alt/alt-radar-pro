@@ -609,6 +609,44 @@ export default function LiquidationHeatmapDesk() {
     [swingView],
   );
 
+  /**
+   * Decides which level labels the chart may draw.
+   *
+   * Even short labels collide when two levels sit at nearly the same price,
+   * and a stack of overlapping text is worse than no text — it hides the
+   * candles behind it and none of it can be read. So labels are claimed
+   * top-down by strength: the first to claim a vertical slot keeps it, the
+   * rest are drawn as their zone without a caption. Nothing is lost, because
+   * every level is listed in full under the chart.
+   */
+  const labelSlots = useMemo(() => {
+    if (!layout) return { ob: new Set<number>(), gap: new Set<number>() };
+    const MIN_GAP_PX = 15;
+    const taken: number[] = [];
+    const claim = (price: number) => {
+      const y = layout.y(price);
+      if (taken.some((other) => Math.abs(other - y) < MIN_GAP_PX)) return false;
+      taken.push(y);
+      return true;
+    };
+
+    // Magnet lines are claimed first: they are the levels the panel's own
+    // summary cards name, so losing their caption would contradict the cards.
+    for (const zone of [layout.heatmap.topZoneAbove, layout.heatmap.topZoneBelow]) {
+      if (zone && zone.price >= layout.lo && zone.price <= layout.hi) claim(zone.price);
+    }
+
+    const ob = new Set<number>();
+    for (const block of [...orderBlocks].sort((a, b) => b.strength - a.strength)) {
+      if (claim(block.high)) ob.add(block.index);
+    }
+    const gap = new Set<number>();
+    for (const g of [...gaps].sort((a, b) => b.quality - a.quality)) {
+      if (claim(g.high)) gap.add(g.index);
+    }
+    return { ob, gap };
+  }, [layout, orderBlocks, gaps]);
+
   const keyLevels = useMemo(() => {
     if (!layout) return [];
     // Pivots come from the candles actually on screen, so the levels named
@@ -937,16 +975,17 @@ export default function LiquidationHeatmapDesk() {
                     width={layout.candleAreaW}
                     height={Math.max(1.5, layout.y(gap.low) - layout.y(gap.high))}
                     className={gap.side === "ALCISTA" ? "liq-fvg up" : "liq-fvg down"}
-                    opacity={0.08 + (gap.quality / 100) * 0.14}
+                    opacity={0.04 + (gap.quality / 100) * 0.07}
                   />
-                  <text
-                    x={MARGIN.left + 4}
-                    y={layout.y(gap.high) - 2}
-                    className={gap.side === "ALCISTA" ? "liq-fvg-label up" : "liq-fvg-label down"}
-                  >
-                    {gap.kind} · {shortUsd(gap.volumeUsd)} ·{" "}
-                    {confidenceLabel(gap.kind === "IFVG" ? (gapConfidence?.ifvg ?? null) : (gapConfidence?.fvg ?? null))}
-                  </text>
+                  {labelSlots.gap.has(gap.index) && (
+                    <text
+                      x={MARGIN.left + 4}
+                      y={layout.y(gap.high) - 2}
+                      className={gap.side === "ALCISTA" ? "liq-fvg-label up" : "liq-fvg-label down"}
+                    >
+                      {gap.kind}
+                    </text>
+                  )}
                 </g>
               ))}
 
@@ -971,7 +1010,7 @@ export default function LiquidationHeatmapDesk() {
                       width={Math.max(4, MARGIN.left + layout.candleAreaW - startX)}
                       height={height}
                       className={bullish ? "liq-ob up" : "liq-ob down"}
-                      opacity={0.1 + (block.strength / 100) * 0.16}
+                      opacity={0.05 + (block.strength / 100) * 0.08}
                     />
                     <line
                       x1={startX}
@@ -980,14 +1019,15 @@ export default function LiquidationHeatmapDesk() {
                       y2={top + height / 2}
                       className={bullish ? "liq-ob-mid up" : "liq-ob-mid down"}
                     />
-                    <text
-                      x={startX + 5}
-                      y={top - 3}
-                      className={bullish ? "liq-ob-label up" : "liq-ob-label down"}
-                    >
-                      OB {bullish ? "↑" : "↓"} {priceLabel(block.mid)} · {shortUsd(block.volumeUsd)} ·{" "}
-                      {confidenceLabel(obConfidence)}
-                    </text>
+                    {labelSlots.ob.has(block.index) && (
+                      <text
+                        x={startX + 5}
+                        y={top - 3}
+                        className={bullish ? "liq-ob-label up" : "liq-ob-label down"}
+                      >
+                        OB {bullish ? "↑" : "↓"}
+                      </text>
+                    )}
                   </g>
                 );
               })}
@@ -1128,6 +1168,61 @@ export default function LiquidationHeatmapDesk() {
                   </em>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Detail lives here, not on the chart. A caption long enough to
+              carry volume and a hit rate cannot share vertical space with
+              another one — on the chart they stacked into an unreadable pile
+              that also hid the candles. In a list each line has its own row. */}
+          {(orderBlocks.length > 0 || gaps.length > 0) && (
+            <div className="liq-levels">
+              <h4>NIVELES DETECTADOS EN LA VENTANA</h4>
+              <div className="liq-levels-list">
+                {[
+                  ...orderBlocks.map((block) => ({
+                    key: `ob-${block.index}`,
+                    kind: `OB ${block.side === "ALCISTA" ? "↑" : "↓"}`,
+                    cls: block.side === "ALCISTA" ? "up" : "down",
+                    price: block.mid,
+                    low: block.low,
+                    high: block.high,
+                    volumeUsd: block.volumeUsd,
+                    stats: obConfidence,
+                    rank: block.strength,
+                  })),
+                  ...gaps.map((gap) => ({
+                    key: `gap-${gap.index}`,
+                    kind: gap.kind,
+                    cls: gap.side === "ALCISTA" ? "up" : "down",
+                    price: gap.mid,
+                    low: gap.low,
+                    high: gap.high,
+                    volumeUsd: gap.volumeUsd,
+                    stats: gap.kind === "IFVG" ? (gapConfidence?.ifvg ?? null) : (gapConfidence?.fvg ?? null),
+                    rank: gap.quality,
+                  })),
+                ]
+                  .sort((a, b) => b.price - a.price)
+                  .map((level) => (
+                    <div key={level.key} className={level.cls}>
+                      <b className="lv-kind">{level.kind}</b>
+                      <u className="lv-price">
+                        {priceLabel(level.low)}–{priceLabel(level.high)}
+                      </u>
+                      <span className="lv-vol">{shortUsd(level.volumeUsd)}</span>
+                      <em
+                        className={
+                          level.stats && level.stats.tested > 0 && level.stats.tested < 8
+                            ? "lv-conf thin"
+                            : "lv-conf"
+                        }
+                      >
+                        {confidenceLabel(level.stats)}
+                      </em>
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
 
