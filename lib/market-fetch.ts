@@ -22,37 +22,88 @@ export const FUTURES_BASES = [
   "https://fapi2.binance.com",
 ];
 
-/** Candles per timeframe for the activity profile that feeds the map. */
-export const LOOKBACK: Record<string, number> = { "15m": 500, "1h": 500, "4h": 500, "1d": 365 };
-
 /**
- * Binance's open-interest history endpoint takes its own period names and,
- * critically, only retains about 30 days of history — and caps a single call
- * at 500 rows. Daily candles therefore get no OI coverage at all, and the
- * shorter frames get partial coverage. That is fine: the engine falls back to
- * volume per-candle wherever OI is missing, and reports how much of the map
- * came from which source.
+ * Per-timeframe configuration, in one table.
+ *
+ * These four settings were three separate maps that had to be kept in step by
+ * hand, which is how a timeframe ends up half-configured. They belong
+ * together because they are not independent: the lookback decides how much
+ * history exists, the half-life decides how much of it still counts, the
+ * price range decides how far a projection is meaningful, and the OI period
+ * decides whether the better data source is even available.
+ *
+ * HALF-LIFE SCALES WITH THE HORIZON, NOT WITH WALL-CLOCK TIME
+ *
+ * The first version used ~2 days of real time on every frame, reasoning from
+ * how fast leveraged positions turn over. That is right for intraday and
+ * wrong for the rest: two days is a fraction of one weekly candle, so it
+ * would discount almost the entire chart to nothing. Someone reading a weekly
+ * map is looking at positions held for weeks. The horizon therefore grows
+ * with the frame — from hours on the minute chart to months on the weekly.
+ *
+ * PRICE RANGE SCALES TOO
+ *
+ * Projecting ±22% on a 1-minute chart covers ground price will not see all
+ * day, and the map is mostly empty. On a weekly chart ±22% is too narrow to
+ * hold the levels that matter. Each frame gets a range that matches how far
+ * price actually travels in it.
+ *
+ * WHERE OPEN INTEREST IS SIMPLY NOT AVAILABLE
+ *
+ * Binance's openInterestHist accepts 5m, 15m, 30m, 1h, 2h, 4h, 6h, 12h and 1d
+ * only, and retains about 30 days. So 1m, 3d and 1w have no OI period at all,
+ * and the long frames would get negligible coverage even if they did. Those
+ * fall back to volume per candle, and the panel reports the coverage rather
+ * than implying the better source was used.
  */
-/**
- * Half-life in candles, chosen so each timeframe discounts activity on a
- * comparable real-time scale (~2 days). Leveraged perpetual positions turn
- * over fast — a published study of BitMEX found roughly 3.5% of longs were
- * force-liquidated every single day — so treating month-old activity as
- * still-open would overstate the map badly.
- */
-export const HALF_LIFE_CANDLES: Record<string, number> = {
-  "15m": 192,
-  "1h": 48,
-  "4h": 12,
-  "1d": 3,
+export type TimeframeConfig = {
+  /** Candles to request for the activity profile. */
+  lookback: number;
+  /** Candles until older activity counts half as much. */
+  halfLife: number;
+  /** How far above and below price to project liquidations. */
+  priceRange: number;
+  /** Binance openInterestHist period, or null where it does not exist. */
+  oiPeriod: string | null;
+  /** Shown on the selector. */
+  label: string;
 };
 
-export const OI_PERIOD: Record<string, string | null> = {
-  "15m": "15m",
-  "1h": "1h",
-  "4h": "4h",
-  "1d": null,
+export const TIMEFRAMES: Record<string, TimeframeConfig> = {
+  // ~8 hours of history; positions here are measured in hours.
+  "1m": { lookback: 500, halfLife: 240, priceRange: 0.03, oiPeriod: null, label: "1M" },
+  "5m": { lookback: 500, halfLife: 288, priceRange: 0.05, oiPeriod: "5m", label: "5M" },
+  "15m": { lookback: 500, halfLife: 192, priceRange: 0.08, oiPeriod: "15m", label: "15M" },
+  "30m": { lookback: 500, halfLife: 144, priceRange: 0.1, oiPeriod: "30m", label: "30M" },
+  "1h": { lookback: 500, halfLife: 96, priceRange: 0.14, oiPeriod: "1h", label: "1H" },
+  "4h": { lookback: 500, halfLife: 42, priceRange: 0.22, oiPeriod: "4h", label: "4H" },
+  "12h": { lookback: 400, halfLife: 28, priceRange: 0.3, oiPeriod: "12h", label: "12H" },
+  // A year of daily candles; the horizon is a couple of weeks.
+  "1d": { lookback: 365, halfLife: 21, priceRange: 0.4, oiPeriod: "1d", label: "1D" },
+  // Binance has no 3-day OI period, so this runs on volume.
+  "3d": { lookback: 300, halfLife: 10, priceRange: 0.5, oiPeriod: null, label: "3D" },
+  // Several years of weekly candles; positions held for months.
+  "1w": { lookback: 260, halfLife: 8, priceRange: 0.6, oiPeriod: null, label: "1S" },
 };
+
+/** Order shown in the selector, coarse to fine reading left to right. */
+export const TIMEFRAME_ORDER = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d", "1w"];
+
+export function timeframeConfig(timeframe: string): TimeframeConfig {
+  return TIMEFRAMES[timeframe] ?? TIMEFRAMES["1h"];
+}
+
+/** Kept as views over the table so existing callers keep working and cannot
+ *  drift from it. */
+export const LOOKBACK: Record<string, number> = Object.fromEntries(
+  Object.entries(TIMEFRAMES).map(([key, value]) => [key, value.lookback]),
+);
+export const HALF_LIFE_CANDLES: Record<string, number> = Object.fromEntries(
+  Object.entries(TIMEFRAMES).map(([key, value]) => [key, value.halfLife]),
+);
+export const OI_PERIOD: Record<string, string | null> = Object.fromEntries(
+  Object.entries(TIMEFRAMES).map(([key, value]) => [key, value.oiPeriod]),
+);
 
 export async function loadRows(symbol: string, interval: string, limit: number, signal: AbortSignal) {
   const query = `symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`;
