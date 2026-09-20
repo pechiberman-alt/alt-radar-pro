@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { publishAlert } from "@/lib/alert-bus";
 import { buildMtfZones } from "@/lib/mtf-zones";
 import { readFibZone } from "@/lib/fib-zone";
 import { loadRows } from "@/lib/market-fetch";
@@ -118,7 +119,12 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
           // One symbol failing must not silence the others.
         }
       }
-      if (alive && found.length) setDetected(found);
+      if (!alive || !found.length) return;
+      setDetected(found);
+      // On-screen banners are separate from system notifications on purpose:
+      // they show while the app is open regardless of browser permission,
+      // which is the case that needs no setup from the reader.
+      for (const alert of found) publishAlert(alert);
     })();
 
     return () => {

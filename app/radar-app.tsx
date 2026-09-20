@@ -32,6 +32,7 @@ import AssetFlowDesk from "./asset-flows";
 import BigTradesDesk from "./big-trades-desk";
 import ZonesDesk from "./zones-desk";
 import AlertCenter from "./alert-center";
+import AlertToasts from "./alert-toasts";
 import SwingDesk from "./swing-desk";
 import { Collapsible, WorkspaceBar, useWorkspace } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -914,6 +915,7 @@ export default function RadarApp() {
         <div className="system">
           <span className={error ? "offline" : "live"}>● {error ? "DEGRADADO" : "EN VIVO"}</span>
           <AccountPanel />
+          <AlertToasts />
           {installPrompt && <button className="install-app" onClick={installApp}>↓ INSTALAR</button>}
           <button
             aria-label="Activar o desactivar sonido"

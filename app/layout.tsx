@@ -31,6 +31,7 @@ import "./asset-flows.css";
 import "./big-trades-desk.css";
 import "./zones-desk.css";
 import "./alert-center.css";
+import "./alert-toasts.css";
 import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 

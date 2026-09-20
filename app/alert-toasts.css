@@ -1,0 +1,25 @@
+/* Banners sit above everything but clear of the phone's bottom nav, and are
+   click-through except on the cards themselves, so they never block a tap on
+   the chart underneath. */
+.toasts{position:fixed;left:0;right:0;bottom:calc(74px + env(safe-area-inset-bottom,0px));z-index:60;display:grid;gap:7px;padding:0 12px;pointer-events:none;justify-items:stretch}
+
+.toast{pointer-events:auto;display:grid;gap:3px;padding:11px 13px;border-radius:6px;background:#0d1714f2;border:1px solid var(--line);backdrop-filter:blur(8px);box-shadow:0 8px 24px #00000066;max-width:560px;margin:0 auto;width:100%;min-width:0;animation:toast-in .18s ease-out}
+.toast.p-critica{border-color:#73323a;border-left:3px solid var(--red)}
+.toast.p-importante{border-color:#6b5527;border-left:3px solid var(--amber)}
+.toast.p-informativa{border-left:3px solid var(--green2)}
+
+@keyframes toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+
+.toast-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.toast-head b{font:8px var(--font-mono);letter-spacing:1px;color:var(--muted)}
+.toast-head button{background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:0 2px}
+.toast-head button:hover{color:var(--text)}
+.toast-title{font:11px var(--font-mono);color:var(--text)}
+.toast span{font:10px var(--font-mono);line-height:1.55;color:#9aa7a0}
+.toast small{font:8px var(--font-mono);color:var(--green2);margin-top:2px}
+
+@media(min-width:1000px){
+  .toasts{left:auto;right:18px;bottom:18px;width:380px;padding:0}
+  .toast{margin:0}
+}
