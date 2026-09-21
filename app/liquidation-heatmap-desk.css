@@ -258,3 +258,37 @@
   .liq-levels-list>div{grid-template-columns:46px minmax(0,1fr) 56px;gap:4px 8px}
   .lv-conf{grid-column:1/-1;text-align:left;font-size:9px}
 }
+
+/* Liquidity pools: single-price lines, not zones — dashed to read as
+   "resting orders here", distinct from the solid magnet lines. */
+.liq-pool-line{stroke-width:1.4;stroke-dasharray:6 4;opacity:.55}
+.liq-pool-line.up{stroke:var(--green)}
+.liq-pool-line.down{stroke:var(--red)}
+.liq-pool-label{font:9px var(--font-mono);letter-spacing:.3px;text-anchor:end}
+.liq-pool-label.up{fill:var(--green)}
+.liq-pool-label.down{fill:var(--red)}
+@media(max-width:700px){ .liq-pool-label{font-size:11px} }
+.liq-legend i.pool{background:none;border-top:2px dashed var(--green);width:16px;height:0}
+
+/* ── Escenarios posibles ── */
+.liq-scenarios{margin-top:14px;padding:13px 14px;background:#0a110d;border:1px solid var(--line);border-radius:5px;min-width:0}
+.liq-scenarios h4{margin:0 0 8px;font:9px var(--font-mono);letter-spacing:1.2px;color:var(--green2)}
+.sc-note{margin:0 0 12px;font:9px var(--font-mono);line-height:1.7;color:var(--muted)}
+.sc-list{display:grid;gap:10px}
+.sc-list>div{padding:11px 13px;border-radius:4px;background:#0b130f;border:1px solid var(--line);min-width:0}
+.sc-alcista{border-left:3px solid var(--green)}
+.sc-bajista{border-left:3px solid var(--red)}
+.sc-barrido{border-left:3px solid var(--amber)}
+.sc-head b{font:12px var(--font-sans);color:var(--text);letter-spacing:-.2px}
+.sc-alcista .sc-head b{color:var(--green)}
+.sc-bajista .sc-head b{color:var(--red)}
+.sc-barrido .sc-head b{color:var(--amber)}
+.sc-row{display:grid;grid-template-columns:78px minmax(0,1fr);gap:8px;margin-top:6px;font:10px var(--font-mono);min-width:0}
+.sc-row span{color:var(--muted);letter-spacing:.6px;font-size:8px;align-self:baseline}
+.sc-row em{font-style:normal;color:#b9c5be;overflow-wrap:break-word}
+.sc-reasoning{margin:9px 0 0;font:9px var(--font-mono);line-height:1.7;color:#8e9c94}
+
+@media(max-width:700px){
+  .sc-row{grid-template-columns:1fr}
+  .sc-row span{margin-bottom:1px}
+}

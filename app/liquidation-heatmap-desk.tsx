@@ -8,6 +8,8 @@ import {
   type LiquidationHeatmap,
 } from "@/lib/liquidation-heatmap";
 import { findFairValueGaps, gapStats, type FairValueGap, type GapStats } from "@/lib/fair-value-gaps";
+import { findLiquidityPools, type LiquidityPool } from "@/lib/liquidity-pools";
+import { buildScenarios, type ScenarioBoard } from "@/lib/scenario-analysis";
 import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
 import { findOrderBlocks, orderBlockStats, type OrderBlock, type ZoneStats } from "@/lib/order-blocks";
 import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
@@ -599,6 +601,24 @@ export default function LiquidationHeatmapDesk() {
     () => (swingView.length ? gapStats(swingView) : null),
     [swingView],
   );
+
+  const pools = useMemo<LiquidityPool[]>(() => {
+    if (!layout || !swingView.length) return [];
+    return findLiquidityPools(swingView).filter(
+      (pool) => pool.price >= layout.lo && pool.price <= layout.hi,
+    );
+  }, [layout, swingView]);
+
+  const scenarios = useMemo<ScenarioBoard | null>(() => {
+    if (!layout) return null;
+    return buildScenarios({
+      currentPrice: layout.heatmap.currentPrice,
+      pools,
+      orderBlocks,
+      gaps,
+      heatmap: layout.heatmap,
+    });
+  }, [layout, pools, orderBlocks, gaps]);
   const obConfidence = useMemo<ZoneStats | null>(
     () => (swingView.length ? orderBlockStats(swingView) : null),
     [swingView],
@@ -620,7 +640,7 @@ export default function LiquidationHeatmapDesk() {
    * every level is listed in full under the chart.
    */
   const labelSlots = useMemo(() => {
-    if (!layout) return { ob: new Set<number>(), gap: new Set<number>() };
+    if (!layout) return { pool: new Set<number>(), ob: new Set<number>(), gap: new Set<number>() };
     const MIN_GAP_PX = 15;
     const taken: number[] = [];
     const claim = (price: number) => {
@@ -636,6 +656,10 @@ export default function LiquidationHeatmapDesk() {
       if (zone && zone.price >= layout.lo && zone.price <= layout.hi) claim(zone.price);
     }
 
+    const pool = new Set<number>();
+    for (const p of [...pools].sort((a, b) => b.strength - a.strength)) {
+      if (claim(p.price)) pool.add(p.formedAt);
+    }
     const ob = new Set<number>();
     for (const block of [...orderBlocks].sort((a, b) => b.strength - a.strength)) {
       if (claim(block.high)) ob.add(block.index);
@@ -644,8 +668,8 @@ export default function LiquidationHeatmapDesk() {
     for (const g of [...gaps].sort((a, b) => b.quality - a.quality)) {
       if (claim(g.high)) gap.add(g.index);
     }
-    return { ob, gap };
-  }, [layout, orderBlocks, gaps]);
+    return { pool, ob, gap };
+  }, [layout, pools, orderBlocks, gaps]);
 
   const keyLevels = useMemo(() => {
     if (!layout) return [];
@@ -934,6 +958,35 @@ export default function LiquidationHeatmapDesk() {
                 );
               })}
 
+              {/* Liquidity pools: dashed lines, since they mark a single price
+                  where resting orders cluster — not a zone with width like
+                  the other layers. Drawn furthest back of the level layers
+                  because they are the widest-horizon read on the chart. */}
+              {pools.map((pool) => {
+                const y = layout.y(pool.price);
+                const bullish = pool.side === "COMPRA";
+                return (
+                  <g key={`pool-${pool.formedAt}-${pool.side}`}>
+                    <line
+                      x1={MARGIN.left}
+                      x2={MARGIN.left + layout.candleAreaW}
+                      y1={y}
+                      y2={y}
+                      className={bullish ? "liq-pool-line up" : "liq-pool-line down"}
+                    />
+                    {labelSlots.pool.has(pool.formedAt) && (
+                      <text
+                        x={MARGIN.left + layout.candleAreaW - 4}
+                        y={y - 3}
+                        className={bullish ? "liq-pool-label up" : "liq-pool-label down"}
+                      >
+                        {bullish ? "LIQ ↑" : "LIQ ↓"} ×{pool.touches}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+
               {/* The Fibonacci band sits furthest back: it is the widest
                   piece of context, and everything else is read inside it. */}
               {fibZone && fibZone.zoneHigh >= layout.lo && fibZone.zoneLow <= layout.hi && (
@@ -1175,11 +1228,23 @@ export default function LiquidationHeatmapDesk() {
               carry volume and a hit rate cannot share vertical space with
               another one — on the chart they stacked into an unreadable pile
               that also hid the candles. In a list each line has its own row. */}
-          {(orderBlocks.length > 0 || gaps.length > 0) && (
+          {(orderBlocks.length > 0 || gaps.length > 0 || pools.length > 0) && (
             <div className="liq-levels">
               <h4>NIVELES DETECTADOS EN LA VENTANA</h4>
               <div className="liq-levels-list">
                 {[
+                  ...pools.map((pool) => ({
+                    key: `pool-${pool.formedAt}-${pool.side}`,
+                    kind: `LIQ ${pool.side === "COMPRA" ? "↑" : "↓"}`,
+                    cls: pool.side === "COMPRA" ? "up" : "down",
+                    price: pool.price,
+                    low: pool.price,
+                    high: pool.price,
+                    volumeUsd: null as number | null,
+                    stats: null,
+                    rank: pool.strength,
+                    detail: `×${pool.touches} toques`,
+                  })),
                   ...orderBlocks.map((block) => ({
                     key: `ob-${block.index}`,
                     kind: `OB ${block.side === "ALCISTA" ? "↑" : "↓"}`,
@@ -1190,6 +1255,7 @@ export default function LiquidationHeatmapDesk() {
                     volumeUsd: block.volumeUsd,
                     stats: obConfidence,
                     rank: block.strength,
+                    detail: undefined as string | undefined,
                   })),
                   ...gaps.map((gap) => ({
                     key: `gap-${gap.index}`,
@@ -1201,6 +1267,7 @@ export default function LiquidationHeatmapDesk() {
                     volumeUsd: gap.volumeUsd,
                     stats: gap.kind === "IFVG" ? (gapConfidence?.ifvg ?? null) : (gapConfidence?.fvg ?? null),
                     rank: gap.quality,
+                    detail: undefined as string | undefined,
                   })),
                 ]
                   .sort((a, b) => b.price - a.price)
@@ -1210,7 +1277,9 @@ export default function LiquidationHeatmapDesk() {
                       <u className="lv-price">
                         {priceLabel(level.low)}–{priceLabel(level.high)}
                       </u>
-                      <span className="lv-vol">{shortUsd(level.volumeUsd)}</span>
+                      <span className="lv-vol">
+                        {level.volumeUsd !== null ? shortUsd(level.volumeUsd) : (level as { detail?: string }).detail ?? ""}
+                      </span>
                       <em
                         className={
                           level.stats && level.stats.tested > 0 && level.stats.tested < 8
@@ -1222,6 +1291,48 @@ export default function LiquidationHeatmapDesk() {
                       </em>
                     </div>
                   ))}
+              </div>
+            </div>
+          )}
+
+          {scenarios && scenarios.scenarios.length > 0 && (
+            <div className="liq-scenarios">
+              <h4>ESCENARIOS POSIBLES</h4>
+              <p className="sc-note">{scenarios.note}</p>
+              <div className="sc-list">
+                {scenarios.scenarios.map((scenario) => (
+                  <div key={scenario.id} className={`sc-${scenario.id.toLowerCase()}`}>
+                    <div className="sc-head">
+                      <b>{scenario.title}</b>
+                    </div>
+                    <div className="sc-row">
+                      <span>GATILLO</span>
+                      <em>
+                        {priceLabel(scenario.trigger.price)} · {scenario.trigger.label}
+                      </em>
+                    </div>
+                    {scenario.target && (
+                      <div className="sc-row">
+                        <span>OBJETIVO</span>
+                        <em>
+                          {priceLabel(scenario.target.price)} · {scenario.target.label}
+                          {scenario.target.confluences.length > 0
+                            ? ` (+ ${scenario.target.confluences.join(", ")})`
+                            : ""}
+                        </em>
+                      </div>
+                    )}
+                    {scenario.invalidation && (
+                      <div className="sc-row">
+                        <span>INVALIDA SI</span>
+                        <em>
+                          rompe {priceLabel(scenario.invalidation.price)} · {scenario.invalidation.label}
+                        </em>
+                      </div>
+                    )}
+                    <p className="sc-reasoning">{scenario.reasoning}</p>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -1250,6 +1361,10 @@ export default function LiquidationHeatmapDesk() {
             <span>
               <i className="fib" />
               Banda Fibonacci
+            </span>
+            <span>
+              <i className="pool" />
+              Liquidez (mín/máx clave)
             </span>
           </div>
 
