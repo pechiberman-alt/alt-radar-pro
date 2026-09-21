@@ -35,7 +35,7 @@ import PressureDesk from "./pressure-desk";
 import AlertCenter from "./alert-center";
 import AlertToasts from "./alert-toasts";
 import SwingDesk from "./swing-desk";
-import { Collapsible, WorkspaceBar, useWorkspace } from "./workspace";
+import { Collapsible, WelcomeHint, WorkspaceBar, useWorkspace } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
 import type { PumpReading } from "@/lib/pump-radar";
 import type { CorrelationInsights } from "./correlation-watch";
@@ -73,12 +73,12 @@ const NAV_ITEMS = [
   { label: "ÓRDENES GRANDES", mobile: "GRANDES", icon: "◆", id: "ordenes-grandes" },
   { label: "ZONAS MTF", mobile: "ZONAS", icon: "▭", id: "zonas" },
   { label: "PRESIÓN", mobile: "PRESIÓN", icon: "◌", id: "presion" },
-  { label: "ALERTAS", mobile: "AVISOS", icon: "◈", id: "alertas" },
+  { label: "ALERTAS", mobile: "AVISOS", icon: "⚠", id: "alertas" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
   { label: "SWING", mobile: "SWING", icon: "◤", id: "swing" },
   { label: "RIESGO", mobile: "RIESGO", icon: "◎", id: "riesgo" },
-  { label: "ANALISTA", mobile: "CHAT", icon: "◈", id: "asistente" },
+  { label: "ANALISTA", mobile: "CHAT", icon: "✎", id: "asistente" },
   { label: "COMPARAR", mobile: "COMP", icon: "⇄", id: "comparador" },
   { label: "VIGILANCIA", mobile: "WATCH", icon: "◈", id: "vigilancia" },
   { label: "ORDER FLOW", mobile: "FLOW", icon: "▦", id: "order-flow" },
@@ -932,6 +932,8 @@ export default function RadarApp() {
       <MarketStrip data={data} structure={structure} />
 
       <div className="shell">
+        <WelcomeHint />
+
         <WorkspaceBar
           open={workspace.open}
           toggle={workspace.toggle}

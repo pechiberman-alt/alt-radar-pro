@@ -314,3 +314,14 @@ small {
   background: var(--green);
   box-shadow: 0 0 8px var(--green);
 }
+
+/* ── Grupos de la barra de workspace ── */
+.ws-group{margin-top:12px}
+.ws-group:first-of-type{margin-top:8px}
+.ws-group-label{display:block;margin-bottom:6px;font:8px var(--font-mono);letter-spacing:1.2px;color:var(--muted)}
+
+.ws-welcome{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;padding:11px 13px;background:#0b1b14;border:1px solid #2d6a4d;border-radius:5px}
+.ws-welcome span{flex:1;font:10px var(--font-mono);line-height:1.65;color:#b9c5be}
+.ws-welcome span b{color:var(--green)}
+.ws-welcome button{flex:0 0 auto;background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:0 2px}
+.ws-welcome button:hover{color:var(--text)}

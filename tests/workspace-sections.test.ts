@@ -56,3 +56,57 @@ test("WORKSPACE_SECTIONS has no id without a matching Collapsible to open", asyn
     `WORKSPACE_SECTIONS registra secciones que ningún <Collapsible> usa: ${orphaned.join(", ")}`,
   );
 });
+
+async function workspaceSource(): Promise<string> {
+  return readFile(new URL("../app/workspace.tsx", import.meta.url), "utf8");
+}
+
+/** Pulls out one bracketed literal-array declaration by its opening text. */
+function arrayBlock(source: string, opensWith: string): string {
+  const start = source.indexOf(opensWith);
+  return source.slice(start, source.indexOf("];", start));
+}
+
+test("every section belongs to one of the declared groups", async () => {
+  const source = await workspaceSource();
+  const groups = new Set(
+    [...arrayBlock(source, "WORKSPACE_GROUPS = [").matchAll(/"([^"]+)"/g)].map((m) => m[1]),
+  );
+  const rows = [
+    ...arrayBlock(source, "WORKSPACE_SECTIONS: WorkspaceSection[] = [").matchAll(
+      /id:\s*"([a-z-]+)".*?group:\s*"([^"]+)"/g,
+    ),
+  ];
+  assert.ok(rows.length >= 20, "se esperaban ~23 secciones — algo cambió la sintaxis");
+
+  // matchAll yields [fullMatch, capture1, capture2, ...] — index 0 is the
+  // whole matched text, not a field. capture1 is the id, capture2 the group.
+  const orphans = rows.filter(([, , group]) => !groups.has(group)).map(([, id]) => id);
+  assert.deepEqual(
+    orphans,
+    [],
+    "una sección sin grupo válido no aparecería en ninguna categoría de la barra",
+  );
+});
+
+test("only the orientation panels open by default — the wall-of-data regression", async () => {
+  const source = await workspaceSource();
+  const rows = [
+    ...arrayBlock(source, "WORKSPACE_SECTIONS: WorkspaceSection[] = [").matchAll(
+      /id:\s*"([a-z-]+)".*?primary:\s*(true|false)/g,
+    ),
+  ];
+  assert.ok(rows.length >= 20, "se esperaban ~23 secciones — algo cambió la sintaxis");
+
+  const openByDefault = rows
+    .filter(([, , primary]) => primary === "true")
+    .map(([, id]) => id);
+  // Not a hardcoded exact set on purpose — this only fails if the count
+  // creeps back up, which is exactly what happened before: each new panel
+  // seemed reasonable as primary:true on its own, and the total went to 16
+  // of 23.
+  assert.ok(
+    openByDefault.length <= 5,
+    `${openByDefault.length} paneles abren por defecto (${openByDefault.join(", ")}): revisar si de verdad todos son orientación, no trabajo`,
+  );
+});
