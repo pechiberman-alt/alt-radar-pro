@@ -16,32 +16,61 @@ export type WorkspaceSection = {
   label: string;
   /** Shown collapsed by default when false. */
   primary: boolean;
+  /** Which group this section's chip renders under in the workspace bar. */
+  group: WorkspaceGroup;
 };
 
+export const WORKSPACE_GROUPS = [
+  "EMPEZÁ ACÁ",
+  "SEÑALES Y ENTRADAS",
+  "ESTRUCTURA DE MERCADO",
+  "FLUJO INSTITUCIONAL",
+  "GESTIÓN Y HERRAMIENTAS",
+] as const;
+export type WorkspaceGroup = (typeof WORKSPACE_GROUPS)[number];
+
+/**
+ * Only three sections open by default: the ones that answer "what's going on
+ * right now" without picking a symbol or a strategy first. Every other panel
+ * is real work someone came here to do on purpose, so it waits one tap away
+ * instead of loading — and, for the live ones, connecting — before anyone
+ * asked for it. This is the rule the file's own comment above already
+ * states; it had drifted to 16 of 23 open by default as panels were added
+ * across sessions, each one seeming reasonable on its own.
+ */
 export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
-  { id: "resumen", label: "RESUMEN", primary: true },
-  { id: "inteligencia", label: "SEÑALES", primary: true },
-  { id: "scalping", label: "SCALPING", primary: false },
-  { id: "pumpeo", label: "PUMPEO", primary: true },
-  { id: "liquidaciones", label: "LIQUIDACIONES", primary: true },
-  { id: "desbloqueos", label: "OFERTA PENDIENTE", primary: true },
-  { id: "flujo-activos", label: "FLUJO POR ACTIVO", primary: true },
-  { id: "ordenes-grandes", label: "ÓRDENES GRANDES", primary: true },
-  { id: "zonas", label: "ZONAS MTF", primary: true },
-  { id: "presion", label: "PRESIÓN", primary: true },
-  { id: "alertas", label: "ALERTAS", primary: true },
-  { id: "institucional", label: "INSTITUCIONAL", primary: true },
-  { id: "reservas", label: "RESERVAS", primary: true },
-  { id: "swing", label: "SWING", primary: true },
-  { id: "riesgo", label: "RIESGO", primary: true },
-  { id: "asistente", label: "ANALISTA", primary: true },
-  { id: "comparador", label: "COMPARAR", primary: false },
-  { id: "estructura", label: "DOMINANCIA", primary: false },
-  { id: "vigilancia", label: "CORRELACIONES", primary: false },
-  { id: "order-flow", label: "ORDER FLOW", primary: true },
-  { id: "scanner", label: "ESCÁNER", primary: false },
-  { id: "historial", label: "HISTORIAL", primary: false },
-  { id: "instalar", label: "INSTALAR", primary: false },
+  // EMPEZÁ ACÁ — orientation. Open by default; everything else is not.
+  { id: "resumen", label: "RESUMEN", primary: true, group: "EMPEZÁ ACÁ" },
+  { id: "alertas", label: "ALERTAS", primary: true, group: "EMPEZÁ ACÁ" },
+  { id: "inteligencia", label: "SEÑALES", primary: true, group: "EMPEZÁ ACÁ" },
+
+  // SEÑALES Y ENTRADAS — strategies and entry detection.
+  { id: "swing", label: "SWING", primary: false, group: "SEÑALES Y ENTRADAS" },
+  { id: "scalping", label: "SCALPING", primary: false, group: "SEÑALES Y ENTRADAS" },
+  { id: "pumpeo", label: "PUMPEO", primary: false, group: "SEÑALES Y ENTRADAS" },
+  { id: "presion", label: "PRESIÓN", primary: false, group: "SEÑALES Y ENTRADAS" },
+  { id: "order-flow", label: "ORDER FLOW", primary: false, group: "SEÑALES Y ENTRADAS" },
+
+  // ESTRUCTURA DE MERCADO — where price sits and why.
+  { id: "liquidaciones", label: "LIQUIDACIONES", primary: false, group: "ESTRUCTURA DE MERCADO" },
+  { id: "zonas", label: "ZONAS MTF", primary: false, group: "ESTRUCTURA DE MERCADO" },
+  { id: "estructura", label: "DOMINANCIA", primary: false, group: "ESTRUCTURA DE MERCADO" },
+  { id: "vigilancia", label: "CORRELACIONES", primary: false, group: "ESTRUCTURA DE MERCADO" },
+  { id: "comparador", label: "COMPARAR", primary: false, group: "ESTRUCTURA DE MERCADO" },
+
+  // FLUJO INSTITUCIONAL — what large money is doing.
+  { id: "institucional", label: "INSTITUCIONAL", primary: false, group: "FLUJO INSTITUCIONAL" },
+  { id: "reservas", label: "RESERVAS", primary: false, group: "FLUJO INSTITUCIONAL" },
+  { id: "flujo-activos", label: "FLUJO POR ACTIVO", primary: false, group: "FLUJO INSTITUCIONAL" },
+  { id: "ordenes-grandes", label: "ÓRDENES GRANDES", primary: false, group: "FLUJO INSTITUCIONAL" },
+  { id: "desbloqueos", label: "OFERTA PENDIENTE", primary: false, group: "FLUJO INSTITUCIONAL" },
+
+  // GESTIÓN Y HERRAMIENTAS — everything else useful.
+  { id: "riesgo", label: "RIESGO", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
+  { id: "asistente", label: "ANALISTA", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
+  { id: "scanner", label: "ESCÁNER", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
+  { id: "historial", label: "HISTORIAL", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
+  { id: "instalar", label: "INSTALAR", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
 ];
 
 const STORAGE_KEY = "alt-radar-pro:workspace:v1";
@@ -128,7 +157,9 @@ export function Collapsible({
   );
 }
 
-/** Control bar listing every section, so nothing hidden is ever lost. */
+/** Control bar listing every section grouped by what it's for, so nothing
+ *  hidden is ever lost and a new visitor can tell what kind of panel each
+ *  one is before opening it. */
 export function WorkspaceBar({
   open,
   toggle,
@@ -148,23 +179,88 @@ export function WorkspaceBar({
         <span>WORKSPACE</span>
         <b>{visible}/{WORKSPACE_SECTIONS.length} PANELES</b>
       </div>
-      <div className="ws-chips">
-        {WORKSPACE_SECTIONS.map((section) => (
-          <button
-            key={section.id}
-            className={open[section.id] ? "on" : ""}
-            onClick={() => toggle(section.id)}
-            aria-pressed={open[section.id]}
-          >
-            {section.label}
-          </button>
-        ))}
-      </div>
+      {WORKSPACE_GROUPS.map((group) => {
+        const sections = WORKSPACE_SECTIONS.filter((section) => section.group === group);
+        if (!sections.length) return null;
+        return (
+          <div className="ws-group" key={group}>
+            <span className="ws-group-label">{group}</span>
+            <div className="ws-chips">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  className={open[section.id] ? "on" : ""}
+                  onClick={() => toggle(section.id)}
+                  aria-pressed={open[section.id]}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
       <div className="ws-actions">
         <button onClick={() => setAll(true)}>TODO</button>
         <button onClick={() => setAll(false)}>NADA</button>
         <button onClick={reset}>PREDET.</button>
       </div>
+    </div>
+  );
+}
+
+const WELCOME_KEY = "alt-radar-pro:welcome-seen:v1";
+
+/**
+ * A one-line orientation hint for a first visit, dismissed once and
+ * remembered — the same storage pattern the panel-open state already uses.
+ *
+ * Reducing which panels open by default (above) fixes the wall-of-data
+ * problem, but a brand new visitor still lands on an unfamiliar layout with
+ * no explanation of where to look first. This says it once, in one line, and
+ * gets out of the way — it is not a guided tour, because a tour that has to
+ * be dismissed on every screen becomes its own kind of clutter.
+ */
+export function WelcomeHint() {
+  // Starts hidden on both server and first client render, matching what
+  // useWorkspace does above and for the same reason: reading localStorage
+  // directly in the initial render can disagree between the server's HTML
+  // and the client's first paint, and that mismatch is a real bug, not a
+  // theoretical one. The deferred effect below corrects it after hydration,
+  // which React treats as a normal post-mount update rather than a mismatch.
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        if (window.localStorage.getItem(WELCOME_KEY) !== "1") setDismissed(false);
+      } catch {
+        setDismissed(false);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setDismissed(true);
+    try {
+      window.localStorage.setItem(WELCOME_KEY, "1");
+    } catch {
+      // Nothing to do: worst case it shows again next visit.
+    }
+  }, []);
+
+  if (dismissed) return null;
+
+  return (
+    <div className="ws-welcome">
+      <span>
+        Para empezar: <b>RESUMEN</b> te da el pulso del mercado y <b>ALERTAS</b> lo que necesita tu
+        atención ahora. El resto está agrupado por tipo, a un toque, en el panel de abajo.
+      </span>
+      <button onClick={dismiss} aria-label="Cerrar">
+        ×
+      </button>
     </div>
   );
 }
