@@ -349,3 +349,58 @@
 .lf-empty{margin:0;padding:12px;text-align:center;font:9px var(--font-mono);line-height:1.6;color:var(--muted);border:1px dashed var(--line);border-radius:4px}
 .lf-note{margin:10px 0 0;font:8px var(--font-mono);line-height:1.7;color:var(--muted)}
 @media(max-width:700px){.lf-totals{grid-template-columns:1fr 1fr}.lf-list>div{grid-template-columns:58px 50px minmax(0,1fr) 58px;gap:6px}}
+
+/* ── Capas ── */
+.liq-layers{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;-webkit-overflow-scrolling:touch}
+.liq-layers button{flex:0 0 auto;background:#0a110d;border:1px solid var(--line);border-radius:12px;padding:5px 11px;color:var(--muted);font:9px var(--font-mono);letter-spacing:.6px;cursor:pointer}
+.liq-layers button.on{background:#0c251a;border-color:#2d6a4d;color:var(--green)}
+
+/* ── Zonas de reversión ── */
+.liq-rev{stroke-width:1;stroke-dasharray:4 3}
+.liq-rev.up{fill:rgba(57,242,154,.07);stroke:rgba(57,242,154,.55)}
+.liq-rev.down{fill:rgba(255,89,100,.07);stroke:rgba(255,89,100,.55)}
+.liq-rev-label{font:9px var(--font-mono);letter-spacing:.4px}
+.liq-rev-label.up{fill:var(--green)}.liq-rev-label.down{fill:var(--red)}
+
+/* ── Wyckoff ── */
+.liq-wy-box{stroke-width:1}
+.liq-wy-box.up{fill:rgba(57,242,154,.04);stroke:rgba(57,242,154,.35)}
+.liq-wy-box.down{fill:rgba(255,89,100,.04);stroke:rgba(255,89,100,.35)}
+.liq-wy-label{font:8px var(--font-mono);letter-spacing:.5px}
+.liq-wy-label.up{fill:var(--green2)}.liq-wy-label.down{fill:var(--red)}
+.liq-wy-dot.up{fill:var(--green)}.liq-wy-dot.down{fill:var(--red)}
+.liq-wy-event{font:8px var(--font-mono);fill:var(--amber);text-anchor:middle}
+
+/* ── Banderas ── */
+.liq-flag-pole{stroke-width:2;opacity:.7}
+.liq-flag-pole.up{stroke:var(--green)}.liq-flag-pole.down{stroke:var(--red)}
+.liq-flag-chan{stroke-width:1.3}
+.liq-flag-chan.up{stroke:var(--green)}.liq-flag-chan.down{stroke:var(--red)}
+.liq-flag-target{stroke-width:1;stroke-dasharray:3 4;opacity:.7}
+.liq-flag-target.up{stroke:var(--green)}.liq-flag-target.down{stroke:var(--red)}
+.liq-flag-label{font:8px var(--font-mono);letter-spacing:.4px}
+.liq-flag-label.end{text-anchor:end}
+.liq-flag-label.up{fill:var(--green)}.liq-flag-label.down{fill:var(--red)}
+@media(max-width:700px){.liq-rev-label,.liq-wy-label,.liq-flag-label{font-size:10px}.liq-wy-event{font-size:9px}}
+
+/* ── Sección de patrones ── */
+.liq-patterns{margin-top:14px;padding:12px 13px;background:#0a110d;border:1px solid var(--line);border-radius:5px;min-width:0}
+.liq-patterns h4{margin:0 0 10px;font:9px var(--font-mono);letter-spacing:1.2px;color:var(--green2)}
+.pt-block{margin-bottom:10px;min-width:0}
+.pt-sub{display:block;margin-bottom:6px;font:8px var(--font-mono);letter-spacing:1px;color:var(--muted)}
+.pt-row{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:3px 8px;align-items:baseline;padding:7px 9px;margin-bottom:4px;background:#0b130f;border:1px solid var(--line);border-radius:4px;font:10px var(--font-mono)}
+.pt-row.up{border-left:3px solid var(--green)}.pt-row.down{border-left:3px solid var(--red)}
+.pt-row b{color:var(--amber);letter-spacing:1px}
+.pt-row u{text-decoration:none;color:var(--text)}
+.pt-row em{font-style:normal;color:var(--muted);font-size:9px;text-align:right}
+.pt-row small{grid-column:1/-1;color:#8e9c94;font-size:9px}
+.pt-card{padding:10px 12px;background:#0b130f;border:1px solid var(--line);border-radius:4px}
+.pt-card.up{border-left:3px solid var(--green)}.pt-card.down{border-left:3px solid var(--red)}
+.pt-card.up .pt-sub{color:var(--green)}.pt-card.down .pt-sub{color:var(--red)}
+.pt-phase{display:block;margin-bottom:8px;font:12px var(--font-mono);color:var(--text)}
+.pt-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:6px}
+.pt-grid>div{display:grid;gap:2px;min-width:0}
+.pt-grid span{font:8px var(--font-mono);color:var(--muted);letter-spacing:.6px}
+.pt-grid b{font:11px var(--font-mono);color:var(--text);overflow-wrap:anywhere}
+.pt-card p,.pt-note{margin:0;font:9px var(--font-mono);line-height:1.65;color:#8e9c94}
+.pt-note{margin-top:4px;color:var(--muted)}

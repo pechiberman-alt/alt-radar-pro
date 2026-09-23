@@ -17,6 +17,8 @@ import {
   type LiveKline,
   type LiveLiquidation,
 } from "@/lib/live-market";
+import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
+import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
 import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
 import { buildScenarios, type ScenarioBoard } from "@/lib/scenario-analysis";
 import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
@@ -41,6 +43,36 @@ type DisplayCandle = {
   close: number;
   volume: number;
 };
+type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "fvg" | "fib" | "volumen" | "reales";
+const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
+/**
+ * Fewer layers on by default. Order blocks, gaps and Fibonacci are the noisiest
+ * and their levels already feed the reversal zones, so a reader who never
+ * turns them on still gets their information where it has been cross-checked.
+ */
+const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
+  calor: true,
+  reversion: true,
+  patrones: true,
+  liquidez: true,
+  ob: false,
+  fvg: false,
+  fib: false,
+  volumen: true,
+  reales: true,
+};
+const LAYER_LABELS: [LayerKey, string][] = [
+  ["calor", "CALOR"],
+  ["reversion", "REVERSIÓN"],
+  ["patrones", "PATRONES"],
+  ["liquidez", "LIQUIDEZ"],
+  ["reales", "LIQ. REALES"],
+  ["volumen", "VOLUMEN"],
+  ["ob", "OB"],
+  ["fvg", "FVG"],
+  ["fib", "FIB"],
+];
+
 type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; timeframe: string };
 
 /**
@@ -164,6 +196,30 @@ export default function LiquidationHeatmapDesk() {
   const [symbols, setSymbols] = useState<string[]>(FALLBACK_SYMBOLS);
   const [symbolQuery, setSymbolQuery] = useState("");
   const [htfPools, setHtfPools] = useState<{ timeframe: string; pools: LiquidityPool[] }[]>([]);
+  const [layers, setLayers] = useState<Record<LayerKey, boolean>>(DEFAULT_LAYERS);
+  // Deferred read, same as the workspace: the server and the first client
+  // paint must agree, so the saved choice is applied right after hydration.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(LAYERS_KEY) ?? "null");
+        if (saved && typeof saved === "object") setLayers({ ...DEFAULT_LAYERS, ...saved });
+      } catch {
+        // Keep the defaults.
+      }
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, []);
+  const toggleLayer = (key: LayerKey) =>
+    setLayers((current) => {
+      const next = { ...current, [key]: !current[key] };
+      try {
+        window.localStorage.setItem(LAYERS_KEY, JSON.stringify(next));
+      } catch {
+        // Not persisted; still applied for this visit.
+      }
+      return next;
+    });
   const [liveKline, setLiveKline] = useState<LiveKline | null>(null);
   const [liveLiqs, setLiveLiqs] = useState<LiveLiquidation[]>([]);
   const [liveStatus, setLiveStatus] = useState<"conectando" | "en vivo" | "sin conexión">("conectando");
@@ -535,8 +591,8 @@ export default function LiquidationHeatmapDesk() {
     // Volume gets its own strip under the candles instead of being drawn
     // behind them, where it would compete with the liquidity bands. Everything
     // price-based (y, rows, pinch) uses plotH, which now ends above the strip.
-    const volH = Math.max(26, Math.round(fullH * 0.14));
-    const VOL_GAP = 8;
+    const volH = layers.volumen ? Math.max(26, Math.round(fullH * 0.14)) : 0;
+    const VOL_GAP = layers.volumen ? 8 : 0;
     const plotH = fullH - volH - VOL_GAP;
     if (plotW < 80 || plotH < 80) return null;
     const volTop = MARGIN.top + plotH + VOL_GAP;
@@ -672,8 +728,8 @@ export default function LiquidationHeatmapDesk() {
       .map((zone) => ({ ...zone, banded: banded.has(zone.price) }))
       .sort((a, b) => a.price - b.price);
 
-    return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT, volTop, volH };
-  }, [data, box, visibleCandles, priceView, liveKline, timeframe, symbol]);
+    return { candles, series, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT, volTop, volH };
+  }, [data, box, visibleCandles, priceView, liveKline, timeframe, symbol, layers.volumen]);
 
   // Keep the gesture's view of the price window in step with what is drawn.
   // In an effect, not during render: writing a ref while rendering is a side
@@ -784,8 +840,59 @@ export default function LiquidationHeatmapDesk() {
    * rest are drawn as their zone without a caption. Nothing is lost, because
    * every level is listed in full under the chart.
    */
+  /**
+   * Patterns are read on the whole loaded series, not only the zoomed window —
+   * otherwise zooming would make a Wyckoff range appear and vanish. Indices
+   * are shifted into the visible window for drawing; off-screen parts clip.
+   */
+  const patternSeries = useMemo(
+    () =>
+      layout
+        ? layout.series.map((c) => ({
+            openTime: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+            quoteVolume: 0,
+          }))
+        : [],
+    [layout],
+  );
+  const patternOffset = layout ? layout.series.length - layout.candles.length : 0;
+  const flags = useMemo<FlagPattern[]>(() => findFlags(patternSeries), [patternSeries]);
+  const wyckoff = useMemo<WyckoffReading | null>(() => readWyckoff(patternSeries), [patternSeries]);
+
+  const reversalZones = useMemo<ReversalZone[]>(() => {
+    if (!layout || livePrice === null) return [];
+    const p = livePrice;
+    const atoms: LevelAtom[] = [];
+    const around = (price: number, pct: number) => ({ low: price * (1 - pct), high: price * (1 + pct) });
+    for (const pool of pools) {
+      if (pool.taken) continue;
+      atoms.push({ kind: "liquidez", weight: pool.frames.length > 1 ? 1.5 : 1, ...around(pool.price, 0.0005) });
+    }
+    for (const zone of [layout.heatmap.topZoneAbove, layout.heatmap.topZoneBelow]) {
+      if (zone) atoms.push({ kind: "imán de liquidaciones", weight: 1.5, ...around(zone.price, 0.002) });
+    }
+    for (const block of orderBlocks) atoms.push({ kind: "order block", weight: 1, low: block.low, high: block.high });
+    for (const gap of gaps) atoms.push({ kind: gap.kind, weight: gap.kind === "IFVG" ? 1.25 : 1, low: gap.low, high: gap.high });
+    if (fibZone) for (const l of fibZone.levels) atoms.push({ kind: "Fibonacci", weight: 1, ...around(l.price, 0.001) });
+    if (wyckoff) {
+      atoms.push({ kind: "borde de rango Wyckoff", weight: 1.25, ...around(wyckoff.support, 0.0015) });
+      atoms.push({ kind: "borde de rango Wyckoff", weight: 1.25, ...around(wyckoff.resistance, 0.0015) });
+      for (const e of wyckoff.events) {
+        if (e.type === "SPRING" || e.type === "UPTHRUST") {
+          atoms.push({ kind: e.type === "SPRING" ? "spring" : "upthrust", weight: 1.5, ...around(e.price, 0.0015) });
+        }
+      }
+    }
+    return findReversalZones(p, atoms).filter((z) => z.high >= layout.lo && z.low <= layout.hi);
+  }, [layout, livePrice, pools, orderBlocks, gaps, fibZone, wyckoff]);
+
   const labelSlots = useMemo(() => {
-    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), gap: new Set<number>() };
+    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), gap: new Set<number>(), rev: new Set<number>(), fib: [] as { y: number; text: string }[] };
     const MIN_GAP_PX = 15;
     const taken: number[] = [];
     const claim = (price: number) => {
@@ -801,20 +908,43 @@ export default function LiquidationHeatmapDesk() {
       if (zone && zone.price >= layout.lo && zone.price <= layout.hi) claim(zone.price);
     }
 
-    const pool = new Set<string>();
-    for (const p of pools) {
-      if (claim(p.price)) pool.add(p.id);
+    // Reversal zones next: they are the synthesis, the level a reader most
+    // needs named. Hidden layers claim nothing, so turning one off frees space.
+    const rev = new Set<number>();
+    if (layers.reversion) {
+      for (const [i, z] of [...reversalZones.entries()].sort((a, b) => b[1].score - a[1].score)) {
+        if (claim(z.high)) rev.add(i);
+      }
     }
+    const pool = new Set<string>();
+    if (layers.liquidez) for (const p of pools) if (claim(p.price)) pool.add(p.id);
     const ob = new Set<number>();
-    for (const block of [...orderBlocks].sort((a, b) => b.strength - a.strength)) {
-      if (claim(block.high)) ob.add(block.index);
+    if (layers.ob) {
+      for (const block of [...orderBlocks].sort((a, b) => b.strength - a.strength)) {
+        if (claim(block.high)) ob.add(block.index);
+      }
     }
     const gap = new Set<number>();
-    for (const g of [...gaps].sort((a, b) => b.quality - a.quality)) {
-      if (claim(g.high)) gap.add(g.index);
+    if (layers.fvg) {
+      for (const g of [...gaps].sort((a, b) => b.quality - a.quality)) if (claim(g.high)) gap.add(g.index);
     }
-    return { pool, ob, gap };
-  }, [layout, pools, orderBlocks, gaps]);
+    // Fibonacci labels, merged when close, then claimed like everything else —
+    // they used to be drawn outside this system and landed on other labels.
+    const fib: { y: number; text: string }[] = [];
+    if (layers.fib && fibZone) {
+      const merged = fibZone.levels
+        .map((level) => ({ price: level.price, ratio: level.ratio }))
+        .sort((a, b) => b.price - a.price)
+        .reduce<{ price: number; text: string }[]>((acc, level) => {
+          const last = acc[acc.length - 1];
+          if (last && Math.abs(layout.y(level.price) - layout.y(last.price)) < 12) last.text += ` · ${level.ratio}`;
+          else acc.push({ price: level.price, text: String(level.ratio) });
+          return acc;
+        }, []);
+      for (const m of merged) if (claim(m.price)) fib.push({ y: layout.y(m.price), text: m.text });
+    }
+    return { pool, ob, gap, rev, fib };
+  }, [layout, pools, orderBlocks, gaps, reversalZones, fibZone, layers]);
 
   const keyLevels = useMemo(() => {
     if (!layout) return [];
@@ -1033,6 +1163,16 @@ export default function LiquidationHeatmapDesk() {
             </button>
           </div>
 
+          {/* Layers, as in any charting tool: the map had grown to seven
+              overlays at once, and a chart showing everything shows nothing. */}
+          <div className="liq-layers" role="group" aria-label="Capas del mapa">
+            {LAYER_LABELS.map(([key, label]) => (
+              <button key={key} className={layers[key] ? "on" : ""} onClick={() => toggleLayer(key)} aria-pressed={layers[key]}>
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div
             className="liq-chart-wrap"
             ref={chartRef}
@@ -1067,7 +1207,7 @@ export default function LiquidationHeatmapDesk() {
                   Spans are deliberately faint and thin: they are context for
                   the candles, not the subject. The profile bar on the right
                   is where intensity is meant to be read. */}
-              {layout.zones.map((zone) => {
+              {layers.calor && layout.zones.map((zone) => {
                 const yPos = layout.y(zone.price);
                 const startX = layout.zoneStartX(zone.formedAt);
                 const endX = MARGIN.left + layout.candleAreaW;
@@ -1116,11 +1256,105 @@ export default function LiquidationHeatmapDesk() {
                 );
               })}
 
+              {/* Reversal zones: bands where several detectors agree. */}
+              {layers.reversion &&
+                reversalZones.map((z, i) => {
+                  const top = layout.y(z.high);
+                  const h = Math.max(3, layout.y(z.low) - top);
+                  const cls = z.side === "SOPORTE" ? "up" : "down";
+                  return (
+                    <g key={`rev-${i}`}>
+                      <rect x={MARGIN.left} y={top} width={layout.candleAreaW} height={h} className={`liq-rev ${cls}`} />
+                      {labelSlots.rev.has(i) && (
+                        <text x={MARGIN.left + 5} y={top - 3} className={`liq-rev-label ${cls}`}>
+                          {"★".repeat(z.stars)} {z.side === "SOPORTE" ? "REVERSIÓN ↑" : "REVERSIÓN ↓"}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+
+              {/* Wyckoff range and its events, then flags. */}
+              {layers.patrones && wyckoff && (() => {
+                const x0 = Math.max(0, wyckoff.start - patternOffset);
+                const x1 = wyckoff.end - patternOffset;
+                if (x1 < 0) return null;
+                const top = layout.y(wyckoff.resistance);
+                const bottom = layout.y(wyckoff.support);
+                const cls = wyckoff.kind === "ACUMULACIÓN" ? "up" : "down";
+                return (
+                  <g>
+                    <rect
+                      x={layout.x(x0) - layout.bodyW}
+                      y={top}
+                      width={Math.max(4, layout.x(x1) - layout.x(x0) + layout.bodyW * 2)}
+                      height={Math.max(2, bottom - top)}
+                      className={`liq-wy-box ${cls}`}
+                    />
+                    <text x={layout.x(x0) - layout.bodyW + 3} y={top - 4} className={`liq-wy-label ${cls}`}>
+                      WYCKOFF · {wyckoff.kind} · {wyckoff.phase.split(" · ")[0]}
+                    </text>
+                    {wyckoff.events.map((e) => {
+                      const i = e.index - patternOffset;
+                      if (i < 0) return null;
+                      const below = e.type === "SC" || e.type === "SPRING" || (e.type === "AR" && wyckoff.kind === "DISTRIBUCIÓN") || e.type === "SOW";
+                      const ey = layout.y(e.price) + (below ? 12 : -6);
+                      return (
+                        <g key={`${e.type}-${e.index}`}>
+                          <circle cx={layout.x(i)} cy={layout.y(e.price)} r={2.4} className={`liq-wy-dot ${cls}`} />
+                          <text x={layout.x(i)} y={ey} className="liq-wy-event">
+                            {e.type}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </g>
+                );
+              })()}
+
+              {layers.patrones &&
+                flags.map((f) => {
+                  const bull = f.kind === "BULL FLAG";
+                  const ps = f.poleStart - patternOffset;
+                  const pe = f.poleEnd - patternOffset;
+                  const fs = f.flagStart - patternOffset;
+                  const fe = f.flagEnd - patternOffset;
+                  if (fe < 0) return null;
+                  const cls = bull ? "up" : "down";
+                  const poleFrom = bull ? layout.series[f.poleStart].low : layout.series[f.poleStart].high;
+                  const poleTo = bull ? layout.series[f.poleEnd].high : layout.series[f.poleEnd].low;
+                  const endX = MARGIN.left + layout.candleAreaW;
+                  return (
+                    <g key={f.kind}>
+                      {ps >= 0 && (
+                        <line x1={layout.x(ps)} y1={layout.y(poleFrom)} x2={layout.x(pe)} y2={layout.y(poleTo)} className={`liq-flag-pole ${cls}`} />
+                      )}
+                      <line x1={layout.x(Math.max(0, fs))} y1={layout.y(f.upper[0])} x2={layout.x(fe)} y2={layout.y(f.upper[1])} className={`liq-flag-chan ${cls}`} />
+                      <line x1={layout.x(Math.max(0, fs))} y1={layout.y(f.lower[0])} x2={layout.x(fe)} y2={layout.y(f.lower[1])} className={`liq-flag-chan ${cls}`} />
+                      {f.status !== "FALLIDA" && f.target >= layout.lo && f.target <= layout.hi && (
+                        <>
+                          <line x1={layout.x(fe)} x2={endX} y1={layout.y(f.target)} y2={layout.y(f.target)} className={`liq-flag-target ${cls}`} />
+                          <text x={endX - 4} y={layout.y(f.target) - 3} className={`liq-flag-label ${cls} end`}>
+                            OBJ {bull ? "↑" : "↓"}
+                          </text>
+                        </>
+                      )}
+                      <text
+                        x={layout.x(Math.max(0, fs))}
+                        y={layout.y(bull ? f.upper[0] : f.lower[0]) + (bull ? -6 : 13)}
+                        className={`liq-flag-label ${cls}`}
+                      >
+                        {f.kind} · {f.status}
+                      </text>
+                    </g>
+                  );
+                })}
+
               {/* Liquidity pools: dashed lines, since they mark a single price
                   where resting orders cluster — not a zone with width like
                   the other layers. Drawn furthest back of the level layers
                   because they are the widest-horizon read on the chart. */}
-              {pools.map((pool) => {
+              {layers.liquidez && pools.map((pool) => {
                 const y = layout.y(pool.price);
                 const bullish = pool.side === "COMPRA";
                 return (
@@ -1147,7 +1381,7 @@ export default function LiquidationHeatmapDesk() {
 
               {/* The Fibonacci band sits furthest back: it is the widest
                   piece of context, and everything else is read inside it. */}
-              {fibZone && fibZone.zoneHigh >= layout.lo && fibZone.zoneLow <= layout.hi && (
+              {layers.fib && fibZone && fibZone.zoneHigh >= layout.lo && fibZone.zoneLow <= layout.hi && (
                 <g>
                   <rect
                     x={MARGIN.left}
@@ -1168,16 +1402,7 @@ export default function LiquidationHeatmapDesk() {
                   ))}
                   {/* Levels a few pixels apart get one shared label: three
                       numbers stacked on the same line cannot be read. */}
-                  {fibZone.levels
-                    .map((level) => ({ y: layout.y(level.price), ratio: level.ratio }))
-                    .sort((a, b) => a.y - b.y)
-                    .reduce<{ y: number; text: string }[]>((acc, level) => {
-                      const last = acc[acc.length - 1];
-                      if (last && level.y - last.y < 12) last.text += ` · ${level.ratio}`;
-                      else acc.push({ y: level.y, text: String(level.ratio) });
-                      return acc;
-                    }, [])
-                    .map((label) => (
+                  {labelSlots.fib.map((label) => (
                       <text
                         key={label.text}
                         x={MARGIN.left + layout.candleAreaW - 4}
@@ -1191,7 +1416,7 @@ export default function LiquidationHeatmapDesk() {
               )}
 
               {/* Gaps: bands price crossed without trading both sides. */}
-              {gaps.map((gap) => (
+              {layers.fvg && gaps.map((gap) => (
                 <g key={`fvg-${gap.index}`}>
                   <rect
                     x={MARGIN.left}
@@ -1217,7 +1442,7 @@ export default function LiquidationHeatmapDesk() {
                   price action is read against, not marks on top of it. Drawn
                   from where the block formed to the right edge, because the
                   level exists from that candle onward. */}
-              {orderBlocks.map((block) => {
+              {layers.ob && orderBlocks.map((block) => {
                 const top = layout.y(block.high);
                 const bottom = layout.y(block.low);
                 const height = Math.max(2, bottom - top);
@@ -1286,7 +1511,7 @@ export default function LiquidationHeatmapDesk() {
                   largest in view carry a label, so a cascade stays readable. */}
               {(() => {
                 const cs = layout.candles;
-                if (!cs.length || !liveLiqs.length) return null;
+                if (!layers.reales || !cs.length || !liveLiqs.length) return null;
                 const visible = liveLiqs.filter(
                   (l) => l.time >= cs[0].time && l.price >= layout.lo && l.price <= layout.hi,
                 );
@@ -1321,6 +1546,7 @@ export default function LiquidationHeatmapDesk() {
                   line is the 20-candle average, so a bar well above it is a
                   candle traded with unusual size — the part worth noticing. */}
               {(() => {
+                if (!layers.volumen) return null;
                 const vols = layout.candles.map((c) => c.volume * c.close);
                 const maxV = Math.max(0, ...vols);
                 if (!(maxV > 0)) return null;
@@ -1372,7 +1598,7 @@ export default function LiquidationHeatmapDesk() {
               />
 
               {/* The same two levels the cards name, drawn where they sit. */}
-              {[
+              {layers.calor && [
                 { zone: data.heatmap.topZoneAbove, cls: "up", label: "IMÁN ↑" },
                 { zone: data.heatmap.topZoneBelow, cls: "down", label: "IMÁN ↓" },
               ].map(({ zone, cls, label }) =>
@@ -1481,6 +1707,59 @@ export default function LiquidationHeatmapDesk() {
               carry volume and a hit rate cannot share vertical space with
               another one — on the chart they stacked into an unreadable pile
               that also hid the candles. In a list each line has its own row. */}
+          {(reversalZones.length > 0 || flags.length > 0 || wyckoff) && (
+            <div className="liq-patterns">
+              <h4>PATRONES Y ZONAS DE REVERSIÓN</h4>
+
+              {reversalZones.length > 0 && (
+                <div className="pt-block">
+                  <span className="pt-sub">MEJORES ZONAS DE REVERSIÓN · por confluencia</span>
+                  {reversalZones.map((z, i) => (
+                    <div key={`rz-${i}`} className={`pt-row ${z.side === "SOPORTE" ? "up" : "down"}`}>
+                      <b>{"★".repeat(z.stars)}</b>
+                      <u>{priceLabel(z.low)}–{priceLabel(z.high)}</u>
+                      <em>{z.side.toLowerCase()} · a {z.distancePct.toFixed(2)}%</em>
+                      <small>{z.kinds.join(" + ")}</small>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {flags.map((f) => (
+                <div key={f.kind} className={`pt-block pt-card ${f.kind === "BULL FLAG" ? "up" : "down"}`}>
+                  <span className="pt-sub">{f.kind} · {f.status}</span>
+                  <div className="pt-grid">
+                    <div><span>RUPTURA</span><b>{priceLabel(f.breakout)}</b></div>
+                    <div><span>OBJETIVO</span><b>{priceLabel(f.target)}</b></div>
+                    <div><span>INVALIDA</span><b>{priceLabel(f.invalidation)}</b></div>
+                  </div>
+                  <p>
+                    Retroceso {f.retracePct.toFixed(0)}% del mástil{f.volumeFades ? ", volumen bajando en la bandera" : ", sin caída de volumen en la bandera (más débil)"}.
+                    El objetivo es el movimiento medido —altura del mástil desde la ruptura—, una convención, no una promesa.
+                  </p>
+                </div>
+              ))}
+
+              {wyckoff && (
+                <div className={`pt-block pt-card ${wyckoff.kind === "ACUMULACIÓN" ? "up" : "down"}`}>
+                  <span className="pt-sub">WYCKOFF · {wyckoff.kind}</span>
+                  <b className="pt-phase">{wyckoff.phase}</b>
+                  <div className="pt-grid">
+                    <div><span>SOPORTE</span><b>{priceLabel(wyckoff.support)}</b></div>
+                    <div><span>RESISTENCIA</span><b>{priceLabel(wyckoff.resistance)}</b></div>
+                    <div><span>EVENTOS</span><b>{wyckoff.events.map((e) => e.type).join(" · ")}</b></div>
+                  </div>
+                  <p>{wyckoff.note}</p>
+                </div>
+              )}
+
+              <p className="pt-note">
+                Patrones detectados con reglas mecánicas, no a ojo. Una zona con más estrellas tiene más detectores
+                independientes de acuerdo en ese precio: sube las chances de reacción, no garantiza el giro.
+              </p>
+            </div>
+          )}
+
           {/* The measured counterpart to the estimated map above. */}
           <div className="liq-live-feed">
             <div className="lf-head">
