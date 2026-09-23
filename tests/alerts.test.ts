@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createDeliveryState,
   DEFAULT_ALERT_PREFERENCES,
+  dcaReminderAlert,
   flowAlert,
   riskAlert,
   selectDeliverable,
@@ -168,4 +169,25 @@ test("the Fibonacci alert reports its frame and depth but claims no rate", async
   assert.match(alert.body, /64\.2%/);
   assert.match(alert.body, /Marco 1h/);
   assert.equal(alert.evidence?.rate, null, "el backtest mide otra muestra: unirlas sería insinuar un vínculo que los datos no sostienen");
+});
+
+test("a DCA reminder is keyed per symbol per day, so it cannot fire twice for the same purchase", () => {
+  const morning = dcaReminderAlert("BTCUSDT", 100, NOW);
+  const evening = dcaReminderAlert("BTCUSDT", 100, NOW + 8 * 3_600_000);
+  assert.equal(morning.id, evening.id, "mismo día, mismo símbolo: es el mismo recordatorio");
+  const nextDay = dcaReminderAlert("BTCUSDT", 100, NOW + 26 * 3_600_000);
+  assert.notEqual(morning.id, nextDay.id);
+  assert.equal(morning.category, "DCA");
+  assert.match(morning.body, /nadie ejecuta la compra por vos/);
+});
+
+test("DCA reminders are delivered through the same selection rules as everything else", () => {
+  const state = createDeliveryState();
+  const out = selectDeliverable([dcaReminderAlert("ETHUSDT", 50, NOW)], prefs(), state, NOW);
+  assert.equal(out.length, 1);
+  assert.equal(
+    selectDeliverable([dcaReminderAlert("ETHUSDT", 50, NOW + 60_000)], prefs(), state, NOW + 60_000).length,
+    0,
+    "el mismo día no debe repetirse",
+  );
 });

@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { publishAlert } from "@/lib/alert-bus";
 import { buildMtfZones } from "@/lib/mtf-zones";
+import { isDueToday, type DcaSchedule } from "@/lib/dca-tracker";
 import { readFibZone } from "@/lib/fib-zone";
 import { loadRows } from "@/lib/market-fetch";
 import { parseSwingKlines } from "@/lib/swing-entries";
 import {
   CATEGORY_COOLDOWN_MINUTES,
+  dcaReminderAlert,
   describeEvidence,
   fibAlert,
   zoneAlert,
@@ -26,6 +28,7 @@ const CATEGORIES: { id: AlertCategory; label: string; hint: string }[] = [
   { id: "ZONA", label: "ZONAS", hint: "Entrada en demanda, oferta o banda Fibonacci" },
   { id: "LIQUIDACIÓN", label: "LIQUIDACIÓN", hint: "Cercanía a una zona imán" },
   { id: "FLUJO", label: "FLUJO", hint: "Cambios de régimen institucional" },
+  { id: "DCA", label: "DCA", hint: "Día programado de compra — te avisa, no compra" },
 ];
 
 const PRIORITIES: { id: AlertPriority; label: string; hint: string }[] = [
@@ -119,6 +122,25 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
           // One symbol failing must not silence the others.
         }
       }
+
+      // DCA reminders: no market data needed, so this runs once after the
+      // per-symbol loop rather than inside it. A 401 (no session) just means
+      // no schedules to check — not an error worth breaking the loop for.
+      try {
+        const response = await fetch("/api/dca/schedule", { cache: "no-store" });
+        if (response.ok) {
+          const body = (await response.json()) as { schedules: DcaSchedule[] };
+          const now = new Date();
+          for (const schedule of body.schedules) {
+            if (isDueToday(schedule, now)) {
+              found.push(dcaReminderAlert(schedule.symbol, schedule.usdAmount));
+            }
+          }
+        }
+      } catch {
+        // Same as any other source here: one failing must not silence the rest.
+      }
+
       if (!alive || !found.length) return;
       setDetected(found);
       // On-screen banners are separate from system notifications on purpose:

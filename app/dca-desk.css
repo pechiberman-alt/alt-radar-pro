@@ -1,0 +1,43 @@
+.dca-desk{display:block;min-width:0;overflow-x:hidden}
+.dca-premise{margin:14px 0;padding:12px 14px;background:#0b120e;border:1px solid var(--line);border-left:3px solid var(--green2);border-radius:4px;font:10px var(--font-mono);line-height:1.7;color:#9aa7a0}
+.dca-premise b{color:#b9c5be}
+.dca-loading{font:9px var(--font-mono);color:var(--muted);padding:20px 0;text-align:center}
+.dca-empty{display:grid;gap:5px;padding:24px;text-align:center;border:1px solid var(--line);border-radius:4px}
+.dca-empty b{font:11px var(--font-mono);letter-spacing:1.2px;color:var(--amber)}
+.dca-empty span{font:10px var(--font-mono);color:var(--muted)}
+
+.dca-positions{display:grid;gap:8px;margin-bottom:14px}
+.dca-positions>div{padding:11px 13px;background:#0a110d;border:1px solid var(--line);border-radius:4px;min-width:0}
+.dca-positions>div>b{font:13px var(--font-mono);color:var(--text)}
+.dca-pos-figures{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:7px}
+.dca-pos-figures>div{display:grid;gap:1px;min-width:0}
+.dca-pos-figures span{font:8px var(--font-mono);color:var(--muted)}
+.dca-pos-figures u{text-decoration:none;font:12px var(--font-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dca-positions em{display:block;margin-top:6px;font-style:normal;font:9px var(--font-mono);color:var(--muted)}
+
+.dca-form h4,.dca-section{margin:14px 0 8px!important;font:9px var(--font-mono)!important;letter-spacing:1.2px;color:var(--green2)}
+.dca-form-row{display:grid;grid-template-columns:1fr 1fr 1fr 1.4fr auto;gap:6px}
+.dca-form-row input{background:#0a110d;border:1px solid var(--line);border-radius:3px;padding:8px 9px;color:var(--text);font:10px var(--font-mono);min-width:0}
+.dca-form-row button{background:#0c251a;border:1px solid #2d6a4d;border-radius:3px;color:var(--green);font:9px var(--font-mono);letter-spacing:.8px;padding:8px 12px;cursor:pointer}
+.dca-error{margin:8px 0;font:10px var(--font-mono);color:var(--red)}
+
+.dca-list{display:grid;gap:5px;margin-top:10px}
+.dca-list>div{display:grid;grid-template-columns:56px minmax(0,1fr) 70px auto;gap:8px;align-items:center;padding:7px 10px;background:#0a110d;border:1px solid var(--line);border-radius:4px;font:10px var(--font-mono)}
+.dca-list em{font-style:normal;color:#b9c5be}
+.dca-list small{color:var(--muted);font-size:8px}
+.dca-list button{background:none;border:0;color:var(--muted);font-size:14px;cursor:pointer}
+
+.dca-schedule-note{margin:0 0 10px;font:9px var(--font-mono);line-height:1.65;color:var(--muted)}
+.dca-schedule-list{display:grid;gap:5px;margin-bottom:10px}
+.dca-schedule-list>div{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 10px;background:#0a110d;border:1px solid var(--line);border-radius:4px;font:10px var(--font-mono)}
+.dca-schedule-list em{font-style:normal;color:#b9c5be}
+.dca-schedule-list button{background:none;border:0;color:var(--muted);font-size:14px;cursor:pointer}
+.dca-schedule-form{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px}
+.dca-schedule-form input,.dca-schedule-form select{background:#0a110d;border:1px solid var(--line);border-radius:3px;padding:8px 9px;color:var(--text);font:10px var(--font-mono);min-width:0}
+.dca-schedule-form button{background:#0c251a;border:1px solid #2d6a4d;border-radius:3px;color:var(--green);font:9px var(--font-mono);letter-spacing:.8px;padding:8px 12px;cursor:pointer}
+
+@media(max-width:700px){
+  .dca-pos-figures{grid-template-columns:1fr 1fr}
+  .dca-form-row,.dca-schedule-form{grid-template-columns:1fr 1fr}
+  .dca-list>div{grid-template-columns:1fr 1fr}
+}
