@@ -9,9 +9,6 @@
  */
 
 export const FALLBACK_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
-/** How many pairs to offer. Enough to cover what actually trades, few enough
- *  that a selector row stays scannable rather than a wall of tickers. */
-const SYMBOL_COUNT = 30;
 
 const BROWSER_BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
 
@@ -242,6 +239,8 @@ export async function loadOiDelta(
  * Binance itself, so the selector always offers what is actually liquid, and
  * only perpetuals, since the whole map depends on futures data.
  */
+/** Every USDT perpetual, most traded first. The selector shows the top few and
+ *  searches the rest, so there is no reason to cut the list here. */
 export async function loadTopSymbols(signal: AbortSignal): Promise<string[] | null> {
   for (const base of FUTURES_BASES) {
     try {
@@ -260,7 +259,6 @@ export async function loadTopSymbols(signal: AbortSignal): Promise<string[] | nu
             Number.isFinite(Number(row.quoteVolume)),
         )
         .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
-        .slice(0, SYMBOL_COUNT)
         .map((row) => row.symbol);
       if (ranked.length >= 5) return ranked;
     } catch {
@@ -268,4 +266,28 @@ export async function loadTopSymbols(signal: AbortSignal): Promise<string[] | nu
     }
   }
   return null;
+}
+
+/**
+ * Higher frames to read liquidity from, for a given chart frame.
+ *
+ * Equal highs on the daily hold more resting orders than equal highs on the
+ * 15-minute, because more participants saw them and placed stops there. So a
+ * chart shows its own pools plus those of the next one or two larger frames,
+ * never smaller ones — a 1m pool on a 4h chart is noise at that scale.
+ */
+const HIGHER: Record<string, string[]> = {
+  "1m": ["15m", "1h"],
+  "5m": ["1h", "4h"],
+  "15m": ["1h", "4h"],
+  "30m": ["4h", "1d"],
+  "1h": ["4h", "1d"],
+  "4h": ["1d", "1w"],
+  "12h": ["1d", "1w"],
+  "1d": ["1w"],
+  "3d": ["1w"],
+  "1w": [],
+};
+export function higherTimeframes(timeframe: string): string[] {
+  return HIGHER[timeframe] ?? [];
 }
