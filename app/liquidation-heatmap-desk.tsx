@@ -8,13 +8,14 @@ import {
   type LiquidationHeatmap,
 } from "@/lib/liquidation-heatmap";
 import { findFairValueGaps, gapStats, type FairValueGap, type GapStats } from "@/lib/fair-value-gaps";
-import { findLiquidityPools, type LiquidityPool } from "@/lib/liquidity-pools";
+import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
 import { buildScenarios, type ScenarioBoard } from "@/lib/scenario-analysis";
 import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
 import { findOrderBlocks, orderBlockStats, type OrderBlock, type ZoneStats } from "@/lib/order-blocks";
 import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
 import {
   FALLBACK_SYMBOLS,
+  higherTimeframes,
   loadOiDelta,
   loadOpenInterest,
   loadRows,
@@ -152,6 +153,33 @@ export default function LiquidationHeatmapDesk() {
     center: null,
   });
   const [symbols, setSymbols] = useState<string[]>(FALLBACK_SYMBOLS);
+  const [symbolQuery, setSymbolQuery] = useState("");
+  const [htfPools, setHtfPools] = useState<{ timeframe: string; pools: LiquidityPool[] }[]>([]);
+
+  // Liquidity from the larger frames, loaded on its own so the map does not
+  // wait for it. Only unswept pools matter; findLiquidityPools already drops
+  // the rest.
+  useEffect(() => {
+    const controller = new AbortController();
+    let alive = true;
+    (async () => {
+      const out: { timeframe: string; pools: LiquidityPool[] }[] = [];
+      for (const tf of higherTimeframes(timeframe)) {
+        try {
+          const rows = await loadRows(symbol, tf, 300, controller.signal);
+          const candles = parseSwingKlines(rows);
+          if (candles.length >= 20) out.push({ timeframe: tf, pools: findLiquidityPools(candles) });
+        } catch {
+          // A missing larger frame only means fewer confluences, not an error.
+        }
+      }
+      if (alive) setHtfPools(out);
+    })();
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [symbol, timeframe]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -205,6 +233,7 @@ export default function LiquidationHeatmapDesk() {
   // map so a failure can't leave BTC's chart on screen under an ETH label,
   // and reset the refresh counter so that load is allowed to report errors.
   const selectSymbol = (next: string) => {
+    setSymbolQuery("");
     setLoading(true);
     setError("");
     setData(null);
@@ -407,8 +436,15 @@ export default function LiquidationHeatmapDesk() {
     if (!candles.length) return null;
 
     const plotW = box.width - MARGIN.left - MARGIN.right;
-    const plotH = box.height - MARGIN.top - MARGIN.bottom;
+    const fullH = box.height - MARGIN.top - MARGIN.bottom;
+    // Volume gets its own strip under the candles instead of being drawn
+    // behind them, where it would compete with the liquidity bands. Everything
+    // price-based (y, rows, pinch) uses plotH, which now ends above the strip.
+    const volH = Math.max(26, Math.round(fullH * 0.14));
+    const VOL_GAP = 8;
+    const plotH = fullH - volH - VOL_GAP;
     if (plotW < 80 || plotH < 80) return null;
+    const volTop = MARGIN.top + plotH + VOL_GAP;
     // The profile strip scales with width instead of eating a fixed 104px of
     // a narrow phone, where that was a quarter of the whole chart.
     const profileW = Math.max(52, Math.min(120, box.width * 0.13));
@@ -541,7 +577,7 @@ export default function LiquidationHeatmapDesk() {
       .map((zone) => ({ ...zone, banded: banded.has(zone.price) }))
       .sort((a, b) => a.price - b.price);
 
-    return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT };
+    return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT, volTop, volH };
   }, [data, box, visibleCandles, priceView]);
 
   // Keep the gesture's view of the price window in step with what is drawn.
@@ -602,12 +638,15 @@ export default function LiquidationHeatmapDesk() {
     [swingView],
   );
 
-  const pools = useMemo<LiquidityPool[]>(() => {
+  // Merged across the chart's own frame and the larger ones. A level seen on
+  // several frames is one line naming all of them, not a stack of copies.
+  const pools = useMemo<MtfPool[]>(() => {
     if (!layout || !swingView.length) return [];
-    return findLiquidityPools(swingView).filter(
-      (pool) => pool.price >= layout.lo && pool.price <= layout.hi,
-    );
-  }, [layout, swingView]);
+    return mergeMtfPools([
+      { timeframe, pools: findLiquidityPools(swingView) },
+      ...htfPools,
+    ]).filter((pool) => pool.price >= layout.lo && pool.price <= layout.hi);
+  }, [layout, swingView, htfPools, timeframe]);
 
   const scenarios = useMemo<ScenarioBoard | null>(() => {
     if (!layout) return null;
@@ -640,7 +679,7 @@ export default function LiquidationHeatmapDesk() {
    * every level is listed in full under the chart.
    */
   const labelSlots = useMemo(() => {
-    if (!layout) return { pool: new Set<number>(), ob: new Set<number>(), gap: new Set<number>() };
+    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), gap: new Set<number>() };
     const MIN_GAP_PX = 15;
     const taken: number[] = [];
     const claim = (price: number) => {
@@ -656,9 +695,9 @@ export default function LiquidationHeatmapDesk() {
       if (zone && zone.price >= layout.lo && zone.price <= layout.hi) claim(zone.price);
     }
 
-    const pool = new Set<number>();
-    for (const p of [...pools].sort((a, b) => b.strength - a.strength)) {
-      if (claim(p.price)) pool.add(p.formedAt);
+    const pool = new Set<string>();
+    for (const p of pools) {
+      if (claim(p.price)) pool.add(p.id);
     }
     const ob = new Set<number>();
     for (const block of [...orderBlocks].sort((a, b) => b.strength - a.strength)) {
@@ -734,8 +773,18 @@ export default function LiquidationHeatmapDesk() {
       </p>
 
       <div className="liq-controls">
+        <input
+          className="liq-search"
+          value={symbolQuery}
+          onChange={(e) => setSymbolQuery(e.target.value)}
+          placeholder={`Buscar entre ${symbols.length} pares…`}
+          aria-label="Buscar par"
+        />
         <div className="liq-symbols">
-          {symbols.map((s) => (
+          {(symbolQuery.trim()
+            ? symbols.filter((s) => s.includes(symbolQuery.trim().toUpperCase())).slice(0, 40)
+            : [...new Set([symbol, ...symbols.slice(0, 15)])]
+          ).map((s) => (
             <button
               key={s}
               className={s === symbol ? "active" : ""}
@@ -966,21 +1015,21 @@ export default function LiquidationHeatmapDesk() {
                 const y = layout.y(pool.price);
                 const bullish = pool.side === "COMPRA";
                 return (
-                  <g key={`pool-${pool.formedAt}-${pool.side}`}>
+                  <g key={pool.id}>
                     <line
                       x1={MARGIN.left}
                       x2={MARGIN.left + layout.candleAreaW}
                       y1={y}
                       y2={y}
-                      className={bullish ? "liq-pool-line up" : "liq-pool-line down"}
+                      className={`liq-pool-line ${bullish ? "up" : "down"}${pool.frames.length > 1 ? " multi" : ""}`}
                     />
-                    {labelSlots.pool.has(pool.formedAt) && (
+                    {labelSlots.pool.has(pool.id) && (
                       <text
                         x={MARGIN.left + layout.candleAreaW - 4}
                         y={y - 3}
                         className={bullish ? "liq-pool-label up" : "liq-pool-label down"}
                       >
-                        {bullish ? "LIQ ↑" : "LIQ ↓"} ×{pool.touches}
+                        {bullish ? "LIQ ↑" : "LIQ ↓"} {pool.frames.join("·")}
                       </text>
                     )}
                   </g>
@@ -999,23 +1048,36 @@ export default function LiquidationHeatmapDesk() {
                     className={fibZone.inZone ? "liq-fib active" : "liq-fib"}
                   />
                   {fibZone.levels.map((level) => (
-                    <g key={level.ratio}>
-                      <line
-                        x1={MARGIN.left}
-                        x2={MARGIN.left + layout.candleAreaW}
-                        y1={layout.y(level.price)}
-                        y2={layout.y(level.price)}
-                        className="liq-fib-line"
-                      />
+                    <line
+                      key={level.ratio}
+                      x1={MARGIN.left}
+                      x2={MARGIN.left + layout.candleAreaW}
+                      y1={layout.y(level.price)}
+                      y2={layout.y(level.price)}
+                      className="liq-fib-line"
+                    />
+                  ))}
+                  {/* Levels a few pixels apart get one shared label: three
+                      numbers stacked on the same line cannot be read. */}
+                  {fibZone.levels
+                    .map((level) => ({ y: layout.y(level.price), ratio: level.ratio }))
+                    .sort((a, b) => a.y - b.y)
+                    .reduce<{ y: number; text: string }[]>((acc, level) => {
+                      const last = acc[acc.length - 1];
+                      if (last && level.y - last.y < 12) last.text += ` · ${level.ratio}`;
+                      else acc.push({ y: level.y, text: String(level.ratio) });
+                      return acc;
+                    }, [])
+                    .map((label) => (
                       <text
+                        key={label.text}
                         x={MARGIN.left + layout.candleAreaW - 4}
-                        y={layout.y(level.price) - 3}
+                        y={label.y - 3}
                         className="liq-fib-label"
                       >
-                        {level.ratio}
+                        {label.text}
                       </text>
-                    </g>
-                  ))}
+                    ))}
                 </g>
               )}
 
@@ -1109,6 +1171,52 @@ export default function LiquidationHeatmapDesk() {
                   </g>
                 );
               })}
+
+              {/* Volume strip. Bars scale to the largest candle in view; the
+                  line is the 20-candle average, so a bar well above it is a
+                  candle traded with unusual size — the part worth noticing. */}
+              {(() => {
+                const vols = layout.candles.map((c) => c.volume * c.close);
+                const maxV = Math.max(0, ...vols);
+                if (!(maxV > 0)) return null;
+                const vy = (v: number) => layout.volTop + layout.volH - (v / maxV) * layout.volH;
+                const avg = vols.map((_, i) => {
+                  const from = Math.max(0, i - 19);
+                  const slice = vols.slice(from, i + 1);
+                  return slice.reduce((a, b) => a + b, 0) / slice.length;
+                });
+                return (
+                  <g>
+                    <line
+                      x1={MARGIN.left}
+                      x2={MARGIN.left + layout.candleAreaW}
+                      y1={layout.volTop - 4}
+                      y2={layout.volTop - 4}
+                      className="liq-vol-sep"
+                    />
+                    {layout.candles.map((c, i) => {
+                      const top = vy(vols[i]);
+                      return (
+                        <rect
+                          key={`v${c.time}`}
+                          x={layout.x(i) - layout.bodyW / 2}
+                          y={top}
+                          width={layout.bodyW}
+                          height={Math.max(0.6, layout.volTop + layout.volH - top)}
+                          className={c.close >= c.open ? "liq-vol-up" : "liq-vol-down"}
+                        />
+                      );
+                    })}
+                    <polyline
+                      points={avg.map((v, i) => `${layout.x(i)},${vy(v)}`).join(" ")}
+                      className="liq-vol-avg"
+                    />
+                    <text x={MARGIN.left + 4} y={layout.volTop + 9} className="liq-vol-label">
+                      VOL · máx {shortUsd(maxV)}
+                    </text>
+                  </g>
+                );
+              })()}
 
               <line
                 x1={MARGIN.left}
@@ -1234,7 +1342,7 @@ export default function LiquidationHeatmapDesk() {
               <div className="liq-levels-list">
                 {[
                   ...pools.map((pool) => ({
-                    key: `pool-${pool.formedAt}-${pool.side}`,
+                    key: pool.id,
                     kind: `LIQ ${pool.side === "COMPRA" ? "↑" : "↓"}`,
                     cls: pool.side === "COMPRA" ? "up" : "down",
                     price: pool.price,
@@ -1243,7 +1351,7 @@ export default function LiquidationHeatmapDesk() {
                     volumeUsd: null as number | null,
                     stats: null,
                     rank: pool.strength,
-                    detail: `×${pool.touches} toques`,
+                    detail: `${pool.frames.join("·")} · ×${pool.touches}`,
                   })),
                   ...orderBlocks.map((block) => ({
                     key: `ob-${block.index}`,
@@ -1364,7 +1472,7 @@ export default function LiquidationHeatmapDesk() {
             </span>
             <span>
               <i className="pool" />
-              Liquidez (mín/máx clave)
+              Liquidez mín/máx · gruesa = varios marcos
             </span>
           </div>
 

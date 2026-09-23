@@ -292,3 +292,18 @@
   .sc-row{grid-template-columns:1fr}
   .sc-row span{margin-bottom:1px}
 }
+
+/* Volume strip */
+.liq-vol-sep{stroke:#1c2923;stroke-width:1}
+.liq-vol-up{fill:var(--green);opacity:.45}
+.liq-vol-down{fill:var(--red);opacity:.45}
+.liq-vol-avg{fill:none;stroke:var(--amber);stroke-width:1;opacity:.7}
+.liq-vol-label{font:8px var(--font-mono);fill:var(--muted);letter-spacing:.5px}
+@media(max-width:700px){.liq-vol-label{font-size:10px}}
+
+/* Multi-timeframe liquidity: a level several frames agree on reads heavier. */
+.liq-pool-line.multi{stroke-width:2.4;stroke-dasharray:9 4;opacity:.85}
+
+/* Pair search */
+.liq-search{width:100%;margin-bottom:7px;background:#0a110d;border:1px solid var(--line);border-radius:3px;padding:8px 10px;color:var(--text);font:11px var(--font-mono)}
+.liq-search::placeholder{color:var(--muted)}

@@ -131,3 +131,59 @@ test("results are capped and ordered by price, high to low", () => {
   assert.ok(pools.length <= 2);
   for (let i = 1; i < pools.length; i += 1) assert.ok(pools[i - 1].price >= pools[i].price);
 });
+
+/* ── multi-timeframe merge ── */
+
+const p = (side: "COMPRA" | "VENTA", price: number, strength = 60) => ({
+  side, price, touches: 2, formedAt: 0, swept: false, sweptAt: null, strength,
+});
+
+test("the same level on two frames becomes one pool that names both", async () => {
+  const { mergeMtfPools } = await import("../lib/liquidity-pools.ts");
+  const merged = mergeMtfPools([
+    { timeframe: "1h", pools: [p("COMPRA", 100.1)] },
+    { timeframe: "1d", pools: [p("COMPRA", 100)] },
+  ]);
+  assert.equal(merged.length, 1);
+  assert.deepEqual(merged[0].frames, ["1d", "1h"], "marco mayor primero");
+  assert.equal(merged[0].price, 100, "conserva el precio del marco mayor");
+  assert.equal(merged[0].touches, 4);
+});
+
+test("opposite sides at the same price are not merged", async () => {
+  const { mergeMtfPools } = await import("../lib/liquidity-pools.ts");
+  const merged = mergeMtfPools([
+    { timeframe: "1h", pools: [p("COMPRA", 100)] },
+    { timeframe: "4h", pools: [p("VENTA", 100)] },
+  ]);
+  assert.equal(merged.length, 2);
+});
+
+test("levels beyond the tolerance stay separate", async () => {
+  const { mergeMtfPools } = await import("../lib/liquidity-pools.ts");
+  const merged = mergeMtfPools([
+    { timeframe: "1h", pools: [p("COMPRA", 100)] },
+    { timeframe: "4h", pools: [p("COMPRA", 101)] },
+  ]);
+  assert.equal(merged.length, 2);
+});
+
+test("multi-frame levels rank ahead of stronger single-frame ones", async () => {
+  const { mergeMtfPools } = await import("../lib/liquidity-pools.ts");
+  const merged = mergeMtfPools([
+    { timeframe: "1h", pools: [p("COMPRA", 100, 50), p("VENTA", 90, 99)] },
+    { timeframe: "4h", pools: [p("COMPRA", 100, 50)] },
+  ]);
+  assert.equal(merged[0].frames.length, 2);
+});
+
+test("higher frames never include the chart's own or a smaller one", async () => {
+  const { higherTimeframes } = await import("../lib/market-fetch.ts");
+  const order = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d", "1w"];
+  for (const tf of order) {
+    for (const h of higherTimeframes(tf)) {
+      assert.ok(order.indexOf(h) > order.indexOf(tf), `${h} no es mayor que ${tf}`);
+    }
+  }
+  assert.deepEqual(higherTimeframes("1w"), []);
+});

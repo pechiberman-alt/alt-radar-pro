@@ -149,3 +149,54 @@ export function findLiquidityPools(
     .slice(0, limit)
     .sort((a, b) => b.price - a.price);
 }
+
+export type MtfPool = LiquidityPool & {
+  /** Stable key across timeframes, for rendering and label slots. */
+  id: string;
+  /** Frames where this level appears, largest first. */
+  frames: string[];
+};
+
+const FRAME_RANK = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d", "1w"];
+
+/**
+ * Merges pools found on several frames into one list.
+ *
+ * The same resting-order level usually shows up on more than one chart. Drawn
+ * once per frame it becomes two or three stacked lines saying the same thing;
+ * merged, it becomes one line that states how many frames agree — and that
+ * agreement is the useful information, since a level visible on the daily and
+ * the 4h has had more traders placing orders at it than one seen only on the
+ * 15-minute. Pools within `tolerancePct` on the same side are one level.
+ */
+export function mergeMtfPools(
+  entries: { timeframe: string; pools: LiquidityPool[] }[],
+  tolerancePct = 0.002,
+): MtfPool[] {
+  const merged: MtfPool[] = [];
+  const rank = (tf: string) => FRAME_RANK.indexOf(tf);
+  // Largest frames first, so a merged level keeps the higher frame's price.
+  const ordered = [...entries].sort((a, b) => rank(b.timeframe) - rank(a.timeframe));
+
+  for (const { timeframe, pools } of ordered) {
+    for (const pool of pools) {
+      const match = merged.find(
+        (m) => m.side === pool.side && Math.abs(m.price - pool.price) / m.price <= tolerancePct,
+      );
+      if (match) {
+        if (!match.frames.includes(timeframe)) match.frames.push(timeframe);
+        match.touches += pool.touches;
+        match.strength = Math.max(match.strength, pool.strength);
+      } else {
+        merged.push({
+          ...pool,
+          id: `${pool.side}-${timeframe}-${pool.price.toFixed(8)}`,
+          frames: [timeframe],
+        });
+      }
+    }
+  }
+  for (const m of merged) m.frames.sort((a, b) => rank(b) - rank(a));
+  // More frames first, then strength: that is the order labels claim space in.
+  return merged.sort((a, b) => b.frames.length - a.frames.length || b.strength - a.strength);
+}
