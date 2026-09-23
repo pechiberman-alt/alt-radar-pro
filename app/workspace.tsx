@@ -45,6 +45,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   { id: "inteligencia", label: "SEÑALES", primary: true, group: "EMPEZÁ ACÁ" },
 
   // SEÑALES Y ENTRADAS — strategies and entry detection.
+  { id: "spot", label: "ESTRATEGIA SPOT", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "swing", label: "SWING", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "scalping", label: "SCALPING", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "pumpeo", label: "PUMPEO", primary: false, group: "SEÑALES Y ENTRADAS" },
