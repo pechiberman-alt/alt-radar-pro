@@ -8,6 +8,15 @@ import {
   type LiquidationHeatmap,
 } from "@/lib/liquidation-heatmap";
 import { findFairValueGaps, gapStats, type FairValueGap, type GapStats } from "@/lib/fair-value-gaps";
+import {
+  isPoolTaken,
+  liquidationTotals,
+  mergeLiveCandle,
+  parseForceOrder,
+  parseKline,
+  type LiveKline,
+  type LiveLiquidation,
+} from "@/lib/live-market";
 import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
 import { buildScenarios, type ScenarioBoard } from "@/lib/scenario-analysis";
 import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
@@ -155,6 +164,85 @@ export default function LiquidationHeatmapDesk() {
   const [symbols, setSymbols] = useState<string[]>(FALLBACK_SYMBOLS);
   const [symbolQuery, setSymbolQuery] = useState("");
   const [htfPools, setHtfPools] = useState<{ timeframe: string; pools: LiquidityPool[] }[]>([]);
+  const [liveKline, setLiveKline] = useState<LiveKline | null>(null);
+  const [liveLiqs, setLiveLiqs] = useState<LiveLiquidation[]>([]);
+  const [liveStatus, setLiveStatus] = useState<"conectando" | "en vivo" | "sin conexión">("conectando");
+
+  /**
+   * One socket per pair and frame: the forming candle and the market-wide
+   * liquidation stream, filtered to this pair. Same connect/retry pattern as
+   * the order-flow panel. Candle updates arrive several times a second; they
+   * are applied at most once a second, because every update re-runs the
+   * structure detectors and a faster redraw adds nothing a reader can see.
+   */
+  useEffect(() => {
+    let closed = false;
+    let socket: WebSocket | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
+    let pending: LiveKline | null = null;
+    const key = symbol.toLowerCase();
+
+    // Reset for the new pair/frame, deferred out of the effect's commit —
+    // a previous pair's prints must never appear on this chart.
+    queueMicrotask(() => {
+      if (closed) return;
+      setLiveKline(null);
+      setLiveLiqs([]);
+      setLiveStatus("conectando");
+    });
+
+    const flush = setInterval(() => {
+      if (pending) {
+        setLiveKline(pending);
+        pending = null;
+      }
+    }, 1000);
+
+    const connect = () => {
+      if (closed) return;
+      const ws = new WebSocket(
+        `wss://fstream.binance.com/stream?streams=${key}@kline_${timeframe}/!forceOrder@arr`,
+      );
+      socket = ws;
+      ws.onopen = () => {
+        failures = 0;
+        setLiveStatus("en vivo");
+      };
+      ws.onmessage = (event) => {
+        let msg: { stream?: string; data?: unknown };
+        try {
+          msg = JSON.parse(event.data as string);
+        } catch {
+          return;
+        }
+        if (msg.stream?.includes("@kline_")) {
+          const k = parseKline(msg.data);
+          if (k) pending = k;
+        } else if (msg.stream?.includes("forceOrder")) {
+          const liq = parseForceOrder(msg.data);
+          if (liq && liq.symbol === symbol) {
+            setLiveLiqs((current) => [liq, ...current].slice(0, 300));
+          }
+        }
+      };
+      ws.onerror = () => ws.close();
+      ws.onclose = () => {
+        if (closed || ws !== socket) return;
+        failures += 1;
+        setLiveStatus(failures >= 4 ? "sin conexión" : "conectando");
+        retry = setTimeout(connect, Math.min(8_000, 900 + failures * 700));
+      };
+    };
+    connect();
+
+    return () => {
+      closed = true;
+      clearTimeout(retry);
+      clearInterval(flush);
+      socket?.close();
+    };
+  }, [symbol, timeframe]);
 
   // Liquidity from the larger frames, loaded on its own so the map does not
   // wait for it. Only unswept pools matter; findLiquidityPools already drops
@@ -432,7 +520,14 @@ export default function LiquidationHeatmapDesk() {
   const layout = useMemo(() => {
     if (!data || !data.candles.length) return null;
     const { heatmap } = data;
-    const candles = data.candles.slice(-visibleCandles);
+    // Only merge a live candle into a series of the same frame: after a
+    // frame switch the socket can deliver before the new candles load, and a
+    // 4h candle appended to a 1h series would be drawn as if it belonged.
+    const series =
+      data.timeframe === timeframe && data.heatmap.symbol === symbol
+        ? mergeLiveCandle(data.candles, liveKline)
+        : data.candles;
+    const candles = series.slice(-visibleCandles);
     if (!candles.length) return null;
 
     const plotW = box.width - MARGIN.left - MARGIN.right;
@@ -578,7 +673,7 @@ export default function LiquidationHeatmapDesk() {
       .sort((a, b) => a.price - b.price);
 
     return { candles, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT, volTop, volH };
-  }, [data, box, visibleCandles, priceView]);
+  }, [data, box, visibleCandles, priceView, liveKline, timeframe, symbol]);
 
   // Keep the gesture's view of the price window in step with what is drawn.
   // In an effect, not during render: writing a ref while rendering is a side
@@ -606,6 +701,12 @@ export default function LiquidationHeatmapDesk() {
       (block) => block.high >= layout.lo && block.low <= layout.hi,
     );
   }, [layout]);
+
+  const livePrice =
+    liveKline && data?.timeframe === timeframe && data.heatmap.symbol === symbol
+      ? liveKline.close
+      : (data?.heatmap.currentPrice ?? null);
+  const liqTotals = useMemo(() => liquidationTotals(liveLiqs), [liveLiqs]);
 
   const swingView = useMemo(
     () =>
@@ -640,24 +741,29 @@ export default function LiquidationHeatmapDesk() {
 
   // Merged across the chart's own frame and the larger ones. A level seen on
   // several frames is one line naming all of them, not a stack of copies.
-  const pools = useMemo<MtfPool[]>(() => {
+  const pools = useMemo<(MtfPool & { taken: boolean })[]>(() => {
     if (!layout || !swingView.length) return [];
     return mergeMtfPools([
-      { timeframe, pools: findLiquidityPools(swingView) },
+      // Closed candles only: the forming candle decides "taken" below,
+      // live, instead of silently deleting the level mid-candle.
+      { timeframe, pools: findLiquidityPools(swingView.slice(0, -1)) },
       ...htfPools,
-    ]).filter((pool) => pool.price >= layout.lo && pool.price <= layout.hi);
+    ])
+      .filter((pool) => pool.price >= layout.lo && pool.price <= layout.hi)
+      .map((pool) => ({ ...pool, taken: isPoolTaken(pool, swingView.at(-1) ?? null) }));
   }, [layout, swingView, htfPools, timeframe]);
 
   const scenarios = useMemo<ScenarioBoard | null>(() => {
     if (!layout) return null;
     return buildScenarios({
-      currentPrice: layout.heatmap.currentPrice,
-      pools,
+      currentPrice: livePrice ?? layout.heatmap.currentPrice,
+      // A level already taken has no orders left to aim at.
+      pools: pools.filter((pool) => !pool.taken),
       orderBlocks,
       gaps,
       heatmap: layout.heatmap,
     });
-  }, [layout, pools, orderBlocks, gaps]);
+  }, [layout, pools, orderBlocks, gaps, livePrice]);
   const obConfidence = useMemo<ZoneStats | null>(
     () => (swingView.length ? orderBlockStats(swingView) : null),
     [swingView],
@@ -853,7 +959,7 @@ export default function LiquidationHeatmapDesk() {
             </div>
             <div className="liq-bias-price">
               <span>PRECIO ACTUAL</span>
-              <b>${priceLabel(data.heatmap.currentPrice)}</b>
+              <b>${priceLabel(livePrice ?? data.heatmap.currentPrice)}</b>
             </div>
           </div>
 
@@ -905,6 +1011,9 @@ export default function LiquidationHeatmapDesk() {
               ⟳
             </button>
             <span>
+              <i className={`liq-live ${liveStatus === "en vivo" ? "on" : liveStatus === "sin conexión" ? "off" : ""}`}>
+                {liveStatus.toUpperCase()}
+              </i>{" "}
               {visibleCandles} velas
               {updatedAt !== null && (
                 <i className="liq-updated">
@@ -1021,7 +1130,7 @@ export default function LiquidationHeatmapDesk() {
                       x2={MARGIN.left + layout.candleAreaW}
                       y1={y}
                       y2={y}
-                      className={`liq-pool-line ${bullish ? "up" : "down"}${pool.frames.length > 1 ? " multi" : ""}`}
+                      className={`liq-pool-line ${bullish ? "up" : "down"}${pool.frames.length > 1 ? " multi" : ""}${pool.taken ? " taken" : ""}`}
                     />
                     {labelSlots.pool.has(pool.id) && (
                       <text
@@ -1029,7 +1138,7 @@ export default function LiquidationHeatmapDesk() {
                         y={y - 3}
                         className={bullish ? "liq-pool-label up" : "liq-pool-label down"}
                       >
-                        {bullish ? "LIQ ↑" : "LIQ ↓"} {pool.frames.join("·")}
+                        {pool.taken ? "TOMADA" : bullish ? "LIQ ↑" : "LIQ ↓"} {pool.frames.join("·")}
                       </text>
                     )}
                   </g>
@@ -1172,6 +1281,42 @@ export default function LiquidationHeatmapDesk() {
                 );
               })}
 
+              {/* Real liquidations, as they print. Bubble area follows size;
+                  red = longs forced out, green = shorts. Only the three
+                  largest in view carry a label, so a cascade stays readable. */}
+              {(() => {
+                const cs = layout.candles;
+                if (!cs.length || !liveLiqs.length) return null;
+                const visible = liveLiqs.filter(
+                  (l) => l.time >= cs[0].time && l.price >= layout.lo && l.price <= layout.hi,
+                );
+                const labelled = new Set(
+                  [...visible].sort((a, b) => b.notionalUsd - a.notionalUsd).slice(0, 3),
+                );
+                return visible.map((l, k) => {
+                  let i = cs.length - 1;
+                  while (i > 0 && cs[i].time > l.time) i -= 1;
+                  const r = Math.min(14, 2.5 + Math.sqrt(l.notionalUsd / 5000));
+                  const cx = layout.x(i);
+                  const cy = layout.y(l.price);
+                  return (
+                    <g key={`lq-${l.time}-${k}`}>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={r}
+                        className={l.side === "LARGOS" ? "liq-print long" : "liq-print short"}
+                      />
+                      {labelled.has(l) && (
+                        <text x={cx + r + 3} y={cy + 3} className="liq-print-label">
+                          {shortUsd(l.notionalUsd)}
+                        </text>
+                      )}
+                    </g>
+                  );
+                });
+              })()}
+
               {/* Volume strip. Bars scale to the largest candle in view; the
                   line is the 20-candle average, so a bar well above it is a
                   candle traded with unusual size — the part worth noticing. */}
@@ -1221,8 +1366,8 @@ export default function LiquidationHeatmapDesk() {
               <line
                 x1={MARGIN.left}
                 x2={box.width - MARGIN.right}
-                y1={layout.y(data.heatmap.currentPrice)}
-                y2={layout.y(data.heatmap.currentPrice)}
+                y1={layout.y(livePrice ?? data.heatmap.currentPrice)}
+                y2={layout.y(livePrice ?? data.heatmap.currentPrice)}
                 className="liq-price-line"
               />
 
@@ -1291,9 +1436,9 @@ export default function LiquidationHeatmapDesk() {
 
             <div
               className="liq-price-badge"
-              style={{ top: `${(layout.y(data.heatmap.currentPrice) / box.height) * 100}%` }}
+              style={{ top: `${(layout.y(livePrice ?? data.heatmap.currentPrice) / box.height) * 100}%` }}
             >
-              ${priceLabel(data.heatmap.currentPrice)}
+              ${priceLabel(livePrice ?? data.heatmap.currentPrice)}
             </div>
 
             {hovered && (
@@ -1336,6 +1481,78 @@ export default function LiquidationHeatmapDesk() {
               carry volume and a hit rate cannot share vertical space with
               another one — on the chart they stacked into an unreadable pile
               that also hid the candles. In a list each line has its own row. */}
+          {/* The measured counterpart to the estimated map above. */}
+          <div className="liq-live-feed">
+            <div className="lf-head">
+              <h4>LIQUIDEZ TOMADA · EN VIVO</h4>
+              <i className={`liq-live ${liveStatus === "en vivo" ? "on" : liveStatus === "sin conexión" ? "off" : ""}`}>
+                {liveStatus.toUpperCase()}
+              </i>
+            </div>
+
+            <div className="lf-totals">
+              <div className="long">
+                <span>LARGOS LIQUIDADOS</span>
+                <b>{shortUsd(liqTotals.longsUsd)}</b>
+              </div>
+              <div className="short">
+                <span>CORTOS LIQUIDADOS</span>
+                <b>{shortUsd(liqTotals.shortsUsd)}</b>
+              </div>
+              <div>
+                <span>EVENTOS</span>
+                <b>{liqTotals.count}</b>
+                <em>
+                  {liqTotals.dominant === "PAREJO"
+                    ? "sin lado dominante"
+                    : `pierden más los ${liqTotals.dominant.toLowerCase()}`}
+                </em>
+              </div>
+            </div>
+
+            {pools.some((pool) => pool.taken) && (
+              <div className="lf-taken">
+                {pools
+                  .filter((pool) => pool.taken)
+                  .map((pool) => (
+                    <span key={pool.id} className={pool.side === "COMPRA" ? "up" : "down"}>
+                      {pool.side === "COMPRA" ? "↑" : "↓"} {priceLabel(pool.price)} · {pool.frames.join("·")} tomada en esta vela
+                    </span>
+                  ))}
+              </div>
+            )}
+
+            {liveLiqs.length === 0 ? (
+              <p className="lf-empty">
+                Sin liquidaciones en {symbol.replace("USDT", "")} desde que abriste el mapa. En un par
+                tranquilo pueden pasar minutos sin ninguna; no es una falla de conexión.
+              </p>
+            ) : (
+              <div className="lf-list">
+                {liveLiqs.slice(0, 12).map((l, k) => (
+                  <div key={`${l.time}-${k}`} className={l.side === "LARGOS" ? "long" : "short"}>
+                    <em>
+                      {new Date(l.time).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </em>
+                    <b>{l.side}</b>
+                    <u>{priceLabel(l.price)}</u>
+                    <span>{shortUsd(l.notionalUsd)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="lf-note">
+              Estos son cierres forzados reales de Binance, no la estimación del mapa. Binance publica como
+              máximo uno por segundo por par, así que en una cascada el conteo se queda corto; y es un
+              solo exchange. Sirve para ver dónde se quemó el combustible, no el total del mercado.
+            </p>
+          </div>
+
           {(orderBlocks.length > 0 || gaps.length > 0 || pools.length > 0) && (
             <div className="liq-levels">
               <h4>NIVELES DETECTADOS EN LA VENTANA</h4>
@@ -1469,6 +1686,10 @@ export default function LiquidationHeatmapDesk() {
             <span>
               <i className="fib" />
               Banda Fibonacci
+            </span>
+            <span>
+              <i className="print" />
+              Liquidación real (en vivo)
             </span>
             <span>
               <i className="pool" />
