@@ -35,6 +35,7 @@ import "./alert-center.css";
 import "./alert-toasts.css";
 import "./trade-journal-desk.css";
 import "./dca-desk.css";
+import "./spot-desk.css";
 import "./responsive-fixes.css";
 import PwaRegister from "./pwa-register";
 
