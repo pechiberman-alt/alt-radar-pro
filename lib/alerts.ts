@@ -26,7 +26,7 @@
  */
 
 export type AlertPriority = "CRITICA" | "IMPORTANTE" | "INFORMATIVA";
-export type AlertCategory = "SEÑAL" | "RIESGO" | "ZONA" | "LIQUIDACIÓN" | "FLUJO";
+export type AlertCategory = "SEÑAL" | "RIESGO" | "ZONA" | "LIQUIDACIÓN" | "FLUJO" | "DCA";
 
 /**
  * Evidence attached to an alert.
@@ -90,6 +90,10 @@ export const CATEGORY_COOLDOWN_MINUTES: Record<AlertCategory, number> = {
   ZONA: 20,
   LIQUIDACIÓN: 20,
   FLUJO: 120,
+  // A DCA reminder is daily at most by nature — the schedule itself decides
+  // how often it should fire, so the cooldown only needs to block true
+  // duplicates within the same day.
+  DCA: 600,
 };
 
 export type AlertPreferences = {
@@ -109,6 +113,7 @@ export const DEFAULT_ALERT_PREFERENCES: AlertPreferences = {
     ZONA: true,
     LIQUIDACIÓN: true,
     FLUJO: false,
+    DCA: true,
   },
 };
 
@@ -309,6 +314,21 @@ export function flowAlert(
     body: laggard
       ? `El dinero institucional entró a ${leader} y salió de ${laggard} esta semana.`
       : `${leader} lidera las entradas institucionales de la semana.`,
+    at,
+  };
+}
+
+
+export function dcaReminderAlert(symbol: string, usdAmount: number, at = Date.now()): Alert {
+  return {
+    // One per symbol per calendar day: a schedule can only mean today's
+    // purchase, so a second reminder the same day would just be noise.
+    id: `dca-${symbol}-${new Date(at).toISOString().slice(0, 10)}`,
+    priority: "IMPORTANTE",
+    category: "DCA",
+    symbol,
+    title: `${symbol} · día de compra programada`,
+    body: `Según tu calendario, hoy toca comprar ${usdAmount} USD de ${symbol}. Esto es un recordatorio — nadie ejecuta la compra por vos.`,
     at,
   };
 }
