@@ -404,3 +404,4 @@
 .pt-grid b{font:11px var(--font-mono);color:var(--text);overflow-wrap:anywhere}
 .pt-card p,.pt-note{margin:0;font:9px var(--font-mono);line-height:1.65;color:#8e9c94}
 .pt-note{margin-top:4px;color:var(--muted)}
+.liq-live.warn{background:#2a2110;color:var(--amber)}
