@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { onSession } from "@/lib/account-events";
+import SignInPrompt from "./sign-in-prompt";
 
 type Status = {
   isAdmin: boolean;
@@ -45,6 +47,7 @@ export default function SettingsDesk() {
     void (async () => {
       await load();
     })();
+    return onSession(() => void load());
   }, [load]);
 
   const claim = async () => {
@@ -97,7 +100,7 @@ export default function SettingsDesk() {
         </span>
       </div>
 
-      {state === "signed-out" && <p className="set-note">Ingresá con tu cuenta (INGRESAR arriba).</p>}
+      {state === "signed-out" && <SignInPrompt why="La configuración la maneja la cuenta administradora." />}
       {state === "error" && <p className="set-note">No se pudo leer la configuración.</p>}
 
       {state === "ready" && status && !status.isAdmin && (

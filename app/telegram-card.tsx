@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { onSession } from "@/lib/account-events";
+import SignInPrompt from "./sign-in-prompt";
 import type { TelegramCategory, TelegramPrefs } from "@/lib/telegram";
 
 type State =
@@ -42,7 +44,11 @@ export default function TelegramCard() {
     // Coming back from Telegram after tapping Start: refresh the link state.
     const onVisible = () => document.visibilityState === "visible" && void load();
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    const offSession = onSession(() => void load());
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      offSession();
+    };
   }, [load]);
 
   const link = async () => {
@@ -98,7 +104,9 @@ export default function TelegramCard() {
         Te llegan aunque la app esté cerrada: el servidor revisa cada 5 minutos y te manda sólo lo que elijas.
       </p>
 
-      {state.kind === "signed-out" && <p className="tg-note">Ingresá con tu cuenta (INGRESAR arriba) para vincular Telegram.</p>}
+      {state.kind === "signed-out" && (
+        <SignInPrompt why="El bot necesita saber a quién mandarle las alertas: se vincula a tu cuenta." />
+      )}
       {state.kind === "not-configured" && (
         <p className="tg-note">El bot todavía no está configurado: cargá el token de @BotFather en CONFIGURACIÓN.</p>
       )}

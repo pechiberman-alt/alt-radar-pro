@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import {
+  defaultAccountMode,
+  notifySession,
+  onOpenAccount,
+  rememberHasAccount,
+  showSection,
+  type AccountMode,
+} from "@/lib/account-events";
 
 type SessionUser = { id: number; email: string };
 
@@ -45,6 +53,17 @@ export default function AccountPanel() {
   const [status, setStatus] = useState<SessionState>("loading");
   const [expired, setExpired] = useState(false);
   const [sessionKey, setSessionKey] = useState(0);
+  const [initialMode, setInitialMode] = useState<AccountMode>("register");
+
+  // Any panel can open the drawer on the right tab (see SignInPrompt).
+  useEffect(
+    () =>
+      onOpenAccount((mode) => {
+        setInitialMode(mode);
+        setOpen(true);
+      }),
+    [],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -70,15 +89,20 @@ export default function AccountPanel() {
     setSessionKey((key) => key + 1);
   }, []);
 
+  // Panels that depend on the session refresh when it changes, instead of
+  // showing "sign in" until the page is reloaded.
   const signedIn = useCallback((next: SessionUser) => {
     setExpired(false);
     setUser(next);
     setStatus("ready");
+    rememberHasAccount();
+    notifySession();
   }, []);
 
   const signedOut = useCallback(() => {
     setUser(null);
     setStatus("ready");
+    notifySession();
   }, []);
 
   /** Session died server-side while the drawer was open. */
@@ -86,6 +110,7 @@ export default function AccountPanel() {
     setUser(null);
     setStatus("ready");
     setExpired(true);
+    notifySession();
   }, []);
 
   useEffect(() => {
@@ -100,8 +125,11 @@ export default function AccountPanel() {
   return (
     <>
       <button
-        className="account-trigger"
-        onClick={() => setOpen(true)}
+        className={`account-trigger${label ? "" : " signed-out"}`}
+        onClick={() => {
+          setInitialMode(defaultAccountMode());
+          setOpen(true);
+        }}
         aria-label={user ? `Cuenta de ${user.email}` : "Ingresar a tu cuenta"}
       >
         {/* Not a <span>: the mobile header hides spans inside .system. */}
@@ -136,9 +164,10 @@ export default function AccountPanel() {
                   user={user}
                   onSignedOut={signedOut}
                   onSessionExpired={sessionExpired}
+                  onClose={() => setOpen(false)}
                 />
               ) : (
-                <AuthForms onSignedIn={signedIn} expired={expired} />
+                <AuthForms key={initialMode} onSignedIn={signedIn} expired={expired} initialMode={initialMode} />
               )}
             </aside>
           </div>,
@@ -151,13 +180,18 @@ export default function AccountPanel() {
 function AuthForms({
   onSignedIn,
   expired,
+  initialMode,
 }: {
   onSignedIn: (user: SessionUser) => void;
   expired: boolean;
+  initialMode: AccountMode;
 }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<AccountMode>(expired ? "login" : initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminCode, setAdminCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -182,6 +216,18 @@ function AuthForms({
         return;
       }
       const body = (await me.json()) as { user: SessionUser | null };
+      // Optional: claim the admin role in the same step, if a code was given.
+      if (body.user && adminCode.trim()) {
+        const claim = await fetch("/api/admin/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: adminCode.trim() }),
+        }).catch(() => null);
+        if (!claim?.ok) {
+          const reason = claim ? await readError(claim, "") : "";
+          window.alert(`Cuenta lista, pero el código de administrador no se aplicó${reason ? `: ${reason}` : ""}.`);
+        }
+      }
       if (body.user) onSignedIn(body.user);
       else setError("Entraste, pero no se pudo leer la sesión. Recargá la página.");
     } catch {
@@ -193,8 +239,14 @@ function AuthForms({
 
   return (
     <div className="account-body">
-      <p className="eyebrow">ACCESO DE CLIENTE</p>
-      <h2 className="account-title">{mode === "login" ? "Ingresar" : "Crear cuenta"}</h2>
+      <p className="eyebrow">TU CUENTA DE ALT RADAR</p>
+      <h2 className="account-title">{mode === "login" ? "Ingresar" : "Crear cuenta gratis"}</h2>
+      {mode === "register" && (
+        <p className="account-why">
+          Con tu cuenta activás las <b>alertas por Telegram</b>, tu <b>registro de operaciones</b>, el{" "}
+          <b>DCA</b> y la <b>IA</b>. Solo email y contraseña.
+        </p>
+      )}
 
       {expired && <p className="account-warn">Tu sesión venció. Volvé a ingresar.</p>}
 
@@ -232,16 +284,31 @@ function AuthForms({
         </label>
         <label>
           <span>CONTRASEÑA</span>
-          <input
-            type="password"
-            value={password}
-            autoComplete={mode === "login" ? "current-password" : "new-password"}
-            required
-            minLength={mode === "register" ? 8 : undefined}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <div className="account-pass">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              required
+              minLength={mode === "register" ? 8 : undefined}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label="Mostrar u ocultar contraseña">
+              {showPassword ? "OCULTAR" : "VER"}
+            </button>
+          </div>
         </label>
         {mode === "register" && <small className="account-hint">Mínimo 8 caracteres.</small>}
+        {!adminOpen ? (
+          <button type="button" className="account-admin-toggle" onClick={() => setAdminOpen(true)}>
+            ¿Tenés un código de administrador?
+          </button>
+        ) : (
+          <label>
+            <span>CÓDIGO DE ADMINISTRADOR (OPCIONAL)</span>
+            <input value={adminCode} autoComplete="off" onChange={(event) => setAdminCode(event.target.value)} />
+          </label>
+        )}
         {error && <p className="account-error">{error}</p>}
         <button className="account-submit" type="submit" disabled={busy}>
           {busy ? "PROCESANDO…" : mode === "login" ? "INGRESAR" : "CREAR CUENTA"}
@@ -249,8 +316,8 @@ function AuthForms({
       </form>
 
       <p className="disclaimer">
-        Tu cuenta es individual e independiente. Sirve para vincular tu Binance en modo lectura y
-        ver tu cartera dentro de la terminal.
+        {mode === "login" ? "¿No tenés cuenta? Tocá CREAR CUENTA arriba. " : "¿Ya tenés cuenta? Tocá INGRESAR arriba. "}
+        Tu cuenta es individual. También sirve para vincular tu Binance en modo lectura.
       </p>
     </div>
   );
@@ -260,11 +327,17 @@ function AccountHome({
   user,
   onSignedOut,
   onSessionExpired,
+  onClose,
 }: {
   user: SessionUser;
   onSignedOut: () => void;
   onSessionExpired: () => void;
+  onClose: () => void;
 }) {
+  const goTo = (id: string) => {
+    onClose();
+    showSection(id);
+  };
   const [portfolio, setPortfolio] = useState<PortfolioState>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -352,6 +425,13 @@ function AccountHome({
     <div className="account-body">
       <p className="eyebrow">CUENTA ACTIVA</p>
       <h2 className="account-title">{user.email}</h2>
+
+      <div className="account-next">
+        <b>PRIMEROS PASOS</b>
+        <button onClick={() => goTo("alertas")}>1 · Vincular Telegram para recibir alertas →</button>
+        <button onClick={() => goTo("registro")}>2 · Cargar mis operaciones (win rate) →</button>
+        <button onClick={() => goTo("dca")}>3 · Programar mi DCA →</button>
+      </div>
       <button className="account-ghost" onClick={signOut} disabled={pending !== null}>
         {pending === "signout" ? "CERRANDO…" : "CERRAR SESIÓN"}
       </button>

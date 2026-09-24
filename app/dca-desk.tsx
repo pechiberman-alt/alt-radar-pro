@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { onSession } from "@/lib/account-events";
+import SignInPrompt from "./sign-in-prompt";
 import {
   DCA_SCHEDULE_FREQUENCIES,
   type DcaFrequency,
@@ -111,6 +113,8 @@ export default function DcaDesk() {
     (async () => {
       await load();
     })();
+    // Signing in elsewhere on the page refreshes this panel.
+    return onSession(() => void load());
   }, [load]);
 
   const submitPurchase = async (e: React.FormEvent) => {
@@ -199,10 +203,7 @@ export default function DcaDesk() {
       {authState === "loading" && <p className="dca-loading">CARGANDO…</p>}
 
       {authState === "out" && (
-        <div className="dca-empty">
-          <b>SIN SESIÓN INICIADA</b>
-          <span>El registro es personal — entrá con INGRESAR arriba y volvé acá.</span>
-        </div>
+        <SignInPrompt why="Tu DCA es personal: cada compra y el calendario quedan guardados en tu cuenta." />
       )}
 
       {authState === "in" && (

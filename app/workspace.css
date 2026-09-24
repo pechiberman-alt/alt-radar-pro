@@ -326,3 +326,4 @@ small {
 .ws-welcome button{flex:0 0 auto;background:none;border:0;color:var(--muted);font-size:17px;line-height:1;cursor:pointer;padding:0 2px}
 .ws-welcome button:hover{color:var(--text)}
 .ws-build{font:8px var(--font-mono);color:var(--muted);letter-spacing:.5px}
+.ws-welcome-cta{display:block;margin-top:8px;padding:9px 12px;background:#0c251a;border:1px solid #2d6a4d;border-radius:4px;color:var(--green);font:10px var(--font-mono);letter-spacing:.8px;cursor:pointer}

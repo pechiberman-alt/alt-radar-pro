@@ -61,3 +61,30 @@
   .account-trigger-slim{display:inline;font-style:normal}
   .balance-list>div,.history-block>div{grid-template-columns:58px 1fr auto;gap:7px}
 }
+
+/* Signed out on a phone: a real, labelled button instead of a bare arrow. */
+@media(max-width:700px){
+  .account-trigger.signed-out{width:auto!important;padding:0 10px;flex:0 0 auto}
+  .account-trigger.signed-out .account-trigger-wide{display:inline}
+  .account-trigger.signed-out .account-trigger-slim{display:none}
+}
+
+.account-why{margin:6px 0 14px;padding:10px 12px;background:#0b120e;border:1px solid var(--line);border-left:3px solid var(--green2);border-radius:4px;font:10px var(--font-mono);line-height:1.7;color:#9aa7a0}
+.account-why b{color:#b9c5be}
+.account-pass{position:relative}
+.account-pass input{padding-right:62px}
+.account-pass button{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--muted);font:9px var(--font-mono);letter-spacing:.6px;cursor:pointer}
+.account-admin-toggle{background:none;border:0;padding:0;margin:4px 0;color:var(--muted);font:9px var(--font-mono);text-decoration:underline;cursor:pointer;text-align:left}
+.account-ok{margin:8px 0 0;font:10px var(--font-mono);color:var(--green)}
+
+.account-next{margin:0 0 14px;padding:12px;background:#0b1b14;border:1px solid #2d6a4d;border-radius:5px}
+.account-next b{display:block;margin-bottom:8px;font:9px var(--font-mono);letter-spacing:1.1px;color:var(--green)}
+.account-next button{display:block;width:100%;margin-top:6px;padding:10px;background:#0c251a;border:1px solid #2d6a4d;border-radius:4px;color:var(--green);font:10px var(--font-mono);letter-spacing:.8px;cursor:pointer;text-align:left}
+
+/* Shared prompt for panels that need an account. */
+.signin-prompt{display:grid;gap:6px;padding:14px;border:1px solid #2d6a4d;border-radius:5px;background:#0b1b14;text-align:center}
+.signin-prompt b{font:10px var(--font-mono);letter-spacing:1.1px;color:var(--green)}
+.signin-prompt span{font:10px var(--font-mono);line-height:1.6;color:#9aa7a0}
+.signin-prompt div{display:flex;gap:6px;margin-top:4px}
+.signin-prompt button{flex:1;padding:11px 8px;background:#0c251a;border:1px solid #2d6a4d;border-radius:4px;color:var(--green);font:10px var(--font-mono);letter-spacing:.8px;cursor:pointer}
+.signin-prompt button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
