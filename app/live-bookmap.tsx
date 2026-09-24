@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FUTURES_WS, futuresStreamUrl } from "@/lib/binance-ws";
 import type { BrainTimeframe } from "@/lib/market-brain";
 import type { DerivativesSnapshot } from "@/lib/market-brain";
 import type { LiquiditySnapshot } from "@/lib/liquidity-history";
@@ -591,6 +592,7 @@ export default function LiveBookmap({
     let retry: ReturnType<typeof setTimeout>;
     let watchdog: ReturnType<typeof setTimeout>;
     let activeSocket: WebSocket | null = null;
+    let currentHandle: ((event: MessageEvent) => void) | null = null;
     let failures = 0;
     const key = symbol.toLowerCase();
     const streamDepth = depth <= 5 ? 5 : depth <= 10 ? 10 : 20;
@@ -601,16 +603,22 @@ export default function LiveBookmap({
       // pair: a single symbol fires rarely, so the panel looked broken during
       // perfectly normal quiet stretches. Events are tagged with their symbol
       // and the ones for the pair on screen are highlighted.
-      const streams = `${key}@depth${streamDepth}@100ms/${key}@${venue === "futures" ? "trade" : "aggTrade"}${venue === "futures" ? "/!forceOrder@arr" : ""}`;
-      const socket = new WebSocket(`${host}/stream?streams=${streams}`);
+      // Futures: the book is a /public stream, trades and liquidations are
+      // /market (see lib/binance-ws.ts), so they travel on a second socket
+      // opened below. Spot keeps both on one connection.
+      const socket = new WebSocket(
+        venue === "futures"
+          ? futuresStreamUrl([`${key}@depth${streamDepth}@100ms`])
+          : `${host}/stream?streams=${key}@depth${streamDepth}@100ms/${key}@aggTrade`,
+      );
       activeSocket = socket;
       let receivedDepth = false;
       watchdog = setTimeout(() => {
         if (!receivedDepth) socket.close();
       }, 9_000);
 
-      socket.onmessage = (event) => {
-        if (closed || socket !== activeSocket) return;
+      const handle = (event: MessageEvent) => {
+        if (closed) return;
         try {
           const message = JSON.parse(event.data);
           const data = message.data ?? message;
@@ -710,6 +718,11 @@ export default function LiveBookmap({
           return;
         }
       };
+      currentHandle = handle;
+      socket.onmessage = (event) => {
+        if (socket !== activeSocket) return;
+        handle(event);
+      };
 
       socket.onerror = () => socket.close();
       socket.onclose = () => {
@@ -722,7 +735,7 @@ export default function LiveBookmap({
         setStatus(failures >= 4 ? "no disponible" : "conectando");
         const next =
           venue === "futures"
-            ? "wss://fstream.binance.com"
+            ? FUTURES_WS.public
             : host.includes("stream.binance.com")
               ? "wss://data-stream.binance.vision"
               : "wss://stream.binance.com:9443";
@@ -730,17 +743,40 @@ export default function LiveBookmap({
       };
     };
 
-    connect(
-      venue === "futures"
-        ? "wss://fstream.binance.com"
-        : "wss://stream.binance.com:9443",
-    );
+    // Second futures socket for /market streams. It shares the depth socket's
+    // handler, which dispatches on the event type, so trades and
+    // liquidations land exactly where they did on the old single connection.
+    let marketSocket: WebSocket | null = null;
+    let marketRetry: ReturnType<typeof setTimeout> | undefined;
+    let marketFailures = 0;
+    const connectMarket = () => {
+      if (closed || venue !== "futures") return;
+      const ws = new WebSocket(futuresStreamUrl([`${key}@aggTrade`, "!forceOrder@arr"]));
+      marketSocket = ws;
+      ws.onopen = () => {
+        marketFailures = 0;
+      };
+      ws.onmessage = (event) => {
+        if (!closed && ws === marketSocket) currentHandle?.(event);
+      };
+      ws.onerror = () => ws.close();
+      ws.onclose = () => {
+        if (closed || ws !== marketSocket) return;
+        marketFailures += 1;
+        marketRetry = setTimeout(connectMarket, Math.min(8_000, 1000 + marketFailures * 800));
+      };
+    };
+
+    connect(venue === "futures" ? FUTURES_WS.public : "wss://stream.binance.com:9443");
+    connectMarket();
 
     return () => {
       closed = true;
       clearTimeout(retry);
       clearTimeout(watchdog);
       clearTimeout(resetTimer);
+      clearTimeout(marketRetry);
+      marketSocket?.close();
       activeSocket?.close();
       activeSocket = null;
     };
