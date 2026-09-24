@@ -5,7 +5,18 @@
  * can be revoked instantly by deleting its row.
  */
 
-const PBKDF2_ITERATIONS = 120_000;
+/**
+ * Cloudflare Workers (workerd) refuses PBKDF2 above 100,000 iterations with
+ * "NotSupportedError: iteration counts above 100000 are not supported". Node,
+ * wrangler dev and Miniflare do not enforce it, so 120,000 passed every local
+ * test while registration and login returned 500 for every real user — the
+ * database had zero accounts because none could ever be created.
+ *
+ * Never raise PBKDF2_ITERATIONS above the ceiling; a test pins it. The margin
+ * that matters against guessing is rate limiting and keeping D1 private.
+ */
+export const WORKERS_PBKDF2_MAX_ITERATIONS = 100_000;
+export const PBKDF2_ITERATIONS = 100_000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export const SESSION_COOKIE = "ar_session";
 
