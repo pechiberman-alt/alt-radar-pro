@@ -75,13 +75,16 @@ export type FlagPattern = {
  * failed when a close leaves it the other way. Target is the classic measured
  * move — pole height from the breakout — which is a convention, not a law.
  */
-export function findFlags(c: SwingCandle[], lookback = 45): FlagPattern[] {
+export function findFlags(c: SwingCandle[], lookback = 120, maxPerKind = 2): FlagPattern[] {
   if (c.length < 40) return [];
   const last = c.length - 1;
   const out: FlagPattern[] = [];
 
+  // Several per kind across the window, newest first and never overlapping:
+  // a flag that already confirmed or failed is still worth seeing on the chart.
   for (const bull of [true, false]) {
-    for (let e = last - 4; e >= Math.max(20, last - lookback); e -= 1) {
+    let found = 0;
+    for (let e = last - 4; e >= Math.max(20, last - lookback) && found < maxPerKind; e -= 1) {
       // Pole: extreme at e, origin the opposite extreme within 12 candles.
       let s = e;
       for (let k = e - 1; k >= e - 12 && k > 0; k -= 1) {
@@ -151,7 +154,8 @@ export function findFlags(c: SwingCandle[], lookback = 45): FlagPattern[] {
         volumeFades: avg(flag.map((x) => x.volume)) < avg(window.map((x) => x.volume)),
         status,
       });
-      break;
+      found += 1;
+      e = s - 1; // continue before this pole, so patterns never overlap
     }
   }
   return out;

@@ -1,4 +1,5 @@
 "use client";
+import { BUILD_ID } from "@/lib/build-info";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -182,6 +183,7 @@ export function WorkspaceBar({
       <div className="ws-title">
         <span>WORKSPACE</span>
         <b>{visible}/{WORKSPACE_SECTIONS.length} PANELES</b>
+        <small className="ws-build" title="Versión de la app que estás usando">v {BUILD_ID}</small>
       </div>
       {WORKSPACE_GROUPS.map((group) => {
         const sections = WORKSPACE_SECTIONS.filter((section) => section.group === group);

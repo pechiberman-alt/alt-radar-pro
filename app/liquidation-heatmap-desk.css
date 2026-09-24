@@ -405,3 +405,11 @@
 .pt-card p,.pt-note{margin:0;font:9px var(--font-mono);line-height:1.65;color:#8e9c94}
 .pt-note{margin-top:4px;color:var(--muted)}
 .liq-live.warn{background:#2a2110;color:var(--amber)}
+
+/* Pattern status strip */
+.liq-pstrip{display:flex;gap:5px;flex-wrap:wrap;margin:-2px 0 8px}
+.liq-pstrip span{font:8px var(--font-mono);letter-spacing:.5px;padding:4px 8px;border-radius:3px;border:1px solid var(--line);background:#0a110d;color:var(--muted)}
+.liq-pstrip span.up{color:var(--green);border-color:#2d6a4d;background:#0b1b14}
+.liq-pstrip span.down{color:var(--red);border-color:#5a2b31;background:#170e10}
+.liq-pstrip span.rev{color:var(--amber);border-color:#6b5527;background:#141207}
+@media(max-width:700px){.liq-pstrip span{font-size:9px}}
