@@ -7,6 +7,8 @@ interface __BaseEnv_Env {
 	ENCRYPTION_KEY: string;
 	/** Telegram bot token from @BotFather. Set as a Cloudflare secret. Alerts are off while it is missing. */
 	TELEGRAM_BOT_TOKEN?: string;
+	/** Anthropic API key for the ANALISTA AI mode (Cloudflare secret). Off while missing. */
+	ANTHROPIC_API_KEY?: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

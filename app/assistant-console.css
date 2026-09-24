@@ -54,3 +54,16 @@
 .assistant-question{grid-template-columns:1fr;gap:3px}
 .assistant-question time{grid-row:1;justify-self:end}
 }
+
+/* ── Modo IA ── */
+.assistant-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0 8px}
+.assistant-modes button{display:grid;gap:2px;text-align:left;padding:9px 11px;background:#0a110d;border:1px solid var(--line);border-radius:4px;color:var(--muted);font:10px var(--font-mono);letter-spacing:.8px;cursor:pointer}
+.assistant-modes button.on{background:#0c251a;border-color:#2d6a4d;color:var(--green)}
+.assistant-modes em{font-style:normal;font-size:8px;letter-spacing:0;color:var(--muted)}
+.assistant-ai-note{margin:0 0 10px;padding:9px 11px;background:#141207;border:1px solid #5c4a1c;border-radius:4px;font:9px var(--font-mono);line-height:1.6;color:#b8ab8c}
+.assistant-answer.ai{border-left:3px solid #7c6cf0}
+.assistant-answer.ai .assistant-answer-head span{color:#a99cff}
+.assistant-answer.ai.error{border-left-color:var(--amber)}
+.assistant-answer.ai.error .assistant-answer-head span{color:var(--amber)}
+.ai-text{white-space:pre-line}
+.assistant-thinking{padding:10px 12px;font:9px var(--font-mono);letter-spacing:1px;color:#a99cff;animation:liq-pulse 1.4s ease-in-out infinite}

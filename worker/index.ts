@@ -45,6 +45,8 @@ async function archiveMarketStructure(db: D1Database) {
 interface Env {
   /** Telegram bot token (Cloudflare secret). Alerts are off while it is missing. */
   TELEGRAM_BOT_TOKEN?: string;
+  /** Anthropic API key for the ANALISTA AI mode (Cloudflare secret). Off while missing. */
+  ANTHROPIC_API_KEY?: string;
   ASSETS: Fetcher;
   DB: D1Database;
   IMAGES: {
