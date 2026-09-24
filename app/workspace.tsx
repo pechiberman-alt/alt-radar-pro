@@ -42,6 +42,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   // EMPEZÁ ACÁ — orientation. Open by default; everything else is not.
   { id: "resumen", label: "RESUMEN", primary: true, group: "EMPEZÁ ACÁ" },
   { id: "alertas", label: "ALERTAS", primary: true, group: "EMPEZÁ ACÁ" },
+  { id: "noticias", label: "NOTICIAS", primary: true, group: "EMPEZÁ ACÁ" },
   { id: "inteligencia", label: "SEÑALES", primary: true, group: "EMPEZÁ ACÁ" },
 
   // SEÑALES Y ENTRADAS — strategies and entry detection.
