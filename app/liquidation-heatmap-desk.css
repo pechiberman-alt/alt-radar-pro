@@ -45,8 +45,8 @@
 .liq-axis-label{font:10px var(--font-mono);fill:#a8b8b0}
 .liq-axis-x{text-anchor:middle}
 
-.liq-price-badge{position:absolute;right:2px;transform:translateY(-50%);background:var(--amber);color:#241a05;font:10px var(--font-mono);font-weight:700;padding:3px 7px;border-radius:3px;pointer-events:none}
-.liq-tooltip{position:absolute;left:14px;top:14px;display:grid;gap:2px;padding:9px 11px;background:#0a120eee;border:1px solid #2d4a3c;border-radius:4px;pointer-events:none;backdrop-filter:blur(4px)}
+.liq-price-badge{position:absolute;right:2px;z-index:3;transform:translateY(-50%);display:grid;justify-items:end;gap:1px;background:var(--amber);color:#241a05;font:10px var(--font-mono);font-weight:700;padding:3px 7px;border-radius:3px;pointer-events:none;box-shadow:0 2px 8px #0008}
+.liq-tooltip{position:absolute;z-index:4;left:14px;top:14px;display:grid;gap:2px;padding:9px 11px;background:#0a120eee;border:1px solid #2d4a3c;border-radius:4px;pointer-events:none;backdrop-filter:blur(4px)}
 .liq-tooltip b{font:12px var(--font-mono);color:var(--text)}
 .liq-tooltip span{font:9px var(--font-mono);color:#b9c5be}
 .liq-tooltip small{font:8px var(--font-mono);color:var(--muted)}
@@ -413,3 +413,14 @@
 .liq-pstrip span.down{color:var(--red);border-color:#5a2b31;background:#170e10}
 .liq-pstrip span.rev{color:var(--amber);border-color:#6b5527;background:#141207}
 @media(max-width:700px){.liq-pstrip span{font-size:9px}}
+
+/* Live price on the axis, coloured like the forming candle, flashing on change. */
+.liq-price-badge.up{background:#1fb56f;color:#03130b}
+.liq-price-badge.down{background:#e0414f;color:#1c0306}
+.lpb-price{display:block;animation:lpb-flash .7s ease-out}
+.lpb-count{font:9px var(--font-mono);font-weight:600;opacity:.8}
+@keyframes lpb-flash{0%{filter:brightness(1.9)}100%{filter:none}}
+@media (prefers-reduced-motion:reduce){.lpb-price{animation:none}}
+.liq-price-line.up{stroke:#1fb56f}
+.liq-price-line.down{stroke:#e0414f}
+@media(max-width:700px){.liq-price-badge{font-size:11px}}
