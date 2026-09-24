@@ -6,6 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "prebuild": "node scripts/write-build-info.mjs",
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",

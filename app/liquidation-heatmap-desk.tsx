@@ -845,7 +845,7 @@ export default function LiquidationHeatmapDesk() {
   }, [layout, livePrice, pools, orderBlocks, gaps, fibZone, wyckoff]);
 
   const labelSlots = useMemo(() => {
-    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), gap: new Set<number>(), rev: new Set<number>(), fib: [] as { y: number; text: string }[] };
+    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), gap: new Set<number>(), rev: new Set<number>(), fib: [] as { y: number; text: string }[], wy: false, flag: new Set<string>() };
     const MIN_GAP_PX = 15;
     const taken: number[] = [];
     const claim = (price: number) => {
@@ -867,6 +867,17 @@ export default function LiquidationHeatmapDesk() {
     if (layers.reversion) {
       for (const [i, z] of [...reversalZones.entries()].sort((a, b) => b[1].score - a[1].score)) {
         if (claim(z.high)) rev.add(i);
+      }
+    }
+    // Patterns next: the Wyckoff title sits under its box, flag titles at their
+    // channel edge. Both used to be drawn outside this system and collided
+    // with the reversal labels.
+    let wy = false;
+    const flag = new Set<string>();
+    if (layers.patrones) {
+      if (wyckoff) wy = claim(wyckoff.support * 0.998);
+      for (const f of flags) {
+        if (claim(f.kind === "BULL FLAG" ? f.upper[0] : f.lower[0])) flag.add(`${f.kind}-${f.poleEnd}`);
       }
     }
     const pool = new Set<string>();
@@ -896,8 +907,8 @@ export default function LiquidationHeatmapDesk() {
         }, []);
       for (const m of merged) if (claim(m.price)) fib.push({ y: layout.y(m.price), text: m.text });
     }
-    return { pool, ob, gap, rev, fib };
-  }, [layout, pools, orderBlocks, gaps, reversalZones, fibZone, layers]);
+    return { pool, ob, gap, rev, fib, wy, flag };
+  }, [layout, pools, orderBlocks, gaps, reversalZones, fibZone, layers, wyckoff, flags]);
 
   const keyLevels = useMemo(() => {
     if (!layout) return [];
@@ -1133,6 +1144,27 @@ export default function LiquidationHeatmapDesk() {
             ))}
           </div>
 
+          {/* Always says what the pattern detectors found in this window —
+              including "nothing" — so an empty chart is never ambiguous. */}
+          {layers.patrones && (
+            <div className="liq-pstrip">
+              <span className={wyckoff ? (wyckoff.kind === "ACUMULACIÓN" ? "up" : "down") : "none"}>
+                WYCKOFF · {wyckoff ? `${wyckoff.kind} ${wyckoff.phase.split(" · ")[0].toUpperCase()}` : "sin rango válido"}
+              </span>
+              {(["BULL FLAG", "BEAR FLAG"] as const).map((kind) => {
+                const f = flags.find((x) => x.kind === kind);
+                return (
+                  <span key={kind} className={f ? (kind === "BULL FLAG" ? "up" : "down") : "none"}>
+                    {kind} · {f ? f.status : "no hay"}
+                  </span>
+                );
+              })}
+              <span className={reversalZones.length ? "rev" : "none"}>
+                REVERSIÓN · {reversalZones.filter((z) => z.side === "SOPORTE").length}↑ {reversalZones.filter((z) => z.side === "RESISTENCIA").length}↓
+              </span>
+            </div>
+          )}
+
           <div
             className="liq-chart-wrap"
             ref={chartRef}
@@ -1251,9 +1283,11 @@ export default function LiquidationHeatmapDesk() {
                       height={Math.max(2, bottom - top)}
                       className={`liq-wy-box ${cls}`}
                     />
-                    <text x={layout.x(x0) - layout.bodyW + 3} y={top - 4} className={`liq-wy-label ${cls}`}>
-                      WYCKOFF · {wyckoff.kind} · {wyckoff.phase.split(" · ")[0]}
-                    </text>
+                    {labelSlots.wy && (
+                      <text x={layout.x(x0) - layout.bodyW + 3} y={bottom + 11} className={`liq-wy-label ${cls}`}>
+                        WYCKOFF · {wyckoff.kind} · {wyckoff.phase.split(" · ")[0]}
+                      </text>
+                    )}
                     {wyckoff.events.map((e) => {
                       const i = e.index - patternOffset;
                       if (i < 0) return null;
@@ -1285,7 +1319,7 @@ export default function LiquidationHeatmapDesk() {
                   const poleTo = bull ? layout.series[f.poleEnd].high : layout.series[f.poleEnd].low;
                   const endX = MARGIN.left + layout.candleAreaW;
                   return (
-                    <g key={f.kind}>
+                    <g key={`${f.kind}-${f.poleEnd}`}>
                       {ps >= 0 && (
                         <line x1={layout.x(ps)} y1={layout.y(poleFrom)} x2={layout.x(pe)} y2={layout.y(poleTo)} className={`liq-flag-pole ${cls}`} />
                       )}
@@ -1299,13 +1333,15 @@ export default function LiquidationHeatmapDesk() {
                           </text>
                         </>
                       )}
-                      <text
-                        x={layout.x(Math.max(0, fs))}
-                        y={layout.y(bull ? f.upper[0] : f.lower[0]) + (bull ? -6 : 13)}
-                        className={`liq-flag-label ${cls}`}
-                      >
-                        {f.kind} · {f.status}
-                      </text>
+                      {labelSlots.flag.has(`${f.kind}-${f.poleEnd}`) && (
+                        <text
+                          x={layout.x(Math.max(0, fs))}
+                          y={layout.y(bull ? f.upper[0] : f.lower[0]) + (bull ? -6 : 13)}
+                          className={`liq-flag-label ${cls}`}
+                        >
+                          {f.kind} · {f.status}
+                        </text>
+                      )}
                     </g>
                   );
                 })}
@@ -1686,7 +1722,7 @@ export default function LiquidationHeatmapDesk() {
               )}
 
               {flags.map((f) => (
-                <div key={f.kind} className={`pt-block pt-card ${f.kind === "BULL FLAG" ? "up" : "down"}`}>
+                <div key={`${f.kind}-${f.poleEnd}`} className={`pt-block pt-card ${f.kind === "BULL FLAG" ? "up" : "down"}`}>
                   <span className="pt-sub">{f.kind} · {f.status}</span>
                   <div className="pt-grid">
                     <div><span>RUPTURA</span><b>{priceLabel(f.breakout)}</b></div>
