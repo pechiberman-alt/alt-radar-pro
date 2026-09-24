@@ -59,7 +59,9 @@ test("bot commands parse with and without the bot's @name", () => {
   assert.deepEqual(parseCommand("/start abc123"), { cmd: "start", arg: "abc123" });
   assert.deepEqual(parseCommand("/stop@AltRadarBot"), { cmd: "stop", arg: "" });
   assert.equal(parseCommand("/ESTADO").cmd, "estado");
-  assert.equal(parseCommand("hola").cmd, "ayuda");
+  assert.deepEqual(parseCommand("¿cómo ves BTC?"), { cmd: "texto", arg: "¿cómo ves BTC?" }, "texto libre va al analista");
+  assert.equal(parseCommand("/nuevo").cmd, "nuevo");
+  assert.equal(parseCommand("/algo").cmd, "ayuda");
   assert.equal(parseCommand(undefined).cmd, "ayuda");
 });
 

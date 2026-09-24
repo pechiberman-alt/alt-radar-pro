@@ -140,15 +140,19 @@ export function selectForUser(
   return { send: eligible.slice(0, cap), rest, suppressed: rest.length };
 }
 
-export type BotCommand = { cmd: "start" | "stop" | "estado" | "ayuda"; arg: string };
+export type BotCommand = { cmd: "start" | "stop" | "estado" | "nuevo" | "ayuda" | "texto"; arg: string };
 
 export function parseCommand(text: string | undefined): BotCommand {
-  const m = (text ?? "").trim().match(/^\/(\w+)(?:@\w+)?(?:\s+(.*))?$/);
+  const raw = (text ?? "").trim();
+  // Anything that is not a command is a question for the analyst.
+  if (raw && !raw.startsWith("/")) return { cmd: "texto", arg: raw };
+  const m = raw.match(/^\/(\w+)(?:@\w+)?(?:\s+([\s\S]*))?$/);
   const name = m?.[1]?.toLowerCase() ?? "";
   const arg = (m?.[2] ?? "").trim();
   if (name === "start") return { cmd: "start", arg };
   if (name === "stop") return { cmd: "stop", arg };
   if (name === "estado") return { cmd: "estado", arg };
+  if (name === "nuevo" || name === "new" || name === "reset") return { cmd: "nuevo", arg };
   return { cmd: "ayuda", arg };
 }
 

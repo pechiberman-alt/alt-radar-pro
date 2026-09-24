@@ -102,6 +102,7 @@ export default function TelegramCard() {
       </div>
       <p className="tg-why">
         Te llegan aunque la app esté cerrada: el servidor revisa cada 5 minutos y te manda sólo lo que elijas.
+        Además podés escribirle al bot cualquier pregunta y te responde la IA con los datos del radar.
       </p>
 
       {state.kind === "signed-out" && (
