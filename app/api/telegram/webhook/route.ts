@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
+import { getSecret } from "@/lib/app-settings";
 import { parseCommand, sendMessage, webhookSecret } from "@/lib/telegram";
 import { ensureTelegramSchema } from "@/lib/telegram-server";
 
@@ -17,8 +18,9 @@ const HELP =
  * posting to this URL. Always answers 200 to Telegram so it does not retry.
  */
 export async function POST(request: NextRequest) {
-  const token = env.TELEGRAM_BOT_TOKEN;
-  if (!token || !env.DB) return NextResponse.json({ ok: true });
+  if (!env.DB) return NextResponse.json({ ok: true });
+  const token = (await getSecret(env.DB, env, "telegram_bot_token")).value;
+  if (!token) return NextResponse.json({ ok: true });
   if (request.headers.get("x-telegram-bot-api-secret-token") !== (await webhookSecret(token))) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }

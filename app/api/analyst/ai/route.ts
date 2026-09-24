@@ -11,6 +11,7 @@ import {
   trimHistory,
   type ChatTurn,
 } from "@/lib/ai-analyst";
+import { getSecret } from "@/lib/app-settings";
 import { KNOWLEDGE } from "@/lib/assistant/knowledge";
 import { getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
   if (!session || !env.DB) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   const user = await getSessionUser(env.DB, session);
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
-  const key = env.ANTHROPIC_API_KEY;
+  const key = (await getSecret(env.DB, env, "anthropic_api_key")).value;
   if (!key) return NextResponse.json({ error: "IA NO CONFIGURADA" }, { status: 503 });
 
   const body = (await request.json().catch(() => null)) as { question?: string; snapshot?: unknown; history?: ChatTurn[] } | null;

@@ -1,5 +1,6 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
+import { getSecret } from "../lib/app-settings";
 import { runTelegramDispatch } from "../lib/telegram-dispatch";
 import handler from "vinext/server/app-router-entry";
 import { runSignalAutomation } from "../lib/automation";
@@ -43,6 +44,8 @@ async function archiveMarketStructure(db: D1Database) {
 }
 
 interface Env {
+  /** Encryption key for secrets saved from the app (optional Cloudflare secret). */
+  ENCRYPTION_KEY?: string;
   /** Telegram bot token (Cloudflare secret). Alerts are off while it is missing. */
   TELEGRAM_BOT_TOKEN?: string;
   /** Anthropic API key for the ANALISTA AI mode (Cloudflare secret). Off while missing. */
@@ -113,11 +116,14 @@ const worker = {
         }),
       );
     }
-    if (controller.cron === "*/5 * * * *" && env.TELEGRAM_BOT_TOKEN) {
+    if (controller.cron === "*/5 * * * *") {
+      // Token from a Cloudflare secret or, if absent, the one saved in the app.
       ctx.waitUntil(
-        runTelegramDispatch(env.DB, env.TELEGRAM_BOT_TOKEN).catch((error) => {
-          console.error("[ALT_RADAR_TELEGRAM_SCHEDULED]", error);
-        }),
+        getSecret(env.DB, env, "telegram_bot_token")
+          .then(({ value }) => (value ? runTelegramDispatch(env.DB, value) : null))
+          .catch((error) => {
+            console.error("[ALT_RADAR_TELEGRAM_SCHEDULED]", error);
+          }),
       );
     }
     if (controller.cron === "*/5 * * * *") {

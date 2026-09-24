@@ -100,7 +100,7 @@ export default function TelegramCard() {
 
       {state.kind === "signed-out" && <p className="tg-note">Ingresá con tu cuenta (INGRESAR arriba) para vincular Telegram.</p>}
       {state.kind === "not-configured" && (
-        <p className="tg-note">El bot todavía no está configurado en el servidor (falta el token de @BotFather).</p>
+        <p className="tg-note">El bot todavía no está configurado: cargá el token de @BotFather en CONFIGURACIÓN.</p>
       )}
 
       {state.kind === "ready" && !state.linked && (

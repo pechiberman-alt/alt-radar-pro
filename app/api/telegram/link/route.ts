@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
+import { getSecret } from "@/lib/app-settings";
 import { getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 import { linkCode, parsePrefs } from "@/lib/telegram";
 import { botUsername, ensureTelegramSchema, ensureWebhook } from "@/lib/telegram-server";
@@ -11,7 +12,7 @@ async function context(request: NextRequest) {
   if (!tokenCookie || !env.DB) return { error: NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 }) };
   const user = await getSessionUser(env.DB, tokenCookie);
   if (!user) return { error: NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 }) };
-  const bot = env.TELEGRAM_BOT_TOKEN;
+  const bot = (await getSecret(env.DB, env, "telegram_bot_token")).value;
   if (!bot) return { error: NextResponse.json({ error: "BOT NO CONFIGURADO" }, { status: 503 }) };
   await ensureTelegramSchema(env.DB);
   return { user, bot, db: env.DB };

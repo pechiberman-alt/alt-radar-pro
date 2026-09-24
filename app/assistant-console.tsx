@@ -89,7 +89,7 @@ export default function AssistantConsole({
         d.error === "SESIÓN REQUERIDA"
           ? "Para usar la IA ingresá con tu cuenta (INGRESAR arriba). El modo REGLAS funciona sin cuenta."
           : d.error === "IA NO CONFIGURADA"
-            ? "La IA todavía no está configurada en el servidor (falta la clave de Anthropic). El modo REGLAS sigue disponible."
+            ? "La IA todavía no está configurada: cargá la clave de Anthropic en CONFIGURACIÓN. El modo REGLAS sigue disponible."
             : d.error === "LÍMITE DIARIO ALCANZADO"
               ? `Llegaste al límite de ${AI_DAILY_LIMIT} preguntas con IA por hoy. Se renueva mañana; el modo REGLAS no tiene límite.`
               : d.error ?? "";
