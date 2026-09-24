@@ -1,5 +1,6 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
+import { runTelegramDispatch } from "../lib/telegram-dispatch";
 import handler from "vinext/server/app-router-entry";
 import { runSignalAutomation } from "../lib/automation";
 import { archiveCoreLiquidity } from "../lib/liquidity-archive";
@@ -42,6 +43,8 @@ async function archiveMarketStructure(db: D1Database) {
 }
 
 interface Env {
+  /** Telegram bot token (Cloudflare secret). Alerts are off while it is missing. */
+  TELEGRAM_BOT_TOKEN?: string;
   ASSETS: Fetcher;
   DB: D1Database;
   IMAGES: {
@@ -105,6 +108,13 @@ const worker = {
       ctx.waitUntil(
         archiveMarketStructure(env.DB).catch((error) => {
           console.error("[ALT_RADAR_STRUCTURE_SCHEDULED]", error);
+        }),
+      );
+    }
+    if (controller.cron === "*/5 * * * *" && env.TELEGRAM_BOT_TOKEN) {
+      ctx.waitUntil(
+        runTelegramDispatch(env.DB, env.TELEGRAM_BOT_TOKEN).catch((error) => {
+          console.error("[ALT_RADAR_TELEGRAM_SCHEDULED]", error);
         }),
       );
     }

@@ -5,6 +5,8 @@ interface __BaseEnv_Env {
 	DB: D1Database;
 	/** AES-GCM key (base64, 32 bytes) for encrypting client Binance credentials at rest. Set via `wrangler secret put ENCRYPTION_KEY`. */
 	ENCRYPTION_KEY: string;
+	/** Telegram bot token from @BotFather. Set as a Cloudflare secret. Alerts are off while it is missing. */
+	TELEGRAM_BOT_TOKEN?: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
