@@ -38,6 +38,7 @@ import TradeJournalDesk from "./trade-journal-desk";
 import DcaDesk from "./dca-desk";
 import SpotDesk from "./spot-desk";
 import SentimentDesk from "./sentiment-desk";
+import SettingsDesk from "./settings-desk";
 import SwingDesk from "./swing-desk";
 import { Collapsible, WelcomeHint, WorkspaceBar, useWorkspace } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -81,6 +82,7 @@ const NAV_ITEMS = [
   { label: "NOTICIAS", mobile: "NOTICIAS", icon: "✦", id: "noticias" },
   { label: "REGISTRO", mobile: "REGISTRO", icon: "▤", id: "registro" },
   { label: "DCA", mobile: "DCA", icon: "⟳", id: "dca" },
+  { label: "CONFIGURACIÓN", mobile: "AJUSTES", icon: "⚙", id: "configuracion" },
   { label: "ESTRATEGIA SPOT", mobile: "SPOT", icon: "◎", id: "spot" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
@@ -1192,6 +1194,10 @@ export default function RadarApp() {
 
         <Collapsible id="registro" label="REGISTRO" open={workspace.open["registro"]} onToggle={workspace.toggle}>
           <TradeJournalDesk />
+        </Collapsible>
+
+        <Collapsible id="configuracion" label="CONFIGURACIÓN" open={workspace.open["configuracion"]} onToggle={workspace.toggle}>
+          <SettingsDesk />
         </Collapsible>
 
         <Collapsible id="dca" label="DCA" open={workspace.open["dca"]} onToggle={workspace.toggle}>

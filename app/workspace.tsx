@@ -76,6 +76,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   { id: "instalar", label: "INSTALAR", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "registro", label: "REGISTRO", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "dca", label: "DCA", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
+  { id: "configuracion", label: "CONFIGURACIÓN", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
 ];
 
 const STORAGE_KEY = "alt-radar-pro:workspace:v1";
