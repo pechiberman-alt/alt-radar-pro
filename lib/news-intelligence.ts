@@ -6,7 +6,7 @@ type FeedDefinition = {
   defaultSource: string;
 };
 
-type RawNewsItem = {
+export type RawNewsItem = {
   title: string;
   url: string;
   source: string;
@@ -152,7 +152,7 @@ function readTag(block: string, tagName: string) {
   return match ? decodeXml(match[1]) : "";
 }
 
-function parseRss(xml: string, defaultSource: string): RawNewsItem[] {
+export function parseRss(xml: string, defaultSource: string): RawNewsItem[] {
   return [...xml.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)]
     .map((match) => {
       const block = match[1];
