@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { onSession } from "@/lib/account-events";
+import SignInPrompt from "./sign-in-prompt";
 import type { TradeEntry, TradeStats } from "@/lib/trade-journal";
 
 const money = (value: number) => {
@@ -71,6 +73,8 @@ export default function TradeJournalDesk() {
     (async () => {
       await load();
     })();
+    // Signing in elsewhere on the page refreshes this panel.
+    return onSession(() => void load());
   }, [load]);
 
   const submit = async (e: React.FormEvent) => {
@@ -136,12 +140,7 @@ export default function TradeJournalDesk() {
       {authState === "loading" && <p className="journal-loading">CARGANDO…</p>}
 
       {authState === "out" && (
-        <div className="journal-empty">
-          <b>SIN SESIÓN INICIADA</b>
-          <span>
-            El registro es personal, así que necesita cuenta — entrá con INGRESAR arriba y volvé acá.
-          </span>
-        </div>
+        <SignInPrompt why="Tu registro de operaciones y tu win rate son personales y quedan en tu cuenta." />
       )}
 
       {authState === "in" && (

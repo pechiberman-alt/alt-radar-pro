@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import SignInPrompt from "./sign-in-prompt";
 import { AI_DAILY_LIMIT, compactSnapshot, type ChatTurn } from "@/lib/ai-analyst";
 import { ask, type AssistantAnswer, type AssistantContext } from "@/lib/assistant/index";
 
 type Entry =
   | { id: number; kind: "rules"; question: string; answer: AssistantAnswer; at: string }
-  | { id: number; kind: "ai"; question: string; text: string; error: boolean; at: string };
+  | { id: number; kind: "ai"; question: string; text: string; error: boolean; needsAccount?: boolean; at: string };
 
 type Mode = "reglas" | "ia";
 
@@ -87,7 +88,7 @@ export default function AssistantConsole({
       if (typeof d.remaining === "number") setAiRemaining(d.remaining);
       const message =
         d.error === "SESIÓN REQUERIDA"
-          ? "Para usar la IA ingresá con tu cuenta (INGRESAR arriba). El modo REGLAS funciona sin cuenta."
+          ? "La IA necesita una cuenta porque cada respuesta tiene un costo y se limita por usuario. El modo REGLAS funciona sin cuenta."
           : d.error === "IA NO CONFIGURADA"
             ? "La IA todavía no está configurada: cargá la clave de Anthropic en CONFIGURACIÓN. El modo REGLAS sigue disponible."
             : d.error === "LÍMITE DIARIO ALCANZADO"
@@ -95,7 +96,7 @@ export default function AssistantConsole({
               : d.error ?? "";
       entry = r.ok && d.text
         ? { id: nextId.current++, kind: "ai", question: text, text: d.text, error: false, at: new Date().toLocaleTimeString() }
-        : { id: nextId.current++, kind: "ai", question: text, text: message || "La IA no respondió.", error: true, at: new Date().toLocaleTimeString() };
+        : { id: nextId.current++, kind: "ai", question: text, text: message || "La IA no respondió.", error: true, needsAccount: d.error === "SESIÓN REQUERIDA", at: new Date().toLocaleTimeString() };
     } catch {
       entry = { id: nextId.current++, kind: "ai", question: text, text: "Sin conexión con la IA.", error: true, at: new Date().toLocaleTimeString() };
     }
@@ -180,6 +181,7 @@ export default function AssistantConsole({
                   <span>{entry.error ? "AVISO" : "IA · CLAUDE"}</span>
                 </div>
                 <p className="ai-text">{entry.text}</p>
+                {entry.needsAccount && <SignInPrompt why="Creá tu cuenta gratis y volvé a preguntar." />}
               </div>
             </div>
           ) : (

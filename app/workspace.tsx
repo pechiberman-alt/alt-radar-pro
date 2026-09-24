@@ -1,4 +1,5 @@
 "use client";
+import { onShowSection, openAccount } from "@/lib/account-events";
 import { BUILD_ID } from "@/lib/build-info";
 
 import { useCallback, useEffect, useState } from "react";
@@ -123,6 +124,9 @@ export function useWorkspace() {
   }, []);
 
   const reset = useCallback(() => setOpen(defaultState()), []);
+
+  // "Go to" buttons elsewhere in the app open the section before scrolling.
+  useEffect(() => onShowSection((id) => setOpen((current) => ({ ...current, [id]: true }))), []);
 
   return { open, toggle, setAll, reset };
 }
@@ -263,7 +267,8 @@ export function WelcomeHint() {
     <div className="ws-welcome">
       <span>
         Para empezar: <b>RESUMEN</b> te da el pulso del mercado y <b>ALERTAS</b> lo que necesita tu
-        atención ahora. El resto está agrupado por tipo, a un toque, en el panel de abajo.
+        atención ahora. Con una cuenta gratis activás alertas por Telegram, registro, DCA e IA.
+        <button className="ws-welcome-cta" onClick={() => openAccount("register")}>CREAR CUENTA GRATIS</button>
       </span>
       <button onClick={dismiss} aria-label="Cerrar">
         ×
