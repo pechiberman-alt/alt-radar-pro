@@ -17,6 +17,7 @@ import {
   type LiveKline,
   type LiveLiquidation,
 } from "@/lib/live-market";
+import { futuresStreamUrl } from "@/lib/binance-ws";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
 import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
 import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
@@ -26,6 +27,7 @@ import { findOrderBlocks, orderBlockStats, type OrderBlock, type ZoneStats } fro
 import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
 import {
   FALLBACK_SYMBOLS,
+  FUTURES_BASES,
   higherTimeframes,
   loadOiDelta,
   loadOpenInterest,
@@ -222,25 +224,32 @@ export default function LiquidationHeatmapDesk() {
     });
   const [liveKline, setLiveKline] = useState<LiveKline | null>(null);
   const [liveLiqs, setLiveLiqs] = useState<LiveLiquidation[]>([]);
-  const [liveStatus, setLiveStatus] = useState<"conectando" | "en vivo" | "sin conexión">("conectando");
+  const [liveStatus, setLiveStatus] = useState<"conectando" | "en vivo" | "sondeo" | "sin conexión">("conectando");
 
   /**
-   * One socket per pair and frame: the forming candle and the market-wide
-   * liquidation stream, filtered to this pair. Same connect/retry pattern as
-   * the order-flow panel. Candle updates arrive several times a second; they
-   * are applied at most once a second, because every update re-runs the
-   * structure detectors and a faster redraw adds nothing a reader can see.
+   * One socket per pair and frame on Binance's /market route: the forming
+   * candle and the market-wide liquidation stream, filtered to this pair.
+   *
+   * "EN VIVO" is claimed only once a candle has actually arrived — an open
+   * socket that delivers nothing is not live, and saying so was how a frozen
+   * price sat under a green badge. A watchdog reconnects a silent socket, and
+   * if the socket keeps failing the candle is polled over REST every 3 s, with
+   * the badge saying which of the two is feeding the chart.
+   *
+   * Candle updates are applied at most once a second: each one re-runs the
+   * structure detectors, and a faster redraw adds nothing a reader can see.
    */
   useEffect(() => {
     let closed = false;
     let socket: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    let poller: ReturnType<typeof setInterval> | undefined;
     let failures = 0;
+    let socketLive = false;
     let pending: LiveKline | null = null;
     const key = symbol.toLowerCase();
 
-    // Reset for the new pair/frame, deferred out of the effect's commit —
-    // a previous pair's prints must never appear on this chart.
     queueMicrotask(() => {
       if (closed) return;
       setLiveKline(null);
@@ -255,15 +264,56 @@ export default function LiquidationHeatmapDesk() {
       }
     }, 1000);
 
+    const poll = async () => {
+      if (closed || socketLive) return;
+      for (const base of FUTURES_BASES) {
+        try {
+          const r = await fetch(`${base}/fapi/v1/klines?symbol=${symbol}&interval=${timeframe}&limit=1`, {
+            cache: "no-store",
+          });
+          if (!r.ok) continue;
+          const row = ((await r.json()) as unknown[][])[0];
+          if (!row || closed || socketLive) return;
+          pending = {
+            time: Number(row[0]),
+            open: Number(row[1]),
+            high: Number(row[2]),
+            low: Number(row[3]),
+            close: Number(row[4]),
+            volume: Number(row[5]),
+            closed: false,
+          };
+          setLiveStatus("sondeo");
+          return;
+        } catch {
+          // Next mirror.
+        }
+      }
+    };
+    const startPolling = () => {
+      if (poller || closed) return;
+      void poll();
+      poller = setInterval(() => void poll(), 3000);
+    };
+    const stopPolling = () => {
+      clearInterval(poller);
+      poller = undefined;
+    };
+    // If nothing live has arrived after a few seconds, poll while the socket
+    // keeps trying — the chart should move either way.
+    const fallbackTimer = setTimeout(() => {
+      if (!socketLive) startPolling();
+    }, 6000);
+
     const connect = () => {
       if (closed) return;
-      const ws = new WebSocket(
-        `wss://fstream.binance.com/stream?streams=${key}@kline_${timeframe}/!forceOrder@arr`,
-      );
+      const ws = new WebSocket(futuresStreamUrl([`${key}@kline_${timeframe}`, "!forceOrder@arr"]));
       socket = ws;
       ws.onopen = () => {
-        failures = 0;
-        setLiveStatus("en vivo");
+        clearTimeout(watchdog);
+        watchdog = setTimeout(() => {
+          if (!socketLive) ws.close();
+        }, 10_000);
       };
       ws.onmessage = (event) => {
         let msg: { stream?: string; data?: unknown };
@@ -274,20 +324,29 @@ export default function LiquidationHeatmapDesk() {
         }
         if (msg.stream?.includes("@kline_")) {
           const k = parseKline(msg.data);
-          if (k) pending = k;
+          if (!k) return;
+          pending = k;
+          if (!socketLive) {
+            socketLive = true;
+            failures = 0;
+            clearTimeout(watchdog);
+            stopPolling();
+            setLiveStatus("en vivo");
+          }
         } else if (msg.stream?.includes("forceOrder")) {
           const liq = parseForceOrder(msg.data);
-          if (liq && liq.symbol === symbol) {
-            setLiveLiqs((current) => [liq, ...current].slice(0, 300));
-          }
+          if (liq && liq.symbol === symbol) setLiveLiqs((current) => [liq, ...current].slice(0, 300));
         }
       };
       ws.onerror = () => ws.close();
       ws.onclose = () => {
         if (closed || ws !== socket) return;
+        clearTimeout(watchdog);
+        socketLive = false;
         failures += 1;
-        setLiveStatus(failures >= 4 ? "sin conexión" : "conectando");
-        retry = setTimeout(connect, Math.min(8_000, 900 + failures * 700));
+        if (failures >= 2) startPolling();
+        setLiveStatus((current) => (current === "sondeo" ? "sondeo" : failures >= 4 ? "sin conexión" : "conectando"));
+        retry = setTimeout(connect, Math.min(15_000, 1000 + failures * 1500));
       };
     };
     connect();
@@ -295,7 +354,10 @@ export default function LiquidationHeatmapDesk() {
     return () => {
       closed = true;
       clearTimeout(retry);
+      clearTimeout(watchdog);
+      clearTimeout(fallbackTimer);
       clearInterval(flush);
+      stopPolling();
       socket?.close();
     };
   }, [symbol, timeframe]);
@@ -1141,8 +1203,8 @@ export default function LiquidationHeatmapDesk() {
               ⟳
             </button>
             <span>
-              <i className={`liq-live ${liveStatus === "en vivo" ? "on" : liveStatus === "sin conexión" ? "off" : ""}`}>
-                {liveStatus.toUpperCase()}
+              <i className={`liq-live ${liveStatus === "en vivo" || liveStatus === "sondeo" ? "on" : liveStatus === "sin conexión" ? "off" : ""}`}>
+                {liveStatus === "sondeo" ? "EN VIVO · 3S" : liveStatus.toUpperCase()}
               </i>{" "}
               {visibleCandles} velas
               {updatedAt !== null && (
@@ -1764,8 +1826,8 @@ export default function LiquidationHeatmapDesk() {
           <div className="liq-live-feed">
             <div className="lf-head">
               <h4>LIQUIDEZ TOMADA · EN VIVO</h4>
-              <i className={`liq-live ${liveStatus === "en vivo" ? "on" : liveStatus === "sin conexión" ? "off" : ""}`}>
-                {liveStatus.toUpperCase()}
+              <i className={`liq-live ${liveStatus === "en vivo" || liveStatus === "sondeo" ? "on" : liveStatus === "sin conexión" ? "off" : ""}`}>
+                {liveStatus === "sondeo" ? "EN VIVO · 3S" : liveStatus.toUpperCase()}
               </i>
             </div>
 
