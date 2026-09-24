@@ -74,6 +74,37 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["fib", "FIB"],
 ];
 
+const FRAME_MS: Record<string, number> = {
+  "1m": 60_000,
+  "5m": 300_000,
+  "15m": 900_000,
+  "30m": 1_800_000,
+  "1h": 3_600_000,
+  "4h": 14_400_000,
+  "12h": 43_200_000,
+  "1d": 86_400_000,
+  "3d": 259_200_000,
+  "1w": 604_800_000,
+};
+
+/** Time left in the forming candle, like a trading terminal shows under the
+ *  price. Its own timer, so the map is not re-rendered every second for it. */
+function CandleCountdown({ closeAt }: { closeAt: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const left = Math.max(0, Math.floor((closeAt - now) / 1000));
+  const d = Math.floor(left / 86400);
+  const h = Math.floor((left % 86400) / 3600);
+  const m = Math.floor((left % 3600) / 60);
+  const sec = left % 60;
+  const pad = (v: number) => String(v).padStart(2, "0");
+  const text = d > 0 ? `${d}d ${pad(h)}:${pad(m)}` : h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+  return <small className="lpb-count">{text}</small>;
+}
+
 type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; timeframe: string };
 
 /**
@@ -1590,7 +1621,9 @@ export default function LiquidationHeatmapDesk() {
                 x2={box.width - MARGIN.right}
                 y1={layout.y(livePrice ?? data.heatmap.currentPrice)}
                 y2={layout.y(livePrice ?? data.heatmap.currentPrice)}
-                className="liq-price-line"
+                className={`liq-price-line ${
+                  (layout.candles.at(-1)?.close ?? 0) >= (layout.candles.at(-1)?.open ?? 0) ? "up" : "down"
+                }`}
               />
 
               {/* The same two levels the cards name, drawn where they sit. */}
@@ -1656,11 +1689,21 @@ export default function LiquidationHeatmapDesk() {
               ))}
             </svg>
 
+            {/* It existed before but sat under the chart and the axis strip
+                (no z-index), so the live price was never visible on the axis. */}
             <div
-              className="liq-price-badge"
+              className={`liq-price-badge ${
+                (layout.candles.at(-1)?.close ?? 0) >= (layout.candles.at(-1)?.open ?? 0) ? "up" : "down"
+              }`}
               style={{ top: `${(layout.y(livePrice ?? data.heatmap.currentPrice) / box.height) * 100}%` }}
             >
-              ${priceLabel(livePrice ?? data.heatmap.currentPrice)}
+              {/* Keyed by price so the flash replays on every change. */}
+              <span key={String(livePrice)} className="lpb-price">
+                {priceLabel(livePrice ?? data.heatmap.currentPrice)}
+              </span>
+              {layout.candles.at(-1) && FRAME_MS[timeframe] && (
+                <CandleCountdown closeAt={layout.candles.at(-1)!.time + FRAME_MS[timeframe]} />
+              )}
             </div>
 
             {hovered && (
