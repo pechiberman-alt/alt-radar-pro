@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import TelegramCard from "./telegram-card";
 import { publishAlert } from "@/lib/alert-bus";
 import { buildMtfZones } from "@/lib/mtf-zones";
 import { isDueToday, type DcaSchedule } from "@/lib/dca-tracker";
@@ -300,6 +301,8 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
           <span>Los avisos siguen apareciendo abajo, en la lista.</span>
         </div>
       )}
+
+      <TelegramCard />
 
       {pushState !== "unavailable" && (
         <button

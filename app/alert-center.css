@@ -59,3 +59,26 @@
 .alerts-push.on{background:#0c251a;border-color:#2d6a4d;color:var(--green)}
 .alerts-push:disabled{opacity:.6;cursor:default}
 .alerts-push em{font-style:normal;font-size:9px;letter-spacing:0;color:#8ba99a;line-height:1.55}
+
+/* ── Telegram ── */
+.tg-card{margin-bottom:12px;padding:12px 13px;background:#0a1419;border:1px solid #1f4a5e;border-left:3px solid #2aa3dd;border-radius:5px}
+.tg-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tg-head b{font:10px var(--font-mono);letter-spacing:1.1px;color:#58bfee}
+.tg-head span{font:8px var(--font-mono);letter-spacing:.8px;padding:2px 6px;border-radius:3px;background:#16242b;color:var(--muted)}
+.tg-head span.on{background:#0c2d20;color:var(--green)}
+.tg-why{margin:6px 0 10px;font:9px var(--font-mono);line-height:1.6;color:#8e9c94}
+.tg-link{width:100%;padding:12px;background:#12384a;border:1px solid #2aa3dd;border-radius:4px;color:#8fd6f7;font:10px var(--font-mono);letter-spacing:1px;cursor:pointer}
+.tg-link:disabled{opacity:.6}
+.tg-cats{display:grid;gap:5px}
+.tg-cats label{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;background:#0b1316;border:1px solid var(--line);border-radius:4px;cursor:pointer}
+.tg-cats label.on{border-color:#1f4a5e}
+.tg-cats input{margin-top:2px;accent-color:#2aa3dd}
+.tg-cats div{display:grid;gap:1px}
+.tg-cats b{font:9px var(--font-mono);letter-spacing:.8px;color:var(--text)}
+.tg-cats em{font-style:normal;font:8px var(--font-mono);color:var(--muted)}
+.tg-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:9px 0;font:9px var(--font-mono);color:var(--muted)}
+.tg-row select{background:#0b1316;border:1px solid var(--line);border-radius:3px;color:var(--text);font:10px var(--font-mono);padding:6px 8px}
+.tg-actions{display:flex;gap:6px}
+.tg-actions button{flex:1;padding:9px;background:#12384a;border:1px solid #2aa3dd;border-radius:4px;color:#8fd6f7;font:9px var(--font-mono);letter-spacing:.8px;cursor:pointer}
+.tg-actions button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+.tg-note{margin:8px 0 0;font:9px var(--font-mono);line-height:1.6;color:var(--amber)}
