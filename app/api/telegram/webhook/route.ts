@@ -1,16 +1,19 @@
-import { env } from "cloudflare:workers";
+import { env, waitUntil } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { getSecret } from "@/lib/app-settings";
 import { parseCommand, sendMessage, webhookSecret } from "@/lib/telegram";
+import { answerInTelegram, clearChat } from "@/lib/telegram-ai-server";
 import { ensureTelegramSchema } from "@/lib/telegram-server";
 
 export const dynamic = "force-dynamic";
 
 const HELP =
-  "<b>ALT RADAR PRO · bot de alertas</b>\n" +
+  "<b>ALT RADAR PRO</b>\n" +
+  "Escribime cualquier pregunta sobre el mercado y te respondo con los datos del radar (ej: <i>¿cómo ves BTC?</i>, <i>¿qué señales hay abiertas?</i>).\n\n" +
   "/estado — resumen del momento\n" +
+  "/nuevo — empezar una conversación nueva\n" +
   "/stop — dejar de recibir alertas\n\n" +
-  "Qué recibir se elige en la app: ALERTAS → Telegram.";
+  "Qué alertas recibir se elige en la app: ALERTAS → Telegram.";
 
 /**
  * Messages sent to the bot. Telegram echoes the secret set at setWebhook in a
@@ -25,12 +28,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const update = (await request.json().catch(() => null)) as { message?: { chat?: { id?: number }; text?: string } } | null;
+  const update = (await request.json().catch(() => null)) as { update_id?: number; message?: { chat?: { id?: number }; text?: string } } | null;
   const chatId = update?.message?.chat?.id;
   if (!chatId) return NextResponse.json({ ok: true });
   const chat = String(chatId);
   const { cmd, arg } = parseCommand(update?.message?.text);
   await ensureTelegramSchema(env.DB);
+
+  // Telegram retries a webhook it thinks failed; each update is handled once.
+  if (typeof update?.update_id === "number") {
+    const fresh = await env.DB.prepare("INSERT OR IGNORE INTO telegram_sent (key, sent_at) VALUES (?1, ?2)")
+      .bind(`upd:${update.update_id}`, Date.now())
+      .run();
+    if (!fresh.meta.changes) return NextResponse.json({ ok: true });
+  }
+
+  if (cmd === "texto") {
+    const link = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE chat_id = ?1").bind(chat).first<{ user_id: number }>();
+    if (!link) {
+      await sendMessage(token, chat, "Para hacerme preguntas, vinculá este chat con tu cuenta: en la app, ALERTAS → VINCULAR TELEGRAM.");
+      return NextResponse.json({ ok: true });
+    }
+    // Answer Telegram now; the model can take several seconds.
+    waitUntil(answerInTelegram(env.DB, env, token, chat, link.user_id, arg));
+    return NextResponse.json({ ok: true });
+  }
+  if (cmd === "nuevo") {
+    await clearChat(env.DB, chat);
+    await sendMessage(token, chat, "Listo, empezamos una conversación nueva.");
+    return NextResponse.json({ ok: true });
+  }
 
   if (cmd === "start" && arg) {
     const code = await env.DB.prepare("SELECT user_id, expires_at FROM telegram_link_codes WHERE code = ?1")
