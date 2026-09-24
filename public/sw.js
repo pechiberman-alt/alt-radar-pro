@@ -1,7 +1,8 @@
-const CACHE="alt-radar-shell-v5",SHELL=["/","/manifest.webmanifest","/icon-192.png","/icon-512.png","/og.png"];
+const CACHE="alt-radar-shell-v6",SHELL=["/","/manifest.webmanifest","/icon-192.png","/icon-512.png","/og.png"];
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
-self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET"||new URL(r.url).pathname.startsWith("/api/"))return;e.respondWith(fetch(r).then(response=>{const copy=response.clone();caches.open(CACHE).then(c=>c.put(r,copy));return response}).catch(()=>caches.match(r).then(hit=>hit||caches.match("/"))))});
+/* Same-origin only. It used to cache every GET, Binance included, and serve the cached copy when the network failed: a live candle poll that failed got the last saved candle back as a success, which is a frozen price. Market data must never come from a cache. */
+self.addEventListener("fetch",e=>{const r=e.request;const u=new URL(r.url);if(r.method!=="GET"||u.origin!==self.location.origin||u.pathname.startsWith("/api/"))return;e.respondWith(fetch(r).then(response=>{const copy=response.clone();caches.open(CACHE).then(c=>c.put(r,copy));return response}).catch(()=>caches.match(r).then(hit=>hit||caches.match("/"))))});
 
 /* Push: wakes the worker with the site closed. The payload is intentionally
    empty, so the content is fetched here rather than encrypted in transit —

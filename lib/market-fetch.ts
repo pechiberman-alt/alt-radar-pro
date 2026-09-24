@@ -10,7 +10,7 @@
 
 export const FALLBACK_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"];
 
-const BROWSER_BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
+export const BROWSER_BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
 
 /** Futures hosts, for open interest. Same mirror list market-brain already uses. */
 export const FUTURES_BASES = [
