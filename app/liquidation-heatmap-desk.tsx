@@ -1246,6 +1246,15 @@ export default function LiquidationHeatmapDesk() {
               role="img"
               aria-label="Mapa de liquidaciones estimado"
             >
+              {/* Everything priced is clipped to the price area. The scale is
+                  capped around the current price, so old candles, flags or
+                  pivots beyond it used to spill down over the volume, RSI and
+                  MACD panes. */}
+              <defs>
+                <clipPath id="liq-price-clip">
+                  <rect x={0} y={MARGIN.top - 2} width={box.width} height={layout.plotH + 4} />
+                </clipPath>
+              </defs>
               {priceTicks.map((tick) => (
                 <line
                   key={tick.price}
@@ -1257,6 +1266,7 @@ export default function LiquidationHeatmapDesk() {
                 />
               ))}
 
+              <g clipPath="url(#liq-price-clip)">
               {/* Each zone is drawn twice: a horizontal span running from
                   where it formed to the right edge — the level existed from
                   that moment on — and a profile bar in the right strip
@@ -1605,6 +1615,8 @@ export default function LiquidationHeatmapDesk() {
                 });
               })()}
 
+              </g>
+
               {/* Volume strip. Bars scale to the largest candle in view; the
                   line is the 20-candle average, so a bar well above it is a
                   candle traded with unusual size — the part worth noticing. */}
@@ -1658,10 +1670,20 @@ export default function LiquidationHeatmapDesk() {
                   divergences whose indicator pane is on are drawn, so a line on
                   the price always has its counterpart visible below. */}
               {(() => {
-                const shown = osc.divs
-                  .filter((d) => d.from - patternOffset >= 0)
-                  .filter((d) => (d.indicator === "RSI" ? layout.rsiH > 0 : layout.macdH > 0))
-                  .slice(0, 6);
+                // Up to four per indicator, both pivots inside the window.
+                const inView = osc.divs.filter((d) => d.from - patternOffset >= 0);
+                const shown = [
+                  ...(layout.rsiH > 0 ? inView.filter((d) => d.indicator === "RSI").slice(0, 4) : []),
+                  ...(layout.macdH > 0 ? inView.filter((d) => d.indicator === "MACD").slice(0, 4) : []),
+                ];
+                const tag = (d: (typeof shown)[number]) =>
+                  `${d.kind === "OCULTA" ? "OCULTA" : "DIV"} ${d.side === "ALCISTA" ? "↑" : "↓"}`;
+                const dots = (d: (typeof shown)[number], y1: number, y2: number) => (
+                  <>
+                    <circle cx={layout.x(d.from - patternOffset)} cy={y1} r={2.6} className={`div-dot ${d.side === "ALCISTA" ? "up" : "down"}`} />
+                    <circle cx={layout.x(d.to - patternOffset)} cy={y2} r={2.6} className={`div-dot ${d.side === "ALCISTA" ? "up" : "down"}`} />
+                  </>
+                );
                 const cls = (d: (typeof shown)[number]) =>
                   `div-line ${d.side === "ALCISTA" ? "up" : "down"}${d.kind === "OCULTA" ? " hidden" : ""}`;
                 const x0 = MARGIN.left;
@@ -1682,14 +1704,23 @@ export default function LiquidationHeatmapDesk() {
                       ))}
                       <polyline points={pts} className="osc-rsi" />
                       {shown.filter((d) => d.indicator === "RSI").map((d) => (
-                        <line
-                          key={`rp-${d.from}-${d.to}`}
-                          x1={layout.x(d.from - patternOffset)}
-                          y1={yv(d.oscFrom)}
-                          x2={layout.x(d.to - patternOffset)}
-                          y2={yv(d.oscTo)}
-                          className={cls(d)}
-                        />
+                        <g key={`rp-${d.from}-${d.to}`}>
+                          <line
+                            x1={layout.x(d.from - patternOffset)}
+                            y1={yv(d.oscFrom)}
+                            x2={layout.x(d.to - patternOffset)}
+                            y2={yv(d.oscTo)}
+                            className={cls(d)}
+                          />
+                          {dots(d, yv(d.oscFrom), yv(d.oscTo))}
+                          <text
+                            x={layout.x(d.to - patternOffset)}
+                            y={yv(d.oscTo) + (d.side === "ALCISTA" ? 11 : -5)}
+                            className={`div-label ${d.side === "ALCISTA" ? "up" : "down"} mid`}
+                          >
+                            {tag(d)}
+                          </text>
+                        </g>
                       ))}
                       <text x={x0 + 4} y={top + 10} className="osc-label">
                         RSI 14 · {lastV != null ? lastV.toFixed(1) : "—"}
@@ -1734,14 +1765,23 @@ export default function LiquidationHeatmapDesk() {
                       <polyline points={line(vm)} className="osc-macd" />
                       <polyline points={line(vs)} className="osc-signal" />
                       {shown.filter((d) => d.indicator === "MACD").map((d) => (
-                        <line
-                          key={`mp-${d.from}-${d.to}`}
-                          x1={layout.x(d.from - patternOffset)}
-                          y1={yv(d.oscFrom)}
-                          x2={layout.x(d.to - patternOffset)}
-                          y2={yv(d.oscTo)}
-                          className={cls(d)}
-                        />
+                        <g key={`mp-${d.from}-${d.to}`}>
+                          <line
+                            x1={layout.x(d.from - patternOffset)}
+                            y1={yv(d.oscFrom)}
+                            x2={layout.x(d.to - patternOffset)}
+                            y2={yv(d.oscTo)}
+                            className={cls(d)}
+                          />
+                          {dots(d, yv(d.oscFrom), yv(d.oscTo))}
+                          <text
+                            x={layout.x(d.to - patternOffset)}
+                            y={yv(d.oscTo) + (d.side === "ALCISTA" ? 11 : -5)}
+                            className={`div-label ${d.side === "ALCISTA" ? "up" : "down"} mid`}
+                          >
+                            {tag(d)}
+                          </text>
+                        </g>
                       ))}
                       <text x={x0 + 4} y={top + 10} className="osc-label">
                         MACD 12·26·9{lastH != null ? ` · hist ${lastH >= 0 ? "+" : ""}${lastH.toPrecision(3)}` : ""}
@@ -1752,25 +1792,22 @@ export default function LiquidationHeatmapDesk() {
 
                 return (
                   <g>
-                    {shown.map((d) => (
-                      <g key={`pp-${d.indicator}-${d.from}-${d.to}`}>
-                        <line
-                          x1={layout.x(d.from - patternOffset)}
-                          y1={layout.y(d.priceFrom)}
-                          x2={layout.x(d.to - patternOffset)}
-                          y2={layout.y(d.priceTo)}
-                          className={cls(d)}
-                        />
-                        <text
-                          x={layout.x(d.to - patternOffset) + 4}
-                          y={layout.y(d.priceTo) + (d.side === "ALCISTA" ? 12 : -5)}
-                          className={`div-label ${d.side === "ALCISTA" ? "up" : "down"}`}
-                        >
-                          {d.indicator}
-                          {d.kind === "OCULTA" ? " OCULTA" : " DIV"}
-                        </text>
-                      </g>
-                    ))}
+                    {/* On the price: the two pivots joined, no text — the label
+                        sits on the oscillator, where there is room for it. */}
+                    <g clipPath="url(#liq-price-clip)">
+                      {shown.map((d) => (
+                        <g key={`pp-${d.indicator}-${d.from}-${d.to}`}>
+                          <line
+                            x1={layout.x(d.from - patternOffset)}
+                            y1={layout.y(d.priceFrom)}
+                            x2={layout.x(d.to - patternOffset)}
+                            y2={layout.y(d.priceTo)}
+                            className={cls(d)}
+                          />
+                          {dots(d, layout.y(d.priceFrom), layout.y(d.priceTo))}
+                        </g>
+                      ))}
+                    </g>
                     {rsiPane}
                     {macdPane}
                   </g>
@@ -1957,6 +1994,38 @@ export default function LiquidationHeatmapDesk() {
                 Patrones detectados con reglas mecánicas, no a ojo. Una zona con más estrellas tiene más detectores
                 independientes de acuerdo en ese precio: sube las chances de reacción, no garantiza el giro.
               </p>
+            </div>
+          )}
+
+          {(layers.rsi || layers.macd) && (
+            <div className="div-list">
+              <h4>DIVERGENCIAS EN ESTE GRÁFICO · {timeframe.toUpperCase()}</h4>
+              {osc.divs.filter((d) => d.from - patternOffset >= 0).length ? (
+                osc.divs
+                  .filter((d) => d.from - patternOffset >= 0)
+                  .slice(0, 8)
+                  .map((d) => (
+                    <div key={`dl-${d.indicator}-${d.from}-${d.to}`} className={`${d.side === "ALCISTA" ? "up" : "down"}${d.kind === "OCULTA" ? " hidden" : ""}`}>
+                      <b>
+                        {d.indicator} · {d.kind === "OCULTA" ? "OCULTA" : "REGULAR"} {d.side}
+                      </b>
+                      <span>
+                        precio {priceLabel(d.priceFrom)} → {priceLabel(d.priceTo)} · {d.indicator}{" "}
+                        {d.oscFrom.toPrecision(3)} → {d.oscTo.toPrecision(3)}
+                      </span>
+                      <em>hace {d.age} velas</em>
+                    </div>
+                  ))
+              ) : (
+                <p className="div-none">
+                  No hay divergencias en la ventana visible. Alejá el zoom (−) para ver más velas o probá otra temporalidad.
+                </p>
+              )}
+              <small>
+                {osc.stats.rate === null
+                  ? "Sin divergencias resueltas en la serie cargada."
+                  : `En esta serie funcionaron ${Math.round(osc.stats.rate * 100)}% de ${osc.stats.tested} (el azar da ~50%).`}
+              </small>
             </div>
           )}
 
