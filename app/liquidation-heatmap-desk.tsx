@@ -18,6 +18,8 @@ import {
 } from "@/lib/live-market";
 import { browserFeedDeps, startLiveFeed, type FeedStatus } from "@/lib/live-feed";
 import { divergenceStats, findDivergences, macd, rsi } from "@/lib/oscillators";
+import { bucketSize, buildFootprints, candleDelta, cumulativeDelta, imbalance, parseAggTrade, type Trade } from "@/lib/footprint";
+import { findSweeps, sweepStats } from "@/lib/liquidity-sweeps";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
 import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
 import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
@@ -45,8 +47,12 @@ type DisplayCandle = {
   low: number;
   close: number;
   volume: number;
+  /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
+  takerBuy?: number;
 };
-type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd";
+type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "tomas";
+/** Footprint needs individual trades: legible and fetchable only on short frames. */
+const FOOTPRINT_FRAMES = new Set(["1m", "5m", "15m"]);
 const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
 /**
  * Fewer layers on by default. Order blocks, gaps and Fibonacci are the noisiest
@@ -64,6 +70,8 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   volumen: true,
   rsi: true,
   macd: true,
+  footprint: false,
+  tomas: true,
   reales: true,
 };
 const LAYER_LABELS: [LayerKey, string][] = [
@@ -73,6 +81,8 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["liquidez", "LIQUIDEZ"],
   ["reales", "LIQ. REALES"],
   ["volumen", "VOLUMEN"],
+  ["tomas", "TOMAS DE LIQ."],
+  ["footprint", "FOOTPRINT"],
   ["rsi", "RSI"],
   ["macd", "MACD"],
   ["ob", "OB"],
@@ -248,7 +258,8 @@ export default function LiquidationHeatmapDesk() {
     }, 0);
     return () => window.clearTimeout(t);
   }, []);
-  const toggleLayer = (key: LayerKey) =>
+  const toggleLayer = (key: LayerKey) => {
+    if (key === "footprint") setVisibleCandles((v) => (layers.footprint ? Math.max(v, 25) : Math.min(v, 12)));
     setLayers((current) => {
       const next = { ...current, [key]: !current[key] };
       try {
@@ -258,8 +269,16 @@ export default function LiquidationHeatmapDesk() {
       }
       return next;
     });
+  };
   const [liveKline, setLiveKline] = useState<LiveKline | null>(null);
   const [liveLiqs, setLiveLiqs] = useState<LiveLiquidation[]>([]);
+  // Footprint: trades kept in a ref as they arrive, published to state once a
+  // second (a busy pair prints dozens per second).
+  const footprintMode = layers.footprint && FOOTPRINT_FRAMES.has(timeframe);
+  const tradesRef = useRef<Map<number, Trade>>(new Map());
+  const tradesDirty = useRef(false);
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [cross, setCross] = useState<{ i: number; y: number } | null>(null);
   const [feed, setFeed] = useState<FeedStatus>({ state: "conectando", source: null, lastUpdate: null });
 
   // Live feed: WebSocket first, REST (futures, then spot) as fallback. The
@@ -281,6 +300,11 @@ export default function LiquidationHeatmapDesk() {
         onKline: (k) => alive && setLiveKline(k),
         onLiquidation: (l) => alive && setLiveLiqs((current) => [l, ...current].slice(0, 300)),
         onStatus: (next) => alive && setFeed(next),
+        trades: footprintMode,
+        onTrade: (t) => {
+          tradesRef.current.set(t.id, t);
+          tradesDirty.current = true;
+        },
       },
       browserFeedDeps(),
     );
@@ -288,7 +312,68 @@ export default function LiquidationHeatmapDesk() {
       alive = false;
       stop();
     };
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, footprintMode]);
+
+  // Footprint backfill: the last ~6,000 trades (6 pages of 1,000, newest
+  // first), then live trades from the socket. Candles older than the first
+  // trade seen are not given a footprint at all.
+  useEffect(() => {
+    if (!footprintMode) return;
+    const controller = new AbortController();
+    let alive = true;
+    tradesRef.current = new Map();
+    const publish = () => {
+      const all = [...tradesRef.current.values()];
+      // Bounded memory on busy pairs: keep the newest 40,000.
+      if (all.length > 40_000) {
+        all.sort((a, b) => a.id - b.id);
+        for (const t of all.slice(0, all.length - 40_000)) tradesRef.current.delete(t.id);
+      }
+      setTrades([...tradesRef.current.values()]);
+    };
+    (async () => {
+      let fromId: number | null = null;
+      for (let page = 0; page < 6; page += 1) {
+        let rows: unknown[] | null = null;
+        for (const base of FUTURES_BASES) {
+          try {
+            const r = await fetch(
+              `${base}/fapi/v1/aggTrades?symbol=${symbol}&limit=1000${fromId !== null ? `&fromId=${fromId}` : ""}`,
+              { signal: controller.signal, cache: "no-store" },
+            );
+            if (r.ok) {
+              rows = (await r.json()) as unknown[];
+              break;
+            }
+          } catch {
+            // Next mirror.
+          }
+        }
+        if (!alive || !rows?.length) break;
+        let minId = Infinity;
+        for (const raw of rows) {
+          const t = parseAggTrade(raw);
+          if (!t) continue;
+          tradesRef.current.set(t.id, t);
+          minId = Math.min(minId, t.id);
+        }
+        if (!Number.isFinite(minId) || minId < 1000) break;
+        fromId = minId - 1000;
+      }
+      if (alive) publish();
+    })();
+    const flush = window.setInterval(() => {
+      if (tradesDirty.current) {
+        tradesDirty.current = false;
+        publish();
+      }
+    }, 1000);
+    return () => {
+      alive = false;
+      controller.abort();
+      window.clearInterval(flush);
+    };
+  }, [footprintMode, symbol, timeframe]);
 
   // Liquidity from the larger frames, loaded on its own so the map does not
   // wait for it. Only unswept pools matter; findLiquidityPools already drops
@@ -384,7 +469,8 @@ export default function LiquidationHeatmapDesk() {
     setTimeframe(next);
   };
 
-  const MIN_VISIBLE = 25;
+  // A footprint is only readable a handful of candles wide on a phone.
+  const MIN_VISIBLE = layers.footprint && FOOTPRINT_FRAMES.has(timeframe) ? 6 : 25;
   const MAX_VISIBLE = 220;
   const clampVisible = (n: number) => Math.max(MIN_VISIBLE, Math.min(MAX_VISIBLE, Math.round(n)));
   const MIN_PRICE_SCALE = 0.12;
@@ -534,9 +620,15 @@ export default function LiquidationHeatmapDesk() {
         }
 
         setUpdatedAt(Date.now());
+        const takerBuyByTime = new Map<number, number>();
+        for (const row of rows as unknown[][]) {
+          const v = Number(row[9]);
+          if (Number.isFinite(v)) takerBuyByTime.set(Number(row[0]), v);
+        }
         setData({
           heatmap,
           candles: candles.slice(-MAX_DISPLAY_CANDLES).map((candle) => ({
+            takerBuy: takerBuyByTime.get(candle.openTime),
             time: candle.openTime,
             open: candle.open,
             high: candle.high,
@@ -624,8 +716,12 @@ export default function LiquidationHeatmapDesk() {
     const MAX_SPAN = 0.09; // ±9% of price is as far as the window will stretch.
     const capHi = heatmap.currentPrice * (1 + MAX_SPAN);
     const capLo = heatmap.currentPrice * (1 - MAX_SPAN);
-    const wantHi = Math.max(tradedHi, ...zonePrices.filter((p) => p <= capHi));
-    const wantLo = Math.min(tradedLo, ...zonePrices.filter((p) => p >= capLo));
+    // Footprint mode frames the candles only: its cells are rows of price
+    // inside each candle, and a window stretched to a far magnet zone
+    // squashed a 1-minute candle to two pixels.
+    const fitCandles = layers.footprint && FOOTPRINT_FRAMES.has(timeframe);
+    const wantHi = fitCandles ? tradedHi : Math.max(tradedHi, ...zonePrices.filter((p) => p <= capHi));
+    const wantLo = fitCandles ? tradedLo : Math.min(tradedLo, ...zonePrices.filter((p) => p >= capLo));
 
     const headroom = (wantHi - wantLo) * 0.06;
     const autoLo = Math.max(0, wantLo - headroom);
@@ -736,7 +832,7 @@ export default function LiquidationHeatmapDesk() {
       .sort((a, b) => a.price - b.price);
 
     return { candles, series, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT, volTop, volH, rsiTop, rsiH, macdTop, macdH };
-  }, [data, box, visibleCandles, priceView, liveKline, timeframe, symbol, layers.volumen, layers.rsi, layers.macd]);
+  }, [data, box, visibleCandles, priceView, liveKline, timeframe, symbol, layers.volumen, layers.rsi, layers.macd, layers.footprint]);
 
   // Keep the gesture's view of the price window in step with what is drawn.
   // In an effect, not during render: writing a ref while rendering is a side
@@ -882,6 +978,22 @@ export default function LiquidationHeatmapDesk() {
     ];
     return { r, m, divs, stats: divergenceStats(patternSeries, divs) };
   }, [patternSeries]);
+
+  const footprints = useMemo(() => {
+    if (!footprintMode || !layout || !trades.length) return null;
+    let first = Infinity;
+    for (const t of trades) if (t.time < first) first = t.time;
+    const size = bucketSize(layout.candles.map((c) => c.high - c.low));
+    const map = buildFootprints(trades, layout.candles.map((c) => c.time), FRAME_MS[timeframe], size, first);
+    let maxCell = 0;
+    for (const fp of map.values()) for (const c of fp.cells.values()) maxCell = Math.max(maxCell, c.buy + c.sell);
+    return { map, maxCell };
+  }, [footprintMode, layout, trades, timeframe]);
+
+  // Liquidity sweeps on 5-candle pivots: about 13 per 300 candles on random
+  // data, with a 50–51% "worked" rate there — the baseline shown in the panel.
+  const sweeps = useMemo(() => findSweeps(patternSeries, 5), [patternSeries]);
+  const sweepSt = useMemo(() => sweepStats(patternSeries, sweeps), [patternSeries, sweeps]);
   const wyckoff = useMemo<WyckoffReading | null>(() => readWyckoff(patternSeries), [patternSeries]);
 
   const reversalZones = useMemo<ReversalZone[]>(() => {
@@ -1226,6 +1338,11 @@ export default function LiquidationHeatmapDesk() {
                   </span>
                 );
               })}
+              {layers.tomas && (
+                <span className={sweeps.some((sw) => sw.index - patternOffset >= 0) ? "rev" : "none"}>
+                  TOMAS · {sweeps.filter((sw) => sw.index - patternOffset >= 0).length} en vista
+                </span>
+              )}
               <span className={reversalZones.length ? "rev" : "none"}>
                 REVERSIÓN · {reversalZones.filter((z) => z.side === "SOPORTE").length}↑ {reversalZones.filter((z) => z.side === "RESISTENCIA").length}↓
               </span>
@@ -1235,6 +1352,53 @@ export default function LiquidationHeatmapDesk() {
           <div
             className="liq-chart-wrap"
             ref={chartRef}
+            // A phone tap also emits a synthetic mouse move before the click;
+            // following only real mice keeps the tap from being undone.
+            onPointerMove={(e) => {
+              if (!layout || e.pointerType !== "mouse") return;
+              const r = e.currentTarget.getBoundingClientRect();
+              const px = ((e.clientX - r.left) / r.width) * box.width;
+              const py = ((e.clientY - r.top) / r.height) * box.height;
+              const i = Math.round((px - layout.x(0)) / Math.max(1e-9, layout.x(1) - layout.x(0)));
+              if (i < 0 || i >= layout.candles.length) return setCross(null);
+              setCross({ i, y: py });
+            }}
+            onPointerLeave={(e) => {
+              if (e.pointerType === "mouse") setCross(null);
+            }}
+            // The crosshair walks the candles like a slider: arrows move it,
+            // Escape clears it, and the current candle is announced.
+            role="slider"
+            tabIndex={0}
+            aria-label="Vela seleccionada en el gráfico"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(0, (layout?.candles.length ?? 1) - 1)}
+            aria-valuenow={cross?.i ?? Math.max(0, (layout?.candles.length ?? 1) - 1)}
+            aria-valuetext={
+              cross && layout?.candles[cross.i]
+                ? `Cierre ${priceLabel(layout.candles[cross.i].close)}`
+                : "Tocá una vela para leerla"
+            }
+            onKeyDown={(e) => {
+              if (!layout) return;
+              if (e.key === "Escape") return setCross(null);
+              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+              e.preventDefault();
+              const n = layout.candles.length;
+              setCross((c) => {
+                const i = Math.min(n - 1, Math.max(0, (c?.i ?? n - 1) + (e.key === "ArrowLeft" ? -1 : 1)));
+                return { i, y: layout.y(layout.candles[i].close) };
+              });
+            }}
+            onClick={(e) => {
+              if (!layout) return;
+              const r = e.currentTarget.getBoundingClientRect();
+              const px = ((e.clientX - r.left) / r.width) * box.width;
+              const py = ((e.clientY - r.top) / r.height) * box.height;
+              const i = Math.round((px - layout.x(0)) / Math.max(1e-9, layout.x(1) - layout.x(0)));
+              if (i < 0 || i >= layout.candles.length) return setCross(null);
+              setCross({ i, y: py });
+            }}
             onTouchStart={onTouchStart}
             onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
@@ -1370,12 +1534,17 @@ export default function LiquidationHeatmapDesk() {
                       if (i < 0) return null;
                       const below = e.type === "SC" || e.type === "SPRING" || (e.type === "AR" && wyckoff.kind === "DISTRIBUCIÓN") || e.type === "SOW";
                       const ey = layout.y(e.price) + (below ? 12 : -6);
+                      const nearMagnet = [data.heatmap.topZoneAbove?.price, data.heatmap.topZoneBelow?.price].some(
+                        (p) => typeof p === "number" && Math.abs(layout.y(p) - 6 - ey) < 14,
+                      );
                       return (
                         <g key={`${e.type}-${e.index}`}>
                           <circle cx={layout.x(i)} cy={layout.y(e.price)} r={2.4} className={`liq-wy-dot ${cls}`} />
-                          <text x={layout.x(i)} y={ey} className="liq-wy-event">
-                            {e.type}
-                          </text>
+                          {!nearMagnet && (
+                            <text x={layout.x(i)} y={ey} className="liq-wy-event">
+                              {e.type}
+                            </text>
+                          )}
                         </g>
                       );
                     })}
@@ -1559,6 +1728,65 @@ export default function LiquidationHeatmapDesk() {
                 const up = candle.close >= candle.open;
                 const openY = layout.y(candle.open);
                 const closeY = layout.y(candle.close);
+                const fp = footprints?.map.get(candle.time);
+                if (fp && footprints) {
+                  // Footprint column: one cell per price row, green where
+                  // aggressive buying dominated, red where selling did, shade
+                  // by size; POC outlined; numbers only when the column is
+                  // wide enough to read them.
+                  const colW = Math.max(3, (layout.x(1) - layout.x(0)) * 0.88);
+                  const showText = colW >= 40;
+                  const q = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v >= 100 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2));
+                  const delta = fp.buy - fp.sell;
+                  return (
+                    <g key={candle.time} className={fp.complete ? "" : "fp-partial"}>
+                      <line
+                        x1={xPos - colW / 2 - 2}
+                        x2={xPos - colW / 2 - 2}
+                        y1={layout.y(candle.high)}
+                        y2={layout.y(candle.low)}
+                        className={up ? "liq-wick-up" : "liq-wick-down"}
+                      />
+                      <line
+                        x1={xPos - colW / 2 - 2}
+                        x2={xPos - colW / 2 - 2}
+                        y1={openY}
+                        y2={closeY}
+                        className={`fp-body ${up ? "up" : "down"}`}
+                      />
+                      {[...fp.cells.entries()].map(([price, c]) => {
+                        const yTop = layout.y(price + fp.bucket);
+                        const h = Math.max(1, layout.y(price) - yTop - 0.6);
+                        const total = c.buy + c.sell;
+                        // Square root so mid-sized rows stay visible next to the POC.
+                        const alpha = 0.14 + 0.66 * Math.sqrt(total / Math.max(footprints.maxCell, 1e-12));
+                        const imb = showText ? imbalance(fp, price) : null;
+                        return (
+                          <g key={price}>
+                            <rect
+                              x={xPos - colW / 2}
+                              y={yTop}
+                              width={colW}
+                              height={h}
+                              fill={c.buy >= c.sell ? `rgba(57,242,154,${alpha})` : `rgba(255,89,100,${alpha})`}
+                              className={fp.poc === price ? "fp-poc" : undefined}
+                            />
+                            {showText && h >= 8 && (
+                              <text x={xPos} y={yTop + h / 2 + 3} className={`fp-num${imb ? (imb === "COMPRA" ? " imb-b" : " imb-s") : ""}`}>
+                                {q(c.sell)}×{q(c.buy)}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
+                      {colW >= 17 && (
+                        <text x={xPos} y={layout.y(candle.low) + 11} className={`fp-delta ${delta >= 0 ? "up" : "down"}`}>
+                          {delta >= 0 ? `+${q(delta)}` : `-${q(-delta)}`}
+                        </text>
+                      )}
+                    </g>
+                  );
+                }
                 return (
                   <g key={candle.time}>
                     <line
@@ -1578,6 +1806,35 @@ export default function LiquidationHeatmapDesk() {
                   </g>
                 );
               })}
+
+              {/* Liquidity sweeps: the swept level from its pivot to the sweep
+                  candle, and a marker on the wick that took it. */}
+              {layers.tomas &&
+                sweeps
+                  .filter((sw) => sw.index - patternOffset >= 0)
+                  .slice(0, 6)
+                  .map((sw, k) => {
+                    const xi = layout.x(sw.index - patternOffset);
+                    const xp = layout.x(Math.max(0, sw.pivotIndex - patternOffset));
+                    const yl = layout.y(sw.level);
+                    const ye = layout.y(sw.extreme);
+                    const bull = sw.side === "VENTA"; // stops under a low taken → bullish read
+                    const tip = bull ? ye + 3 : ye - 3;
+                    const d = bull
+                      ? `M ${xi} ${tip} l -4 7 l 8 0 z`
+                      : `M ${xi} ${tip} l -4 -7 l 8 0 z`;
+                    return (
+                      <g key={`sw-${sw.side}-${sw.index}`}>
+                        <line x1={xp} x2={xi} y1={yl} y2={yl} className={`sw-level ${bull ? "up" : "down"}`} />
+                        <path d={d} className={`sw-mark ${bull ? "up" : "down"}`} />
+                        {k < 3 && (
+                          <text x={xi} y={bull ? tip + 18 : tip - 11} className={`sw-label ${bull ? "up" : "down"}`}>
+                            TOMA {bull ? "↑" : "↓"}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
 
               {/* Real liquidations, as they print. Bubble area follows size;
                   red = longs forced out, green = shorts. Only the three
@@ -1640,25 +1897,53 @@ export default function LiquidationHeatmapDesk() {
                       y2={layout.volTop - 4}
                       className="liq-vol-sep"
                     />
+                    {/* Each bar is split by aggressor when Binance provides it:
+                        aggressive buying from the bottom, selling on top. */}
                     {layout.candles.map((c, i) => {
                       const top = vy(vols[i]);
+                      const base = layout.volTop + layout.volH;
+                      const d = candleDelta(c.volume, c.takerBuy);
+                      if (!d) {
+                        return (
+                          <rect
+                            key={`v${c.time}`}
+                            x={layout.x(i) - layout.bodyW / 2}
+                            y={top}
+                            width={layout.bodyW}
+                            height={Math.max(0.6, base - top)}
+                            className={c.close >= c.open ? "liq-vol-up" : "liq-vol-down"}
+                          />
+                        );
+                      }
+                      const buyH = (base - top) * (c.volume > 0 ? d.buy / c.volume : 0);
                       return (
-                        <rect
-                          key={`v${c.time}`}
-                          x={layout.x(i) - layout.bodyW / 2}
-                          y={top}
-                          width={layout.bodyW}
-                          height={Math.max(0.6, layout.volTop + layout.volH - top)}
-                          className={c.close >= c.open ? "liq-vol-up" : "liq-vol-down"}
-                        />
+                        <g key={`v${c.time}`}>
+                          <rect x={layout.x(i) - layout.bodyW / 2} y={base - buyH} width={layout.bodyW} height={Math.max(0.3, buyH)} className="liq-vol-buy" />
+                          <rect x={layout.x(i) - layout.bodyW / 2} y={top} width={layout.bodyW} height={Math.max(0.3, base - buyH - top)} className="liq-vol-sell" />
+                        </g>
                       );
                     })}
                     <polyline
                       points={avg.map((v, i) => `${layout.x(i)},${vy(v)}`).join(" ")}
                       className="liq-vol-avg"
                     />
+                    {/* CVD: running sum of delta over the visible window, scaled
+                        to the pane. Rising = aggressive buyers in control. */}
+                    {(() => {
+                      const cvd = cumulativeDelta(layout.candles.map((c) => candleDelta(c.volume, c.takerBuy)?.delta ?? null));
+                      const vals = cvd.filter((v): v is number => v !== null);
+                      if (vals.length < 2) return null;
+                      const lo = Math.min(...vals);
+                      const hi = Math.max(...vals);
+                      const span = hi - lo || 1;
+                      const pts = cvd
+                        .map((v, i) => (v === null ? "" : `${layout.x(i)},${layout.volTop + 4 + (1 - (v - lo) / span) * (layout.volH - 8)}`))
+                        .filter(Boolean)
+                        .join(" ");
+                      return <polyline points={pts} className="liq-cvd" />;
+                    })()}
                     <text x={MARGIN.left + 4} y={layout.volTop + 9} className="liq-vol-label">
-                      VOL · máx {shortUsd(maxV)}
+                      VOL · máx {shortUsd(maxV)} · <tspan className="lv-buy">compras</tspan>/<tspan className="lv-sell">ventas</tspan> · <tspan className="lv-cvd">CVD</tspan>
                     </text>
                   </g>
                 );
@@ -1899,7 +2184,44 @@ export default function LiquidationHeatmapDesk() {
                         } ${String(new Date(tick.time).getHours()).padStart(2, "0")}h`}
                 </text>
               ))}
+
+              {/* Crosshair: tap a candle (or move the mouse) to read it. */}
+              {cross && layout.candles[cross.i] && (
+                <g className="xh">
+                  <line x1={layout.x(cross.i)} x2={layout.x(cross.i)} y1={MARGIN.top} y2={box.height - MARGIN.bottom} />
+                  {cross.y <= MARGIN.top + layout.plotH && (
+                    <>
+                      <line x1={MARGIN.left} x2={box.width - MARGIN.right} y1={cross.y} y2={cross.y} />
+                      <rect x={box.width - MARGIN.right - 78} y={cross.y - 9} width={76} height={18} rx={3} className="xh-tag" />
+                      <text x={box.width - MARGIN.right - 40} y={cross.y + 4} className="xh-price">
+                        {priceLabel(layout.lo + (1 - (cross.y - MARGIN.top) / layout.plotH) * (layout.hi - layout.lo))}
+                      </text>
+                    </>
+                  )}
+                </g>
+              )}
             </svg>
+            {cross && layout.candles[cross.i] && (() => {
+              const c = layout.candles[cross.i];
+              const d = candleDelta(c.volume, c.takerBuy);
+              const chg = ((c.close - c.open) / c.open) * 100;
+              return (
+                <div className="xh-readout">
+                  <span>{new Date(c.time).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+                  <b>O</b> {priceLabel(c.open)} <b>H</b> {priceLabel(c.high)} <b>L</b> {priceLabel(c.low)} <b>C</b>{" "}
+                  <em className={chg >= 0 ? "up" : "down"}>{priceLabel(c.close)} ({chg >= 0 ? "+" : ""}{chg.toFixed(2)}%)</em>
+                  <br />
+                  <b>VOL</b> {shortUsd(c.volume * c.close)}
+                  {d && (
+                    <>
+                      {" "}<b>Δ</b> <em className={d.delta >= 0 ? "up" : "down"}>{d.delta >= 0 ? "+" : ""}{shortUsd(d.delta * c.close).replace("$-", "-$")}</em>
+                      {" "}<b>COMPRA</b> {Math.round((d.buy / Math.max(c.volume, 1e-12)) * 100)}%
+                    </>
+                  )}
+                  <button onClick={(e) => { e.stopPropagation(); setCross(null); }} aria-label="Cerrar lectura">✕</button>
+                </div>
+              );
+            })()}
 
             {/* It existed before but sat under the chart and the axis strip
                 (no z-index), so the live price was never visible on the axis. */}
@@ -2008,6 +2330,45 @@ export default function LiquidationHeatmapDesk() {
                 Patrones detectados con reglas mecánicas, no a ojo. Una zona con más estrellas tiene más detectores
                 independientes de acuerdo en ese precio: sube las chances de reacción, no garantiza el giro.
               </p>
+            </div>
+          )}
+
+          {layers.footprint && (
+            <p className="fp-hint">
+              {!FOOTPRINT_FRAMES.has(timeframe)
+                ? "FOOTPRINT: disponible en 1M, 5M y 15M — necesita cada operación, y en marcos mayores no hay forma real de reconstruirlo."
+                : !trades.length
+                  ? "FOOTPRINT: cargando operaciones…"
+                  : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
+            </p>
+          )}
+
+          {layers.tomas && (
+            <div className="div-list sw-list">
+              <h4>TOMAS DE LIQUIDEZ · {timeframe.toUpperCase()}</h4>
+              {sweeps.filter((sw) => sw.index - patternOffset >= 0).length ? (
+                sweeps
+                  .filter((sw) => sw.index - patternOffset >= 0)
+                  .slice(0, 6)
+                  .map((sw) => (
+                    <div key={`swl-${sw.side}-${sw.index}`} className={sw.side === "VENTA" ? "up" : "down"}>
+                      <b>{sw.side === "VENTA" ? "TOMA BAJO MÍNIMO ↑" : "TOMA SOBRE MÁXIMO ↓"}</b>
+                      <span>
+                        nivel {priceLabel(sw.level)} · mecha hasta {priceLabel(sw.extreme)} ({sw.depthPct.toFixed(2)}%) y cierre de vuelta adentro
+                      </span>
+                      <em>hace {patternSeries.length - 1 - sw.index} velas</em>
+                    </div>
+                  ))
+              ) : (
+                <p className="div-none">No hay tomas en la ventana visible. Alejá el zoom para ver más velas.</p>
+              )}
+              <small>
+                Toma = mecha más allá de un máximo o mínimo previo (donde descansan stops) con cierre de vuelta
+                adentro; si cierra afuera es ruptura, no toma.{" "}
+                {sweepSt.rate === null
+                  ? "Sin tomas resueltas en la serie."
+                  : `En esta serie revirtieron 1 ATR antes de seguir ${Math.round(sweepSt.rate * 100)}% de ${sweepSt.tested} veces; en gráficos aleatorios da ~50%.`}
+              </small>
             </div>
           )}
 

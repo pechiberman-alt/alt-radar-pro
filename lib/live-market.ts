@@ -30,6 +30,8 @@ export type LiveKline = {
   low: number;
   close: number;
   volume: number;
+  /** Aggressive buying in the candle (kline field V), when provided. */
+  takerBuy?: number;
   closed: boolean;
 };
 
@@ -69,6 +71,7 @@ export function parseKline(payload: unknown): LiveKline | null {
     low: num(k.l),
     close: num(k.c),
     volume: num(k.v),
+    takerBuy: Number.isFinite(num(k.V)) ? num(k.V) : undefined,
     closed: k.x === true,
   };
   return [candle.time, candle.open, candle.high, candle.low, candle.close].every((v) => v > 0)
@@ -76,7 +79,7 @@ export function parseKline(payload: unknown): LiveKline | null {
     : null;
 }
 
-type CandleLike = { time: number; open: number; high: number; low: number; close: number; volume: number };
+type CandleLike = { time: number; open: number; high: number; low: number; close: number; volume: number; takerBuy?: number };
 
 /**
  * Folds the live candle into a loaded series: same open time replaces the
@@ -86,7 +89,16 @@ type CandleLike = { time: number; open: number; high: number; low: number; close
 export function mergeLiveCandle<T extends CandleLike>(candles: T[], live: LiveKline | null): T[] {
   if (!live || !candles.length) return candles;
   const last = candles[candles.length - 1];
-  const next = { ...last, time: live.time, open: live.open, high: live.high, low: live.low, close: live.close, volume: live.volume };
+  const next = {
+    ...last,
+    time: live.time,
+    open: live.open,
+    high: live.high,
+    low: live.low,
+    close: live.close,
+    volume: live.volume,
+    ...(live.takerBuy !== undefined ? { takerBuy: live.takerBuy } : {}),
+  };
   if (live.time === last.time) return [...candles.slice(0, -1), next];
   if (live.time > last.time) return [...candles.slice(1), next];
   return candles;
