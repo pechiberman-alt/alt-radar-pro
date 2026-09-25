@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import MtfOscillators from "./mtf-oscillators";
 import {
   buildLiquidationHeatmap,
   findKeyLevels,
@@ -16,6 +17,7 @@ import {
   type LiveLiquidation,
 } from "@/lib/live-market";
 import { browserFeedDeps, startLiveFeed, type FeedStatus } from "@/lib/live-feed";
+import { divergenceStats, findDivergences, macd, rsi } from "@/lib/oscillators";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
 import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
 import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
@@ -44,7 +46,7 @@ type DisplayCandle = {
   close: number;
   volume: number;
 };
-type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "fvg" | "fib" | "volumen" | "reales";
+type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd";
 const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
 /**
  * Fewer layers on by default. Order blocks, gaps and Fibonacci are the noisiest
@@ -60,6 +62,8 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   fvg: false,
   fib: false,
   volumen: true,
+  rsi: true,
+  macd: true,
   reales: true,
 };
 const LAYER_LABELS: [LayerKey, string][] = [
@@ -69,6 +73,8 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["liquidez", "LIQUIDEZ"],
   ["reales", "LIQ. REALES"],
   ["volumen", "VOLUMEN"],
+  ["rsi", "RSI"],
+  ["macd", "MACD"],
   ["ob", "OB"],
   ["fvg", "FVG"],
   ["fib", "FIB"],
@@ -575,11 +581,28 @@ export default function LiquidationHeatmapDesk() {
     // Volume gets its own strip under the candles instead of being drawn
     // behind them, where it would compete with the liquidity bands. Everything
     // price-based (y, rows, pinch) uses plotH, which now ends above the strip.
-    const volH = layers.volumen ? Math.max(26, Math.round(fullH * 0.14)) : 0;
-    const VOL_GAP = layers.volumen ? 8 : 0;
-    const plotH = fullH - volH - VOL_GAP;
+    // Sub-panes under the price, in order: volume, RSI, MACD. Each is a share
+    // of the height, shrunk together if the price area would drop under half.
+    const PANE_GAP = 8;
+    let volH = layers.volumen ? Math.max(26, Math.round(fullH * 0.12)) : 0;
+    let rsiH = layers.rsi ? Math.max(40, Math.round(fullH * 0.13)) : 0;
+    let macdH = layers.macd ? Math.max(40, Math.round(fullH * 0.13)) : 0;
+    const paneCount = [volH, rsiH, macdH].filter((h) => h > 0).length;
+    const paneTotal = volH + rsiH + macdH + paneCount * PANE_GAP;
+    if (paneTotal > fullH * 0.5) {
+      const k = (fullH * 0.5 - paneCount * PANE_GAP) / (volH + rsiH + macdH);
+      volH = Math.floor(volH * k);
+      rsiH = Math.floor(rsiH * k);
+      macdH = Math.floor(macdH * k);
+    }
+    const plotH = fullH - volH - rsiH - macdH - paneCount * PANE_GAP;
     if (plotW < 80 || plotH < 80) return null;
-    const volTop = MARGIN.top + plotH + VOL_GAP;
+    let cursor = MARGIN.top + plotH;
+    const volTop = volH ? (cursor += PANE_GAP) : cursor;
+    cursor += volH;
+    const rsiTop = rsiH ? (cursor += PANE_GAP) : cursor;
+    cursor += rsiH;
+    const macdTop = macdH ? (cursor += PANE_GAP) : cursor;
     // The profile strip scales with width instead of eating a fixed 104px of
     // a narrow phone, where that was a quarter of the whole chart.
     const profileW = Math.max(52, Math.min(120, box.width * 0.13));
@@ -712,8 +735,8 @@ export default function LiquidationHeatmapDesk() {
       .map((zone) => ({ ...zone, banded: banded.has(zone.price) }))
       .sort((a, b) => a.price - b.price);
 
-    return { candles, series, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT, volTop, volH };
-  }, [data, box, visibleCandles, priceView, liveKline, timeframe, symbol, layers.volumen]);
+    return { candles, series, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT, volTop, volH, rsiTop, rsiH, macdTop, macdH };
+  }, [data, box, visibleCandles, priceView, liveKline, timeframe, symbol, layers.volumen, layers.rsi, layers.macd]);
 
   // Keep the gesture's view of the price window in step with what is drawn.
   // In an effect, not during render: writing a ref while rendering is a side
@@ -846,6 +869,19 @@ export default function LiquidationHeatmapDesk() {
   );
   const patternOffset = layout ? layout.series.length - layout.candles.length : 0;
   const flags = useMemo<FlagPattern[]>(() => findFlags(patternSeries), [patternSeries]);
+
+  // RSI / MACD on the whole loaded series; the panes show the visible slice.
+  const osc = useMemo(() => {
+    const closes = patternSeries.map((c) => c.close);
+    const r = rsi(closes);
+    const m = macd(closes);
+    const macdRange = Math.max(1e-12, ...m.macd.slice(-150).filter((v): v is number => v !== null).map(Math.abs));
+    const divs = [
+      ...findDivergences(patternSeries, r, "RSI", { minOscDelta: 2 }),
+      ...findDivergences(patternSeries, m.macd, "MACD", { minOscDelta: macdRange * 0.05 }),
+    ];
+    return { r, m, divs, stats: divergenceStats(patternSeries, divs) };
+  }, [patternSeries]);
   const wyckoff = useMemo<WyckoffReading | null>(() => readWyckoff(patternSeries), [patternSeries]);
 
   const reversalZones = useMemo<ReversalZone[]>(() => {
@@ -1616,6 +1652,131 @@ export default function LiquidationHeatmapDesk() {
                 );
               })()}
 
+              {/* Oscillator panes and divergences. A divergence is drawn twice:
+                  on the price (its two pivots) and on its oscillator, solid for
+                  regular, dotted for hidden, green bullish, red bearish. Only
+                  divergences whose indicator pane is on are drawn, so a line on
+                  the price always has its counterpart visible below. */}
+              {(() => {
+                const shown = osc.divs
+                  .filter((d) => d.from - patternOffset >= 0)
+                  .filter((d) => (d.indicator === "RSI" ? layout.rsiH > 0 : layout.macdH > 0))
+                  .slice(0, 6);
+                const cls = (d: (typeof shown)[number]) =>
+                  `div-line ${d.side === "ALCISTA" ? "up" : "down"}${d.kind === "OCULTA" ? " hidden" : ""}`;
+                const x0 = MARGIN.left;
+                const x1 = MARGIN.left + layout.candleAreaW;
+
+                const rsiPane = layout.rsiH > 0 && (() => {
+                  const top = layout.rsiTop;
+                  const h = layout.rsiH;
+                  const yv = (v: number) => top + h - (v / 100) * h;
+                  const vis = osc.r.slice(patternOffset);
+                  const pts = vis.map((v, i) => (v === null ? "" : `${layout.x(i)},${yv(v)}`)).filter(Boolean).join(" ");
+                  const lastV = [...vis].reverse().find((v) => v !== null);
+                  return (
+                    <g>
+                      <rect x={x0} y={yv(70)} width={layout.candleAreaW} height={yv(30) - yv(70)} className="osc-band" />
+                      {[70, 50, 30].map((l) => (
+                        <line key={l} x1={x0} x2={x1} y1={yv(l)} y2={yv(l)} className={l === 50 ? "osc-mid" : "osc-level"} />
+                      ))}
+                      <polyline points={pts} className="osc-rsi" />
+                      {shown.filter((d) => d.indicator === "RSI").map((d) => (
+                        <line
+                          key={`rp-${d.from}-${d.to}`}
+                          x1={layout.x(d.from - patternOffset)}
+                          y1={yv(d.oscFrom)}
+                          x2={layout.x(d.to - patternOffset)}
+                          y2={yv(d.oscTo)}
+                          className={cls(d)}
+                        />
+                      ))}
+                      <text x={x0 + 4} y={top + 10} className="osc-label">
+                        RSI 14 · {lastV != null ? lastV.toFixed(1) : "—"}
+                        {lastV != null ? (lastV >= 70 ? " · SOBRECOMPRA" : lastV <= 30 ? " · SOBREVENTA" : "") : ""}
+                      </text>
+                    </g>
+                  );
+                })();
+
+                const macdPane = layout.macdH > 0 && (() => {
+                  const top = layout.macdTop;
+                  const h = layout.macdH;
+                  const vm = osc.m.macd.slice(patternOffset);
+                  const vs = osc.m.signal.slice(patternOffset);
+                  const vh = osc.m.hist.slice(patternOffset);
+                  const maxAbs = Math.max(
+                    1e-12,
+                    ...[...vm, ...vs, ...vh].filter((v): v is number => v !== null).map(Math.abs),
+                  );
+                  const yv = (v: number) => top + h / 2 - (v / maxAbs) * (h / 2 - 2);
+                  const line = (arr: (number | null)[]) =>
+                    arr.map((v, i) => (v === null ? "" : `${layout.x(i)},${yv(v)}`)).filter(Boolean).join(" ");
+                  const lastH = [...vh].reverse().find((v) => v !== null);
+                  return (
+                    <g>
+                      <line x1={x0} x2={x1} y1={yv(0)} y2={yv(0)} className="osc-mid" />
+                      {vh.map((v, i) => {
+                        if (v === null) return null;
+                        const prev = vh[i - 1];
+                        const fading = prev != null && Math.abs(v) < Math.abs(prev);
+                        return (
+                          <rect
+                            key={`h${i}`}
+                            x={layout.x(i) - layout.bodyW / 2}
+                            y={Math.min(yv(v), yv(0))}
+                            width={layout.bodyW}
+                            height={Math.max(0.6, Math.abs(yv(v) - yv(0)))}
+                            className={`osc-hist ${v >= 0 ? "up" : "down"}${fading ? " fade" : ""}`}
+                          />
+                        );
+                      })}
+                      <polyline points={line(vm)} className="osc-macd" />
+                      <polyline points={line(vs)} className="osc-signal" />
+                      {shown.filter((d) => d.indicator === "MACD").map((d) => (
+                        <line
+                          key={`mp-${d.from}-${d.to}`}
+                          x1={layout.x(d.from - patternOffset)}
+                          y1={yv(d.oscFrom)}
+                          x2={layout.x(d.to - patternOffset)}
+                          y2={yv(d.oscTo)}
+                          className={cls(d)}
+                        />
+                      ))}
+                      <text x={x0 + 4} y={top + 10} className="osc-label">
+                        MACD 12·26·9{lastH != null ? ` · hist ${lastH >= 0 ? "+" : ""}${lastH.toPrecision(3)}` : ""}
+                      </text>
+                    </g>
+                  );
+                })();
+
+                return (
+                  <g>
+                    {shown.map((d) => (
+                      <g key={`pp-${d.indicator}-${d.from}-${d.to}`}>
+                        <line
+                          x1={layout.x(d.from - patternOffset)}
+                          y1={layout.y(d.priceFrom)}
+                          x2={layout.x(d.to - patternOffset)}
+                          y2={layout.y(d.priceTo)}
+                          className={cls(d)}
+                        />
+                        <text
+                          x={layout.x(d.to - patternOffset) + 4}
+                          y={layout.y(d.priceTo) + (d.side === "ALCISTA" ? 12 : -5)}
+                          className={`div-label ${d.side === "ALCISTA" ? "up" : "down"}`}
+                        >
+                          {d.indicator}
+                          {d.kind === "OCULTA" ? " OCULTA" : " DIV"}
+                        </text>
+                      </g>
+                    ))}
+                    {rsiPane}
+                    {macdPane}
+                  </g>
+                );
+              })()}
+
               <line
                 x1={MARGIN.left}
                 x2={box.width - MARGIN.right}
@@ -1798,6 +1959,8 @@ export default function LiquidationHeatmapDesk() {
               </p>
             </div>
           )}
+
+          {(layers.rsi || layers.macd) && <MtfOscillators symbol={symbol} />}
 
           {/* The measured counterpart to the estimated map above. */}
           <div className="liq-live-feed">
