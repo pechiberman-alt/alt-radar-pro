@@ -1,4 +1,5 @@
 import { futuresStreamUrl } from "./binance-ws.ts";
+import { parseAggTrade, type Trade } from "./footprint.ts";
 import { parseForceOrder, parseKline, type LiveKline, type LiveLiquidation } from "./live-market.ts";
 
 /**
@@ -56,6 +57,9 @@ export function startLiveFeed(
     onKline: (k: LiveKline) => void;
     onLiquidation: (l: LiveLiquidation) => void;
     onStatus: (s: FeedStatus) => void;
+    /** Subscribe to individual trades too (for the footprint). */
+    trades?: boolean;
+    onTrade?: (t: Trade) => void;
   },
   deps: FeedDeps,
 ): () => void {
@@ -101,6 +105,7 @@ export function startLiveFeed(
       low: Number(row[3]),
       close: Number(row[4]),
       volume: Number(row[5]),
+      takerBuy: Number.isFinite(Number(row[9])) ? Number(row[9]) : undefined,
       closed: false,
     };
     return [k.time, k.open, k.high, k.low, k.close].every((v) => Number.isFinite(v) && v > 0) ? k : null;
@@ -147,7 +152,9 @@ export function startLiveFeed(
   const connect = () => {
     if (closed) return;
     const key = symbol.toLowerCase();
-    const ws = deps.createSocket(futuresStreamUrl([`${key}@kline_${timeframe}`, "!forceOrder@arr"]));
+    const ws = deps.createSocket(
+      futuresStreamUrl([`${key}@kline_${timeframe}`, "!forceOrder@arr", ...(opts.trades ? [`${key}@aggTrade`] : [])]),
+    );
     socket = ws;
     ws.onopen = () => {
       deps.clearTimeout(watchdog);
@@ -173,6 +180,9 @@ export function startLiveFeed(
           stopPolling();
         }
         receive(k, "WS");
+      } else if (msg.stream?.includes("@aggTrade")) {
+        const t = parseAggTrade(msg.data);
+        if (t) opts.onTrade?.(t);
       } else if (msg.stream?.includes("forceOrder")) {
         const liq = parseForceOrder(msg.data);
         if (liq && liq.symbol === symbol) opts.onLiquidation(liq);

@@ -192,3 +192,26 @@ test("everything down ends as 'sin conexión', never as live", async () => {
   assert.deepEqual(h.klines, []);
   h.stop();
 });
+
+test("the trade stream is added only when asked for", async () => {
+  const { startLiveFeed } = await import("../lib/live-feed.ts");
+  const urls: string[] = [];
+  const noop = () => undefined;
+  const deps = {
+    createSocket: (url: string) => {
+      urls.push(url);
+      return { onopen: null, onmessage: null, onerror: null, onclose: null, close: noop };
+    },
+    fetchJson: async () => [],
+    now: () => 0,
+    setTimeout: () => 0,
+    clearTimeout: noop,
+    setInterval: () => 0,
+    clearInterval: noop,
+  };
+  const base = { symbol: "BTCUSDT", timeframe: "1m", futuresBases: [], spotBases: [], onKline: noop, onLiquidation: noop, onStatus: noop };
+  startLiveFeed(base, deps)();
+  startLiveFeed({ ...base, trades: true }, deps)();
+  assert.doesNotMatch(urls[0], /aggTrade/);
+  assert.match(urls[1], /btcusdt@aggTrade$/);
+});

@@ -496,3 +496,46 @@
 /* Dark halo behind every chart label, so text stays readable where candles
    or bands pass under it. */
 .liq-svg text{paint-order:stroke;stroke:#070c0a;stroke-width:3px;stroke-linejoin:round}
+
+/* ── Volume by aggressor + CVD ── */
+.liq-vol-buy{fill:var(--green);opacity:.55}
+.liq-vol-sell{fill:var(--red);opacity:.45}
+.liq-cvd{fill:none;stroke:#58bfee;stroke-width:1.3}
+.lv-buy{fill:var(--green)}.lv-sell{fill:var(--red)}.lv-cvd{fill:#58bfee}
+
+/* ── Footprint ── */
+.fp-poc{stroke:var(--amber);stroke-width:1.2}
+.fp-body{stroke-width:3}
+.fp-body.up{stroke:var(--green)}.fp-body.down{stroke:var(--red)}
+.fp-num{font:7px var(--font-mono);fill:#dfe7e2;text-anchor:middle;stroke-width:2px}
+.fp-num.imb-b{fill:#7dffbf;font-weight:700}
+.fp-num.imb-s{fill:#ff9aa3;font-weight:700}
+.fp-delta{font:7px var(--font-mono);text-anchor:middle;font-weight:600}
+.fp-delta.up{fill:var(--green)}.fp-delta.down{fill:var(--red)}
+.fp-partial{opacity:.45}
+.fp-hint{margin:10px 0 0;padding:9px 11px;background:#0e0c1a;border:1px solid #3a3470;border-radius:4px;font:9px var(--font-mono);line-height:1.6;color:#c9c2ff}
+
+/* ── Liquidity sweeps ── */
+.sw-level{stroke-width:1;stroke-dasharray:2 3;opacity:.8}
+.sw-level.up{stroke:var(--green)}.sw-level.down{stroke:var(--red)}
+.sw-mark.up{fill:var(--green)}.sw-mark.down{fill:var(--red)}
+.sw-label{font:8px var(--font-mono);text-anchor:middle;font-weight:700;letter-spacing:.4px}
+.sw-label.up{fill:var(--green)}.sw-label.down{fill:var(--red)}
+.sw-list h4{color:var(--amber)!important}
+
+/* ── Crosshair ── */
+.xh line{stroke:#9aa7a0;stroke-width:1;stroke-dasharray:3 3;opacity:.8}
+.xh-tag{fill:#1c2923;stroke:#3b4b43}
+.xh-price{font:10px var(--font-mono);fill:var(--text);text-anchor:middle}
+.xh-readout{position:absolute;left:6px;top:6px;right:92px;z-index:4;padding:6px 26px 6px 8px;background:rgba(7,12,10,.92);border:1px solid var(--line);border-radius:4px;font:9px var(--font-mono);line-height:1.6;color:#b9c5be;pointer-events:auto}
+.xh-readout span{color:var(--muted);margin-right:6px}
+.xh-readout b{color:var(--muted);font-weight:400;margin-left:4px}
+.xh-readout em{font-style:normal}
+.xh-readout em.up{color:var(--green)}.xh-readout em.down{color:var(--red)}
+.xh-readout button{position:absolute;top:4px;right:4px;background:none;border:0;color:var(--muted);font-size:12px;cursor:pointer}
+.liq-chart-wrap:focus-visible{outline:1px solid #2d6a4d;outline-offset:2px}
+
+/* ── General polish ── */
+.liq-wick-up,.liq-wick-down{stroke-width:1}
+.liq-grid{stroke:#141d19}
+@media(max-width:700px){.fp-delta,.sw-label{font-size:9px}.xh-readout{font-size:10px}}
