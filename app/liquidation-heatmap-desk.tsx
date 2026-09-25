@@ -1177,9 +1177,9 @@ export default function LiquidationHeatmapDesk() {
                 title={feed.lastUpdate ? `Último dato ${new Date(feed.lastUpdate).toLocaleTimeString()}` : undefined}
               >
                 {feed.state.toUpperCase()}
-                {feed.source ? ` · ${feed.source}` : ""}
+                {feed.source ? ` · ${feed.source === "WS" ? "WS" : feed.source === "REST SPOT" ? "SPOT" : "REST"}` : ""}
                 {feed.lastUpdate
-                  ? ` · ${new Date(feed.lastUpdate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+                  ? ` · ${new Date(feed.lastUpdate).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}`
                   : ""}
               </i>{" "}
               {visibleCandles} velas
@@ -1678,6 +1678,16 @@ export default function LiquidationHeatmapDesk() {
                 ];
                 const tag = (d: (typeof shown)[number]) =>
                   `${d.kind === "OCULTA" ? "OCULTA" : "DIV"} ${d.side === "ALCISTA" ? "↑" : "↓"}`;
+                // Pane labels claim space newest-first; one that would land on
+                // another label or on the pane title is left out (its line and
+                // dots still show, and the list under the chart names it).
+                const placed: { x: number; y: number }[] = [];
+                const labelFits = (x: number, y: number, top: number) => {
+                  if (x < x0 + 175 && y < top + 16) return false;
+                  if (placed.some((p) => Math.abs(p.x - x) < 52 && Math.abs(p.y - y) < 11)) return false;
+                  placed.push({ x, y });
+                  return true;
+                };
                 const dots = (d: (typeof shown)[number], y1: number, y2: number) => (
                   <>
                     <circle cx={layout.x(d.from - patternOffset)} cy={y1} r={2.6} className={`div-dot ${d.side === "ALCISTA" ? "up" : "down"}`} />
@@ -1713,13 +1723,15 @@ export default function LiquidationHeatmapDesk() {
                             className={cls(d)}
                           />
                           {dots(d, yv(d.oscFrom), yv(d.oscTo))}
-                          <text
-                            x={layout.x(d.to - patternOffset)}
-                            y={yv(d.oscTo) + (d.side === "ALCISTA" ? 11 : -5)}
-                            className={`div-label ${d.side === "ALCISTA" ? "up" : "down"} mid`}
-                          >
-                            {tag(d)}
-                          </text>
+                          {labelFits(layout.x(d.to - patternOffset), yv(d.oscTo) + (d.side === "ALCISTA" ? 11 : -5), top) && (
+                            <text
+                              x={layout.x(d.to - patternOffset)}
+                              y={yv(d.oscTo) + (d.side === "ALCISTA" ? 11 : -5)}
+                              className={`div-label ${d.side === "ALCISTA" ? "up" : "down"} mid`}
+                            >
+                              {tag(d)}
+                            </text>
+                          )}
                         </g>
                       ))}
                       <text x={x0 + 4} y={top + 10} className="osc-label">
@@ -1774,13 +1786,15 @@ export default function LiquidationHeatmapDesk() {
                             className={cls(d)}
                           />
                           {dots(d, yv(d.oscFrom), yv(d.oscTo))}
-                          <text
-                            x={layout.x(d.to - patternOffset)}
-                            y={yv(d.oscTo) + (d.side === "ALCISTA" ? 11 : -5)}
-                            className={`div-label ${d.side === "ALCISTA" ? "up" : "down"} mid`}
-                          >
-                            {tag(d)}
-                          </text>
+                          {labelFits(layout.x(d.to - patternOffset), yv(d.oscTo) + (d.side === "ALCISTA" ? 11 : -5), top) && (
+                            <text
+                              x={layout.x(d.to - patternOffset)}
+                              y={yv(d.oscTo) + (d.side === "ALCISTA" ? 11 : -5)}
+                              className={`div-label ${d.side === "ALCISTA" ? "up" : "down"} mid`}
+                            >
+                              {tag(d)}
+                            </text>
+                          )}
                         </g>
                       ))}
                       <text x={x0 + 4} y={top + 10} className="osc-label">
@@ -1921,8 +1935,8 @@ export default function LiquidationHeatmapDesk() {
           </div>
 
           {keyLevels.length > 0 && (
-            <div className="liq-keys">
-              <h4>PUNTOS CLAVE · ESTRUCTURA + LIQUIDACIÓN</h4>
+            <details className="liq-fold liq-keys">
+              <summary>PUNTOS CLAVE · ESTRUCTURA + LIQUIDACIÓN</summary>
               <p className="liq-keys-why">
                 Niveles donde un máximo o mínimo previo cae sobre una zona densa: los stops de quien
                 operó ahí y las liquidaciones proyectadas coinciden en el mismo precio.
@@ -1937,7 +1951,7 @@ export default function LiquidationHeatmapDesk() {
                   </em>
                 </div>
               ))}
-            </div>
+            </details>
           )}
 
           {/* Detail lives here, not on the chart. A caption long enough to
@@ -2040,9 +2054,9 @@ export default function LiquidationHeatmapDesk() {
                 title={feed.lastUpdate ? `Último dato ${new Date(feed.lastUpdate).toLocaleTimeString()}` : undefined}
               >
                 {feed.state.toUpperCase()}
-                {feed.source ? ` · ${feed.source}` : ""}
+                {feed.source ? ` · ${feed.source === "WS" ? "WS" : feed.source === "REST SPOT" ? "SPOT" : "REST"}` : ""}
                 {feed.lastUpdate
-                  ? ` · ${new Date(feed.lastUpdate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+                  ? ` · ${new Date(feed.lastUpdate).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}`
                   : ""}
               </i>
             </div>
@@ -2111,8 +2125,8 @@ export default function LiquidationHeatmapDesk() {
           </div>
 
           {(orderBlocks.length > 0 || gaps.length > 0 || pools.length > 0) && (
-            <div className="liq-levels">
-              <h4>NIVELES DETECTADOS EN LA VENTANA</h4>
+            <details className="liq-fold liq-levels">
+              <summary>NIVELES DETECTADOS EN LA VENTANA</summary>
               <div className="liq-levels-list">
                 {[
                   ...pools.map((pool) => ({
@@ -2124,6 +2138,7 @@ export default function LiquidationHeatmapDesk() {
                     high: pool.price,
                     volumeUsd: null as number | null,
                     stats: null,
+                    noStats: true,
                     rank: pool.strength,
                     detail: `${pool.frames.join("·")} · ×${pool.touches}`,
                   })),
@@ -2157,7 +2172,7 @@ export default function LiquidationHeatmapDesk() {
                     <div key={level.key} className={level.cls}>
                       <b className="lv-kind">{level.kind}</b>
                       <u className="lv-price">
-                        {priceLabel(level.low)}–{priceLabel(level.high)}
+                        {level.low === level.high ? priceLabel(level.low) : `${priceLabel(level.low)}–${priceLabel(level.high)}`}
                       </u>
                       <span className="lv-vol">
                         {level.volumeUsd !== null ? shortUsd(level.volumeUsd) : (level as { detail?: string }).detail ?? ""}
@@ -2169,12 +2184,12 @@ export default function LiquidationHeatmapDesk() {
                             : "lv-conf"
                         }
                       >
-                        {confidenceLabel(level.stats)}
+                        {"noStats" in level && level.noStats ? "" : confidenceLabel(level.stats)}
                       </em>
                     </div>
                   ))}
               </div>
-            </div>
+            </details>
           )}
 
           {scenarios && scenarios.scenarios.length > 0 && (
@@ -2219,6 +2234,8 @@ export default function LiquidationHeatmapDesk() {
             </div>
           )}
 
+          <details className="liq-fold liq-method-fold">
+            <summary>LEYENDA, METODOLOGÍA Y ADVERTENCIAS</summary>
           <div className="liq-legend">
             <span>
               <i className="up" />
@@ -2306,6 +2323,7 @@ export default function LiquidationHeatmapDesk() {
             hueco original aguantó sin invertirse; el IFVG mide, una vez invertido, si ese nuevo rol
             aguantó una segunda prueba. Por eso pueden dar porcentajes distintos.
           </p>
+          </details>
         </>
       )}
     </section>
