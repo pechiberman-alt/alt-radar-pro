@@ -424,3 +424,44 @@
 .liq-price-line.up{stroke:#1fb56f}
 .liq-price-line.down{stroke:#e0414f}
 @media(max-width:700px){.liq-price-badge{font-size:11px}}
+
+/* ── RSI / MACD ── */
+.osc-band{fill:rgba(169,156,255,.05)}
+.osc-level{stroke:#2a3530;stroke-width:1;stroke-dasharray:3 4}
+.osc-mid{stroke:#24302a;stroke-width:1}
+.osc-rsi{fill:none;stroke:#a99cff;stroke-width:1.4}
+.osc-macd{fill:none;stroke:#58bfee;stroke-width:1.3}
+.osc-signal{fill:none;stroke:var(--amber);stroke-width:1.1;opacity:.85}
+.osc-hist.up{fill:var(--green);opacity:.55}
+.osc-hist.down{fill:var(--red);opacity:.55}
+.osc-hist.fade{opacity:.25}
+.osc-label{font:8px var(--font-mono);fill:var(--muted);letter-spacing:.5px}
+.div-line{stroke-width:1.8}
+.div-line.up{stroke:var(--green)}
+.div-line.down{stroke:var(--red)}
+.div-line.hidden{stroke-dasharray:3 3}
+.div-label{font:8px var(--font-mono);letter-spacing:.4px}
+.div-label.up{fill:var(--green)}.div-label.down{fill:var(--red)}
+@media(max-width:700px){.osc-label,.div-label{font-size:10px}}
+
+/* ── MTF oscillators ── */
+.mtf-osc{margin-top:14px;padding:12px 13px;background:#0a110d;border:1px solid var(--line);border-radius:5px;min-width:0}
+.mtf-osc h4{margin:0 0 8px;font:9px var(--font-mono);letter-spacing:1.2px;color:#a99cff}
+.mo-summary{margin:0 0 10px;padding:9px 11px;background:#0e0c1a;border:1px solid #3a3470;border-radius:4px;font:10px var(--font-mono);line-height:1.6;color:#c9c2ff}
+.mo-table{display:grid;gap:6px}
+.mo-row{display:grid;grid-template-columns:44px 1fr 1fr;gap:6px 10px;padding:9px 10px;background:#0b130f;border:1px solid var(--line);border-radius:4px;align-items:start}
+.mo-tf{font:12px var(--font-mono);color:var(--text);grid-row:span 2}
+.mo-cell{display:grid;gap:1px}
+.mo-cell span{font:8px var(--font-mono);color:var(--muted);letter-spacing:.8px}
+.mo-cell u{text-decoration:none;font:12px var(--font-mono);color:var(--text)}
+.mo-cell u.up{color:var(--green)}.mo-cell u.down{color:var(--red)}
+.mo-cell em{font-style:normal;font:8px var(--font-mono);color:var(--muted)}
+.mo-divs{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.mo-divs i{font-style:normal;font:8px var(--font-mono);padding:3px 6px;border-radius:3px;border:1px solid var(--line)}
+.mo-divs i.up{color:var(--green);border-color:#2d6a4d;background:#0b1b14}
+.mo-divs i.down{color:var(--red);border-color:#5a2b31;background:#170e10}
+.mo-divs i.hidden{border-style:dashed}
+.mo-divs i.none{color:var(--muted)}
+.mo-divs small{flex-basis:100%;font:8px var(--font-mono);color:var(--muted)}
+.mo-note{margin:10px 0 0;font:8px var(--font-mono);line-height:1.7;color:var(--muted)}
+@media(max-width:700px){.mo-divs i,.mo-divs small,.mo-cell em{font-size:9px}}
