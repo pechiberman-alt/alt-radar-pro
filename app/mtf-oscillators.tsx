@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadRows } from "@/lib/market-fetch";
+import { loadRows, timeframeConfig } from "@/lib/market-fetch";
 import {
   divergenceStats,
   findDivergences,
@@ -34,7 +34,10 @@ export default function MtfOscillators({ symbol }: { symbol: string }) {
       const out: Row[] = [];
       for (const tf of FRAMES) {
         try {
-          const candles = parseSwingKlines(await loadRows(symbol, tf, 300, controller.signal));
+          // Same candle count as the map for that frame: RSI and MACD depend on
+          // how much history they warm up on, so a shorter series gave values
+          // that did not match the chart's own panes.
+          const candles = parseSwingKlines(await loadRows(symbol, tf, timeframeConfig(tf).lookback, controller.signal));
           if (!alive) return;
           if (candles.length < 60) continue;
           const closes = candles.map((c) => c.close);

@@ -481,3 +481,18 @@
 .div-list em{font-style:normal;font:8px var(--font-mono);color:var(--muted);grid-row:1;grid-column:2}
 .div-list small{display:block;margin-top:6px;font:8px var(--font-mono);color:var(--muted)}
 .div-none{margin:0;font:9px var(--font-mono);line-height:1.6;color:var(--muted)}
+
+/* Collapsible secondary sections of the map. */
+.liq-fold{margin-top:12px;padding:0;background:#0a110d;border:1px solid var(--line);border-radius:5px}
+.liq-fold>summary{list-style:none;cursor:pointer;padding:12px 13px;font:9px var(--font-mono);letter-spacing:1.2px;color:var(--green2);display:flex;justify-content:space-between;align-items:center}
+.liq-fold>summary::-webkit-details-marker{display:none}
+.liq-fold>summary::after{content:"▸ MOSTRAR";color:var(--muted);letter-spacing:.8px}
+.liq-fold[open]>summary::after{content:"▾ OCULTAR"}
+.liq-fold[open]>summary{border-bottom:1px solid var(--line)}
+.liq-fold>*:not(summary){margin-left:13px;margin-right:13px}
+.liq-fold>*:last-child{margin-bottom:12px}
+.liq-fold.liq-keys,.liq-fold.liq-levels{margin-top:14px}
+
+/* Dark halo behind every chart label, so text stays readable where candles
+   or bands pass under it. */
+.liq-svg text{paint-order:stroke;stroke:#070c0a;stroke-width:3px;stroke-linejoin:round}
