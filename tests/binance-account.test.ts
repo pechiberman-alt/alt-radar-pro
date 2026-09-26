@@ -76,6 +76,21 @@ test("an invalid key/secret gets a plain explanation, not Binance's raw text", (
   assert.match(msg, /no reconoció/);
 });
 
+test("a futures permission error names the specific fix, not the IP message it would otherwise get", () => {
+  const msg = friendlyBinanceError(
+    new BinanceApiError("Invalid API-key, IP, or permissions for action.", 401),
+    undefined,
+    "futures",
+  );
+  assert.match(msg, /Habilitar Futuros/);
+  assert.doesNotMatch(msg, /Sin restricciones/, "en contexto futuros no debe caer en el mensaje de restricción de IP");
+});
+
+test("the same error without futures context still gets the IP message, unchanged", () => {
+  const msg = friendlyBinanceError(new BinanceApiError("Invalid API-key, IP, or permissions for action.", 401));
+  assert.match(msg, /Sin restricciones/);
+});
+
 test("app-written Spanish messages (read-only check, trading rights) pass through unchanged", () => {
   const original = "Por seguridad solo se aceptan API keys de solo lectura. Desactivá Trading y Retiros en Binance y volvé a intentar.";
   assert.equal(friendlyBinanceError(new Error(original)), original);
