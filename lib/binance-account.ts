@@ -1,14 +1,19 @@
 /**
  * Per-client Binance spot account linking.
  *
- * Each client's API key/secret are AES-GCM encrypted at rest with a server
- * secret (env.ENCRYPTION_KEY) that never leaves the Worker. Secrets are only
- * ever decrypted in memory, right before a signed request, and never sent
- * back to the browser.
+ * Each client's API key/secret are AES-GCM encrypted at rest. The key used is
+ * resolveEncryptionKey from app-settings.ts: the Cloudflare secret
+ * ENCRYPTION_KEY when set, otherwise an auto-generated key kept in D1 (the
+ * same fallback Telegram and the AI key already use) — so this feature works
+ * the moment someone links an account, with no Cloudflare setup step. That
+ * key never leaves the Worker; secrets are only ever decrypted in memory,
+ * right before a signed request, and never sent back to the browser.
  *
- * Every stored key is verified read-only server-side before being saved:
- * a client key with trading or withdrawal permissions is rejected outright.
+ * Every stored key is verified read-only server-side before being saved: a
+ * client key with trading or withdrawal permissions is rejected outright.
  */
+
+import { resolveEncryptionKey } from "./app-settings.ts";
 
 const BINANCE_BASE = "https://api.binance.com";
 
@@ -26,17 +31,17 @@ function fromBase64(value: string) {
   return bytes;
 }
 
-async function getEncryptionKey(env: Pick<Env, "ENCRYPTION_KEY">) {
-  if (!env.ENCRYPTION_KEY) throw new Error("ENCRYPTION_KEY_MISSING");
-  const keyBytes = fromBase64(env.ENCRYPTION_KEY);
+async function getEncryptionKey(db: D1Database, env: { ENCRYPTION_KEY?: string }) {
+  const keyB64 = await resolveEncryptionKey(db, env);
+  const keyBytes = fromBase64(keyB64);
   return crypto.subtle.importKey("raw", keyBytes as BufferSource, "AES-GCM", false, [
     "encrypt",
     "decrypt",
   ]);
 }
 
-export async function encryptSecret(plain: string, env: Pick<Env, "ENCRYPTION_KEY">) {
-  const key = await getEncryptionKey(env);
+export async function encryptSecret(plain: string, db: D1Database, env: { ENCRYPTION_KEY?: string }) {
+  const key = await getEncryptionKey(db, env);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: iv as BufferSource },
@@ -49,8 +54,8 @@ export async function encryptSecret(plain: string, env: Pick<Env, "ENCRYPTION_KE
   return toBase64(combined);
 }
 
-export async function decryptSecret(encrypted: string, env: Pick<Env, "ENCRYPTION_KEY">) {
-  const key = await getEncryptionKey(env);
+export async function decryptSecret(encrypted: string, db: D1Database, env: { ENCRYPTION_KEY?: string }) {
+  const key = await getEncryptionKey(db, env);
   const combined = fromBase64(encrypted);
   const iv = combined.slice(0, 12);
   const data = combined.slice(12);
@@ -70,10 +75,48 @@ async function hmacSha256Hex(message: string, secret: string) {
   return Array.from(new Uint8Array(signature), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-class BinanceApiError extends Error {
-  constructor(message: string, public status: number) {
+export class BinanceApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
     super(message);
+    this.status = status;
   }
+}
+
+/**
+ * Turns a caught error into a message a client can act on. Binance's own
+ * `msg` field is in English and often assumes the reader controls a fixed
+ * server IP, which nobody linking through this app does — Cloudflare Workers
+ * have no stable egress IP, so the #1 real failure is an IP-restricted key
+ * that a fixed-IP whitelist would never satisfy here.
+ *
+ * A message already written for this app (assertReadOnlyKey's two checks) is
+ * passed through unchanged rather than re-wrapped.
+ */
+export function friendlyBinanceError(error: unknown, fallback = "No se pudo completar la operación con Binance."): string {
+  if (error instanceof BinanceApiError) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("ip")) {
+      return "Binance rechazó la conexión por restricción de IP. La API key debe crearse con acceso \"Sin restricciones\" (Unrestricted): esta app no tiene una IP fija para agregar a una lista blanca.";
+    }
+    if (error.status === 401 || msg.includes("invalid api-key") || msg.includes("api-key format")) {
+      return "Binance no reconoció la API key o el secret. Revisá que los copiaste completos, sin espacios.";
+    }
+    if (msg.includes("signature")) {
+      return "La firma no coincidió: revisá que el API secret esté completo y sin espacios.";
+    }
+    if (msg.includes("timestamp")) {
+      return "El reloj del servidor de Binance y el nuestro no coincidieron. Probá vincular de nuevo.";
+    }
+    return `Binance rechazó la solicitud: ${error.message}`;
+  }
+  if (error instanceof Error) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") return "Binance no respondió a tiempo. Probá de nuevo.";
+    // Messages this module already writes in Spanish for the person reading
+    // them (read-only check, trading/withdrawal rights) pass through as-is.
+    if (/[áéíóúñ]|API key/i.test(error.message)) return error.message;
+  }
+  return fallback;
 }
 
 async function signedRequest<T>(

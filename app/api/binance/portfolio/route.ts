@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { ensureAuthSchema, getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
-import { decryptSecret, getAccountBalances, getDepositHistory, getWithdrawHistory } from "@/lib/binance-account";
+import { decryptSecret, friendlyBinanceError, getAccountBalances, getDepositHistory, getWithdrawHistory } from "@/lib/binance-account";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +22,8 @@ export async function GET(request: Request) {
       return Response.json({ error: "NO HAY CUENTA DE BINANCE VINCULADA" }, { status: 404 });
     }
 
-    const apiKey = await decryptSecret(stored.api_key_encrypted, env);
-    const apiSecret = await decryptSecret(stored.api_secret_encrypted, env);
+    const apiKey = await decryptSecret(stored.api_key_encrypted, env.DB, env);
+    const apiSecret = await decryptSecret(stored.api_secret_encrypted, env.DB, env);
 
     const [balances, depositsResult, withdrawalsResult] = await Promise.all([
       getAccountBalances(apiKey, apiSecret),
@@ -54,7 +54,9 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error("[ALT_RADAR_BINANCE_PORTFOLIO]", error);
-    const message = error instanceof Error ? error.message : "NO SE PUDO LEER LA CARTERA";
-    return Response.json({ error: message }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    return Response.json(
+      { error: friendlyBinanceError(error, "No se pudo leer la cartera.") },
+      { status: 502, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }
