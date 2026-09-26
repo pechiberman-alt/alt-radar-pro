@@ -63,7 +63,7 @@ export async function decryptSecret(encrypted: string, db: D1Database, env: { EN
   return new TextDecoder().decode(plain);
 }
 
-async function hmacSha256Hex(message: string, secret: string) {
+export async function hmacSha256Hex(message: string, secret: string) {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -93,9 +93,22 @@ export class BinanceApiError extends Error {
  * A message already written for this app (assertReadOnlyKey's two checks) is
  * passed through unchanged rather than re-wrapped.
  */
-export function friendlyBinanceError(error: unknown, fallback = "No se pudo completar la operación con Binance."): string {
+export function friendlyBinanceError(
+  error: unknown,
+  fallback = "No se pudo completar la operación con Binance.",
+  context?: "futures",
+): string {
   if (error instanceof BinanceApiError) {
     const msg = error.message.toLowerCase();
+    // Futures gates ALL of /fapi (reading included) behind one permission
+    // flag, and Binance answers a permission problem there with the same
+    // -2015 text used for a bad IP or a bad key. A key already linked and
+    // working for spot rules out both of those, so the honest read here is
+    // "Futures isn't turned on, or there's no futures account yet" — never
+    // the IP message, which would send someone chasing the wrong fix.
+    if (context === "futures" && (error.status === 401 || msg.includes("ip") || msg.includes("permission"))) {
+      return "Binance rechazó la lectura de Futuros. La API key vinculada necesita el permiso \"Habilitar Futuros\" activado, y tu cuenta de Binance necesita tener Futuros habilitado. A diferencia de spot, Binance no ofrece una versión de solo lectura de ese permiso: activarlo también permite operar futuros, aunque esta app nunca lo use para eso.";
+    }
     if (msg.includes("ip")) {
       return "Binance rechazó la conexión por restricción de IP. La API key debe crearse con acceso \"Sin restricciones\" (Unrestricted): esta app no tiene una IP fija para agregar a una lista blanca.";
     }
@@ -119,16 +132,20 @@ export function friendlyBinanceError(error: unknown, fallback = "No se pudo comp
   return fallback;
 }
 
-async function signedRequest<T>(
+/** `base` defaults to the spot API; lib/binance-futures.ts passes the
+ *  futures one so the two account types share one signing implementation
+ *  instead of a second, independently-maintained copy of it. */
+export async function signedRequest<T>(
   path: string,
   params: Record<string, string>,
   apiKey: string,
   apiSecret: string,
+  base: string = BINANCE_BASE,
 ) {
   const query = new URLSearchParams({ ...params, timestamp: Date.now().toString(), recvWindow: "5000" });
   const signature = await hmacSha256Hex(query.toString(), apiSecret);
   query.set("signature", signature);
-  const response = await fetch(`${BINANCE_BASE}${path}?${query.toString()}`, {
+  const response = await fetch(`${base}${path}?${query.toString()}`, {
     headers: { "X-MBX-APIKEY": apiKey },
     signal: AbortSignal.timeout(10_000),
   });
