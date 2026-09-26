@@ -88,3 +88,9 @@
 .signin-prompt div{display:flex;gap:6px;margin-top:4px}
 .signin-prompt button{flex:1;padding:11px 8px;background:#0c251a;border:1px solid #2d6a4d;border-radius:4px;color:var(--green);font:10px var(--font-mono);letter-spacing:.8px;cursor:pointer}
 .signin-prompt button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+
+/* Masks the API secret without type="password", so Chrome's native
+   saved-password suggestion chip never attaches to this field. Firefox
+   doesn't support -webkit-text-security and shows it in plain text instead
+   — an acceptable fallback there, never a broken/unreadable field. */
+.account-masked{-webkit-text-security:disc;text-security:disc}

@@ -530,6 +530,7 @@ function HistoryBlock({
 function LinkForm({ onLinked }: { onLinked: () => void }) {
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -565,16 +566,50 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
       </p>
       <label>
         <span>API KEY</span>
-        <input value={apiKey} required onChange={(event) => setApiKey(event.target.value)} />
+        {/* No autoComplete/name-based trigger for Chrome's saved-login
+            suggestions: this field sits in the same drawer as the real
+            email/password form, and without these it was being offered
+            (and sometimes silently filled with) the account's own saved
+            login instead of an actual Binance key. */}
+        <input
+          value={apiKey}
+          required
+          onChange={(event) => setApiKey(event.target.value)}
+          name="binance-api-key"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          data-lpignore="true"
+          data-1p-ignore
+        />
       </label>
       <label>
         <span>API SECRET</span>
-        <input
-          type="password"
-          value={apiSecret}
-          required
-          onChange={(event) => setApiSecret(event.target.value)}
-        />
+        {/* type="text" + CSS masking, not type="password": a real password
+            input is exactly what triggers Chrome's native "use saved
+            password" chip, which is what was covering this field and
+            offering the account's own login password here instead of the
+            Binance secret. */}
+        <div className="account-pass">
+          <input
+            type="text"
+            className={showSecret ? "" : "account-masked"}
+            value={apiSecret}
+            required
+            onChange={(event) => setApiSecret(event.target.value)}
+            name="binance-api-secret"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-lpignore="true"
+            data-1p-ignore
+          />
+          <button type="button" onClick={() => setShowSecret((v) => !v)} aria-label="Mostrar u ocultar el API secret">
+            {showSecret ? "OCULTAR" : "VER"}
+          </button>
+        </div>
       </label>
       {error && <p className="account-error">{error}</p>}
       <button className="account-submit" type="submit" disabled={busy}>
