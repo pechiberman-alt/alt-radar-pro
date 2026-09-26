@@ -35,6 +35,7 @@ import "./alert-center.css";
 import "./alert-toasts.css";
 import "./trade-journal-desk.css";
 import "./dca-desk.css";
+import "./portfolio-risk.css";
 import "./spot-desk.css";
 import "./sentiment-desk.css";
 import "./settings-desk.css";
