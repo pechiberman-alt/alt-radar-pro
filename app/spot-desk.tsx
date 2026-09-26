@@ -1,41 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { readFibZone } from "@/lib/fib-zone";
-import { loadRows } from "@/lib/market-fetch";
-import { buildMtfZones } from "@/lib/mtf-zones";
-import { evaluateSpot, SPOT_RULES, type SpotPlan } from "@/lib/spot-strategy";
-import { parseSwingKlines } from "@/lib/swing-entries";
-import { parseOverhang } from "@/lib/token-unlocks";
+import { loadSpotPlan } from "@/lib/spot-plan-client";
+import { SPOT_RULES, type SpotPlan } from "@/lib/spot-strategy";
 
 const SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "LINKUSDT", "AVAXUSDT", "SUIUSDT", "ADAUSDT", "DOGEUSDT"];
 
 const px = (v: number) =>
   v >= 1000 ? v.toLocaleString("es-AR", { maximumFractionDigits: 0 }) : v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1 ? 3 : 6 });
 const usd = (v: number) => `$${v.toLocaleString("es-AR", { maximumFractionDigits: 0 })}`;
-
-function ema(values: number[], period: number): number | null {
-  if (values.length < period) return null;
-  const k = 2 / (period + 1);
-  let e = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
-  for (let i = period; i < values.length; i += 1) e = values[i] * k + e * (1 - k);
-  return e;
-}
-
-async function loadOverhang(symbol: string): Promise<number | null> {
-  try {
-    const r = await fetch(
-      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1",
-    );
-    if (!r.ok) return null;
-    const rows = (await r.json()) as unknown[];
-    const base = symbol.replace(/USDT$/, "").toLowerCase();
-    const row = rows.find((x) => (x as { symbol?: string }).symbol === base);
-    return row ? (parseOverhang(row, new Set())?.overhangRatio ?? null) : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function SpotDesk() {
   const [symbol, setSymbol] = useState("SOLUSDT");
@@ -51,36 +24,11 @@ export default function SpotDesk() {
     (async () => {
       setLoading(true);
       try {
-        const [d, h4, overhang] = await Promise.all([
-          loadRows(symbol, "1d", 365, controller.signal).then(parseSwingKlines),
-          loadRows(symbol, "4h", 400, controller.signal).then(parseSwingKlines),
-          loadOverhang(symbol),
-        ]);
+        const result = await loadSpotPlan(symbol, Number(budget) || 0, controller.signal);
         if (!alive) return;
-        if (d.length < 60) throw new Error("short");
-        const current = h4.at(-1)?.close ?? d.at(-1)!.close;
-        const board = buildMtfZones(
-          [{ timeframe: "1d", candles: d }, { timeframe: "4h", candles: h4 }].filter((s) => s.candles.length >= 40),
-          current,
-        );
-        const fib = readFibZone(d);
-        const trend = ema(d.map((c) => c.close), 200);
-        const zones = board?.zones ?? [];
-        setPrice(current);
-        setPlan(
-          evaluateSpot(
-            {
-              symbol,
-              price: current,
-              demandZones: zones.filter((z) => z.kind === "DEMANDA" && z.low <= current),
-              supplyZones: zones.filter((z) => z.kind === "OFERTA" && z.low > current),
-              fib: fib ? { inZone: fib.inZone, side: fib.side, levels: fib.levels, legLow: fib.legLow } : null,
-              aboveTrend: trend === null ? null : current > trend,
-              overhangRatio: overhang,
-            },
-            Number(budget) || 0,
-          ),
-        );
+        if (!result) throw new Error("short");
+        setPrice(result.price);
+        setPlan(result.plan);
         setError("");
       } catch {
         if (alive) setError("NO SE PUDO EVALUAR ESTE PAR");

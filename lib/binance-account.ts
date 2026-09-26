@@ -200,3 +200,14 @@ export async function getDepositHistory(apiKey: string, apiSecret: string) {
 export async function getWithdrawHistory(apiKey: string, apiSecret: string) {
   return signedRequest<BinanceWithdrawal[]>("/sapi/v1/capital/withdraw/history", {}, apiKey, apiSecret);
 }
+
+export type BinanceFill = { symbol: string; price: string; qty: string; isBuyer: boolean; time: number };
+
+/** Up to `limit` most recent fills for one symbol (max Binance allows is 1000).
+ *  A long-lived account can have more history than that; computeCostBasis
+ *  then works from what was actually fetched, and a caller that wants to
+ *  know whether that was enough compares it against the live balance
+ *  (costBasisReliable in lib/cost-basis.ts) rather than assuming it was. */
+export async function getMyTrades(apiKey: string, apiSecret: string, symbol: string, limit = 1000) {
+  return signedRequest<BinanceFill[]>("/api/v3/myTrades", { symbol, limit: String(limit) }, apiKey, apiSecret);
+}

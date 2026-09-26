@@ -36,6 +36,7 @@ import AlertCenter from "./alert-center";
 import AlertToasts from "./alert-toasts";
 import TradeJournalDesk from "./trade-journal-desk";
 import DcaDesk from "./dca-desk";
+import PortfolioRisk from "./portfolio-risk";
 import SpotDesk from "./spot-desk";
 import SentimentDesk from "./sentiment-desk";
 import SettingsDesk from "./settings-desk";
@@ -81,6 +82,7 @@ const NAV_ITEMS = [
   { label: "ALERTAS", mobile: "AVISOS", icon: "⚠", id: "alertas" },
   { label: "NOTICIAS", mobile: "NOTICIAS", icon: "✦", id: "noticias" },
   { label: "REGISTRO", mobile: "REGISTRO", icon: "▤", id: "registro" },
+  { label: "MI CARTERA", mobile: "CARTERA", icon: "◉", id: "cartera" },
   { label: "DCA", mobile: "DCA", icon: "⟳", id: "dca" },
   { label: "CONFIGURACIÓN", mobile: "AJUSTES", icon: "⚙", id: "configuracion" },
   { label: "ESTRATEGIA SPOT", mobile: "SPOT", icon: "◎", id: "spot" },
@@ -1198,6 +1200,10 @@ export default function RadarApp() {
 
         <Collapsible id="configuracion" label="CONFIGURACIÓN" open={workspace.open["configuracion"]} onToggle={workspace.toggle}>
           <SettingsDesk />
+        </Collapsible>
+
+        <Collapsible id="cartera" label="MI CARTERA" open={workspace.open["cartera"]} onToggle={workspace.toggle}>
+          <PortfolioRisk />
         </Collapsible>
 
         <Collapsible id="dca" label="DCA" open={workspace.open["dca"]} onToggle={workspace.toggle}>
