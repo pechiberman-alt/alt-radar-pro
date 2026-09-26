@@ -294,7 +294,7 @@ test("stablecoin regime reads sidelined capital by band", () => {
   assert.equal(stablecoinRegime(3).tone, "risk-on");
   assert.equal(stablecoinRegime(5).tone, "neutral");
   assert.equal(stablecoinRegime(null).tone, "unknown");
-  assert.equal(stablecoinRegime(null).label, "DATA UNAVAILABLE");
+  assert.equal(stablecoinRegime(null).label, "SIN DATOS");
 });
 
 test("stablecoin regime bands are ordered and continuous", () => {

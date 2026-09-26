@@ -33,7 +33,7 @@ async function fetchCandles(symbol: string, interval: "5m" | "15m") {
       lastError = error;
     }
   }
-  throw lastError ?? new Error("DATA UNAVAILABLE");
+  throw lastError ?? new Error("SIN DATOS");
 }
 
 async function loadPair(symbol: string) {

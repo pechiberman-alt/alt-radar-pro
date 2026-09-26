@@ -342,7 +342,7 @@ function SparkBars({ values }: { values: number[] }) {
 }
 
 const capLabel = (value: number | null) => {
-  if (value === null) return "DATA UNAVAILABLE";
+  if (value === null) return "SIN DATOS";
   if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
   if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
   return `$${value.toFixed(0)}`;
@@ -373,7 +373,7 @@ function MarketStrip({
                 </small>
               </>
             ) : (
-              <strong className="muted">DATA UNAVAILABLE</strong>
+              <strong className="muted">SIN DATOS</strong>
             )}
           </div>
         );
@@ -382,7 +382,7 @@ function MarketStrip({
         <span>ETH/BTC <em>DERIVADO SPOT</em></span>
         <strong>{btc && eth ? (eth.price / btc.price).toFixed(6) : "—"}</strong>
         <small className={(eth?.change24h ?? 0) - (btc?.change24h ?? 0) >= 0 ? "positive" : "negative"}>
-          {btc && eth ? percentage(eth.change24h - btc.change24h) : "DATA UNAVAILABLE"}
+          {btc && eth ? percentage(eth.change24h - btc.change24h) : "SIN DATOS"}
         </small>
       </div>
       <div className="market-tile">
@@ -401,7 +401,7 @@ function MarketStrip({
         <strong>
           {structure?.dominance.usdt != null
             ? `${structure.dominance.usdt.toFixed(2)}%`
-            : "DATA UNAVAILABLE"}
+            : "SIN DATOS"}
         </strong>
         <small className="muted">
           {structure?.dominance.stablecoins != null

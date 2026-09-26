@@ -88,8 +88,8 @@ export async function fetchKlineRows(
     `/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`,
     { signal: AbortSignal.timeout(timeout + 3_000), cache: "no-store" },
   );
-  if (!proxied.ok) throw new Error("DATA UNAVAILABLE");
+  if (!proxied.ok) throw new Error("SIN DATOS");
   const rows = await proxied.json();
-  if (!Array.isArray(rows) || !rows.length) throw new Error("DATA UNAVAILABLE");
+  if (!Array.isArray(rows) || !rows.length) throw new Error("SIN DATOS");
   return rows;
 }

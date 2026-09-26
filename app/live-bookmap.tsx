@@ -2880,15 +2880,15 @@ export default function LiveBookmap({
             )}
             {intelligencePanel === "open-interest" && (
               <div className="dock-metric-grid">
-                <div><span>OPEN INTEREST</span><b>{derivatives.openInterestUsd === null ? "DATA UNAVAILABLE" : usdLabel(derivatives.openInterestUsd)}</b></div>
+                <div><span>OPEN INTEREST</span><b>{derivatives.openInterestUsd === null ? "SIN DATOS" : usdLabel(derivatives.openInterestUsd)}</b></div>
                 <div><span>CAMBIO {LIQUIDITY_FRAME_LABEL[marketTimeframe]}</span><b className={(derivatives.openInterestChangePct ?? 0) >= 0 ? "positive" : "negative"}>{derivatives.openInterestChangePct === null ? "—" : signed(derivatives.openInterestChangePct, 2)}</b></div>
                 <div><span>MARK PRICE</span><b>{derivatives.markPrice === null ? "—" : priceLabel(derivatives.markPrice)}</b></div>
-                <small>{derivatives.available ? derivatives.source : "Binance Futures public API · DATA UNAVAILABLE"}</small>
+                <small>{derivatives.available ? derivatives.source : "Binance Futures public API · SIN DATOS"}</small>
               </div>
             )}
             {intelligencePanel === "funding" && (
               <div className="dock-metric-grid">
-                <div><span>FUNDING ACTUAL</span><b className={(derivatives.fundingRatePct ?? 0) > 0.04 ? "negative" : "positive"}>{derivatives.fundingRatePct === null ? "DATA UNAVAILABLE" : `${derivatives.fundingRatePct.toFixed(4)}%`}</b></div>
+                <div><span>FUNDING ACTUAL</span><b className={(derivatives.fundingRatePct ?? 0) > 0.04 ? "negative" : "positive"}>{derivatives.fundingRatePct === null ? "SIN DATOS" : `${derivatives.fundingRatePct.toFixed(4)}%`}</b></div>
                 <div><span>TAKER BUY/SELL</span><b>{derivatives.takerBuySellRatio === null ? "—" : `${derivatives.takerBuySellRatio.toFixed(3)}×`}</b></div>
                 <div><span>LONG/SHORT</span><b>{derivatives.longShortAccountRatio === null ? "—" : `${derivatives.longShortAccountRatio.toFixed(3)}×`}</b></div>
                 <small>Funding y ratios reales cuando Binance Futures los entrega.</small>

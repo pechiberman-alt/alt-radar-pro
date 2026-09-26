@@ -133,7 +133,7 @@ async function fetchCandles(
       lastError = error;
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("DATA UNAVAILABLE");
+  throw lastError instanceof Error ? lastError : new Error("SIN DATOS");
 }
 
 export default function BookmapTimeframeChart({
@@ -248,7 +248,7 @@ export default function BookmapTimeframeChart({
       context.fillStyle = "#65786e";
       context.font = "10px monospace";
       context.textAlign = "center";
-      context.fillText(status === "error" ? "DATA UNAVAILABLE" : "CARGANDO VELAS REALES…", size.width / 2, size.height / 2);
+      context.fillText(status === "error" ? "SIN DATOS" : "CARGANDO VELAS REALES…", size.width / 2, size.height / 2);
       return;
     }
 
@@ -409,7 +409,7 @@ export default function BookmapTimeframeChart({
         <div><span>CAMBIO {frameLabel[timeframe]}</span><b className={(change ?? 0) >= 0 ? "positive" : "negative"}>{signed(change)}</b></div>
         <div><span>VOLUMEN</span><b>{latest ? compactUsd(latest.quoteVolume) : "—"}</b></div>
         <div className="performance-value"><span>WIN RATE {frameLabel[timeframe]}</span><b>{selectedPerformance?.winRate === null || selectedPerformance?.winRate === undefined ? "—" : `${selectedPerformance.winRate.toFixed(1)}%`}</b><small>{selectedPerformance?.evaluated ?? 0} evaluadas</small></div>
-        <div className="performance-value"><span>PROFIT FACTOR {frameLabel[timeframe]}</span><b>{profitFactor}</b><small>{performanceError ? "DATA UNAVAILABLE" : selectedPerformance?.sampleQuality ?? "CARGANDO"}</small></div>
+        <div className="performance-value"><span>PROFIT FACTOR {frameLabel[timeframe]}</span><b>{profitFactor}</b><small>{performanceError ? "SIN DATOS" : selectedPerformance?.sampleQuality ?? "CARGANDO"}</small></div>
       </div>
 
       <div className="tf-chart-shell" ref={shellRef}>
@@ -420,7 +420,7 @@ export default function BookmapTimeframeChart({
           onPointerMove={movePointer}
           onPointerLeave={() => setHover(null)}
         />
-        <div className={`tf-data-status ${status}`}><i /> {status === "live" ? "KLINES LIVE" : status === "loading" ? "CARGANDO" : "DATA UNAVAILABLE"}</div>
+        <div className={`tf-data-status ${status}`}><i /> {status === "live" ? "KLINES LIVE" : status === "loading" ? "CARGANDO" : "SIN DATOS"}</div>
         <div className="tf-chart-legend"><span><i className="ema20" /> EMA 20</span><span><i className="ema50" /> EMA 50</span><span><i className="volume" /> VOLUMEN</span></div>
         {hover && hoverCandle && (
           <div className="tf-crosshair-tooltip" style={{ left: `${Math.min(size.width - 190, Math.max(12, hover.x + 12))}px`, top: `${Math.max(14, hover.y - 78)}px` }}>
@@ -433,7 +433,7 @@ export default function BookmapTimeframeChart({
       </div>
 
       <div className="tf-audit-line">
-        <span>FUENTE: Binance {venue === "futures" ? "Futures" : "Spot"} · {source || "DATA UNAVAILABLE"}</span>
+        <span>FUENTE: Binance {venue === "futures" ? "Futures" : "Spot"} · {source || "SIN DATOS"}</span>
         <span>ACTUALIZADO: {updatedAt ? new Date(updatedAt).toLocaleTimeString() : "—"}</span>
         <b>{selectedPerformance?.sampleQuality ?? "ESTADÍSTICA PENDIENTE"}</b>
         <small>Win Rate y Profit Factor usan señales registradas, no velas elegidas retroactivamente ni operaciones inventadas.</small>

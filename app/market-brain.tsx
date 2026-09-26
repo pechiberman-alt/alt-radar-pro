@@ -80,7 +80,7 @@ async function directJson(bases: string[], path: string, signal: AbortSignal) {
       lastError = error;
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("DATA UNAVAILABLE");
+  throw lastError instanceof Error ? lastError : new Error("SIN DATOS");
 }
 
 async function directOptional(bases: string[], path: string, signal: AbortSignal) {
@@ -109,7 +109,7 @@ async function loadDirectSnapshot(
   klineSettled.forEach((result) => {
     if (result.status === "fulfilled") klines[result.value[0]] = result.value[1];
   });
-  if (!klines[timeframe]) throw new Error("BINANCE DIRECT DATA UNAVAILABLE");
+  if (!klines[timeframe]) throw new Error("SIN DATOS DIRECTOS DE BINANCE");
   const period = encodeURIComponent(timeframe);
   const [premium, interest, history, taker, accounts] = await Promise.all([
     directOptional(browserFuturesBases, `/fapi/v1/premiumIndex?symbol=${encoded}`, signal),
@@ -122,7 +122,7 @@ async function loadDirectSnapshot(
 }
 
 function price(value: number | null | undefined) {
-  if (value === null || value === undefined || !Number.isFinite(value)) return "DATA UNAVAILABLE";
+  if (value === null || value === undefined || !Number.isFinite(value)) return "SIN DATOS";
   if (value >= 1_000) return `$${value.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   if (value >= 1) return `$${value.toFixed(4)}`;
   return `$${value.toPrecision(6)}`;
@@ -157,7 +157,7 @@ function buildAnswer(
   const stamp = new Date(brain.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const evidence = `Lectura ${brain.selectedTimeframe.toUpperCase()} · ${stamp} · ${brain.sources.join(" + ") || "fuente no disponible"}.`;
   if (!selected) {
-    return `No puedo emitir análisis para ${brain.symbol}: DATA UNAVAILABLE. No completaré los valores faltantes con estimaciones. ${evidence}`;
+    return `No puedo emitir análisis para ${brain.symbol}: SIN DATOS. No completaré los valores faltantes con estimaciones. ${evidence}`;
   }
 
   if (normalized.includes("memoria") || normalized.includes("aprend") || normalized.includes("segur") || normalized.includes("privacidad")) {
@@ -167,7 +167,7 @@ function buildAnswer(
 
   if (normalized.includes("scalp") || normalized.includes("entrada") || normalized.includes("stop") || normalized.includes("objetivo")) {
     const aligned = brain.analyses["5m"]?.bias === brain.analyses["15m"]?.bias && brain.analyses["5m"]?.bias !== "NEUTRAL";
-    return `Lectura scalping: 5M ${brain.analyses["5m"] ? biasText(brain.analyses["5m"]!.bias).toLowerCase() : "DATA UNAVAILABLE"} y 15M ${brain.analyses["15m"] ? biasText(brain.analyses["15m"]!.bias).toLowerCase() : "DATA UNAVAILABLE"}. ${aligned ? "Los marcos están alineados, pero la entrada exige además volumen, spread, estructura y stop ATR válidos en el Modo Scalping." : "No hay alineación mínima 5M/15M; no corresponde fabricar una entrada."} Este analista no improvisa niveles: el panel Scalping calcula entrada, invalidación y objetivos únicamente con velas y estructura reales. ${evidence}`;
+    return `Lectura scalping: 5M ${brain.analyses["5m"] ? biasText(brain.analyses["5m"]!.bias).toLowerCase() : "SIN DATOS"} y 15M ${brain.analyses["15m"] ? biasText(brain.analyses["15m"]!.bias).toLowerCase() : "SIN DATOS"}. ${aligned ? "Los marcos están alineados, pero la entrada exige además volumen, spread, estructura y stop ATR válidos en el Modo Scalping." : "No hay alineación mínima 5M/15M; no corresponde fabricar una entrada."} Este analista no improvisa niveles: el panel Scalping calcula entrada, invalidación y objetivos únicamente con velas y estructura reales. ${evidence}`;
   }
 
   if (normalized.includes("liquid") || /x(?:5|10|20|50|100)/.test(normalized)) {
@@ -184,7 +184,7 @@ function buildAnswer(
   }
 
   if (normalized.includes("altseason") || normalized.includes("alt sesión") || normalized.includes("altseson")) {
-    const score = context.altseason.score === null ? "DATA UNAVAILABLE" : `${context.altseason.score}/100`;
+    const score = context.altseason.score === null ? "SIN DATOS" : `${context.altseason.score}/100`;
     return `El entorno Altseason está en “${context.altseason.state}” con score ajustado ${score} (técnico ${context.altseason.raw ?? "—"}, ajuste macro ${context.altseason.adjustment}). ${brain.consensus.alignedFrames}/${brain.consensus.validFrames} temporalidades acompañan el sesgo ${biasText(brain.consensus.bias).toLowerCase()}. Una altseason no se confirma por un solo activo ni por una subida aislada. ${evidence}`;
   }
 
@@ -202,7 +202,7 @@ function buildAnswer(
 
   const derivativeText = brain.derivatives.available
     ? `OI ${pct(brain.derivatives.openInterestChangePct)}, funding ${pct(brain.derivatives.fundingRatePct, 4)} y taker ratio ${multiple(brain.derivatives.takerBuySellRatio)}`
-    : "derivados DATA UNAVAILABLE";
+    : "derivados sin datos";
   return `${brain.symbol} presenta sesgo ${biasText(brain.consensus.bias).toLowerCase()} y score ${brain.consensus.score}/100, con ${brain.consensus.alignedFrames}/${brain.consensus.validFrames} marcos alineados. En ${brain.selectedTimeframe.toUpperCase()}: RSI ${selected.rsi14?.toFixed(1) ?? "—"}, volumen relativo ${multiple(selected.relativeVolume)}, ATR ${pct(selected.atrPct)}; ${derivativeText}. Flujo en vivo: ${context.winner.toLowerCase()}, delta ${pct(context.delta)}. Estado: ${brain.consensus.verdict}. ${evidence}`;
 }
 
@@ -251,7 +251,7 @@ export default function MarketBrain(props: MarketBrainProps) {
           result = await post();
         }
         const { response, payload } = result;
-        if (!response.ok || !payload.selected) throw new Error(payload.error ?? "DATA UNAVAILABLE");
+        if (!response.ok || !payload.selected) throw new Error(payload.error ?? "SIN DATOS");
         if (!alive) return;
         setBrain(payload);
         publishBrainDerivatives(payload);
@@ -259,7 +259,7 @@ export default function MarketBrain(props: MarketBrainProps) {
         setStatus("ready");
       } catch (loadError) {
         if (!alive || controller.signal.aborted) return;
-        setError(loadError instanceof Error ? loadError.message : "DATA UNAVAILABLE");
+        setError(loadError instanceof Error ? loadError.message : "SIN DATOS");
         setStatus("error");
       }
     };
@@ -323,11 +323,12 @@ export default function MarketBrain(props: MarketBrainProps) {
           </span>
         </div>
       </header>
-
+
+
 
       {status === "error" && !brain ? (
         <div className="brain-unavailable">
-          <b>DATA UNAVAILABLE</b>
+          <b>SIN DATOS</b>
           <span>{error}. El sistema no sustituye datos faltantes con números ficticios.</span>
         </div>
       ) : (
@@ -367,7 +368,7 @@ export default function MarketBrain(props: MarketBrainProps) {
             </article>
 
             <article className="derivatives-card">
-              <div className="derivatives-head"><span>DERIVATIVES PULSE</span><b>{brain?.derivatives.available ? "BINANCE FUTURES" : "DATA UNAVAILABLE"}</b></div>
+              <div className="derivatives-head"><span>DERIVATIVES PULSE</span><b>{brain?.derivatives.available ? "BINANCE FUTURES" : "SIN DATOS"}</b></div>
               <div className="derivatives-grid">
                 <div><span>OPEN INTEREST</span><b>{usd(brain?.derivatives.openInterestUsd)}</b><small>{pct(brain?.derivatives.openInterestChangePct)} / {frameLabel[timeframe]}</small></div>
                 <div><span>FUNDING</span><b className={(brain?.derivatives.fundingRatePct ?? 0) > 0.05 ? "negative" : ""}>{pct(brain?.derivatives.fundingRatePct, 4)}</b><small>ÚLTIMO RATE</small></div>
@@ -392,7 +393,7 @@ export default function MarketBrain(props: MarketBrainProps) {
                   <button key={frame} className={`${item?.bias.toLowerCase() ?? "unavailable"} ${frame === timeframe ? "selected" : ""}`} onClick={() => props.onTimeframeChange(frame)}>
                     <span>{frameLabel[frame]}</span>
                     <strong>{item?.score ?? "—"}<small>/100</small></strong>
-                    <b>{item ? biasText(item.bias) : "DATA UNAVAILABLE"}</b>
+                    <b>{item ? biasText(item.bias) : "SIN DATOS"}</b>
                     <div><i style={{ width: `${item?.score ?? 0}%` }} /></div>
                     <p><em>{pct(item?.changePct)}</em><em>RSI {item?.rsi14?.toFixed(0) ?? "—"}</em><em>RV {multiple(item?.relativeVolume)}</em></p>
                   </button>
@@ -484,7 +485,7 @@ export default function MarketBrain(props: MarketBrainProps) {
           </div>
 
           <footer className="brain-audit-footer">
-            <span>FUENTES: {brain?.sources.join(" · ") || "DATA UNAVAILABLE"}</span>
+            <span>FUENTES: {brain?.sources.join(" · ") || "SIN DATOS"}</span>
             <span>ACTUALIZADO: {brain ? new Date(brain.generatedAt).toLocaleString() : "—"}</span>
             <b>Signals are probabilistic market setups, not guarantees or financial advice.</b>
           </footer>

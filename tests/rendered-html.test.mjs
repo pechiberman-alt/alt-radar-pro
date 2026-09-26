@@ -58,7 +58,7 @@ test("contains the requested ownership and safety language", async () => {
 
   assert.match(app, /© 2026 URL\.FX/);
   assert.match(app, /escenarios probabilísticos/i);
-  assert.match(app, /DATA UNAVAILABLE/);
+  assert.match(app, /SIN DATOS/);
   assert.match(layout, /creator: "URL\.FX"/);
 });
 

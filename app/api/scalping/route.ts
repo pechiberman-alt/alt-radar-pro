@@ -83,7 +83,7 @@ async function fetchKlines(symbol: string, interval: "5m" | "15m") {
       lastError = error;
     }
   }
-  throw lastError ?? new Error("DATA UNAVAILABLE");
+  throw lastError ?? new Error("SIN DATOS");
 }
 
 export async function POST(request: Request) {
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[ALT_RADAR_SCALPING]", error);
     return Response.json(
-      { ok: false, error: "SCALPING DATA UNAVAILABLE", signals: [] },
+      { ok: false, error: "SCALPING SIN DATOS", signals: [] },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }

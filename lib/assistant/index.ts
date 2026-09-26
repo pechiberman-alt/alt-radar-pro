@@ -87,7 +87,7 @@ export type AssistantAnswer = {
   concepts: { title: string; summary: string; caveat?: string }[];
 };
 
-const UNAVAILABLE = "DATA UNAVAILABLE";
+const UNAVAILABLE = "SIN DATOS";
 
 const pct = (value: number | null | undefined, digits = 2) =>
   value === null || value === undefined || !Number.isFinite(value)

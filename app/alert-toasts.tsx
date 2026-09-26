@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { subscribeToAlerts } from "@/lib/alert-bus";
 import type { Alert } from "@/lib/alerts";
 
@@ -22,6 +23,11 @@ const DISMISS_MS: Record<Alert["priority"], number | null> = {
 const MAX_VISIBLE = 3;
 
 export default function AlertToasts() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(t);
+  }, []);
   const [toasts, setToasts] = useState<Alert[]>([]);
 
   const dismiss = useCallback((id: string) => {
@@ -42,7 +48,11 @@ export default function AlertToasts() {
 
   if (!toasts.length) return null;
 
-  return (
+  // Rendered into <body>: mounted inside the header, whose backdrop-filter
+  // makes it the containing block for fixed children, the banners were
+  // positioned against the header and appeared on top of it.
+  if (!mounted) return null;
+  return createPortal(
     <div className="toasts" role="status" aria-live="polite">
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast p-${toast.priority.toLowerCase()}`}>
@@ -64,6 +74,7 @@ export default function AlertToasts() {
           ) : null}
         </div>
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }
