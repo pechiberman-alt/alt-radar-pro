@@ -76,6 +76,16 @@ async function localKey(db: D1Database): Promise<string> {
   return (await read(db, "local_key"))!;
 }
 
+/**
+ * The key any AES-GCM secret in this app is encrypted with: the Cloudflare
+ * secret when set, otherwise the same auto-generated local key `localKey`
+ * already uses for Telegram and the AI key — one key, one fallback path,
+ * shared by every feature that stores a secret this way (Binance included).
+ */
+export async function resolveEncryptionKey(db: D1Database, env: SettingsEnv): Promise<string> {
+  return env.ENCRYPTION_KEY ?? (await localKey(db));
+}
+
 export function encryptionStrength(env: SettingsEnv): "fuerte" | "local" {
   return env.ENCRYPTION_KEY ? "fuerte" : "local";
 }

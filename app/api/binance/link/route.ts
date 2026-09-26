@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { ensureAuthSchema, getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
-import { assertReadOnlyKey, encryptSecret } from "@/lib/binance-account";
+import { assertReadOnlyKey, encryptSecret, friendlyBinanceError } from "@/lib/binance-account";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +25,8 @@ export async function POST(request: Request) {
     // Rejects the key server-side if it has trading or withdrawal rights.
     await assertReadOnlyKey(apiKey, apiSecret);
 
-    const encryptedKey = await encryptSecret(apiKey, env);
-    const encryptedSecret = await encryptSecret(apiSecret, env);
+    const encryptedKey = await encryptSecret(apiKey, env.DB, env);
+    const encryptedSecret = await encryptSecret(apiSecret, env.DB, env);
 
     await env.DB.prepare(
       `INSERT INTO binance_credentials (user_id, api_key_encrypted, api_secret_encrypted)
@@ -41,8 +41,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true });
   } catch (error) {
     console.error("[ALT_RADAR_BINANCE_LINK]", error);
-    const message = error instanceof Error ? error.message : "NO SE PUDO VINCULAR LA CUENTA";
-    return Response.json({ error: message }, { status: 400 });
+    return Response.json({ error: friendlyBinanceError(error, "No se pudo vincular la cuenta.") }, { status: 400 });
   }
 }
 
