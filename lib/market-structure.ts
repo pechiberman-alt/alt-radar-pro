@@ -154,7 +154,7 @@ export function stablecoinRegime(
 ): StablecoinRegime {
   if (usdtDominance === null) {
     return {
-      label: "DATA UNAVAILABLE",
+      label: "SIN DATOS",
       reading: "Sin dominancia de stablecoins en el ciclo actual.",
       tone: "unknown",
     };

@@ -80,10 +80,10 @@ export default function SwingDesk({
       const failures = settled.filter((result) => result.status === "rejected").length;
 
       setSetups(found);
-      setError(failures === candidates.length ? "DATA UNAVAILABLE" : "");
+      setError(failures === candidates.length ? "SIN DATOS" : "");
       setLastRun(new Date());
     } catch {
-      if (runId.current === id) setError("DATA UNAVAILABLE");
+      if (runId.current === id) setError("SIN DATOS");
     } finally {
       if (runId.current === id) setLoading(false);
     }

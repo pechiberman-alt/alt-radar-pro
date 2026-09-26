@@ -58,7 +58,7 @@ async function directKlines(symbol: string, interval: "5m" | "15m", signal: Abor
       lastError = error;
     }
   }
-  throw lastError ?? new Error("DATA UNAVAILABLE");
+  throw lastError ?? new Error("SIN DATOS");
 }
 
 async function buildDirectSnapshots(assets: MarketAsset[], signal: AbortSignal) {
@@ -129,7 +129,7 @@ export default function ScalpingDesk({
         }),
       });
       const next = await response.json() as Payload;
-      if (!response.ok || !next.signals?.length) throw new Error(next.error ?? "DATA UNAVAILABLE");
+      if (!response.ok || !next.signals?.length) throw new Error(next.error ?? "SIN DATOS");
       setPayload(next);
       setSelected((current) =>
         current
@@ -142,7 +142,7 @@ export default function ScalpingDesk({
       setStatus("ready");
     } catch (loadError) {
       if (controller.signal.aborted) setError("Tiempo de espera agotado; reintenta el ciclo.");
-      else setError(loadError instanceof Error ? loadError.message : "DATA UNAVAILABLE");
+      else setError(loadError instanceof Error ? loadError.message : "SIN DATOS");
       setStatus("error");
     } finally {
       window.clearTimeout(timeout);
@@ -219,7 +219,7 @@ export default function ScalpingDesk({
 
       {status === "error" && !payload ? (
         <div className="scalp-empty">
-          <b>SCALPING DATA UNAVAILABLE</b>
+          <b>SCALPING SIN DATOS</b>
           <span>{error}. No se generan niveles con datos incompletos.</span>
           <button onClick={() => void refresh()}>REINTENTAR</button>
         </div>

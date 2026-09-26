@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { error: "DATA UNAVAILABLE", upstreamStatus: lastStatus || null },
+    { error: "SIN DATOS", upstreamStatus: lastStatus || null },
     { status: 503, headers: { "Cache-Control": "no-store" } },
   );
 }

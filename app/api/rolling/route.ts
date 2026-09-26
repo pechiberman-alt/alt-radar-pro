@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { error: "DATA UNAVAILABLE" },
+    { error: "SIN DATOS" },
     { status: 503, headers: { "Cache-Control": "no-store" } },
   );
 }

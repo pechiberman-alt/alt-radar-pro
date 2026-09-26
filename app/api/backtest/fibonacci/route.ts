@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const candles = await fetchHistoricalCandles(symbol, interval, limit);
     if (!candles || candles.length < 60) {
       return NextResponse.json(
-        { error: "DATA UNAVAILABLE" },
+        { error: "SIN DATOS" },
         { status: 503, headers: { "Cache-Control": "no-store" } },
       );
     }

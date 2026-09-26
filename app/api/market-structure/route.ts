@@ -164,7 +164,7 @@ export async function GET() {
 
   if (!value) {
     return NextResponse.json(
-      { error: "DATA UNAVAILABLE" },
+      { error: "SIN DATOS" },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }

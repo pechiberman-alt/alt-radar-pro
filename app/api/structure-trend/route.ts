@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   try {
     if (!env.DB) {
       return NextResponse.json(
-        { error: "DATA UNAVAILABLE", reason: "sin base de datos" },
+        { error: "SIN DATOS", reason: "sin base de datos" },
         { status: 503, headers: { "Cache-Control": "no-store" } },
       );
     }
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     );
   } catch {
     return NextResponse.json(
-      { error: "DATA UNAVAILABLE" },
+      { error: "SIN DATOS" },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }

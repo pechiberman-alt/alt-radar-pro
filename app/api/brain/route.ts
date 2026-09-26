@@ -566,7 +566,7 @@ export async function POST(request: Request) {
       "El precio exacto depende de entrada, margen, maintenance tier, comisiones y modo de posición.",
       "Análisis probabilístico; no es garantía ni asesoramiento financiero.",
     ];
-    if (!selected) warnings.unshift("DATA UNAVAILABLE en la temporalidad seleccionada.");
+    if (!selected) warnings.unshift("SIN DATOS en la temporalidad seleccionada.");
     if (!derivatives.available) warnings.unshift("Métricas de derivados no disponibles para este par.");
 
     const payload: MarketBrainPayload = {

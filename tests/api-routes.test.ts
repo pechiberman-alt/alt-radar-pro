@@ -35,7 +35,7 @@ test("every proxy route refuses to cache upstream failures as success", async ()
     );
     assert.match(
       source,
-      /DATA UNAVAILABLE/,
+      /SIN DATOS/,
       `${route}: debe declarar el dato faltante en lugar de completarlo`,
     );
   }

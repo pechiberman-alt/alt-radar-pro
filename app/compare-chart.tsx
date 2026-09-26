@@ -57,7 +57,7 @@ function CompareLine({
   if (!all.length) {
     return (
       <div className="compare-empty">
-        <b>DATA UNAVAILABLE</b>
+        <b>SIN DATOS</b>
         <span>No se pudieron cargar velas para los activos seleccionados.</span>
       </div>
     );
@@ -154,7 +154,7 @@ export default function CompareChart({
             if (requestId.current !== id) return;
             setStates((current) => ({
               ...current,
-              [symbol]: { symbol, candles: [], loading: false, error: "DATA UNAVAILABLE" },
+              [symbol]: { symbol, candles: [], loading: false, error: "SIN DATOS" },
             }));
           }
         }),
@@ -250,7 +250,7 @@ export default function CompareChart({
               <i style={{ background: COLORS[index % COLORS.length] }} />
               <b>{assetName(symbol)}</b>
               {state?.error ? (
-                <span className="muted">DATA UNAVAILABLE</span>
+                <span className="muted">SIN DATOS</span>
               ) : (
                 <span className={point && point.pct >= 0 ? "positive" : "negative"}>
                   {point ? `${point.pct >= 0 ? "+" : ""}${point.pct.toFixed(2)}%` : "—"}

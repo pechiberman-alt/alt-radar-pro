@@ -236,15 +236,15 @@ export default function SignalLedger({
     const report = [
       "ALT RADAR PRO — INFORME AUTOMÁTICO",
       `Fecha: ${new Date().toLocaleString("es-AR")}`,
-      `Altseason ajustada: ${altseason ?? "DATA UNAVAILABLE"}/100`,
-      `Riesgo geopolítico: ${risk ?? "DATA UNAVAILABLE"}/100`,
+      `Altseason ajustada: ${altseason ?? "SIN DATOS"}/100`,
+      `Riesgo geopolítico: ${risk ?? "SIN DATOS"}/100`,
       `Señales activas: ${top.length}`,
       ...top.map(
         (asset) =>
           `• ${assetName(asset.symbol)}/USDT · ${asset.side} · ${asset.signal} · ${asset.score}/100`,
       ),
       `Historial real: ${payload.stats.total} registros; ${payload.stats.evaluated4h} evaluados a 4H`,
-      `Fuentes: ${sources.join(" · ") || "DATA UNAVAILABLE"}`,
+      `Fuentes: ${sources.join(" · ") || "SIN DATOS"}`,
       "Las señales son escenarios probabilísticos, no garantías ni asesoramiento financiero.",
       "© 2026 URL.FX",
     ].join("\n");

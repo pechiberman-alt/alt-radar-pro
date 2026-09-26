@@ -197,7 +197,7 @@ export default function CorrelationWatch({
                 price: null,
                 change24h: null,
                 loading: false,
-                error: "DATA UNAVAILABLE",
+                error: "SIN DATOS",
               },
             }));
           }
@@ -342,7 +342,7 @@ export default function CorrelationWatch({
             <div className="watch-tile" key={item.symbol}>
               <span>{item.label}</span>
               {state?.error ? (
-                <strong className="muted">DATA UNAVAILABLE</strong>
+                <strong className="muted">SIN DATOS</strong>
               ) : (
                 <>
                   <strong>{formatPrice(state?.price ?? null)}</strong>

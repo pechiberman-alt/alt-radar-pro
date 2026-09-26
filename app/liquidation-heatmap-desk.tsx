@@ -2256,6 +2256,8 @@ export default function LiquidationHeatmapDesk() {
             )}
           </div>
 
+          {/* Two columns on laptop widths (see laptop.css); one on phones. */}
+          <div className="liq-below">
           {keyLevels.length > 0 && (
             <details className="liq-fold liq-keys">
               <summary>PUNTOS CLAVE · ESTRUCTURA + LIQUIDACIÓN</summary>
@@ -2594,6 +2596,8 @@ export default function LiquidationHeatmapDesk() {
               </div>
             </div>
           )}
+
+          </div>
 
           <details className="liq-fold liq-method-fold">
             <summary>LEYENDA, METODOLOGÍA Y ADVERTENCIAS</summary>
