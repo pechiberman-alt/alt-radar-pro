@@ -100,6 +100,13 @@ export function friendlyBinanceError(
 ): string {
   if (error instanceof BinanceApiError) {
     const msg = error.message.toLowerCase();
+    // Checked first, before any substring heuristic below: the marker's
+    // payload is Binance's raw (non-JSON) response body, arbitrary text that
+    // could easily contain "ip" or other trigger words by coincidence — that
+    // must never get misread as one of Binance's own rejection reasons.
+    if (error.message.startsWith("NON_JSON_RESPONSE_")) {
+      return `Binance devolvió una respuesta que no se pudo leer (código ${error.status}). Probablemente un bloqueo de red entre el servidor y Binance, no tu API key — probá de nuevo en un rato.`;
+    }
     // Futures gates ALL of /fapi (reading included) behind one permission
     // flag, and Binance answers a permission problem there with the same
     // -2015 text used for a bad IP or a bad key. A key already linked and
@@ -149,7 +156,18 @@ export async function signedRequest<T>(
     headers: { "X-MBX-APIKEY": apiKey },
     signal: AbortSignal.timeout(10_000),
   });
-  const data = (await response.json()) as T & { msg?: string; code?: number };
+  // Read as text first, not response.json() directly: a network-level block
+  // in front of Binance (a WAF/CDN page, not Binance's own API) answers with
+  // HTML or plain text, not JSON. response.json() throwing on that swallows
+  // the status code and body entirely, leaving a bare "Unexpected token"
+  // with nothing to diagnose from. Parsing by hand keeps both.
+  const raw = await response.text();
+  let data: (T & { msg?: string; code?: number }) | null = null;
+  try {
+    data = JSON.parse(raw) as T & { msg?: string; code?: number };
+  } catch {
+    throw new BinanceApiError(`NON_JSON_RESPONSE_${response.status}:${raw.slice(0, 200)}`, response.status);
+  }
   if (!response.ok) {
     throw new BinanceApiError(data?.msg || `BINANCE_ERROR_${response.status}`, response.status);
   }

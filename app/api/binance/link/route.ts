@@ -1,10 +1,12 @@
 import { env } from "cloudflare:workers";
 import { ensureAuthSchema, getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 import { assertReadOnlyKey, encryptSecret, friendlyBinanceError } from "@/lib/binance-account";
+import { logBinanceFailure } from "@/lib/binance-debug-log";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  let userId: number | null = null;
   try {
     if (!env.DB) throw new Error("D1_UNAVAILABLE");
     await ensureAuthSchema(env.DB);
@@ -12,6 +14,7 @@ export async function POST(request: Request) {
     const token = getCookie(request, SESSION_COOKIE);
     const user = token ? await getSessionUser(env.DB, token) : null;
     if (!user) return Response.json({ error: "NO AUTENTICADO" }, { status: 401 });
+    userId = user.id;
 
     const body = (await request.json().catch(() => null)) as
       | { apiKey?: string; apiSecret?: string }
@@ -41,6 +44,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true });
   } catch (error) {
     console.error("[ALT_RADAR_BINANCE_LINK]", error);
+    if (userId !== null && env.DB) await logBinanceFailure(env.DB, "link", userId, error);
     return Response.json({ error: friendlyBinanceError(error, "No se pudo vincular la cuenta.") }, { status: 400 });
   }
 }
