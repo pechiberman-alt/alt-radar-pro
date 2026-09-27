@@ -17,7 +17,12 @@
 
 import { signedRequest } from "./binance-account.ts";
 
-const FAPI_BASE = "https://fapi.binance.com";
+// Same reasoning as lib/binance-account.ts's BINANCE_MIRRORS: Binance's WAF
+// (HTTP 403 is Binance's own documented code for a WAF block) is IP-based,
+// so a mirror can succeed where the primary host is blocked. fapi1/fapi2
+// are the same futures mirrors lib/market-fetch.ts already uses for public
+// futures data.
+const FAPI_MIRRORS = ["https://fapi.binance.com", "https://fapi1.binance.com", "https://fapi2.binance.com"];
 
 export type RawFuturesPosition = {
   symbol: string;
@@ -36,7 +41,7 @@ export type RawFuturesPosition = {
  *  "0"); callers that only want open ones filter that themselves so the raw
  *  shape stays a faithful pass-through of what Binance returned. */
 export async function getFuturesPositions(apiKey: string, apiSecret: string) {
-  return signedRequest<RawFuturesPosition[]>("/fapi/v2/positionRisk", {}, apiKey, apiSecret, FAPI_BASE);
+  return signedRequest<RawFuturesPosition[]>("/fapi/v2/positionRisk", {}, apiKey, apiSecret, FAPI_MIRRORS);
 }
 
 export type RawFuturesAccount = {
@@ -49,5 +54,5 @@ export type RawFuturesAccount = {
 };
 
 export async function getFuturesAccountSummary(apiKey: string, apiSecret: string) {
-  return signedRequest<RawFuturesAccount>("/fapi/v2/account", {}, apiKey, apiSecret, FAPI_BASE);
+  return signedRequest<RawFuturesAccount>("/fapi/v2/account", {}, apiKey, apiSecret, FAPI_MIRRORS);
 }

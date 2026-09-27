@@ -16,6 +16,13 @@
 import { resolveEncryptionKey } from "./app-settings.ts";
 
 const BINANCE_BASE = "https://api.binance.com";
+// Binance's own docs list these as the full API (not market-data-only,
+// unlike data-api.binance.vision) — "should give better performance but
+// have less stability." Tried in order after the primary host, since a
+// Binance WAF block (HTTP 403 — Binance's own documented meaning for that
+// status) is IP-based and doesn't necessarily apply to every mirror the
+// same way.
+const BINANCE_MIRRORS = [BINANCE_BASE, "https://api1.binance.com", "https://api2.binance.com", "https://api3.binance.com", "https://api4.binance.com"];
 
 function toBase64(bytes: ArrayBuffer | Uint8Array) {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -139,16 +146,17 @@ export function friendlyBinanceError(
   return fallback;
 }
 
-/** `base` defaults to the spot API; lib/binance-futures.ts passes the
- *  futures one so the two account types share one signing implementation
- *  instead of a second, independently-maintained copy of it. */
-export async function signedRequest<T>(
+async function signedRequestOnce<T>(
   path: string,
   params: Record<string, string>,
   apiKey: string,
   apiSecret: string,
-  base: string = BINANCE_BASE,
+  base: string,
 ) {
+  // Timestamp and signature are computed fresh per attempt, not once for the
+  // whole mirror loop: Binance's recvWindow is 5s, and a signature from an
+  // earlier, already-failed mirror would be stale by the time a later one
+  // is tried.
   const query = new URLSearchParams({ ...params, timestamp: Date.now().toString(), recvWindow: "5000" });
   const signature = await hmacSha256Hex(query.toString(), apiSecret);
   query.set("signature", signature);
@@ -172,6 +180,38 @@ export async function signedRequest<T>(
     throw new BinanceApiError(data?.msg || `BINANCE_ERROR_${response.status}`, response.status);
   }
   return data;
+}
+
+/** `bases` defaults to the spot mirrors; lib/binance-futures.ts passes its
+ *  own (FAPI_MIRRORS) so the two account types share one signing
+ *  implementation instead of a second, independently-maintained copy of it.
+ *
+ *  Tries each mirror in order, moving to the next ONLY when a mirror
+ *  answered with something that isn't a real Binance response at all — a
+ *  network-level block (NON_JSON_RESPONSE_*) or the fetch failing outright.
+ *  A genuine Binance JSON error (bad key, bad signature, disabled
+ *  permission) is the same on every mirror; surfacing it immediately from
+ *  the first mirror that actually answered is faster and more honest than
+ *  silently retrying a rejection that won't change. */
+export async function signedRequest<T>(
+  path: string,
+  params: Record<string, string>,
+  apiKey: string,
+  apiSecret: string,
+  bases: string[] = BINANCE_MIRRORS,
+) {
+  let lastError: unknown = null;
+  for (const base of bases) {
+    try {
+      return await signedRequestOnce<T>(path, params, apiKey, apiSecret, base);
+    } catch (err) {
+      lastError = err;
+      const isNetworkBlock = err instanceof BinanceApiError && err.message.startsWith("NON_JSON_RESPONSE_");
+      const isFetchFailure = !(err instanceof BinanceApiError);
+      if (!isNetworkBlock && !isFetchFailure) throw err;
+    }
+  }
+  throw lastError;
 }
 
 export type ApiRestrictions = {
