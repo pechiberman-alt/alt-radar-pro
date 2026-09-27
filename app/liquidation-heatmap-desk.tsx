@@ -25,7 +25,15 @@ import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reve
 import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
 import { buildScenarios, type ScenarioBoard } from "@/lib/scenario-analysis";
 import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
-import { findOrderBlocks, orderBlockStats, type OrderBlock, type ZoneStats } from "@/lib/order-blocks";
+import {
+  breakerBlockStats,
+  findBreakerBlocks,
+  findOrderBlocks,
+  orderBlockStats,
+  type BreakerBlock,
+  type OrderBlock,
+  type ZoneStats,
+} from "@/lib/order-blocks";
 import { findPivots, parseSwingKlines } from "@/lib/swing-entries";
 import {
   BROWSER_BASES,
@@ -50,7 +58,7 @@ type DisplayCandle = {
   /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
   takerBuy?: number;
 };
-type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "tomas";
+type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "tomas";
 /** Footprint needs individual trades: legible and fetchable only on short frames. */
 const FOOTPRINT_FRAMES = new Set(["1m", "5m", "15m"]);
 const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
@@ -65,6 +73,7 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   patrones: true,
   liquidez: true,
   ob: false,
+  breaker: false,
   fvg: false,
   fib: false,
   volumen: true,
@@ -86,6 +95,7 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["rsi", "RSI"],
   ["macd", "MACD"],
   ["ob", "OB"],
+  ["breaker", "BREAKER"],
   ["fvg", "FVG"],
   ["fib", "FIB"],
 ];
@@ -184,6 +194,14 @@ const confidenceLabel = (stats: ZoneStats | null) => {
     ? `${pct}% en ${stats.tested} casos (muestra mínima)`
     : `${pct}% en ${stats.tested} casos`;
 };
+
+// Same numbers as confidenceLabel, compact enough to sit directly on the
+// chart next to the zone it describes — the fold list below keeps the full
+// "X% en Y casos" wording, this is just "X%" so the on-chart label doesn't
+// crowd out the price it's labeling. Empty string, not "0%", when there's
+// nothing to report yet.
+const confidencePct = (stats: ZoneStats | null) =>
+  stats && stats.holdRate !== null ? ` · ${Math.round(stats.holdRate * 100)}%` : "";
 
 const priceLabel = (price: number) =>
   price >= 1000
@@ -843,24 +861,6 @@ export default function LiquidationHeatmapDesk() {
     }
   }, [layout]);
 
-  const orderBlocks = useMemo<OrderBlock[]>(() => {
-    if (!layout) return [];
-    // Detected over the visible window so a block always has the candles
-    // that formed it on screen beside it.
-    const swing = layout.candles.map((candle) => ({
-      openTime: candle.time,
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
-      volume: 1,
-      quoteVolume: 0,
-    }));
-    return findOrderBlocks(swing).filter(
-      (block) => block.high >= layout.lo && block.low <= layout.hi,
-    );
-  }, [layout]);
-
   const livePrice =
     liveKline && data?.timeframe === timeframe && data.heatmap.symbol === symbol
       ? liveKline.close
@@ -882,6 +882,24 @@ export default function LiquidationHeatmapDesk() {
         : [],
     [layout],
   );
+
+  // Same swingView every OB-family detector reads — previously this built
+  // its own copy with volume hard-set to 1, so an order block's volumeUsd
+  // on the chart was never the real notional. swingView already exists
+  // with real volume; reusing it here fixed that as a side effect.
+  const orderBlocks = useMemo<OrderBlock[]>(() => {
+    if (!layout || !swingView.length) return [];
+    return findOrderBlocks(swingView).filter(
+      (block) => block.high >= layout.lo && block.low <= layout.hi,
+    );
+  }, [layout, swingView]);
+
+  const breakerBlocks = useMemo<BreakerBlock[]>(() => {
+    if (!layout || !swingView.length) return [];
+    return findBreakerBlocks(swingView).filter(
+      (block) => block.high >= layout.lo && block.low <= layout.hi,
+    );
+  }, [layout, swingView]);
 
   const gaps = useMemo<FairValueGap[]>(() => {
     if (!layout || !swingView.length) return [];
@@ -925,6 +943,11 @@ export default function LiquidationHeatmapDesk() {
   }, [layout, pools, orderBlocks, gaps, livePrice]);
   const obConfidence = useMemo<ZoneStats | null>(
     () => (swingView.length ? orderBlockStats(swingView) : null),
+    [swingView],
+  );
+
+  const breakerConfidence = useMemo<ZoneStats | null>(
+    () => (swingView.length ? breakerBlockStats(swingView) : null),
     [swingView],
   );
 
@@ -1009,6 +1032,10 @@ export default function LiquidationHeatmapDesk() {
       if (zone) atoms.push({ kind: "imán de liquidaciones", weight: 1.5, ...around(zone.price, 0.002) });
     }
     for (const block of orderBlocks) atoms.push({ kind: "order block", weight: 1, low: block.low, high: block.high });
+    // Same weight as IFVG: both are evidence of an OBSERVED failure — price
+    // actually closed through and the level flipped — not just an unfilled
+    // level, which is why both rank above their un-broken counterpart.
+    for (const block of breakerBlocks) atoms.push({ kind: "breaker block", weight: 1.25, low: block.low, high: block.high });
     for (const gap of gaps) atoms.push({ kind: gap.kind, weight: gap.kind === "IFVG" ? 1.25 : 1, low: gap.low, high: gap.high });
     if (fibZone) for (const l of fibZone.levels) atoms.push({ kind: "Fibonacci", weight: 1, ...around(l.price, 0.001) });
     if (wyckoff) {
@@ -1021,10 +1048,10 @@ export default function LiquidationHeatmapDesk() {
       }
     }
     return findReversalZones(p, atoms).filter((z) => z.high >= layout.lo && z.low <= layout.hi);
-  }, [layout, livePrice, pools, orderBlocks, gaps, fibZone, wyckoff]);
+  }, [layout, livePrice, pools, orderBlocks, breakerBlocks, gaps, fibZone, wyckoff]);
 
   const labelSlots = useMemo(() => {
-    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), gap: new Set<number>(), rev: new Set<number>(), fib: [] as { y: number; text: string }[], wy: false, flag: new Set<string>() };
+    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), breaker: new Set<number>(), gap: new Set<number>(), rev: new Set<number>(), fib: [] as { y: number; text: string }[], wy: false, flag: new Set<string>() };
     const MIN_GAP_PX = 15;
     const taken: number[] = [];
     const claim = (price: number) => {
@@ -1067,6 +1094,12 @@ export default function LiquidationHeatmapDesk() {
         if (claim(block.high)) ob.add(block.index);
       }
     }
+    const breaker = new Set<number>();
+    if (layers.breaker) {
+      for (const block of [...breakerBlocks].sort((a, b) => b.strength - a.strength)) {
+        if (claim(block.high)) breaker.add(block.brokenAtIndex);
+      }
+    }
     const gap = new Set<number>();
     if (layers.fvg) {
       for (const g of [...gaps].sort((a, b) => b.quality - a.quality)) if (claim(g.high)) gap.add(g.index);
@@ -1086,8 +1119,8 @@ export default function LiquidationHeatmapDesk() {
         }, []);
       for (const m of merged) if (claim(m.price)) fib.push({ y: layout.y(m.price), text: m.text });
     }
-    return { pool, ob, gap, rev, fib, wy, flag };
-  }, [layout, pools, orderBlocks, gaps, reversalZones, fibZone, layers, wyckoff, flags]);
+    return { pool, ob, breaker, gap, rev, fib, wy, flag };
+  }, [layout, pools, orderBlocks, breakerBlocks, gaps, reversalZones, fibZone, layers, wyckoff, flags]);
 
   const keyLevels = useMemo(() => {
     if (!layout) return [];
@@ -1675,6 +1708,7 @@ export default function LiquidationHeatmapDesk() {
                       className={gap.side === "ALCISTA" ? "liq-fvg-label up" : "liq-fvg-label down"}
                     >
                       {gap.kind}
+                      {confidencePct(gap.kind === "IFVG" ? (gapConfidence?.ifvg ?? null) : (gapConfidence?.fvg ?? null))}
                     </text>
                   )}
                 </g>
@@ -1717,6 +1751,50 @@ export default function LiquidationHeatmapDesk() {
                         className={bullish ? "liq-ob-label up" : "liq-ob-label down"}
                       >
                         OB {bullish ? "↑" : "↓"}
+                        {confidencePct(obConfidence)}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Breaker blocks: an order block price closed through, so the
+                  zone flips role — drawn dashed to read as "this used to be
+                  the other side" rather than as a fresh order block. */}
+              {layers.breaker && breakerBlocks.map((block) => {
+                const top = layout.y(block.high);
+                const bottom = layout.y(block.low);
+                const height = Math.max(2, bottom - top);
+                const startX = layout.zoneStartX(
+                  Math.round((block.brokenAtIndex / Math.max(1, layout.candles.length - 1)) *
+                    Math.max(1, layout.heatmap.profileCandles - 1)),
+                );
+                const bullish = block.side === "ALCISTA";
+                return (
+                  <g key={`breaker-${block.index}`}>
+                    <rect
+                      x={startX}
+                      y={top}
+                      width={Math.max(4, MARGIN.left + layout.candleAreaW - startX)}
+                      height={height}
+                      className={bullish ? "liq-breaker up" : "liq-breaker down"}
+                      opacity={0.05 + (block.strength / 100) * 0.08}
+                    />
+                    <line
+                      x1={startX}
+                      x2={MARGIN.left + layout.candleAreaW}
+                      y1={top + height / 2}
+                      y2={top + height / 2}
+                      className={bullish ? "liq-breaker-mid up" : "liq-breaker-mid down"}
+                    />
+                    {labelSlots.breaker.has(block.brokenAtIndex) && (
+                      <text
+                        x={startX + 5}
+                        y={top - 3}
+                        className={bullish ? "liq-breaker-label up" : "liq-breaker-label down"}
+                      >
+                        BREAKER {bullish ? "↑" : "↓"}
+                        {confidencePct(breakerConfidence)}
                       </text>
                     )}
                   </g>
@@ -2514,6 +2592,18 @@ export default function LiquidationHeatmapDesk() {
                     high: block.high,
                     volumeUsd: block.volumeUsd,
                     stats: obConfidence,
+                    rank: block.strength,
+                    detail: undefined as string | undefined,
+                  })),
+                  ...breakerBlocks.map((block) => ({
+                    key: `breaker-${block.index}`,
+                    kind: `BREAKER ${block.side === "ALCISTA" ? "↑" : "↓"}`,
+                    cls: block.side === "ALCISTA" ? "up" : "down",
+                    price: block.mid,
+                    low: block.low,
+                    high: block.high,
+                    volumeUsd: block.volumeUsd,
+                    stats: breakerConfidence,
                     rank: block.strength,
                     detail: undefined as string | undefined,
                   })),
