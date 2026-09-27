@@ -526,6 +526,10 @@
 .fp-num.imb-s{fill:#ff9aa3;font-weight:700}
 .fp-delta{font:7px var(--font-mono);text-anchor:middle;font-weight:600}
 .fp-delta.up{fill:var(--green)}.fp-delta.down{fill:var(--red)}
+.fp-stack{font:10px var(--font-mono);text-anchor:middle;font-weight:800;paint-order:stroke;stroke:#050a08;stroke-width:0.6px}
+.fp-stack.up{fill:var(--green)}
+.fp-stack.down{fill:var(--red)}
+@media(max-width:700px){.fp-stack{font-size:12px}}
 .fp-partial{opacity:.45}
 .fp-hint{margin:10px 0 0;padding:9px 11px;background:#0e0c1a;border:1px solid #3a3470;border-radius:4px;font:9px var(--font-mono);line-height:1.6;color:#c9c2ff}
 
