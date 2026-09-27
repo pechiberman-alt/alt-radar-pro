@@ -18,7 +18,16 @@ import {
 } from "@/lib/live-market";
 import { browserFeedDeps, startLiveFeed, type FeedStatus } from "@/lib/live-feed";
 import { divergenceStats, findDivergences, macd, rsi } from "@/lib/oscillators";
-import { bucketSize, buildFootprints, candleDelta, cumulativeDelta, imbalance, parseAggTrade, type Trade } from "@/lib/footprint";
+import {
+  bucketSize,
+  buildFootprints,
+  candleDelta,
+  cumulativeDelta,
+  findStackedImbalances,
+  imbalance,
+  parseAggTrade,
+  type Trade,
+} from "@/lib/footprint";
 import { findSweeps, sweepStats } from "@/lib/liquidity-sweeps";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
 import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
@@ -1862,6 +1871,26 @@ export default function LiquidationHeatmapDesk() {
                           {delta >= 0 ? `+${q(delta)}` : `-${q(-delta)}`}
                         </text>
                       )}
+                      {/* Stacked imbalance: several consecutive footprint
+                          levels imbalanced the same direction — the actual
+                          footprint signal, as opposed to one isolated cell.
+                          Drawn at a fixed offset from the candle rather than
+                          gated by colW, so it stays visible zoomed out too,
+                          unlike the per-cell numbers above. */}
+                      {findStackedImbalances(fp, candle.high, candle.low).map((run, ri) => {
+                        const buySide = run.side === "COMPRA";
+                        const y = buySide ? layout.y(candle.low) + 24 : layout.y(candle.high) - 10;
+                        return (
+                          <text
+                            key={`stack-${ri}`}
+                            x={xPos}
+                            y={y}
+                            className={`fp-stack ${buySide ? "up" : "down"}`}
+                          >
+                            {buySide ? "▲" : "▼"} ×{run.levels}
+                          </text>
+                        );
+                      })}
                     </g>
                   );
                 }
