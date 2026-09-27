@@ -102,7 +102,7 @@
   position: absolute; left: 10px; bottom: 9px; display: flex; align-items: center; gap: 6px;
   color: #5e7167; font: 9px var(--font-mono); pointer-events: none;
 }
-.chart-legend-overlay i { width: 90px; height: 4px; background: linear-gradient(90deg,#155e82,#19cabe,#ffd63a,#ff4b2c); }
+.chart-legend-overlay i { width: 90px; height: 4px; background: linear-gradient(90deg,#040a14,#0e447a,#40b0e0,#e8f8ff); }
 .chart-tooltip {
   position: absolute; z-index: 3; width: 154px; padding: 9px 10px;
   border: 1px solid rgba(177, 215, 195, .26); border-radius: 4px;

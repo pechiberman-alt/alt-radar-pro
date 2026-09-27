@@ -218,14 +218,19 @@ const wallStrengthLabel = (value: number) =>
 
 
 function heatColor(intensity: number, alpha = 1) {
+  // Blue-to-white on purpose, not a full rainbow: orange is reserved for
+  // iceberg markers elsewhere on this same canvas (see the ◆ iceberg legend
+  // entry), and a heatmap that also passes through green/yellow/orange at
+  // high intensity competes with that marker instead of reading as a
+  // distinct, deliberate signal against a calmer background.
   const stops = [
-    { at: 0, color: [4, 18, 34] },
-    { at: 0.16, color: [8, 51, 92] },
-    { at: 0.34, color: [8, 109, 139] },
-    { at: 0.52, color: [9, 175, 152] },
-    { at: 0.7, color: [96, 210, 93] },
-    { at: 0.86, color: [226, 225, 53] },
-    { at: 1, color: [255, 101, 34] },
+    { at: 0, color: [4, 10, 20] },
+    { at: 0.18, color: [8, 34, 66] },
+    { at: 0.4, color: [14, 68, 122] },
+    { at: 0.62, color: [24, 118, 178] },
+    { at: 0.8, color: [64, 176, 224] },
+    { at: 0.93, color: [156, 224, 246] },
+    { at: 1, color: [232, 248, 255] },
   ];
   const value = clamp(intensity, 0, 1);
   const upper = stops.find((stop) => stop.at >= value) ?? stops.at(-1)!;
@@ -390,7 +395,12 @@ export default function LiveBookmap({
   const [liquidityHistory, setLiquidityHistory] = useState<Frame[]>([]);
   const [liquidityCoverage, setLiquidityCoverage] = useState({ minutes: 0, samples: 0 });
   const [liquidityArchiveStatus, setLiquidityArchiveStatus] = useState<"loading" | "recording" | "unavailable">("loading");
-  const [timeZoom, setTimeZoom] = useState(1);
+  // Default to a narrower window than the raw 5m/15m/1h span: at 1× the map
+  // starts empty and takes the full window to look like anything, which
+  // reads as broken rather than as a tool still warming up. 4× shows the
+  // last ~75s on the 5m timeframe — full-looking within a minute of opening
+  // — while the existing zoom controls still reach back to the full span.
+  const [timeZoom, setTimeZoom] = useState(4);
   const [priceZoom, setPriceZoom] = useState(1);
   const [panOffset, setPanOffset] = useState(0);
   const [pricePan, setPricePan] = useState(0);
