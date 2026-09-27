@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { decryptSecret, friendlyBinanceError } from "@/lib/binance-account";
+import { logBinanceFailure } from "@/lib/binance-debug-log";
 import { getFuturesAccountSummary, getFuturesPositions } from "@/lib/binance-futures";
 import { ensureAuthSchema, getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 import { openFuturesPositions, parseFuturesAccountSummary } from "@/lib/futures-risk";
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
  * for and never required.
  */
 export async function GET(request: Request) {
+  let userId: number | null = null;
   try {
     if (!env.DB) throw new Error("D1_UNAVAILABLE");
     await ensureAuthSchema(env.DB);
@@ -21,6 +23,7 @@ export async function GET(request: Request) {
     const token = getCookie(request, SESSION_COOKIE);
     const user = token ? await getSessionUser(env.DB, token) : null;
     if (!user) return Response.json({ error: "NO AUTENTICADO" }, { status: 401 });
+    userId = user.id;
 
     const stored = await env.DB.prepare(
       "SELECT api_key_encrypted, api_secret_encrypted FROM binance_credentials WHERE user_id = ?1",
@@ -43,6 +46,7 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error("[ALT_RADAR_BINANCE_FUTURES]", error);
+    if (userId !== null && env.DB) await logBinanceFailure(env.DB, "futures", userId, error);
     return Response.json(
       { error: friendlyBinanceError(error, "No se pudo leer la cuenta de Futuros.", "futures") },
       { status: 502, headers: { "Cache-Control": "no-store" } },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BinanceApiError, decryptSecret, encryptSecret, friendlyBinanceError } from "../lib/binance-account.ts";
+import { BinanceApiError, decryptSecret, encryptSecret, friendlyBinanceError, signedRequest } from "../lib/binance-account.ts";
 
 /** Same minimal fake used in app-settings.test.ts: one key/value table. */
 function fakeD1() {
@@ -89,6 +89,53 @@ test("a futures permission error names the specific fix, not the IP message it w
 test("the same error without futures context still gets the IP message, unchanged", () => {
   const msg = friendlyBinanceError(new BinanceApiError("Invalid API-key, IP, or permissions for action.", 401));
   assert.match(msg, /Sin restricciones/);
+});
+
+test("a non-JSON Binance response reads as a network block, not a credentials problem", () => {
+  const msg = friendlyBinanceError(new BinanceApiError("NON_JSON_RESPONSE_451:<html>Access Denied by geo-IP filter</html>", 451));
+  assert.match(msg, /bloqueo de red/);
+  assert.match(msg, /451/);
+  assert.doesNotMatch(msg, /no reconoció|Sin restricciones|firma/, "no debe caer en ninguna otra categoria de error por casualidad de texto");
+});
+
+test("HTML block-page text is never misread as an IP-restriction message just because it contains \"ip\"", () => {
+  // "script" and "equip" both contain "ip" — the marker check must win
+  // before the generic substring heuristics ever see this text.
+  const msg = friendlyBinanceError(
+    new BinanceApiError("NON_JSON_RESPONSE_403:<script>this device is not equipped to proceed</script>", 403),
+  );
+  assert.match(msg, /bloqueo de red/);
+});
+
+test("signedRequest turns an unparseable (non-JSON) response into a diagnosable error instead of a bare SyntaxError", async (t) => {
+  t.mock.method(globalThis, "fetch", async () =>
+    new Response("<html>Sorry, this service is not available in your region.</html>", { status: 451 }),
+  );
+  await assert.rejects(
+    signedRequest("/api/v3/account", {}, "key", "secret"),
+    (err: unknown) => {
+      assert.ok(err instanceof BinanceApiError, "debe ser un BinanceApiError, no un SyntaxError crudo de JSON.parse");
+      assert.equal((err as BinanceApiError).status, 451);
+      assert.match((err as Error).message, /^NON_JSON_RESPONSE_451:/);
+      assert.match((err as Error).message, /not available in your region/, "el cuerpo real de la respuesta se conserva para diagnosticar");
+      return true;
+    },
+  );
+});
+
+test("signedRequest still parses a normal Binance JSON error response the same as before", async (t) => {
+  t.mock.method(globalThis, "fetch", async () =>
+    new Response(JSON.stringify({ code: -2015, msg: "Invalid API-key, IP, or permissions for action." }), { status: 401 }),
+  );
+  await assert.rejects(
+    signedRequest("/api/v3/account", {}, "key", "secret"),
+    (err: unknown) => {
+      assert.ok(err instanceof BinanceApiError);
+      assert.equal((err as BinanceApiError).status, 401);
+      assert.equal((err as Error).message, "Invalid API-key, IP, or permissions for action.");
+      return true;
+    },
+  );
 });
 
 test("app-written Spanish messages (read-only check, trading rights) pass through unchanged", () => {
