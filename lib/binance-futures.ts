@@ -15,6 +15,14 @@
  * not hidden.
  */
 
+/**
+ * NOT CURRENTLY CALLED FROM ANY LIVE ROUTE — see lib/binance-account.ts's
+ * matching comment on BINANCE_BASE. app/futures-desk.tsx now signs these
+ * same two calls from the browser (lib/binance-client-signed.ts), for the
+ * same WAF reason. Left in place for the same reason: correct, tested,
+ * and exactly what a future proxy would sit in front of.
+ */
+
 import { signedRequest } from "./binance-account.ts";
 
 // Same reasoning as lib/binance-account.ts's BINANCE_MIRRORS: Binance's WAF

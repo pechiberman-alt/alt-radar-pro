@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { onSession, openAccount } from "@/lib/account-events";
-import { riskToInvalidation, type RiskPosition, unrealizedPnl } from "@/lib/cost-basis";
+import { computeCostBasis, costBasisReliable as isCostBasisReliable, riskToInvalidation, type RiskPosition, unrealizedPnl } from "@/lib/cost-basis";
+import { getAccountBalances, getMyTrades } from "@/lib/binance-client-signed";
 import { loadSpotPlan } from "@/lib/spot-plan-client";
 import type { SpotPlan } from "@/lib/spot-strategy";
 import SignInPrompt from "./sign-in-prompt";
@@ -11,6 +12,11 @@ import SignInPrompt from "./sign-in-prompt";
 // ESTRATEGIA SPOT; capped so a large portfolio doesn't fire off a dozen
 // candle fetches at once.
 const MAX_PLANS = 6;
+const STABLES = new Set(["USDT", "USDC", "BUSD", "FDUSD", "DAI", "TUSD", "USDP"]);
+// Trade history is one signed call per asset. Most portfolios have a long
+// tail of dust; only the largest holdings are worth that cost.
+const MAX_ASSETS_WITH_HISTORY = 8;
+const DUST_USD = 5;
 
 const usd = (v: number, opts: Intl.NumberFormatOptions = {}) =>
   `$${v.toLocaleString("es-AR", { maximumFractionDigits: Math.abs(v) >= 1000 ? 0 : 2, ...opts })}`;
@@ -30,25 +36,80 @@ export default function PortfolioRisk() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/binance/risk", { cache: "no-store" });
-      if (r.status === 401) {
+      const credResponse = await fetch("/api/binance/credentials", { cache: "no-store" });
+      if (credResponse.status === 401) {
         setAuthState("out");
         return;
       }
       setAuthState("in");
-      if (r.status === 404) {
+      if (credResponse.status === 404) {
         setLinked(false);
         return;
       }
-      setLinked(true);
-      if (!r.ok) {
-        const d = (await r.json().catch(() => ({}))) as { error?: string };
+      if (!credResponse.ok) {
+        const d = (await credResponse.json().catch(() => ({}))) as { error?: string };
         setError(d.error ?? "NO SE PUDO LEER LA CARTERA");
         return;
       }
+      setLinked(true);
       setError("");
-      const body = (await r.json()) as { positions: RiskPosition[]; totalUsd: number };
-      setTotalUsd(body.totalUsd);
+      const { apiKey, apiSecret } = (await credResponse.json()) as { apiKey: string; apiSecret: string };
+
+      // Everything past this point is the same computation
+      // app/api/binance/risk/route.ts used to do server-side — moved here
+      // because the signed calls it needs (balances, trade history) are
+      // blocked by Binance's WAF from the Worker; see
+      // lib/binance-client-signed.ts's doc comment.
+      const [{ balances }, priceRows] = await Promise.all([
+        getAccountBalances(apiKey, apiSecret),
+        fetch("https://api.binance.com/api/v3/ticker/price")
+          .then((r) => (r.ok ? (r.json() as Promise<{ symbol: string; price: string }[]>) : []))
+          .catch(() => [] as { symbol: string; price: string }[]),
+      ]);
+      const priceOf = new Map(priceRows.map((r) => [r.symbol, Number(r.price)]));
+
+      const held = balances
+        .map((b) => {
+          const qty = Number(b.free) + Number(b.locked);
+          const isStable = STABLES.has(b.asset);
+          const price = isStable ? 1 : (priceOf.get(`${b.asset}USDT`) ?? null);
+          const valueUsd = price !== null ? qty * price : null;
+          return { asset: b.asset, qty, isStable, price, valueUsd };
+        })
+        .filter((h) => h.qty > 0)
+        .sort((a, b) => (b.valueUsd ?? -1) - (a.valueUsd ?? -1));
+
+      const total = held.reduce((s, h) => s + (h.valueUsd ?? 0), 0);
+      setTotalUsd(total);
+
+      const withHistory = held.filter((h) => !h.isStable && (h.valueUsd ?? 0) >= DUST_USD).slice(0, MAX_ASSETS_WITH_HISTORY);
+      const tradeResults = await Promise.allSettled(withHistory.map((h) => getMyTrades(apiKey, apiSecret, `${h.asset}USDT`)));
+      const fillsByAsset = new Map<string, { price: number; qty: number; isBuyer: boolean; time: number }[]>();
+      withHistory.forEach((h, i) => {
+        const r = tradeResults[i];
+        if (r.status === "fulfilled") {
+          fillsByAsset.set(
+            h.asset,
+            r.value.map((f) => ({ price: Number(f.price), qty: Number(f.qty), isBuyer: f.isBuyer, time: f.time })),
+          );
+        }
+      });
+
+      const body: { positions: RiskPosition[] } = {
+        positions: held.map((h) => {
+          const fills = fillsByAsset.get(h.asset);
+          const basis = fills?.length ? computeCostBasis(fills) : null;
+          return {
+            asset: h.asset,
+            qty: h.qty,
+            price: h.price,
+            valueUsd: h.valueUsd,
+            isStable: h.isStable,
+            costBasis: basis,
+            costBasisReliable: basis !== null && isCostBasisReliable(basis.units, h.qty),
+          };
+        }),
+      };
 
       // Non-stable holdings, largest first, capped — each one needs its own
       // candle fetch, so the plan runs only for what's worth the cost.
@@ -74,8 +135,8 @@ export default function PortfolioRisk() {
           }
         }),
       );
-    } catch {
-      setError("SIN CONEXIÓN CON EL SERVIDOR");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "SIN CONEXIÓN CON EL SERVIDOR");
     } finally {
       setLoading(false);
     }
