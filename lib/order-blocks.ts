@@ -298,3 +298,224 @@ export function orderBlockStats(
     tested === 0 ? "SIN MUESTRA" : tested < 8 ? "MUESTRA MÍNIMA" : "MUESTRA RAZONABLE";
   return { tested, held, holdRate: tested > 0 ? held / tested : null, confidence };
 }
+
+/**
+ * Breaker blocks: an order block price closed clean through, which flips its
+ * role rather than erasing it.
+ *
+ * findOrderBlocks drops a mitigated block outright — the right call for
+ * "what's still a live order block", the wrong one for "what happened to the
+ * ones that weren't". A close through the zone (not merely a touch, the same
+ * bar fair-value-gaps.ts uses for an inversion) is read as the origin's
+ * intent failing there: the level that used to be demand is now read as
+ * supply, or the reverse. `side` below is that FLIPPED side, not the
+ * original block's.
+ */
+
+export type BreakerBlock = {
+  /** The side this zone now supports — flipped from the original block. */
+  side: "ALCISTA" | "BAJISTA";
+  low: number;
+  high: number;
+  mid: number;
+  /** Candle index of the original order block. */
+  index: number;
+  time: number;
+  /** Candle index where price closed through and the block broke. */
+  brokenAtIndex: number;
+  brokenAtTime: number;
+  /** Size of the ORIGINAL impulse that formed the order block. */
+  displacement: number;
+  volumeUsd: number;
+  strength: number;
+  /** Candles since the break — since it became a breaker block, not since
+   *  the original order block formed. */
+  ageCandles: number;
+};
+
+export function findBreakerBlocks(
+  candles: SwingCandle[],
+  options: OrderBlockOptions = {},
+): BreakerBlock[] {
+  const minDisplacement = options.minDisplacement ?? 1.8;
+  const impulseWindow = options.impulseWindow ?? 4;
+  const limit = options.limit ?? 6;
+  if (candles.length < 40) return [];
+
+  const found: BreakerBlock[] = [];
+  const last = candles.length - 1;
+
+  for (let i = 20; i < candles.length - impulseWindow - 1; i += 1) {
+    const candle = candles[i];
+    const bullishBlock = candle.close < candle.open;
+    const bearishBlock = candle.close > candle.open;
+    if (!bullishBlock && !bearishBlock) continue;
+
+    const range = averageRange(candles, i);
+    if (!(range > 0)) continue;
+    if (Math.abs(candle.close - candle.open) > range * 3) continue;
+
+    const impulse = candles.slice(i + 1, i + 1 + impulseWindow);
+    if (!impulse.length) continue;
+
+    const move = bullishBlock
+      ? Math.max(...impulse.map((c) => c.high)) - candle.low
+      : candle.high - Math.min(...impulse.map((c) => c.low));
+    const displacement = move / range;
+    if (displacement < minDisplacement) continue;
+
+    const priorWindow = candles.slice(Math.max(0, i - 20), i);
+    const priorHigh = Math.max(...priorWindow.map((c) => c.high));
+    const priorLow = Math.min(...priorWindow.map((c) => c.low));
+    const broke = bullishBlock
+      ? Math.max(...impulse.map((c) => c.high)) > priorHigh
+      : Math.min(...impulse.map((c) => c.low)) < priorLow;
+    if (!broke) continue;
+
+    const low = Math.min(candle.open, candle.close, candle.low);
+    const high = Math.max(candle.open, candle.close, candle.high);
+
+    // First CLOSE beyond the zone after the impulse: the moment it breaks.
+    let brokenAtIndex: number | null = null;
+    for (let j = i + 1 + impulseWindow; j <= last; j += 1) {
+      const c = candles[j];
+      const beyond = bullishBlock ? c.close < low : c.close > high;
+      if (beyond) {
+        brokenAtIndex = j;
+        break;
+      }
+    }
+    // Never broke: it's a live order block (or already mitigated by a mere
+    // touch), not a breaker block.
+    if (brokenAtIndex === null) continue;
+
+    // The flipped role, tested from the break onward: closed back through a
+    // second time means this breaker has itself failed and isn't a live
+    // level anymore — the same standard findOrderBlocks holds a plain block
+    // to.
+    let rebroken = false;
+    for (let k = brokenAtIndex + 1; k <= last; k += 1) {
+      const c = candles[k];
+      const back = bullishBlock ? c.close > high : c.close < low;
+      if (back) {
+        rebroken = true;
+        break;
+      }
+    }
+    if (rebroken) continue;
+
+    const localVolume = average(candles.slice(Math.max(0, i - 20), i).map((c) => c.volume));
+    const volumeRatio = localVolume > 0 ? candle.volume / localVolume : 1;
+    const volumeUsd = candle.volume * ((candle.high + candle.low) / 2);
+    const ageCandles = last - brokenAtIndex;
+    const freshness = Math.max(0, 1 - ageCandles / Math.max(1, candles.length));
+
+    const strength = Math.round(
+      Math.min(
+        100,
+        Math.min(displacement / 4, 1) * 50 + Math.min(volumeRatio / 3, 1) * 20 + freshness * 30,
+      ),
+    );
+
+    found.push({
+      side: bullishBlock ? "BAJISTA" : "ALCISTA",
+      low,
+      high,
+      mid: (low + high) / 2,
+      index: i,
+      time: candle.openTime,
+      brokenAtIndex,
+      brokenAtTime: candles[brokenAtIndex].openTime,
+      displacement,
+      volumeUsd,
+      strength,
+      ageCandles,
+    });
+  }
+
+  const distinct: BreakerBlock[] = [];
+  for (const block of [...found].sort((a, b) => b.strength - a.strength)) {
+    const overlaps = distinct.some(
+      (kept) => kept.side === block.side && block.low <= kept.high && block.high >= kept.low,
+    );
+    if (!overlaps) distinct.push(block);
+  }
+  return distinct.slice(0, limit).sort((a, b) => b.mid - a.mid);
+}
+
+/**
+ * Reliability of the FLIPPED zone once a break has happened and been
+ * retested — the same question gapStats.ifvg asks of an inverted gap, asked
+ * here of a broken order block. Not "how often does a block break" (that's
+ * orderBlockStats's mitigation rate, a different question); this is "once
+ * broken and tested again, does the new role hold."
+ */
+export function breakerBlockStats(candles: SwingCandle[], options: OrderBlockOptions = {}): ZoneStats {
+  const empty: ZoneStats = { tested: 0, held: 0, holdRate: null, confidence: "SIN MUESTRA" };
+  const minDisplacement = options.minDisplacement ?? 1.8;
+  const impulseWindow = options.impulseWindow ?? 4;
+  if (candles.length < 40) return empty;
+
+  const last = candles.length - 1;
+  const outcomes: { held: boolean }[] = [];
+
+  for (let i = 20; i < candles.length - impulseWindow - 1; i += 1) {
+    const candle = candles[i];
+    const bullishBlock = candle.close < candle.open;
+    const bearishBlock = candle.close > candle.open;
+    if (!bullishBlock && !bearishBlock) continue;
+
+    const range = averageRange(candles, i);
+    if (!(range > 0)) continue;
+    if (Math.abs(candle.close - candle.open) > range * 3) continue;
+
+    const impulse = candles.slice(i + 1, i + 1 + impulseWindow);
+    if (!impulse.length) continue;
+
+    const move = bullishBlock
+      ? Math.max(...impulse.map((c) => c.high)) - candle.low
+      : candle.high - Math.min(...impulse.map((c) => c.low));
+    if (move / range < minDisplacement) continue;
+
+    const priorWindow = candles.slice(Math.max(0, i - 20), i);
+    const priorHigh = Math.max(...priorWindow.map((c) => c.high));
+    const priorLow = Math.min(...priorWindow.map((c) => c.low));
+    const broke = bullishBlock
+      ? Math.max(...impulse.map((c) => c.high)) > priorHigh
+      : Math.min(...impulse.map((c) => c.low)) < priorLow;
+    if (!broke) continue;
+
+    const low = Math.min(candle.open, candle.close, candle.low);
+    const high = Math.max(candle.open, candle.close, candle.high);
+
+    let brokenAtIndex: number | null = null;
+    for (let j = i + 1 + impulseWindow; j <= last; j += 1) {
+      const c = candles[j];
+      const beyond = bullishBlock ? c.close < low : c.close > high;
+      if (beyond) {
+        brokenAtIndex = j;
+        break;
+      }
+    }
+    if (brokenAtIndex === null) continue;
+
+    let touched = false;
+    let rebroken = false;
+    for (let k = brokenAtIndex + 1; k <= last; k += 1) {
+      const c = candles[k];
+      if (c.low <= high && c.high >= low) touched = true;
+      const back = bullishBlock ? c.close > high : c.close < low;
+      if (back) {
+        rebroken = true;
+        break;
+      }
+    }
+    if (touched || rebroken) outcomes.push({ held: !rebroken });
+  }
+
+  const tested = outcomes.length;
+  const held = outcomes.filter((o) => o.held).length;
+  const confidence: ZoneStats["confidence"] =
+    tested === 0 ? "SIN MUESTRA" : tested < 8 ? "MUESTRA MÍNIMA" : "MUESTRA RAZONABLE";
+  return { tested, held, holdRate: tested > 0 ? held / tested : null, confidence };
+}
