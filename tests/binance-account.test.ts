@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BinanceApiError, decryptSecret, encryptSecret, friendlyBinanceError, signedRequest } from "../lib/binance-account.ts";
+import { BinanceApiError, decryptSecret, encryptSecret, friendlyBinanceError, signedRequest, validateApiRestrictions } from "../lib/binance-account.ts";
 
 /** Same minimal fake used in app-settings.test.ts: one key/value table. */
 function fakeD1() {
@@ -190,4 +190,31 @@ test("app-written Spanish messages (read-only check, trading rights) pass throug
 test("an unrecognized failure falls back to the caller's own message, never a stack trace", () => {
   assert.equal(friendlyBinanceError(new Error("TypeError: fetch failed"), "No se pudo vincular la cuenta."), "No se pudo vincular la cuenta.");
   assert.equal(friendlyBinanceError("not even an Error object", "No se pudo leer la cartera."), "No se pudo leer la cartera.");
+});
+
+test("validateApiRestrictions accepts a properly read-only key", () => {
+  assert.doesNotThrow(() =>
+    validateApiRestrictions({ enableReading: true, enableSpotAndMarginTrading: false, enableWithdrawals: false }),
+  );
+});
+
+test("validateApiRestrictions rejects reading disabled", () => {
+  assert.throws(
+    () => validateApiRestrictions({ enableReading: false, enableSpotAndMarginTrading: false, enableWithdrawals: false }),
+    /habilitada la lectura/,
+  );
+});
+
+test("validateApiRestrictions rejects spot/margin trading enabled", () => {
+  assert.throws(
+    () => validateApiRestrictions({ enableReading: true, enableSpotAndMarginTrading: true, enableWithdrawals: false }),
+    /solo lectura/,
+  );
+});
+
+test("validateApiRestrictions rejects withdrawals enabled", () => {
+  assert.throws(
+    () => validateApiRestrictions({ enableReading: true, enableSpotAndMarginTrading: false, enableWithdrawals: true }),
+    /solo lectura/,
+  );
 });

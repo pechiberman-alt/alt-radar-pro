@@ -10,6 +10,12 @@ import {
   showSection,
   type AccountMode,
 } from "@/lib/account-events";
+import {
+  checkReadOnly,
+  getAccountBalances,
+  getDepositHistory,
+  getWithdrawHistory,
+} from "@/lib/binance-client-signed";
 
 type SessionUser = { id: number; email: string };
 
@@ -346,28 +352,55 @@ function AccountHome({
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/binance/portfolio")
-      .then(async (response) => {
+    (async () => {
+      try {
+        // The only server round-trip left in this flow: decrypted
+        // credentials for THIS session, held only in this component's
+        // state, never persisted. Everything after this reads Binance
+        // directly from the browser — see lib/binance-client-signed.ts.
+        const credResponse = await fetch("/api/binance/credentials", { cache: "no-store" });
         if (!alive) return;
-        // The session died server-side — send the user back to the login form
-        // instead of showing a stale "active account" header.
-        if (response.status === 401) {
+        if (credResponse.status === 401) {
           onSessionExpired();
           return;
         }
-        // 404 is the "no linked account yet" case, not a failure.
-        if (response.status === 404) {
+        if (credResponse.status === 404) {
           setPortfolio(null);
           return;
         }
-        if (!response.ok) {
-          setError(await readError(response, "No se pudo leer la cartera."));
+        if (!credResponse.ok) {
+          setError(await readError(credResponse, "No se pudo leer la cartera."));
           return;
         }
-        setPortfolio((await response.json()) as Portfolio);
-      })
-      .catch(() => alive && setError("Sin conexión con el servidor."))
-      .finally(() => alive && setLoading(false));
+        const { apiKey, apiSecret } = (await credResponse.json()) as { apiKey: string; apiSecret: string };
+
+        const [balancesResult, depositsResult, withdrawalsResult] = await Promise.all([
+          getAccountBalances(apiKey, apiSecret),
+          getDepositHistory(apiKey, apiSecret).then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+          getWithdrawHistory(apiKey, apiSecret).then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+        ]);
+        if (!alive) return;
+        setPortfolio({
+          balances: balancesResult.balances,
+          updateTime: balancesResult.updateTime,
+          deposits: depositsResult.ok ? depositsResult.value : [],
+          withdrawals: withdrawalsResult.ok ? withdrawalsResult.value : [],
+          // A false flag means that one fetch failed — the empty array
+          // above is a display fallback, not a claim of no history.
+          historyAvailable: { deposits: depositsResult.ok, withdrawals: withdrawalsResult.ok },
+        });
+      } catch {
+        if (alive) setError("Sin conexión con el servidor.");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
     return () => {
       alive = false;
     };
@@ -539,10 +572,17 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
     setBusy(true);
     setError(null);
     try {
+      // The check itself now runs from here, direct against Binance — see
+      // lib/binance-client-signed.ts's doc comment for why: the Worker's own
+      // signed calls are blocked by Binance's WAF (confirmed, all mirrors
+      // included), so the server can no longer verify this on its own. A
+      // key with trading/withdrawal rights never even reaches the server.
+      const restrictions = await checkReadOnly(apiKey, apiSecret);
+
       const response = await fetch("/api/binance/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey, apiSecret }),
+        body: JSON.stringify({ apiKey, apiSecret, restrictions }),
       });
       if (!response.ok) {
         setError(await readError(response, "No se pudo vincular la cuenta."));
@@ -551,8 +591,11 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
       setApiKey("");
       setApiSecret("");
       onLinked();
-    } catch {
-      setError("Sin conexión con el servidor.");
+    } catch (err) {
+      // checkReadOnly's own thrown Error messages (bad permissions, or
+      // BinanceClientError for a network/WAF problem reaching Binance
+      // directly) are already the right thing to show as-is.
+      setError(err instanceof Error ? err.message : "Sin conexión con el servidor.");
     } finally {
       setBusy(false);
     }
@@ -561,8 +604,9 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
   return (
     <form className="account-form" onSubmit={submit}>
       <p className="account-notice">
-        Creá la API key en Binance <b>sin permisos de trading ni de retiro</b>. Si la key tiene
-        alguno de esos permisos, el servidor la rechaza y no la guarda.
+        Creá la API key en Binance <b>sin permisos de trading ni de retiro</b>. Antes de guardarla,
+        verificamos los permisos directo contra Binance desde tu navegador; si tiene trading o
+        retiros habilitados, no se manda ni se guarda.
       </p>
       <label>
         <span>API KEY</span>

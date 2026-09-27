@@ -15,6 +15,23 @@
 
 import { resolveEncryptionKey } from "./app-settings.ts";
 
+/**
+ * NOT CURRENTLY CALLED FROM ANY LIVE ROUTE.
+ *
+ * Everything below that makes a signed call to Binance (signedRequest and
+ * everything built on it — getAccountBalances, getMyTrades,
+ * getDepositHistory, getWithdrawHistory) is blocked by Binance's WAF from
+ * the Worker, mirrors included (confirmed in production; see this
+ * constant's own comment). The app now signs these calls from the browser
+ * instead — see lib/binance-client-signed.ts's doc comment for the full
+ * reasoning and the alternatives that were weighed before choosing that.
+ *
+ * This is left in place, correct and tested, rather than deleted: if a
+ * proxy with a non-datacenter IP is ever added in front of the Worker's
+ * outbound calls (the safer alternative that was declined for cost, not
+ * for being wrong), this is what it would sit in front of. Point new work
+ * here instead of rebuilding it — but nothing should call it today.
+ */
 const BINANCE_BASE = "https://api.binance.com";
 // Binance's own docs list these as the full API (not market-data-only,
 // unlike data-api.binance.vision) — "should give better performance but
@@ -220,14 +237,21 @@ export type ApiRestrictions = {
   enableWithdrawals: boolean;
 };
 
-/** Confirms a key is read-only before we ever store it. */
-export async function assertReadOnlyKey(apiKey: string, apiSecret: string) {
-  const restrictions = await signedRequest<ApiRestrictions>(
-    "/sapi/v1/account/apiRestrictions",
-    {},
-    apiKey,
-    apiSecret,
-  );
+/**
+ * The accept/reject rule for a Binance key, on its own — no network call.
+ *
+ * This used to live inside a function that ALSO fetched
+ * /sapi/v1/account/apiRestrictions from the Worker. That fetch is exactly
+ * the class of call Binance's WAF blocks from here (see BINANCE_MIRRORS'
+ * doc comment) — a live server-side check of this is no longer possible at
+ * all, from any mirror. The actual signed check now happens client-side
+ * (lib/binance-client-signed.ts's checkReadOnly, which reaches Binance
+ * directly from the browser); this function is what the /api/binance/link
+ * route runs the CLIENT-REPORTED restrictions through, so the server still
+ * enforces the same rule rather than trusting the browser's word for it
+ * unchecked — weaker than an independent live check, but not nothing.
+ */
+export function validateApiRestrictions(restrictions: ApiRestrictions): void {
   if (!restrictions.enableReading) {
     throw new Error("La API key no tiene habilitada la lectura.");
   }
@@ -236,7 +260,6 @@ export async function assertReadOnlyKey(apiKey: string, apiSecret: string) {
       "Por seguridad solo se aceptan API keys de solo lectura. Desactivá Trading y Retiros en Binance y volvé a intentar.",
     );
   }
-  return restrictions;
 }
 
 export type BinanceBalance = { asset: string; free: string; locked: string };

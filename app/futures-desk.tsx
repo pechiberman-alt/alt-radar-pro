@@ -2,8 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { onSession, openAccount } from "@/lib/account-events";
-import type { FuturesPositionView, FuturesSummaryView } from "@/lib/futures-risk";
-import { isNearLiquidation } from "@/lib/futures-risk";
+import { getFuturesAccountSummary, getFuturesPositions } from "@/lib/binance-client-signed";
+import {
+  isNearLiquidation,
+  openFuturesPositions,
+  parseFuturesAccountSummary,
+  type FuturesPositionView,
+  type FuturesSummaryView,
+} from "@/lib/futures-risk";
 import SignInPrompt from "./sign-in-prompt";
 
 const POLL_MS = 5000;
@@ -23,31 +29,44 @@ export default function FuturesDesk() {
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [polling, setPolling] = useState(true);
 
+  // Fetched once, then reused for every 5s poll after — re-fetching this
+  // from the server on every single tick would mean the secret transits
+  // repeatedly for no reason. Only the actual Binance calls repeat.
+  const credsRef = useRef<{ apiKey: string; apiSecret: string } | null>(null);
+
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/binance/futures", { cache: "no-store" });
-      if (r.status === 401) {
-        setAuthState("out");
-        return;
+      if (!credsRef.current) {
+        const credResponse = await fetch("/api/binance/credentials", { cache: "no-store" });
+        if (credResponse.status === 401) {
+          setAuthState("out");
+          return;
+        }
+        setAuthState("in");
+        if (credResponse.status === 404) {
+          setLinked(false);
+          return;
+        }
+        if (!credResponse.ok) {
+          const d = (await credResponse.json().catch(() => ({}))) as { error?: string };
+          setError(d.error ?? "NO SE PUDO LEER FUTUROS");
+          return;
+        }
+        setLinked(true);
+        credsRef.current = (await credResponse.json()) as { apiKey: string; apiSecret: string };
       }
-      setAuthState("in");
-      if (r.status === 404) {
-        setLinked(false);
-        return;
-      }
-      setLinked(true);
-      if (!r.ok) {
-        const d = (await r.json().catch(() => ({}))) as { error?: string };
-        setError(d.error ?? "NO SE PUDO LEER FUTUROS");
-        return;
-      }
-      const body = (await r.json()) as { positions: FuturesPositionView[]; summary: FuturesSummaryView; updateTime: number };
-      setPositions(body.positions);
-      setSummary(body.summary);
-      setUpdatedAt(body.updateTime);
+      const { apiKey, apiSecret } = credsRef.current;
+
+      const [rawPositions, rawSummary] = await Promise.all([
+        getFuturesPositions(apiKey, apiSecret),
+        getFuturesAccountSummary(apiKey, apiSecret),
+      ]);
+      setPositions(openFuturesPositions(rawPositions));
+      setSummary(parseFuturesAccountSummary(rawSummary));
+      setUpdatedAt(Date.now());
       setError("");
-    } catch {
-      setError("SIN CONEXIÓN CON EL SERVIDOR");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "SIN CONEXIÓN CON EL SERVIDOR");
     }
   }, []);
 

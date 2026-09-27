@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { ensureAuthSchema, getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
-import { assertReadOnlyKey, encryptSecret, friendlyBinanceError } from "@/lib/binance-account";
+import { encryptSecret, friendlyBinanceError, validateApiRestrictions, type ApiRestrictions } from "@/lib/binance-account";
 import { logBinanceFailure } from "@/lib/binance-debug-log";
 
 export const dynamic = "force-dynamic";
@@ -17,16 +17,25 @@ export async function POST(request: Request) {
     userId = user.id;
 
     const body = (await request.json().catch(() => null)) as
-      | { apiKey?: string; apiSecret?: string }
+      | { apiKey?: string; apiSecret?: string; restrictions?: ApiRestrictions }
       | null;
     const apiKey = body?.apiKey?.trim();
     const apiSecret = body?.apiSecret?.trim();
     if (!apiKey || !apiSecret) {
       return Response.json({ error: "Falta la API key o el secret." }, { status: 400 });
     }
-
-    // Rejects the key server-side if it has trading or withdrawal rights.
-    await assertReadOnlyKey(apiKey, apiSecret);
+    // The live check that used to run here (a signed call to
+    // /sapi/v1/account/apiRestrictions) is exactly the class of request
+    // Binance's WAF blocks from the Worker — see BINANCE_MIRRORS's doc
+    // comment. The browser already ran that same check directly against
+    // Binance (lib/binance-client-signed.ts's checkReadOnly) before this
+    // request was ever sent; this re-validates what it reported, so the
+    // server still enforces the rule rather than trusting the client
+    // unchecked.
+    if (!body?.restrictions) {
+      return Response.json({ error: "Falta el resultado de la verificación de permisos." }, { status: 400 });
+    }
+    validateApiRestrictions(body.restrictions);
 
     const encryptedKey = await encryptSecret(apiKey, env.DB, env);
     const encryptedSecret = await encryptSecret(apiSecret, env.DB, env);
