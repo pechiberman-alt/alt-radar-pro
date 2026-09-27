@@ -138,6 +138,50 @@ test("signedRequest still parses a normal Binance JSON error response the same a
   );
 });
 
+test("a WAF block on the first mirror falls through to the next one, which succeeds", async (t) => {
+  const calls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    calls.push(url);
+    if (calls.length === 1) return new Response("<html>blocked</html>", { status: 403 });
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  });
+  const result = await signedRequest<{ ok: boolean }>(
+    "/api/v3/account",
+    {},
+    "key",
+    "secret",
+    ["https://api.binance.com", "https://api1.binance.com"],
+  );
+  assert.deepEqual(result, { ok: true });
+  assert.equal(calls.length, 2, "tuvo que probar el segundo espejo tras el bloqueo del primero");
+  assert.match(calls[0], /^https:\/\/api\.binance\.com/);
+  assert.match(calls[1], /^https:\/\/api1\.binance\.com/);
+});
+
+test("a real Binance rejection on the first mirror is surfaced immediately — no pointless retries", async (t) => {
+  let callCount = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    callCount += 1;
+    return new Response(JSON.stringify({ code: -2015, msg: "Invalid API-key, IP, or permissions for action." }), { status: 401 });
+  });
+  await assert.rejects(
+    signedRequest("/api/v3/account", {}, "key", "secret", ["https://api.binance.com", "https://api1.binance.com"]),
+  );
+  assert.equal(callCount, 1, "un rechazo real de Binance es el mismo en cualquier espejo: no vale la pena reintentar");
+});
+
+test("when every mirror is blocked, the failure from the LAST one is what surfaces", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => new Response("<html>blocked</html>", { status: 403 }));
+  await assert.rejects(
+    signedRequest("/api/v3/account", {}, "key", "secret", ["https://api.binance.com", "https://api1.binance.com"]),
+    (err: unknown) => {
+      assert.ok(err instanceof BinanceApiError);
+      assert.equal((err as BinanceApiError).status, 403);
+      return true;
+    },
+  );
+});
+
 test("app-written Spanish messages (read-only check, trading rights) pass through unchanged", () => {
   const original = "Por seguridad solo se aceptan API keys de solo lectura. Desactivá Trading y Retiros en Binance y volvé a intentar.";
   assert.equal(friendlyBinanceError(new Error(original)), original);
