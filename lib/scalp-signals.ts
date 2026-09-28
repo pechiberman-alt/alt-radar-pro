@@ -170,6 +170,10 @@ export type ScalpStats = {
   winRate: number | null;
   /** Average result per resolved trade, in units of the risk taken. */
   expectancyR: number | null;
+  /** Gross profit over gross loss: every win pays `rr`, every loss costs 1.
+   *  1 is break-even; above 1 is a profit before fees. Infinity when nothing
+   *  has lost yet, null when nothing has resolved. */
+  profitFactor: number | null;
   /** The win rate at which this reward:risk exactly breaks even (before
    *  fees). A win rate near this is no edge at all. */
   breakevenRate: number;
@@ -234,6 +238,7 @@ export function scalpStats(
     pending,
     winRate: resolved > 0 ? wins / resolved : null,
     expectancyR: resolved > 0 ? (wins * rr - losses) / resolved : null,
+    profitFactor: losses > 0 ? (wins * rr) / losses : wins > 0 ? Infinity : null,
     breakevenRate: 1 / (1 + rr),
     rr,
     confidence: resolved === 0 ? "SIN MUESTRA" : resolved < 15 ? "MUESTRA MÍNIMA" : "MUESTRA RAZONABLE",

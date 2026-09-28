@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CryptoNewsItem, NewsCategory } from "@/lib/crypto-news";
 import type { FearGreed } from "@/lib/fear-greed";
 import { FUTURES_BASES } from "@/lib/market-fetch";
+import AgendaMacro from "./agenda-macro";
 
 type Payload = { fearGreed: FearGreed | null; news: CryptoNewsItem[]; sources: string[]; failed: string[] };
 type Leverage = { longPct: number | null; funding: number | null };
@@ -72,6 +73,7 @@ export default function SentimentDesk() {
   const [lev, setLev] = useState<Leverage>({ longPct: null, funding: null });
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<NewsCategory | "TODAS">("TODAS");
+  const [onlyImportant, setOnlyImportant] = useState(true);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -99,7 +101,14 @@ export default function SentimentDesk() {
   }, [tick]);
 
   const categories = useMemo(() => [...new Set((data?.news ?? []).map((n) => n.category))], [data]);
-  const shown = (data?.news ?? []).filter((n) => filter === "TODAS" || n.category === filter);
+  // What matters first: high-impact headlines, then medium, newest first within
+  // each — and by default nothing low-impact, since the feed is mostly noise.
+  const rank = { ALTO: 0, MEDIO: 1, BAJO: 2 } as const;
+  const shown = (data?.news ?? [])
+    .filter((n) => filter === "TODAS" || n.category === filter)
+    .filter((n) => !onlyImportant || n.impact !== "BAJO")
+    .slice()
+    .sort((a, b) => rank[a.impact] - rank[b.impact] || b.publishedAt - a.publishedAt);
   const fg = data?.fearGreed ?? null;
 
   return (
@@ -162,7 +171,12 @@ export default function SentimentDesk() {
         </div>
       </div>
 
+      <AgendaMacro />
+
       <div className="news-filters">
+        <button className={onlyImportant ? "on" : ""} onClick={() => setOnlyImportant((v) => !v)} title="Oculta las de impacto bajo">
+          {onlyImportant ? "★ SOLO IMPORTANTES" : "☆ MOSTRAR TODAS"}
+        </button>
         {(["TODAS", ...categories] as (NewsCategory | "TODAS")[]).map((c) => (
           <button key={c} className={filter === c ? "on" : ""} onClick={() => setFilter(c)}>{c}</button>
         ))}
@@ -181,7 +195,11 @@ export default function SentimentDesk() {
             <small>{n.source} · {ago(n.publishedAt)}</small>
           </a>
         ))}
-        {data && !shown.length && <p className="sent-none">Sin noticias en esta categoría en las últimas 48 h.</p>}
+        {data && !shown.length && (
+          <p className="sent-none">
+            {onlyImportant ? "Sin noticias importantes en esta categoría en las últimas 48 h. Probá «Mostrar todas»." : "Sin noticias en esta categoría en las últimas 48 h."}
+          </p>
+        )}
       </div>
 
       <p className="sent-caveat">

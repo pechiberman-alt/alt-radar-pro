@@ -78,6 +78,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   { id: "registro", label: "REGISTRO", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "cartera", label: "MI CARTERA", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "futuros", label: "MI CARTERA · FUTUROS", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
+  { id: "bot", label: "BOT DE FUTUROS · PAPEL", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "dca", label: "DCA", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "configuracion", label: "CONFIGURACIÓN", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
 ];
