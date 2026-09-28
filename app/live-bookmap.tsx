@@ -218,19 +218,22 @@ const wallStrengthLabel = (value: number) =>
 
 
 function heatColor(intensity: number, alpha = 1) {
-  // Blue-to-white on purpose, not a full rainbow: orange is reserved for
-  // iceberg markers elsewhere on this same canvas (see the ◆ iceberg legend
-  // entry), and a heatmap that also passes through green/yellow/orange at
-  // high intensity competes with that marker instead of reading as a
-  // distinct, deliberate signal against a calmer background.
+  // Same family a real order-book heatmap uses: a dim steel blue for the
+  // ordinary resting liquidity that fills most of the map, light blue → white
+  // for the strongest levels, then yellow → orange → red only for the truly
+  // outsized orders. Deliberately no green/teal in the middle — that band is
+  // what made the earlier version read as a rainbow instead of a heat scale.
   const stops = [
-    { at: 0, color: [4, 10, 20] },
-    { at: 0.18, color: [8, 34, 66] },
-    { at: 0.4, color: [14, 68, 122] },
-    { at: 0.62, color: [24, 118, 178] },
-    { at: 0.8, color: [64, 176, 224] },
-    { at: 0.93, color: [156, 224, 246] },
-    { at: 1, color: [232, 248, 255] },
+    { at: 0, color: [3, 8, 16] },
+    { at: 0.12, color: [7, 22, 44] },
+    { at: 0.3, color: [14, 52, 92] },
+    { at: 0.48, color: [26, 92, 144] },
+    { at: 0.62, color: [58, 142, 196] },
+    { at: 0.74, color: [150, 205, 235] },
+    { at: 0.82, color: [246, 246, 235] },
+    { at: 0.89, color: [255, 228, 60] },
+    { at: 0.95, color: [255, 140, 30] },
+    { at: 1, color: [230, 40, 30] },
   ];
   const value = clamp(intensity, 0, 1);
   const upper = stops.find((stop) => stop.at >= value) ?? stops.at(-1)!;
@@ -1246,8 +1249,13 @@ export default function LiveBookmap({
       const positiveHeatValues = gridHeat.flatMap((column) =>
         [...column].filter((value) => value > 0),
       );
-      const heatFloor = Math.max(percentile(positiveHeatValues, 0.18), 1);
-      const heatCeiling = Math.max(percentile(positiveHeatValues, 0.97), heatFloor * 1.01);
+      // Floor and ceiling decide what "ordinary" and "outsized" mean. A dense
+      // real book has thousands of similar-sized resting orders, so a low
+      // floor (the old 18th percentile) put the median level in the middle of
+      // the scale and lit up most of the map; the bottom 40% now reads as
+      // background and only the top few percent reach the bright end.
+      const heatFloor = Math.max(percentile(positiveHeatValues, 0.4), 1);
+      const heatCeiling = Math.max(percentile(positiveHeatValues, 0.995), heatFloor * 1.01);
       const plottedTrades = frames.flatMap((frame) => {
         const grouped = new Map<string, Trade>();
         frame.trades.forEach((trade) => {
@@ -1294,9 +1302,15 @@ export default function LiveBookmap({
             ? (Math.log1p(notional) - Math.log1p(heatFloor)) /
               Math.max(Math.log1p(heatCeiling) - Math.log1p(heatFloor), Number.EPSILON)
             : (notional - heatFloor) / Math.max(heatCeiling - heatFloor, Number.EPSILON);
-          const intensity = clamp(normalized, 0, 1);
+          // Gamma slightly above 1 keeps the bulk of the values on the dim end
+          // so brightness stays a signal rather than the default — but only
+          // slightly: with the floor/ceiling above, the 70th percentile lands
+          // on a visible blue, the 90th on steel blue, and only the top few
+          // percent reach white/yellow.
+          const intensity = Math.pow(clamp(normalized, 0, 1), 1.2);
+          if (intensity < 0.015) return;
           const price = low + (row + 0.5) * heatPriceStep;
-          context.fillStyle = heatColor(intensity, 0.2 + intensity * 0.76);
+          context.fillStyle = heatColor(intensity, 0.14 + intensity * 0.84);
           context.fillRect(
             x,
             y(price) - heatRowHeight * 0.62,
