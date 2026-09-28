@@ -124,6 +124,9 @@ const longLiquidationPrice = (entry: number, leverage: number, mmr: number) =>
 const shortLiquidationPrice = (entry: number, leverage: number, mmr: number) =>
   entry * (1 + 1 / leverage - mmr);
 
+/** One leverage tier's contribution to a price level. */
+export type TierShare = { long: number; short: number; formedAt: number };
+
 export type HeatBucket = {
   price: number;
   /** Weighted activity attributed to longs liquidating at this price (below entries). */
@@ -143,6 +146,14 @@ export type HeatBucket = {
    * pinned to the right edge.
    */
   formedAt: number;
+  /**
+   * The same density split by the leverage that would liquidate there. It
+   * always sums back to longDensity / shortDensity; keeping it lets the chart
+   * show only some tiers (say 50x and 100x, the most fragile positions)
+   * without recomputing the map. Optional so a bucket built by hand elsewhere
+   * stays valid.
+   */
+  byLeverage?: Record<number, TierShare>;
 };
 
 export type LiquidationHeatmap = {
@@ -281,6 +292,123 @@ export type LiquidationHeatmapOptions = {
   totalOpenInterestUsd?: number;
 };
 
+type DensityEntry = { long: number; short: number; formedAt: number; tiers: Record<number, TierShare> };
+
+/**
+ * Turns a density map into what the UI reads: buckets normalised to 0–100,
+ * the two strongest zones either side of price, and the directional bias.
+ *
+ * Shared by the full build and by the tier filter, so a filtered map is
+ * computed by exactly the same rules as the whole one. `denominator` is the
+ * total density that dollar amounts are shares of — the whole map's, even when
+ * only some tiers are shown, so that the dollars of a subset are smaller than
+ * the dollars of the whole rather than being rescaled up to fill the same
+ * open interest.
+ */
+function summarizeDensity(
+  density: Map<number, DensityEntry>,
+  binSize: number,
+  currentPrice: number,
+  openInterestUsd: number | null,
+  denominator: number,
+) {
+  const peak = Math.max(...[...density.values()].map((entry) => entry.long + entry.short));
+
+  const buckets: HeatBucket[] = [...density.entries()]
+    .map(([bin, entry]) => {
+      const weight = entry.long + entry.short;
+      return {
+        price: bin * binSize,
+        longDensity: entry.long,
+        shortDensity: entry.short,
+        intensity: peak > 0 ? (weight / peak) * 100 : 0,
+        notionalUsd:
+          openInterestUsd !== null && denominator > 0 ? (weight / denominator) * openInterestUsd : null,
+        formedAt: entry.formedAt,
+        byLeverage: entry.tiers,
+      };
+    })
+    .sort((a, b) => a.price - b.price);
+
+  const above = buckets.filter((bucket) => bucket.price > currentPrice);
+  const below = buckets.filter((bucket) => bucket.price < currentPrice);
+  const topZoneAbove = above.reduce<HeatBucket | null>(
+    (best, bucket) => (!best || bucket.shortDensity > best.shortDensity ? bucket : best),
+    null,
+  );
+  const topZoneBelow = below.reduce<HeatBucket | null>(
+    (best, bucket) => (!best || bucket.longDensity > best.longDensity ? bucket : best),
+    null,
+  );
+
+  // A short liquidation is a forced buy; a long liquidation is a forced sell.
+  // Whichever side carries more total liquidation fuel is the direction a
+  // cascade would tend to accelerate toward if triggered — not a prediction
+  // that it will be triggered. This sums every bucket on each side rather
+  // than comparing just the single densest one: at low leverage, a position
+  // opened on one side of price can still liquidate on the other side, so a
+  // single peak bucket understates how much fuel a side actually holds.
+  const aboveFuel = above.reduce((sum, bucket) => sum + bucket.shortDensity, 0);
+  const belowFuel = below.reduce((sum, bucket) => sum + bucket.longDensity, 0);
+  const total = aboveFuel + belowFuel;
+  let bias: LiquidationHeatmap["bias"] = "SIN SESGO CLARO";
+  let biasNote =
+    "El combustible de liquidación está repartido parejo entre ambos lados. Ninguna dirección tiene una ventaja clara de aceleración.";
+  if (total > 0) {
+    const imbalance = (aboveFuel - belowFuel) / total;
+    if (imbalance > 0.2) {
+      bias = "EMPUJE FUERTE AL ALZA";
+      biasNote =
+        "Hay más liquidez de shorts acumulada arriba que de longs abajo: si el precio sube y los toca, esas liquidaciones son compras forzadas que pueden acelerar el movimiento.";
+    } else if (imbalance < -0.2) {
+      bias = "EMPUJE FUERTE A LA BAJA";
+      biasNote =
+        "Hay más liquidez de longs acumulada abajo que de shorts arriba: si el precio baja y los toca, esas liquidaciones son ventas forzadas que pueden acelerar el movimiento.";
+    }
+  }
+  return { buckets, topZoneAbove, topZoneBelow, bias, biasNote };
+}
+
+/**
+ * The same map restricted to some leverage tiers.
+ *
+ * High-leverage positions are the fragile ones: a 100x position is liquidated
+ * by a 1% move, a 10x by ~10%. Looking at the tiers separately answers a
+ * question the blended map cannot — how much is at stake on a *small* move.
+ *
+ * Returns null when the chosen tiers leave nothing on the map. Maps without
+ * the per-tier split (built before it existed) come back unchanged.
+ */
+export function filterHeatmapTiers(heatmap: LiquidationHeatmap, active: number[]): LiquidationHeatmap | null {
+  if (!heatmap.buckets.some((bucket) => bucket.byLeverage)) return heatmap;
+  const wanted = new Set(active);
+  const density = new Map<number, DensityEntry>();
+  let denominator = 0;
+  for (const bucket of heatmap.buckets) {
+    denominator += bucket.longDensity + bucket.shortDensity;
+    if (!bucket.byLeverage) continue;
+    let long = 0;
+    let short = 0;
+    let formedAt = Infinity;
+    const tiers: Record<number, TierShare> = {};
+    for (const [key, share] of Object.entries(bucket.byLeverage)) {
+      const leverage = Number(key);
+      if (!wanted.has(leverage)) continue;
+      long += share.long;
+      short += share.short;
+      formedAt = Math.min(formedAt, share.formedAt);
+      tiers[leverage] = share;
+    }
+    if (long + short <= 0) continue;
+    density.set(Math.round(bucket.price / heatmap.binSize), { long, short, formedAt, tiers });
+  }
+  if (density.size === 0) return null;
+  return {
+    ...heatmap,
+    ...summarizeDensity(density, heatmap.binSize, heatmap.currentPrice, heatmap.totalOpenInterestUsd, denominator),
+  };
+}
+
 export function buildLiquidationHeatmap(
   symbol: string,
   candles: SwingCandle[],
@@ -336,22 +464,30 @@ export function buildLiquidationHeatmap(
 
   const lowBound = currentPrice * (1 - priceRangePct);
   const highBound = currentPrice * (1 + priceRangePct);
-  const density = new Map<number, { long: number; short: number; formedAt: number }>();
+  const density = new Map<number, DensityEntry>();
 
-  const addDensity = (price: number, long: number, short: number, formedAt: number) => {
+  const addDensity = (price: number, long: number, short: number, formedAt: number, leverage: number) => {
     if (price < lowBound || price > highBound) return;
     // The position this contribution represents would already have been
     // liquidated and closed if price reached its liquidation level after it
     // opened — it cannot still be fuel waiting to go off.
     if (wasSweptAfter(price, formedAt)) return;
     const bin = Math.round(price / binSize);
-    const existing = density.get(bin);
-    if (existing) {
-      existing.long += long;
-      existing.short += short;
-      existing.formedAt = Math.min(existing.formedAt, formedAt);
+    let entry = density.get(bin);
+    if (!entry) {
+      entry = { long: 0, short: 0, formedAt, tiers: {} };
+      density.set(bin, entry);
+    }
+    entry.long += long;
+    entry.short += short;
+    entry.formedAt = Math.min(entry.formedAt, formedAt);
+    const share = entry.tiers[leverage];
+    if (share) {
+      share.long += long;
+      share.short += short;
+      share.formedAt = Math.min(share.formedAt, formedAt);
     } else {
-      density.set(bin, { long, short, formedAt });
+      entry.tiers[leverage] = { long, short, formedAt };
     }
   };
 
@@ -361,16 +497,12 @@ export function buildLiquidationHeatmap(
     const entryPrice = (entryBin + 0.5) * binSize;
     for (const tier of tiers) {
       const weighted = bin.weight * tier.weight;
-      addDensity(longLiquidationPrice(entryPrice, tier.leverage, mmr), weighted, 0, bin.firstIndex);
-      addDensity(shortLiquidationPrice(entryPrice, tier.leverage, mmr), 0, weighted, bin.firstIndex);
+      addDensity(longLiquidationPrice(entryPrice, tier.leverage, mmr), weighted, 0, bin.firstIndex, tier.leverage);
+      addDensity(shortLiquidationPrice(entryPrice, tier.leverage, mmr), 0, weighted, bin.firstIndex, tier.leverage);
     }
   }
 
   if (density.size === 0) return null;
-
-  const peak = Math.max(
-    ...[...density.values()].map((entry) => entry.long + entry.short),
-  );
 
   const totalDensity = [...density.values()].reduce(
     (sum, entry) => sum + entry.long + entry.short,
@@ -381,59 +513,13 @@ export function buildLiquidationHeatmap(
       ? opts.totalOpenInterestUsd
       : null;
 
-  const buckets: HeatBucket[] = [...density.entries()]
-    .map(([bin, entry]) => {
-      const weight = entry.long + entry.short;
-      return {
-        price: bin * binSize,
-        longDensity: entry.long,
-        shortDensity: entry.short,
-        intensity: peak > 0 ? (weight / peak) * 100 : 0,
-        notionalUsd:
-          openInterestUsd !== null && totalDensity > 0
-            ? (weight / totalDensity) * openInterestUsd
-            : null,
-        formedAt: entry.formedAt,
-      };
-    })
-    .sort((a, b) => a.price - b.price);
-
-  const above = buckets.filter((bucket) => bucket.price > currentPrice);
-  const below = buckets.filter((bucket) => bucket.price < currentPrice);
-  const topZoneAbove = above.reduce<HeatBucket | null>(
-    (best, bucket) => (!best || bucket.shortDensity > best.shortDensity ? bucket : best),
-    null,
+  const { buckets, topZoneAbove, topZoneBelow, bias, biasNote } = summarizeDensity(
+    density,
+    binSize,
+    currentPrice,
+    openInterestUsd,
+    totalDensity,
   );
-  const topZoneBelow = below.reduce<HeatBucket | null>(
-    (best, bucket) => (!best || bucket.longDensity > best.longDensity ? bucket : best),
-    null,
-  );
-
-  // A short liquidation is a forced buy; a long liquidation is a forced sell.
-  // Whichever side carries more total liquidation fuel is the direction a
-  // cascade would tend to accelerate toward if triggered — not a prediction
-  // that it will be triggered. This sums every bucket on each side rather
-  // than comparing just the single densest one: at low leverage, a position
-  // opened on one side of price can still liquidate on the other side, so a
-  // single peak bucket understates how much fuel a side actually holds.
-  const aboveFuel = above.reduce((sum, bucket) => sum + bucket.shortDensity, 0);
-  const belowFuel = below.reduce((sum, bucket) => sum + bucket.longDensity, 0);
-  const total = aboveFuel + belowFuel;
-  let bias: LiquidationHeatmap["bias"] = "SIN SESGO CLARO";
-  let biasNote =
-    "El combustible de liquidación está repartido parejo entre ambos lados. Ninguna dirección tiene una ventaja clara de aceleración.";
-  if (total > 0) {
-    const imbalance = (aboveFuel - belowFuel) / total;
-    if (imbalance > 0.2) {
-      bias = "EMPUJE FUERTE AL ALZA";
-      biasNote =
-        "Hay más liquidez de shorts acumulada arriba que de longs abajo: si el precio sube y los toca, esas liquidaciones son compras forzadas que pueden acelerar el movimiento.";
-    } else if (imbalance < -0.2) {
-      bias = "EMPUJE FUERTE A LA BAJA";
-      biasNote =
-        "Hay más liquidez de longs acumulada abajo que de shorts arriba: si el precio baja y los toca, esas liquidaciones son ventas forzadas que pueden acelerar el movimiento.";
-    }
-  }
 
   const tierLabel = MAJOR_SYMBOLS.has(symbol)
     ? "recalibrados con la distribución que Binance publicó de sus propios usuarios (2019)"

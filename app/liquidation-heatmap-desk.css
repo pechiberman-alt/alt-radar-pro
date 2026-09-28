@@ -607,3 +607,25 @@
 .fp-strip em{font-style:normal;font-size:8px;padding:1px 5px;border:1px solid var(--line);border-radius:3px}
 .fp-strip i{display:inline-block;width:90px;height:5px;border-radius:3px}
 .fp-strip u{text-decoration:none;color:#d6b456;cursor:help}
+
+/* Liquidation pools: a solid stepped profile against the price axis, dashed
+   level lines, and price tags on the axis. Shorts liquidated above price are
+   green, longs liquidated below are red — the same sides the cards use. */
+.liq-pool{stroke:none}
+.liq-pool.long{fill:#ff2f43}
+.liq-pool.short{fill:#1fe58a}
+.liq-magnet-line{stroke-width:1.2;opacity:.9}
+.liq-magnet-line.secondary{stroke-width:1;opacity:.55}
+.liq-magnet-label.secondary{opacity:.75}
+.liq-axis-tag{stroke:none}
+.liq-axis-tag.up{fill:#0f9e5c}
+.liq-axis-tag.down{fill:#d92b3d}
+.liq-axis-tag.secondary{opacity:.75}
+.liq-axis-tag-text{font:600 10px var(--font-mono);fill:#fff;text-anchor:middle}
+.liq-pools{display:flex;flex-wrap:wrap;align-items:center;gap:6px 6px;margin:6px 0;padding:7px 10px;background:#0a110d;border:1px solid var(--line);border-radius:4px}
+.liq-pools .lp-title{margin-right:4px;font:8px var(--font-mono);letter-spacing:1.2px;color:var(--muted)}
+.liq-pools button{padding:4px 9px;font:9px var(--font-mono);color:#9aa7a0;background:#0b130f;border:1px solid var(--line);border-radius:3px;cursor:pointer}
+.liq-pools button.on{color:#e7efe9;border-color:#3b5f4d;background:#12241b}
+.liq-pools button.lp-preset{margin-left:4px;color:#a99cff;border-color:#2c2a55}
+.liq-pools .lp-total{margin-left:auto;font:9px var(--font-mono);color:#9aa7a0}
+.liq-pools .lp-total b{color:#e7efe9}
