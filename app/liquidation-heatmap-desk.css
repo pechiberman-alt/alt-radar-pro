@@ -557,3 +557,53 @@
 .liq-wick-up,.liq-wick-down{stroke-width:1}
 .liq-grid{stroke:#141d19}
 @media(max-width:700px){.fp-delta,.sw-label{font-size:9px}.xh-readout{font-size:10px}}
+
+/* Scalping signals: an arrow on the trigger candle, and for the newest live
+   signal the entry / stop / target box a trader would actually place. */
+.sc-mark.up{fill:var(--green);stroke:#03110b;stroke-width:.8px}
+.sc-mark.down{fill:var(--red);stroke:#160406;stroke-width:.8px}
+.sc-label{font:800 9px var(--font-mono);text-anchor:middle;letter-spacing:.4px;paint-order:stroke;stroke:#050a08;stroke-width:2px}
+.sc-label.up{fill:var(--green)}
+.sc-label.down{fill:var(--red)}
+.sc-box.target{fill:var(--green);opacity:.09}
+.sc-box.stop{fill:var(--red);opacity:.09}
+.sc-line{stroke-width:1}
+.sc-line.entry{stroke:#dfe7e2;stroke-dasharray:4 3;opacity:.85}
+.sc-line.stop{stroke:var(--red);opacity:.9}
+.sc-line.target{stroke:var(--green);opacity:.9}
+.sc-tag{font:8px var(--font-mono);text-anchor:end;fill:#dfe7e2;paint-order:stroke;stroke:#050a08;stroke-width:2px}
+.sc-tag.stop{fill:var(--red)}
+.sc-tag.target{fill:var(--green)}
+@media(max-width:700px){.sc-label{font-size:11px}.sc-tag{font-size:10px}}
+.sc-list h4{color:#7ce6b2}
+
+/* Footprint verdict: who is winning, beyond the per-cell numbers. */
+.fp-verdict{margin:8px 0;padding:11px 13px;background:#0a110d;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:5px}
+.fp-verdict.up{border-left-color:var(--green)}
+.fp-verdict.down{border-left-color:var(--red)}
+.fp-verdict.flat{border-left-color:#d6b456}
+.fp-verdict-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+.fp-verdict-head span{font:8px var(--font-mono);letter-spacing:1.2px;color:var(--muted)}
+.fp-verdict-head b{font:13px var(--font-mono);letter-spacing:.6px}
+.fp-verdict.up .fp-verdict-head b{color:var(--green)}
+.fp-verdict.down .fp-verdict-head b{color:var(--red)}
+.fp-verdict.flat .fp-verdict-head b{color:#d6b456}
+.fp-verdict-head em{font-style:normal;font:8px var(--font-mono);padding:2px 6px;border:1px solid var(--line);border-radius:3px;color:#9aa7a0}
+.fp-verdict-bar{height:6px;margin:8px 0 6px;border-radius:3px;opacity:.9}
+.fp-verdict-nums{display:flex;flex-wrap:wrap;gap:3px 14px;font:9px var(--font-mono);color:#9aa7a0}
+.fp-verdict p{margin:7px 0 0;font:9px var(--font-mono);color:#d6b456;line-height:1.5}
+.fp-verdict small{display:block;margin-top:7px;font:8px var(--font-mono);color:var(--muted);line-height:1.5}
+
+/* Slim version of the verdict, right above the chart where the footprint is. */
+.fp-strip{display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;margin:6px 0;padding:7px 11px;background:#0a110d;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:4px;font:9px var(--font-mono);color:#9aa7a0}
+.fp-strip.up{border-left-color:var(--green)}
+.fp-strip.down{border-left-color:var(--red)}
+.fp-strip.flat{border-left-color:#d6b456}
+.fp-strip>span:first-child{letter-spacing:1.1px;color:var(--muted);font-size:8px}
+.fp-strip b{font:11px var(--font-mono);letter-spacing:.5px}
+.fp-strip.up b{color:var(--green)}
+.fp-strip.down b{color:var(--red)}
+.fp-strip.flat b{color:#d6b456}
+.fp-strip em{font-style:normal;font-size:8px;padding:1px 5px;border:1px solid var(--line);border-radius:3px}
+.fp-strip i{display:inline-block;width:90px;height:5px;border-radius:3px}
+.fp-strip u{text-decoration:none;color:#d6b456;cursor:help}

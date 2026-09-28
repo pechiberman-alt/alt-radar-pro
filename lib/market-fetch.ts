@@ -64,27 +64,40 @@ export type TimeframeConfig = {
   oiPeriod: string | null;
   /** Shown on the selector. */
   label: string;
+  /** Length of one candle in milliseconds. The single source for every
+   *  place that needs it (countdown, footprint bucketing, sweep windows) —
+   *  it used to be re-typed as a second table in the chart component, which
+   *  is how a new timeframe could be added to one and silently missing from
+   *  the other. */
+  frameMs: number;
 };
 
 export const TIMEFRAMES: Record<string, TimeframeConfig> = {
   // ~8 hours of history; positions here are measured in hours.
-  "1m": { lookback: 500, halfLife: 240, priceRange: 0.03, oiPeriod: null, label: "1M" },
-  "5m": { lookback: 500, halfLife: 288, priceRange: 0.05, oiPeriod: "5m", label: "5M" },
-  "15m": { lookback: 500, halfLife: 192, priceRange: 0.08, oiPeriod: "15m", label: "15M" },
-  "30m": { lookback: 500, halfLife: 144, priceRange: 0.1, oiPeriod: "30m", label: "30M" },
-  "1h": { lookback: 500, halfLife: 96, priceRange: 0.14, oiPeriod: "1h", label: "1H" },
-  "4h": { lookback: 500, halfLife: 42, priceRange: 0.22, oiPeriod: "4h", label: "4H" },
-  "12h": { lookback: 400, halfLife: 28, priceRange: 0.3, oiPeriod: "12h", label: "12H" },
+  "1m": { lookback: 500, halfLife: 240, priceRange: 0.03, oiPeriod: null, label: "1M", frameMs: 60_000 },
+  // Binance has no 3-minute OI period, so this runs on volume like 1m does.
+  "3m": { lookback: 500, halfLife: 260, priceRange: 0.04, oiPeriod: null, label: "3M", frameMs: 180_000 },
+  "5m": { lookback: 500, halfLife: 288, priceRange: 0.05, oiPeriod: "5m", label: "5M", frameMs: 300_000 },
+  "15m": { lookback: 500, halfLife: 192, priceRange: 0.08, oiPeriod: "15m", label: "15M", frameMs: 900_000 },
+  "30m": { lookback: 500, halfLife: 144, priceRange: 0.1, oiPeriod: "30m", label: "30M", frameMs: 1_800_000 },
+  "1h": { lookback: 500, halfLife: 96, priceRange: 0.14, oiPeriod: "1h", label: "1H", frameMs: 3_600_000 },
+  // Between 1h (96 candles) and 4h (42): the half-life in *time* stays in the
+  // same ballpark, so it lands between the two rather than at either.
+  "2h": { lookback: 500, halfLife: 68, priceRange: 0.18, oiPeriod: "2h", label: "2H", frameMs: 7_200_000 },
+  "4h": { lookback: 500, halfLife: 42, priceRange: 0.22, oiPeriod: "4h", label: "4H", frameMs: 14_400_000 },
+  // Binance has no 8-hour OI period either.
+  "8h": { lookback: 400, halfLife: 34, priceRange: 0.26, oiPeriod: null, label: "8H", frameMs: 28_800_000 },
+  "12h": { lookback: 400, halfLife: 28, priceRange: 0.3, oiPeriod: "12h", label: "12H", frameMs: 43_200_000 },
   // A year of daily candles; the horizon is a couple of weeks.
-  "1d": { lookback: 365, halfLife: 21, priceRange: 0.4, oiPeriod: "1d", label: "1D" },
+  "1d": { lookback: 365, halfLife: 21, priceRange: 0.4, oiPeriod: "1d", label: "1D", frameMs: 86_400_000 },
   // Binance has no 3-day OI period, so this runs on volume.
-  "3d": { lookback: 300, halfLife: 10, priceRange: 0.5, oiPeriod: null, label: "3D" },
+  "3d": { lookback: 300, halfLife: 10, priceRange: 0.5, oiPeriod: null, label: "3D", frameMs: 259_200_000 },
   // Several years of weekly candles; positions held for months.
-  "1w": { lookback: 260, halfLife: 8, priceRange: 0.6, oiPeriod: null, label: "1S" },
+  "1w": { lookback: 260, halfLife: 8, priceRange: 0.6, oiPeriod: null, label: "1S", frameMs: 604_800_000 },
 };
 
 /** Order shown in the selector, coarse to fine reading left to right. */
-export const TIMEFRAME_ORDER = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d", "1w"];
+export const TIMEFRAME_ORDER = ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "8h", "12h", "1d", "3d", "1w"];
 
 export function timeframeConfig(timeframe: string): TimeframeConfig {
   return TIMEFRAMES[timeframe] ?? TIMEFRAMES["1h"];
@@ -278,11 +291,14 @@ export async function loadTopSymbols(signal: AbortSignal): Promise<string[] | nu
  */
 const HIGHER: Record<string, string[]> = {
   "1m": ["15m", "1h"],
+  "3m": ["15m", "1h"],
   "5m": ["1h", "4h"],
   "15m": ["1h", "4h"],
   "30m": ["4h", "1d"],
   "1h": ["4h", "1d"],
+  "2h": ["4h", "1d"],
   "4h": ["1d", "1w"],
+  "8h": ["1d", "1w"],
   "12h": ["1d", "1w"],
   "1d": ["1w"],
   "3d": ["1w"],

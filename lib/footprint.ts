@@ -180,3 +180,115 @@ export function findStackedImbalances(
   }
   return runs;
 }
+
+/**
+ * Who is winning: aggressive buyers or aggressive sellers.
+ *
+ * Every trade has one side that crossed the spread to get filled — that side
+ * is the aggressor. Binance publishes, on every kline of every timeframe, how
+ * much of the candle's volume was bought by aggressors ("taker buy base
+ * volume"); the remainder was sold by them. So this reads the same fact the
+ * footprint cells do, but from data that exists for the whole loaded history
+ * on any timeframe, not only for the recent candles whose individual trades
+ * this session happened to capture.
+ *
+ * It reports a fact about who was more aggressive, with the numbers behind
+ * it — not a forecast. Aggression doesn't guarantee direction: when one side
+ * is clearly winning the fight but price isn't following, that is itself the
+ * reading (the other side is absorbing), and it gets said rather than hidden.
+ */
+export type FlowCandle = { open: number; close: number; volume: number; takerBuy?: number };
+export type FlowWinner = "COMPRADORES" | "VENDEDORES" | "EQUILIBRADO";
+
+export type FlowVerdict = {
+  winner: FlowWinner;
+  /** Null when balanced. */
+  strength: "FUERTE" | "MODERADO" | "LEVE" | null;
+  /** Aggressive buying as a share of all volume, 0–100. */
+  buyPct: number;
+  /** Aggressive buy minus aggressive sell, in the candles' own volume unit. */
+  delta: number;
+  /** Candles that actually carried taker data. */
+  candles: number;
+  /** The same reading over just the latest candles, when there are more
+   *  candles than that to compare against. */
+  recent: { winner: FlowWinner; buyPct: number; candles: number } | null;
+  priceChangePct: number | null;
+  notes: string[];
+};
+
+// Aggressive share hovers around 50% in any ordinary tape, so a couple of
+// points either side is noise, not a winner.
+const BALANCED_BAND = 2;
+
+function winnerOf(buyPct: number): { winner: FlowWinner; strength: FlowVerdict["strength"] } {
+  const gap = buyPct - 50;
+  const size = Math.abs(gap);
+  if (size < BALANCED_BAND) return { winner: "EQUILIBRADO", strength: null };
+  const strength = size >= 10 ? "FUERTE" : size >= 5 ? "MODERADO" : "LEVE";
+  return { winner: gap > 0 ? "COMPRADORES" : "VENDEDORES", strength };
+}
+
+export function flowVerdict(candles: FlowCandle[], options: { recent?: number } = {}): FlowVerdict | null {
+  const recentCount = options.recent ?? 5;
+  const used = candles.filter(
+    (c) => c.takerBuy !== undefined && Number.isFinite(c.takerBuy) && c.volume > 0,
+  );
+  if (used.length < 3) return null;
+
+  const share = (list: FlowCandle[]) => {
+    let buy = 0;
+    let total = 0;
+    for (const c of list) {
+      buy += Math.max(0, Math.min(c.volume, c.takerBuy as number));
+      total += c.volume;
+    }
+    return { buy, total, pct: total > 0 ? (buy / total) * 100 : 50 };
+  };
+
+  const whole = share(used);
+  const { winner, strength } = winnerOf(whole.pct);
+  const delta = whole.buy - (whole.total - whole.buy);
+
+  let recent: FlowVerdict["recent"] = null;
+  if (used.length > recentCount) {
+    const r = share(used.slice(-recentCount));
+    recent = { winner: winnerOf(r.pct).winner, buyPct: r.pct, candles: recentCount };
+  }
+
+  const first = candles[0];
+  const last = candles[candles.length - 1];
+  const priceChangePct = first.open > 0 ? ((last.close - first.open) / first.open) * 100 : null;
+
+  const notes: string[] = [];
+  if (winner !== "EQUILIBRADO" && strength !== "LEVE" && priceChangePct !== null && Math.abs(priceChangePct) >= 0.2) {
+    if (winner === "COMPRADORES" && priceChangePct < 0) {
+      notes.push("Compran agresivo pero el precio cae: los vendedores parecen estar absorbiendo.");
+    } else if (winner === "VENDEDORES" && priceChangePct > 0) {
+      notes.push("Venden agresivo pero el precio sube: los compradores parecen estar absorbiendo.");
+    }
+  }
+  if (recent && winner !== "EQUILIBRADO" && recent.winner !== "EQUILIBRADO" && recent.winner !== winner) {
+    notes.push(
+      `Cambio reciente: en las últimas ${recent.candles} velas ganan ${recent.winner.toLowerCase()} (${recent.buyPct.toFixed(0)}% compra).`,
+    );
+  }
+
+  return { winner, strength, buyPct: whole.pct, delta, candles: used.length, recent, priceChangePct, notes };
+}
+
+/** How many stacked-imbalance runs of each side the given footprints hold. */
+export function stackTally(items: { fp: Footprint | null | undefined; high: number; low: number }[]) {
+  let compra = 0;
+  let venta = 0;
+  let candles = 0;
+  for (const item of items) {
+    if (!item.fp) continue;
+    candles += 1;
+    for (const run of findStackedImbalances(item.fp, item.high, item.low)) {
+      if (run.side === "COMPRA") compra += 1;
+      else venta += 1;
+    }
+  }
+  return { compra, venta, candles };
+}
