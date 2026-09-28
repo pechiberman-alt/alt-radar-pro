@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     userId = user.id;
 
     const body = (await request.json().catch(() => null)) as
-      | { apiKey?: string; apiSecret?: string; restrictions?: ApiRestrictions }
+      | { apiKey?: string; apiSecret?: string; restrictions?: ApiRestrictions; confirmedReadOnly?: boolean }
       | null;
     const apiKey = body?.apiKey?.trim();
     const apiSecret = body?.apiSecret?.trim();
@@ -36,6 +36,11 @@ export async function POST(request: Request) {
       return Response.json({ error: "Falta el resultado de la verificación de permisos." }, { status: 400 });
     }
     validateApiRestrictions(body.restrictions);
+    // The browser can't see the withdrawal permission, so the person's own
+    // confirmation is a hard requirement here, not just a checkbox in the UI.
+    if (body.confirmedReadOnly !== true) {
+      return Response.json({ error: "Confirmá que la API key es de solo lectura (sin trading ni retiros)." }, { status: 400 });
+    }
 
     const encryptedKey = await encryptSecret(apiKey, env.DB, env);
     const encryptedSecret = await encryptSecret(apiSecret, env.DB, env);

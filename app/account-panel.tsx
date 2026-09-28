@@ -12,6 +12,7 @@ import {
 } from "@/lib/account-events";
 import {
   checkReadOnly,
+  friendlyClientError,
   getAccountBalances,
   getDepositHistory,
   getWithdrawHistory,
@@ -564,6 +565,7 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [showSecret, setShowSecret] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -572,17 +574,17 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      // The check itself now runs from here, direct against Binance — see
-      // lib/binance-client-signed.ts's doc comment for why: the Worker's own
-      // signed calls are blocked by Binance's WAF (confirmed, all mirrors
-      // included), so the server can no longer verify this on its own. A
-      // key with trading/withdrawal rights never even reaches the server.
+      // The check runs from here, against Binance's WebSocket API — see
+      // lib/binance-client-signed.ts for why neither the Worker nor plain
+      // browser HTTP can do it. It proves the key works and can read, and
+      // that Binance itself refuses a test order; it cannot see the
+      // withdrawal permission, which is what the confirmation below is for.
       const restrictions = await checkReadOnly(apiKey, apiSecret);
 
       const response = await fetch("/api/binance/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey, apiSecret, restrictions }),
+        body: JSON.stringify({ apiKey, apiSecret, restrictions, confirmedReadOnly: confirmed }),
       });
       if (!response.ok) {
         setError(await readError(response, "No se pudo vincular la cuenta."));
@@ -592,10 +594,16 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
       setApiSecret("");
       onLinked();
     } catch (err) {
-      // checkReadOnly's own thrown Error messages (bad permissions, or
-      // BinanceClientError for a network/WAF problem reaching Binance
-      // directly) are already the right thing to show as-is.
-      setError(err instanceof Error ? err.message : "Sin conexión con el servidor.");
+      const message = friendlyClientError(err);
+      setError(message);
+      // The failure happened in this browser, out of the server's sight, so
+      // report what it was (never the key or secret — only our own message)
+      // where it can actually be diagnosed.
+      void fetch("/api/binance/client-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: "link", message }),
+      }).catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -604,9 +612,10 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
   return (
     <form className="account-form" onSubmit={submit}>
       <p className="account-notice">
-        Creá la API key en Binance <b>sin permisos de trading ni de retiro</b>. Antes de guardarla,
-        verificamos los permisos directo contra Binance desde tu navegador; si tiene trading o
-        retiros habilitados, no se manda ni se guarda.
+        Creá la API key en Binance <b>sin permisos de trading ni de retiro</b> (solo &quot;Habilitar
+        lectura&quot;). Verificamos la key directo contra Binance desde tu navegador y probamos que no
+        pueda operar. <b>El permiso de retiros no se puede comprobar desde acá</b>: por eso tenés
+        que confirmarlo vos abajo.
       </p>
       <label>
         <span>API KEY</span>
@@ -655,8 +664,14 @@ function LinkForm({ onLinked }: { onLinked: () => void }) {
           </button>
         </div>
       </label>
+      <label className="account-confirm">
+        <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+        <span>
+          Confirmo que esta API key es <b>solo de lectura</b>: sin trading y <b>sin retiros</b>.
+        </span>
+      </label>
       {error && <p className="account-error">{error}</p>}
-      <button className="account-submit" type="submit" disabled={busy}>
+      <button className="account-submit" type="submit" disabled={busy || !confirmed}>
         {busy ? "VERIFICANDO…" : "VINCULAR CUENTA"}
       </button>
       <small className="account-hint">
