@@ -94,3 +94,9 @@
    doesn't support -webkit-text-security and shows it in plain text instead
    — an acceptable fallback there, never a broken/unreadable field. */
 .account-masked{-webkit-text-security:disc;text-security:disc}
+
+/* The person's own confirmation that the key can't withdraw — the one thing a
+   browser has no way to check. */
+.account-form label.account-confirm{display:flex;flex-direction:row;align-items:flex-start;gap:9px;padding:9px 10px;border:1px solid #24352d;background:#0a110d;border-radius:4px;cursor:pointer}
+.account-form label.account-confirm input{width:auto;height:auto;margin:2px 0 0;flex:none}
+.account-form label.account-confirm span{font:10px/1.5 var(--font-mono);letter-spacing:0;color:#b5c2ba;text-transform:none}
