@@ -1,3 +1,4 @@
+import { TIMEFRAME_ORDER } from "./market-fetch.ts";
 import { findPivots, type SwingCandle } from "./swing-entries.ts";
 
 /**
@@ -157,7 +158,9 @@ export type MtfPool = LiquidityPool & {
   frames: string[];
 };
 
-const FRAME_RANK = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "3d", "1w"];
+// Coarse-to-fine order comes from the one timeframe table, so a frame added
+// there cannot be missing from this ranking.
+const FRAME_RANK = TIMEFRAME_ORDER;
 
 /**
  * Merges pools found on several frames into one list.

@@ -24,10 +24,13 @@ import {
   candleDelta,
   cumulativeDelta,
   findStackedImbalances,
+  flowVerdict,
   imbalance,
   parseAggTrade,
+  stackTally,
   type Trade,
 } from "@/lib/footprint";
+import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { findSweeps, sweepStats } from "@/lib/liquidity-sweeps";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
 import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
@@ -67,9 +70,9 @@ type DisplayCandle = {
   /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
   takerBuy?: number;
 };
-type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "tomas";
+type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "tomas" | "scalp";
 /** Footprint needs individual trades: legible and fetchable only on short frames. */
-const FOOTPRINT_FRAMES = new Set(["1m", "5m", "15m"]);
+const FOOTPRINT_FRAMES = new Set(["1m", "3m", "5m", "15m"]);
 const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
 /**
  * Fewer layers on by default. Order blocks, gaps and Fibonacci are the noisiest
@@ -90,6 +93,7 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   macd: true,
   footprint: false,
   tomas: true,
+  scalp: true,
   reales: true,
 };
 const LAYER_LABELS: [LayerKey, string][] = [
@@ -100,6 +104,7 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["reales", "LIQ. REALES"],
   ["volumen", "VOLUMEN"],
   ["tomas", "TOMAS DE LIQ."],
+  ["scalp", "SCALP"],
   ["footprint", "FOOTPRINT"],
   ["rsi", "RSI"],
   ["macd", "MACD"],
@@ -109,18 +114,10 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["fib", "FIB"],
 ];
 
-const FRAME_MS: Record<string, number> = {
-  "1m": 60_000,
-  "5m": 300_000,
-  "15m": 900_000,
-  "30m": 1_800_000,
-  "1h": 3_600_000,
-  "4h": 14_400_000,
-  "12h": 43_200_000,
-  "1d": 86_400_000,
-  "3d": 259_200_000,
-  "1w": 604_800_000,
-};
+// One source: the timeframe table. This used to be a second, hand-typed copy.
+const FRAME_MS: Record<string, number> = Object.fromEntries(
+  TIMEFRAME_ORDER.map((id) => [id, timeframeConfig(id).frameMs]),
+);
 
 /** Time left in the forming candle, like a trading terminal shows under the
  *  price. Its own timer, so the map is not re-rendered every second for it. */
@@ -211,6 +208,22 @@ const confidenceLabel = (stats: ZoneStats | null) => {
 // nothing to report yet.
 const confidencePct = (stats: ZoneStats | null) =>
   stats && stats.holdRate !== null ? ` · ${Math.round(stats.holdRate * 100)}%` : "";
+
+// K / M for a quantity, with the app's decimal comma. Signed on request.
+const compactQty = (value: number, signed = false) => {
+  const abs = Math.abs(value);
+  const text =
+    abs >= 1_000_000
+      ? `${(abs / 1_000_000).toLocaleString("es-AR", { maximumFractionDigits: 2 })}M`
+      : abs >= 1_000
+        ? `${(abs / 1_000).toLocaleString("es-AR", { maximumFractionDigits: 1 })}K`
+        : abs.toLocaleString("es-AR", { maximumFractionDigits: abs >= 10 ? 0 : 2 });
+  return signed ? `${value >= 0 ? "+" : "-"}${text}` : text;
+};
+
+// Candles a scalping signal is given to reach its target or its stop — the
+// same horizon its historical win rate is measured with.
+const SCALP_HORIZON = 10;
 
 const priceLabel = (price: number) =>
   price >= 1000
@@ -1028,6 +1041,46 @@ export default function LiquidationHeatmapDesk() {
   const sweepSt = useMemo(() => sweepStats(patternSeries, sweeps), [patternSeries, sweeps]);
   const wyckoff = useMemo<WyckoffReading | null>(() => readWyckoff(patternSeries), [patternSeries]);
 
+  // Scalping signals run on the whole loaded series, minus its last candle:
+  // that one is still forming, and a signal that can appear and vanish while
+  // a candle moves is a repainting signal — the one kind that can't be
+  // trusted or measured. Only closed candles ever signal.
+  const scalpSeries = useMemo(() => patternSeries.slice(0, -1), [patternSeries]);
+  const scalpSignals = useMemo(
+    () => (layers.scalp ? findScalpSignals(scalpSeries, { horizon: SCALP_HORIZON }) : []),
+    [layers.scalp, scalpSeries],
+  );
+  // The newest signal, while it is still inside the horizon it is measured
+  // over. One definition so the chip, the box on the chart and the list can't
+  // disagree about how old it is.
+  const liveScalp = useMemo(() => {
+    const newest = scalpSignals.at(-1);
+    return newest && patternSeries.length - 1 - newest.index <= SCALP_HORIZON ? newest : null;
+  }, [scalpSignals, patternSeries]);
+  const scalpSt = useMemo(
+    () => scalpStats(scalpSeries, scalpSignals, { horizon: SCALP_HORIZON }),
+    [scalpSeries, scalpSignals],
+  );
+
+  // Who is winning, over the candles in view: from the aggressive-buy volume
+  // Binance publishes on every kline, so it exists on every timeframe.
+  const verdict = useMemo(
+    () =>
+      layers.footprint && layout
+        ? flowVerdict(
+            layout.candles.map((c) => ({ open: c.open, close: c.close, volume: c.volume, takerBuy: c.takerBuy })),
+          )
+        : null,
+    [layers.footprint, layout],
+  );
+  const stacks = useMemo(
+    () =>
+      footprintMode && layout && footprints
+        ? stackTally(layout.candles.map((c) => ({ fp: footprints.map.get(c.time), high: c.high, low: c.low })))
+        : null,
+    [footprintMode, layout, footprints],
+  );
+
   const reversalZones = useMemo<ReversalZone[]>(() => {
     if (!layout || livePrice === null) return [];
     const p = livePrice;
@@ -1385,9 +1438,28 @@ export default function LiquidationHeatmapDesk() {
                   TOMAS · {sweeps.filter((sw) => sw.index - patternOffset >= 0).length} en vista
                 </span>
               )}
+              {layers.scalp && (
+                <span className={liveScalp ? (liveScalp.side === "COMPRA" ? "up" : "down") : "none"}>
+                  SCALP · {liveScalp ? `${liveScalp.side} hace ${patternSeries.length - 1 - liveScalp.index} velas` : "sin señal activa"}
+                </span>
+              )}
               <span className={reversalZones.length ? "rev" : "none"}>
                 REVERSIÓN · {reversalZones.filter((z) => z.side === "SOPORTE").length}↑ {reversalZones.filter((z) => z.side === "RESISTENCIA").length}↓
               </span>
+            </div>
+          )}
+
+          {layers.footprint && verdict && (
+            <div className={`fp-strip ${verdict.winner === "COMPRADORES" ? "up" : verdict.winner === "VENDEDORES" ? "down" : "flat"}`}>
+              <span>QUIÉN VA GANANDO</span>
+              <b>{verdict.winner === "EQUILIBRADO" ? "EQUILIBRADO" : `GANAN ${verdict.winner}`}</b>
+              {verdict.strength && <em>{verdict.strength}</em>}
+              <i style={{ background: `linear-gradient(90deg, var(--green) ${verdict.buyPct}%, var(--red) ${verdict.buyPct}%)` }} />
+              <span>compra {verdict.buyPct.toFixed(0)}% · venta {(100 - verdict.buyPct).toFixed(0)}%</span>
+              <span>Δ {compactQty(verdict.delta, true)} {symbol.replace(/USDT$/, "")}</span>
+              {verdict.notes.length > 0 && (
+                <u title={verdict.notes.join(" ")}>⚠ {verdict.notes.some((n) => n.includes("absorbiendo")) ? "absorción" : "cambio reciente"}</u>
+              )}
             </div>
           )}
 
@@ -1943,6 +2015,53 @@ export default function LiquidationHeatmapDesk() {
                     );
                   })}
 
+              {/* Scalping signals: an arrow on the candle that triggered, and for
+                  the newest one still inside its horizon, the entry, stop and
+                  target it defined — the box a trader would actually place. */}
+              {layers.scalp &&
+                (() => {
+                  const visible = scalpSignals.filter((sg) => sg.index - patternOffset >= 0);
+                  const right = MARGIN.left + layout.candleAreaW;
+                  const live = liveScalp && liveScalp.index - patternOffset >= 0 ? liveScalp : null;
+                  const yE = live ? layout.y(live.entry) : 0;
+                  const yS = live ? layout.y(live.stop) : 0;
+                  const yT = live ? layout.y(live.target) : 0;
+                  const x0 = live ? layout.x(live.index - patternOffset) : 0;
+                  return (
+                    <g>
+                      {live && (
+                        <g>
+                          <rect x={x0} y={Math.min(yE, yT)} width={Math.max(0, right - x0)} height={Math.abs(yT - yE)} className="sc-box target" />
+                          <rect x={x0} y={Math.min(yE, yS)} width={Math.max(0, right - x0)} height={Math.abs(yS - yE)} className="sc-box stop" />
+                          <line x1={x0} x2={right} y1={yE} y2={yE} className="sc-line entry" />
+                          <line x1={x0} x2={right} y1={yS} y2={yS} className="sc-line stop" />
+                          <line x1={x0} x2={right} y1={yT} y2={yT} className="sc-line target" />
+                          <text x={right - 4} y={yE - 3} className="sc-tag">ENTRADA {priceLabel(live.entry)}</text>
+                          <text x={right - 4} y={live.side === "COMPRA" ? yS + 10 : yS - 3} className="sc-tag stop">STOP {priceLabel(live.stop)}</text>
+                          <text x={right - 4} y={live.side === "COMPRA" ? yT - 3 : yT + 10} className="sc-tag target">OBJ {priceLabel(live.target)} · {live.rr.toLocaleString("es-AR")}R</text>
+                        </g>
+                      )}
+                      {visible.map((sg, k) => {
+                        const candle = patternSeries[sg.index];
+                        const xi = layout.x(sg.index - patternOffset);
+                        const buy = sg.side === "COMPRA";
+                        const tip = buy ? layout.y(candle.low) + 5 : layout.y(candle.high) - 5;
+                        const d = buy ? `M ${xi} ${tip} l -5 9 l 10 0 z` : `M ${xi} ${tip} l -5 -9 l 10 0 z`;
+                        return (
+                          <g key={`sc-${sg.side}-${sg.index}`}>
+                            <path d={d} className={`sc-mark ${buy ? "up" : "down"}`} />
+                            {k >= visible.length - 2 && (
+                              <text x={xi} y={buy ? tip + 21 : tip - 13} className={`sc-label ${buy ? "up" : "down"}`}>
+                                {sg.side}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
+                    </g>
+                  );
+                })()}
+
               {/* Real liquidations, as they print. Bubble area follows size;
                   red = longs forced out, green = shorts. Only the three
                   largest in view carry a label, so a cascade stays readable. */}
@@ -2443,13 +2562,90 @@ export default function LiquidationHeatmapDesk() {
           )}
 
           {layers.footprint && (
+            <div className={`fp-verdict ${verdict ? (verdict.winner === "COMPRADORES" ? "up" : verdict.winner === "VENDEDORES" ? "down" : "flat") : "flat"}`}>
+              {verdict ? (
+                <>
+                  <div className="fp-verdict-head">
+                    <span>QUIÉN VA GANANDO</span>
+                    <b>{verdict.winner === "EQUILIBRADO" ? "EQUILIBRADO" : `GANAN ${verdict.winner}`}</b>
+                    {verdict.strength && <em>{verdict.strength}</em>}
+                  </div>
+                  <div
+                    className="fp-verdict-bar"
+                    style={{ background: `linear-gradient(90deg, var(--green) ${verdict.buyPct}%, var(--red) ${verdict.buyPct}%)` }}
+                  />
+                  <div className="fp-verdict-nums">
+                    <span>compra agresiva {verdict.buyPct.toFixed(0)}% · venta {(100 - verdict.buyPct).toFixed(0)}%</span>
+                    <span>Δ {compactQty(verdict.delta, true)} {symbol.replace(/USDT$/, "")}</span>
+                    <span>{verdict.candles} velas en vista</span>
+                    {verdict.recent && (
+                      <span>
+                        últimas {verdict.recent.candles}: {verdict.recent.winner.toLowerCase()} ({verdict.recent.buyPct.toFixed(0)}% compra)
+                      </span>
+                    )}
+                    {stacks && stacks.candles > 0 && (
+                      <span>
+                        apilados (operaciones reales): ▲ {stacks.compra} compra · ▼ {stacks.venta} venta
+                      </span>
+                    )}
+                  </div>
+                  {verdict.notes.map((note) => (
+                    <p key={note}>{note}</p>
+                  ))}
+                  <small>
+                    Agresor = quien cruza el spread para ejecutar. Sale del volumen comprador agresivo que Binance publica en cada
+                    vela, así que vale en todas las temporalidades. Describe quién fue más agresivo, no anticipa el precio.
+                  </small>
+                </>
+              ) : (
+                <p>Sin datos suficientes de volumen agresivo en las velas a la vista.</p>
+              )}
+            </div>
+          )}
+
+          {layers.footprint && (
             <p className="fp-hint">
               {!FOOTPRINT_FRAMES.has(timeframe)
-                ? "FOOTPRINT: disponible en 1M, 5M y 15M — necesita cada operación, y en marcos mayores no hay forma real de reconstruirlo."
+                ? "FOOTPRINT (celdas por precio): necesita cada operación y solo existe en 1M, 3M, 5M y 15M. En este marco te queda el veredicto de arriba, que sí cubre todo el historial."
                 : !trades.length
                   ? "FOOTPRINT: cargando operaciones…"
                   : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
             </p>
+          )}
+
+          {layers.scalp && (
+            <div className="div-list sc-list">
+              <h4>SEÑALES SCALPING · {timeframe.toUpperCase()}</h4>
+              {scalpSignals.filter((sg) => sg.index - patternOffset >= 0).length ? (
+                scalpSignals
+                  .filter((sg) => sg.index - patternOffset >= 0)
+                  .slice(-6)
+                  .reverse()
+                  .map((sg) => (
+                    <div key={`scl-${sg.side}-${sg.index}`} className={sg.side === "COMPRA" ? "up" : "down"}>
+                      <b>{sg.side} · entrada {priceLabel(sg.entry)}</b>
+                      <span>
+                        stop {priceLabel(sg.stop)} · objetivo {priceLabel(sg.target)} ({sg.rr.toLocaleString("es-AR")}:1) · {sg.reason}
+                      </span>
+                      <em>hace {patternSeries.length - 1 - sg.index} velas</em>
+                    </div>
+                  ))
+              ) : (
+                <p className="div-none">No hay señales en la ventana visible. Alejá el zoom para ver más velas.</p>
+              )}
+              <small>
+                Regla mecánica: pullback a la EMA20 a favor de la tendencia (EMA20 sobre/bajo EMA50, RSI sin estirar), tomado en la
+                vela que lo rechaza. Solo velas cerradas: una señal no aparece ni desaparece mientras la vela se mueve.{" "}
+                {scalpSt.winRate === null
+                  ? "Sin señales resueltas en la serie todavía."
+                  : `En esta serie: ${scalpSt.wins} al objetivo · ${scalpSt.losses} al stop (${Math.round(scalpSt.winRate * 100)}%, ${scalpSt.confidence.toLowerCase()}). Con ${scalpSt.rr.toLocaleString("es-AR")}:1 el punto de equilibrio es ${Math.round(scalpSt.breakevenRate * 100)}%; en datos aleatorios este mismo método gana ~37%. ${
+                      scalpSt.confidence === "MUESTRA RAZONABLE"
+                        ? `Expectativa ${(scalpSt.expectancyR ?? 0) >= 0 ? "+" : ""}${(scalpSt.expectancyR ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}R por operación, sin comisiones ni deslizamiento.`
+                        : "Con tan pocas señales resueltas todavía no se puede estimar una expectativa: un porcentaje sobre unas pocas operaciones cambia decenas de puntos por azar."
+                    }`}{" "}
+                Es una lectura, no asesoramiento financiero.
+              </small>
+            </div>
           )}
 
           {layers.tomas && (
