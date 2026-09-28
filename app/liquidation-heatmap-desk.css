@@ -629,3 +629,10 @@
 .liq-pools button.lp-preset{margin-left:4px;color:#a99cff;border-color:#2c2a55}
 .liq-pools .lp-total{margin-left:auto;font:9px var(--font-mono);color:#9aa7a0}
 .liq-pools .lp-total b{color:#e7efe9}
+
+/* Stacked liquidation columns: one pixel per cell, stretched without smoothing. */
+.liq-columns{image-rendering:pixelated;image-rendering:crisp-edges;pointer-events:none}
+
+/* Chart labels sit on top of the liquidation columns now; a dark outline keeps
+   them legible over yellow and green without a box behind every word. */
+.liq-svg text:not(.liq-axis-tag-text):not(.liq-axis-label){paint-order:stroke;stroke:rgba(5,10,8,.9);stroke-width:3px;stroke-linejoin:round}
