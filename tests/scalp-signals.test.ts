@@ -188,6 +188,27 @@ test("stats: break-even rate and expectancy follow from the reward:risk", () => 
   assert.equal(st.losses, 1);
   assert.equal(st.winRate, 0.5);
   assert.equal(st.expectancyR, (1 * 1.5 - 1) / 2); // +0.25R
+  assert.equal(st.profitFactor, 1.5); // 1 win of 1.5R over 1 loss of 1R
+});
+
+test("stats: profit factor with no losses is infinite, and with nothing resolved it is nothing — not zero", () => {
+  const allWins = scalpStats(series([[101.6, 99.9]]), [sig(2, "COMPRA")], { horizon: 5 });
+  assert.equal(allWins.profitFactor, Infinity);
+  const none = scalpStats(series([[100.3, 99.7]]), [sig(2, "COMPRA")], { horizon: 10 });
+  assert.equal(none.profitFactor, null);
+});
+
+test("CALIBRATION: on random walks the profit factor sits below 1 — no edge means no profit", () => {
+  let wins = 0;
+  let losses = 0;
+  for (let seed = 1; seed <= 40; seed += 1) {
+    const candles = walk(seed * 7919);
+    const st = scalpStats(candles, findScalpSignals(candles));
+    wins += st.wins;
+    losses += st.losses;
+  }
+  const pf = (wins * 1.5) / losses;
+  assert.ok(pf > 0.6 && pf < 1.05, `profit factor ${pf.toFixed(2)}`); // measured ~0.88
 });
 
 test("stats: confidence needs 15 resolved trades, stricter than the 8 zone stats use", () => {

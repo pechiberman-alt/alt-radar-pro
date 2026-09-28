@@ -37,6 +37,7 @@ import "./trade-journal-desk.css";
 import "./dca-desk.css";
 import "./portfolio-risk.css";
 import "./futures-desk.css";
+import "./bot-desk.css";
 import "./spot-desk.css";
 import "./sentiment-desk.css";
 import "./settings-desk.css";

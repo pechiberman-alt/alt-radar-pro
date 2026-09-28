@@ -1441,6 +1441,7 @@ export default function LiquidationHeatmapDesk() {
               {layers.scalp && (
                 <span className={liveScalp ? (liveScalp.side === "COMPRA" ? "up" : "down") : "none"}>
                   SCALP · {liveScalp ? `${liveScalp.side} hace ${patternSeries.length - 1 - liveScalp.index} velas` : "sin señal activa"}
+                  {scalpSt.winRate !== null && ` · WR ${Math.round(scalpSt.winRate * 100)}% · PF ${scalpSt.profitFactor === Infinity ? "∞" : (scalpSt.profitFactor ?? 0).toLocaleString("es-AR", { maximumFractionDigits: 2 })}`}
                 </span>
               )}
               <span className={reversalZones.length ? "rev" : "none"}>
@@ -2638,7 +2639,7 @@ export default function LiquidationHeatmapDesk() {
                 vela que lo rechaza. Solo velas cerradas: una señal no aparece ni desaparece mientras la vela se mueve.{" "}
                 {scalpSt.winRate === null
                   ? "Sin señales resueltas en la serie todavía."
-                  : `En esta serie: ${scalpSt.wins} al objetivo · ${scalpSt.losses} al stop (${Math.round(scalpSt.winRate * 100)}%, ${scalpSt.confidence.toLowerCase()}). Con ${scalpSt.rr.toLocaleString("es-AR")}:1 el punto de equilibrio es ${Math.round(scalpSt.breakevenRate * 100)}%; en datos aleatorios este mismo método gana ~37%. ${
+                  : `En esta serie: ${scalpSt.wins} al objetivo · ${scalpSt.losses} al stop (win rate ${Math.round(scalpSt.winRate * 100)}% · profit factor ${scalpSt.profitFactor === Infinity ? "∞" : (scalpSt.profitFactor ?? 0).toLocaleString("es-AR", { maximumFractionDigits: 2 })}; ${scalpSt.confidence.toLowerCase()}). Con ${scalpSt.rr.toLocaleString("es-AR")}:1 el punto de equilibrio es ${Math.round(scalpSt.breakevenRate * 100)}%; en datos aleatorios este mismo método gana ~37% y da profit factor ~0,9. ${
                       scalpSt.confidence === "MUESTRA RAZONABLE"
                         ? `Expectativa ${(scalpSt.expectancyR ?? 0) >= 0 ? "+" : ""}${(scalpSt.expectancyR ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}R por operación, sin comisiones ni deslizamiento.`
                         : "Con tan pocas señales resueltas todavía no se puede estimar una expectativa: un porcentaje sobre unas pocas operaciones cambia decenas de puntos por azar."
