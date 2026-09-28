@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import MtfOscillators from "./mtf-oscillators";
 import {
   buildLiquidationHeatmap,
+  filterHeatmapTiers,
   findKeyLevels,
+  leverageTiersFor,
   type HeatBucket,
   type LiquidationHeatmap,
 } from "@/lib/liquidation-heatmap";
@@ -156,27 +158,6 @@ type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; time
  */
 const FRAME_OPTIONS = TIMEFRAME_ORDER.map((id) => ({ id, label: timeframeConfig(id).label }));
 
-/** Green → amber → red, matching the app's own tokens rather than a stock
- *  colormap, so a dense cluster reads with the same alarm colour as
- *  everything else risk-related in this terminal. */
-const GREEN: [number, number, number] = [57, 242, 154];
-const AMBER: [number, number, number] = [244, 184, 74];
-const RED: [number, number, number] = [255, 89, 100];
-
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-
-function intensityColor(intensity: number, alpha: number): string {
-  const t = Math.max(0, Math.min(100, intensity)) / 100;
-  const [from, to] = t < 0.55 ? [GREEN, AMBER] : [AMBER, RED];
-  const localT = t < 0.55 ? t / 0.55 : (t - 0.55) / 0.45;
-  const r = Math.round(lerp(from[0], to[0], localT));
-  const g = Math.round(lerp(from[1], to[1], localT));
-  const b = Math.round(lerp(from[2], to[2], localT));
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
 const usd = (value: number) => {
   if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
@@ -244,10 +225,34 @@ const DEFAULT_BOX = { width: 1000, height: 470 };
 /** Candles kept for display; zoom picks a tail of these without refetching. */
 const MAX_DISPLAY_CANDLES = 220;
 const MARGIN = { top: 12, right: 78, bottom: 28, left: 10 };
+/** Leverage tiers the liquidation model works with (identical for every symbol). */
+const ALL_TIERS = leverageTiersFor("BTCUSDT").map((t) => t.leverage);
 export default function LiquidationHeatmapDesk() {
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [timeframe, setTimeframe] = useState("1h");
-  const [data, setData] = useState<ApiResponse | null>(null);
+  const [rawData, setData] = useState<ApiResponse | null>(null);
+  // Which leverage tiers the liquidation map shows. All by default; a 100x
+  // position dies to a ~1% move and a 10x to ~10%, so isolating tiers answers
+  // "how much is at stake on a small move" — which the blended map can't.
+  const [tiers, setTiers] = useState<number[]>(ALL_TIERS);
+  const data = useMemo<ApiResponse | null>(() => {
+    if (!rawData) return rawData;
+    const filtered = filterHeatmapTiers(rawData.heatmap, tiers);
+    if (filtered) return { ...rawData, heatmap: filtered };
+    // The chosen tiers leave nothing in range: show that, not the full map
+    // under a label that says otherwise.
+    return {
+      ...rawData,
+      heatmap: {
+        ...rawData.heatmap,
+        buckets: [],
+        topZoneAbove: null,
+        topZoneBelow: null,
+        bias: "SIN SESGO CLARO",
+        biasNote: "No hay niveles de liquidación para los apalancamientos elegidos en este rango.",
+      },
+    };
+  }, [rawData, tiers]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
@@ -737,7 +742,7 @@ export default function LiquidationHeatmapDesk() {
     const macdTop = macdH ? (cursor += PANE_GAP) : cursor;
     // The profile strip scales with width instead of eating a fixed 104px of
     // a narrow phone, where that was a quarter of the whole chart.
-    const profileW = Math.max(52, Math.min(120, box.width * 0.13));
+    const profileW = Math.max(56, Math.min(150, box.width * 0.15));
 
     // Scale to cover BOTH the traded range and the two magnet zones the
     // cards above call out. Scaling to candles alone left those zones off
@@ -859,7 +864,7 @@ export default function LiquidationHeatmapDesk() {
      * what actually guarantees separated lines, regardless of how the
      * intensities happen to be distributed.
      */
-    const BAND_LIMIT = 12;
+    const BAND_LIMIT = 8;
     const banded = new Set(
       [...scored]
         .sort((a, b) => b.intensity - a.intensity)
@@ -871,7 +876,77 @@ export default function LiquidationHeatmapDesk() {
       .map((zone) => ({ ...zone, banded: banded.has(zone.price) }))
       .sort((a, b) => a.price - b.price);
 
-    return { candles, series, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, rowHeight: ROW_HEIGHT, volTop, volH, rsiTop, rsiH, macdTop, macdH };
+    /**
+     * The profile on the right, as a solid stepped silhouette rather than
+     * hundreds of hairlines.
+     *
+     * Rows a few pixels tall were drawn as bars 1–3px thick in an intensity
+     * rainbow: readable as texture, unreadable as a profile. Merging every
+     * three rows into one step gives the chunky staircase a reader can compare
+     * at a glance — length carries the size, colour carries the side (shorts
+     * liquidated above price, longs below).
+     */
+    const STEP_ROWS = 3;
+    const steps = new Map<number, { long: number; short: number; usd: number; formedAt: number; bestTotal: number; bestPrice: number }>();
+    for (const [rowIndex, row] of rows) {
+      const group = Math.floor(rowIndex / STEP_ROWS);
+      const total = row.longDensity + row.shortDensity;
+      const current = steps.get(group);
+      if (current) {
+        current.long += row.longDensity;
+        current.short += row.shortDensity;
+        current.usd += row.notionalUsd;
+        current.formedAt = Math.min(current.formedAt, row.formedAt);
+        if (total > current.bestTotal) {
+          current.bestTotal = total;
+          current.bestPrice = row.price;
+        }
+      } else {
+        steps.set(group, { long: row.longDensity, short: row.shortDensity, usd: row.notionalUsd, formedAt: row.formedAt, bestTotal: total, bestPrice: row.price });
+      }
+    }
+    const stepPeak = Math.max(...[...steps.values()].map((st) => st.long + st.short), 1);
+    const priceSpan = hi - lo;
+    const profileSteps = [...steps.entries()]
+      .map(([group, st]) => {
+        const pLo = lo + ((group * STEP_ROWS) / rowCount) * priceSpan;
+        const pHi = lo + (((group + 1) * STEP_ROWS) / rowCount) * priceSpan;
+        const total = st.long + st.short;
+        return {
+          key: group,
+          yTop: y(pHi),
+          h: y(pLo) - y(pHi),
+          frac: total / stepPeak,
+          side: (pLo + pHi) / 2 < heatmap.currentPrice ? ("long" as const) : ("short" as const),
+          total,
+          usd: st.usd,
+          long: st.long,
+          short: st.short,
+          formedAt: st.formedAt,
+          price: st.bestPrice,
+        };
+      })
+      // Only steps big enough to read as a pool: the small ones scattered along
+      // the axis were noise that made the silhouette look ragged.
+      .filter((st) => st.frac >= 0.1);
+
+    // The next-strongest pool on each side, apart from the magnet the cards
+    // already name — so the chart marks more than just two levels.
+    const groupOf = (price: number) => Math.floor((((price - lo) / priceSpan) * rowCount) / STEP_ROWS);
+    const secondaryPool = (side: "long" | "short") => {
+      const anchor = side === "short" ? heatmap.topZoneAbove : heatmap.topZoneBelow;
+      const anchorGroup = anchor ? groupOf(anchor.price) : null;
+      const best = profileSteps
+        .filter((st) => st.side === side && (anchorGroup === null || Math.abs(st.key - anchorGroup) > 4))
+        .sort((a, b) => b.total - a.total)[0];
+      return best && best.frac >= 0.25 ? best : null;
+    };
+    const secondaryPools = [secondaryPool("short"), secondaryPool("long")].filter(
+      (pool): pool is NonNullable<ReturnType<typeof secondaryPool>> => pool !== null,
+    );
+    const poolTotalUsd = [...rows.values()].reduce((sum, row) => sum + row.notionalUsd, 0);
+
+    return { candles, series, heatmap, y, x, bodyW, zoneStartX, candleAreaW, profileW, plotH, lo, hi, zones, profileSteps, secondaryPools, poolTotalUsd, rowHeight: ROW_HEIGHT, volTop, volH, rsiTop, rsiH, macdTop, macdH };
   }, [data, box, visibleCandles, priceView, liveKline, timeframe, symbol, layers.volumen, layers.rsi, layers.macd, layers.footprint]);
 
   // Keep the gesture's view of the price window in step with what is drawn.
@@ -1418,6 +1493,42 @@ export default function LiquidationHeatmapDesk() {
             ))}
           </div>
 
+          {layers.calor && layout && (
+            <div className="liq-pools">
+              <span className="lp-title">POOLS</span>
+              {ALL_TIERS.map((tier) => {
+                const on = tiers.includes(tier);
+                return (
+                  <button
+                    key={tier}
+                    className={on ? "on" : ""}
+                    aria-pressed={on}
+                    onClick={() =>
+                      setTiers((current) =>
+                        current.includes(tier)
+                          ? current.length > 1
+                            ? current.filter((t) => t !== tier)
+                            : current
+                          : [...current, tier].sort((a, b) => a - b),
+                      )
+                    }
+                  >
+                    {tier}X
+                  </button>
+                );
+              })}
+              <button className="lp-preset" onClick={() => setTiers(ALL_TIERS)}>
+                TODOS
+              </button>
+              <button className="lp-preset" onClick={() => setTiers([50, 75, 100])} title="Las posiciones más frágiles: una vela chica las liquida">
+                ALTO APALANCAMIENTO
+              </button>
+              <span className="lp-total" title="Reparto proporcional del open interest actual: una estimación, no posiciones medidas una por una">
+                Total en vista: <b>{layout.heatmap.totalOpenInterestUsd !== null && layout.poolTotalUsd > 0 ? usd(layout.poolTotalUsd) : "—"}</b>
+              </span>
+            </div>
+          )}
+
           {/* Always says what the pattern detectors found in this window —
               including "nothing" — so an empty chart is never ambiguous. */}
           {layers.patrones && (
@@ -1555,13 +1666,39 @@ export default function LiquidationHeatmapDesk() {
                   Spans are deliberately faint and thin: they are context for
                   the candles, not the subject. The profile bar on the right
                   is where intensity is meant to be read. */}
+              {/* The pools: a solid stepped profile flush against the price axis. */}
+              {layers.calor &&
+                layout.profileSteps.map((st) => {
+                  const w = Math.max(3, st.frac * layout.profileW);
+                  const bucket: HeatBucket = {
+                    price: st.price,
+                    longDensity: st.long,
+                    shortDensity: st.short,
+                    intensity: st.frac * 100,
+                    notionalUsd: st.usd > 0 ? st.usd : null,
+                    formedAt: st.formedAt,
+                  };
+                  return (
+                    <rect
+                      key={`pf-${st.key}`}
+                      x={box.width - MARGIN.right - w}
+                      y={st.yTop}
+                      width={w}
+                      height={st.h + 0.6}
+                      className={`liq-pool ${st.side}`}
+                      style={{ opacity: 0.42 + st.frac * 0.58 }}
+                      onMouseEnter={() => setHovered(bucket)}
+                      onMouseLeave={() => setHovered((current) => (current?.price === st.price ? null : current))}
+                    />
+                  );
+                })}
+
               {layers.calor && layout.zones.map((zone) => {
                 const yPos = layout.y(zone.price);
                 const startX = layout.zoneStartX(zone.formedAt);
                 const endX = MARGIN.left + layout.candleAreaW;
                 const relative = zone.intensity / 100;
                 const thickness = Math.max(1.2, relative * layout.rowHeight);
-                const barW = Math.max(2, relative * layout.profileW);
                 const asBucket = {
                   price: zone.price,
                   longDensity: zone.longDensity,
@@ -1590,16 +1727,13 @@ export default function LiquidationHeatmapDesk() {
                         y={yPos - thickness / 2}
                         width={endX - startX}
                         height={thickness}
-                        fill={intensityColor(zone.intensity, 0.12 + relative * 0.3)}
+                        fill={
+                          zone.price > layout.heatmap.currentPrice
+                            ? `rgba(31,229,138,${0.08 + relative * 0.2})`
+                            : `rgba(255,47,67,${0.08 + relative * 0.2})`
+                        }
                       />
                     )}
-                    <rect
-                      x={endX}
-                      y={yPos - thickness / 2}
-                      width={barW}
-                      height={thickness}
-                      fill={intensityColor(zone.intensity, 1)}
-                    />
                   </g>
                 );
               })}
@@ -2372,9 +2506,31 @@ export default function LiquidationHeatmapDesk() {
                       {label} {priceLabel(zone.price)}
                       {zone.notionalUsd !== null ? ` · ${usd(zone.notionalUsd)}` : ""}
                     </text>
+                    <rect x={box.width - MARGIN.right} y={layout.y(zone.price) - 8} width={MARGIN.right - 4} height={16} rx={2} className={`liq-axis-tag ${cls}`} />
+                    <text x={box.width - MARGIN.right + (MARGIN.right - 4) / 2} y={layout.y(zone.price) + 3.5} className="liq-axis-tag-text">
+                      {priceLabel(zone.price)}
+                    </text>
                   </g>
                 ) : null,
               )}
+              {layers.calor &&
+                layout.secondaryPools.map((pool) => {
+                  const cls = pool.side === "short" ? "up" : "down";
+                  const yy = layout.y(pool.price);
+                  return (
+                    <g key={`sec-${pool.key}`}>
+                      <line x1={MARGIN.left} x2={box.width - MARGIN.right} y1={yy} y2={yy} className={`liq-magnet-line secondary ${cls}`} />
+                      <text x={MARGIN.left + 6} y={yy - 5} className={`liq-magnet-label secondary ${cls}`}>
+                        POOL {pool.side === "short" ? "↑" : "↓"} {priceLabel(pool.price)}
+                        {pool.usd > 0 ? ` · ${usd(pool.usd)}` : ""}
+                      </text>
+                      <rect x={box.width - MARGIN.right} y={yy - 8} width={MARGIN.right - 4} height={16} rx={2} className={`liq-axis-tag secondary ${cls}`} />
+                      <text x={box.width - MARGIN.right + (MARGIN.right - 4) / 2} y={yy + 3.5} className="liq-axis-tag-text">
+                        {priceLabel(pool.price)}
+                      </text>
+                    </g>
+                  );
+                })}
 
               {priceTicks.map((tick) => (
                 <text
