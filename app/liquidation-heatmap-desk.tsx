@@ -32,6 +32,7 @@ import {
   stackTally,
   type Trade,
 } from "@/lib/footprint";
+import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { findSweeps, sweepStats } from "@/lib/liquidity-sweeps";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
@@ -139,7 +140,14 @@ function CandleCountdown({ closeAt }: { closeAt: number }) {
   return <small className="lpb-count">{text}</small>;
 }
 
-type ApiResponse = { heatmap: LiquidationHeatmap; candles: DisplayCandle[]; timeframe: string };
+type ApiResponse = {
+  heatmap: LiquidationHeatmap;
+  candles: DisplayCandle[];
+  timeframe: string;
+  /** Every estimated level with when it formed and when price took it — the columns. */
+  lives: LiquidationLife[];
+  halfLife: number | null;
+};
 
 /**
  * Candles come from the browser, and the map is built here rather than on the
@@ -268,7 +276,17 @@ export default function LiquidationHeatmapDesk() {
    * out under the reader.
    */
   useEffect(() => {
-    const period = timeframe === "15m" ? 60_000 : timeframe === "1h" ? 120_000 : 300_000;
+    // Short frames refresh faster: the liquidation columns show where each
+    // level was swept, and on 1m a five-minute refresh left levels drawn for
+    // five candles after price had already taken them.
+    const period =
+      timeframe === "1m"
+        ? 30_000
+        : timeframe === "3m" || timeframe === "5m" || timeframe === "15m"
+          ? 60_000
+          : timeframe === "30m" || timeframe === "1h" || timeframe === "2h"
+            ? 120_000
+            : 300_000;
     const id = setInterval(() => setRefreshKey((key) => key + 1), period);
     return () => clearInterval(id);
   }, [timeframe]);
@@ -664,6 +682,11 @@ export default function LiquidationHeatmapDesk() {
           return;
         }
 
+        const lives = buildLiquidationLives(symbol, candles, {
+          oiDeltaByIndex: oiDeltaByIndex ?? undefined,
+          priceRangePct: config.priceRange,
+        });
+
         setUpdatedAt(Date.now());
         const takerBuyByTime = new Map<number, number>();
         for (const row of rows as unknown[][]) {
@@ -686,6 +709,8 @@ export default function LiquidationHeatmapDesk() {
             volume: candle.volume,
           })),
           timeframe,
+          lives,
+          halfLife: config.halfLife ?? null,
         });
       } catch {
         if (alive) fail("MAPA NO DISPONIBLE");
@@ -1116,6 +1141,55 @@ export default function LiquidationHeatmapDesk() {
   const sweepSt = useMemo(() => sweepStats(patternSeries, sweeps), [patternSeries, sweeps]);
   const wyckoff = useMemo<WyckoffReading | null>(() => readWyckoff(patternSeries), [patternSeries]);
 
+  /**
+   * The stacked liquidation columns, painted once into a small image (one
+   * pixel per cell) and stretched over the candle area: tens of thousands of
+   * SVG rectangles would make every zoom and every live tick crawl. Skipped in
+   * footprint mode, where the candles' own price cells need the space.
+   */
+  const columnImage = useMemo(() => {
+    if (!layers.calor || !layout || !data?.lives?.length || typeof document === "undefined") return null;
+    if (layers.footprint && FOOTPRINT_FRAMES.has(timeframe)) return null;
+    const times = layout.candles.map((c) => c.time);
+    const rows = Math.max(40, Math.min(170, Math.round(layout.plotH / 4)));
+    const grid = liquidationGrid(data.lives, {
+      times,
+      lo: layout.lo,
+      hi: layout.hi,
+      rows,
+      halfLife: data.halfLife,
+      frameMs: FRAME_MS[data.timeframe] ?? 3_600_000,
+      tiers,
+    });
+    if (!grid.scale) return null;
+    // Three pixels per column, the third left empty, so the columns read as
+    // separate bars once there is room for a gap.
+    const gap = layout.candleAreaW / grid.cols >= 5;
+    const px = gap ? 3 : 1;
+    const canvas = document.createElement("canvas");
+    canvas.width = grid.cols * px;
+    canvas.height = grid.rows;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const image = ctx.createImageData(canvas.width, canvas.height);
+    for (let c = 0; c < grid.cols; c += 1) {
+      for (let r = 0; r < grid.rows; r += 1) {
+        const color = gridColor(grid.cells[c * grid.rows + r], grid.scale);
+        if (!color) continue;
+        const yPix = grid.rows - 1 - r; // row 0 is the bottom of the price range
+        for (let k = 0; k < (gap ? 2 : 1); k += 1) {
+          const o = (yPix * canvas.width + c * px + k) * 4;
+          image.data[o] = color[0];
+          image.data[o + 1] = color[1];
+          image.data[o + 2] = color[2];
+          image.data[o + 3] = color[3];
+        }
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+    return canvas.toDataURL();
+  }, [layers.calor, layers.footprint, layout, data, timeframe, tiers]);
+
   // Scalping signals run on the whole loaded series, minus its last candle:
   // that one is still forming, and a signal that can appear and vanish while
   // a candle moves is a repainting signal — the one kind that can't be
@@ -1280,11 +1354,18 @@ export default function LiquidationHeatmapDesk() {
     if (!layout) return [];
     const { lo, hi, y } = layout;
     const step = (hi - lo) / 6;
+    // A tick that would sit on one of the pool price tags is dropped: the two
+    // labels printed on top of each other read as one garbled number.
+    const tagYs = layers.calor
+      ? [layout.heatmap.topZoneAbove?.price, layout.heatmap.topZoneBelow?.price, ...layout.secondaryPools.map((p) => p.price)]
+          .filter((p): p is number => typeof p === "number" && p >= lo && p <= hi)
+          .map((p) => y(p))
+      : [];
     return Array.from({ length: 7 }, (_, i) => {
       const price = lo + step * i;
       return { price, yPos: y(price) };
-    });
-  }, [layout]);
+    }).filter((tick) => tagYs.every((ty) => Math.abs(ty - tick.yPos) > 13));
+  }, [layout, layers.calor]);
 
   const dateTicks = useMemo(() => {
     if (!layout) return [];
@@ -1666,6 +1747,21 @@ export default function LiquidationHeatmapDesk() {
                   Spans are deliberately faint and thin: they are context for
                   the candles, not the subject. The profile bar on the right
                   is where intensity is meant to be read. */}
+              {/* The columns: each estimated level from the candle that created
+                  it to the candle that swept it. */}
+              {columnImage && (
+                <image
+                  href={columnImage}
+                  x={MARGIN.left}
+                  y={MARGIN.top}
+                  width={layout.candleAreaW}
+                  height={layout.plotH}
+                  preserveAspectRatio="none"
+                  className="liq-columns"
+                  clipPath="url(#liq-price-clip)"
+                />
+              )}
+
               {/* The pools: a solid stepped profile flush against the price axis. */}
               {layers.calor &&
                 layout.profileSteps.map((st) => {
@@ -1693,7 +1789,7 @@ export default function LiquidationHeatmapDesk() {
                   );
                 })}
 
-              {layers.calor && layout.zones.map((zone) => {
+              {layers.calor && !columnImage && layout.zones.map((zone) => {
                 const yPos = layout.y(zone.price);
                 const startX = layout.zoneStartX(zone.formedAt);
                 const endX = MARGIN.left + layout.candleAreaW;
