@@ -26,7 +26,7 @@
  */
 
 export type AlertPriority = "CRITICA" | "IMPORTANTE" | "INFORMATIVA";
-export type AlertCategory = "SEÑAL" | "RIESGO" | "ZONA" | "LIQUIDACIÓN" | "FLUJO" | "DCA";
+export type AlertCategory = "SEÑAL" | "RIESGO" | "ZONA" | "LIQUIDACIÓN" | "FLUJO" | "DCA" | "VOLUMEN";
 
 /**
  * Evidence attached to an alert.
@@ -90,6 +90,9 @@ export const CATEGORY_COOLDOWN_MINUTES: Record<AlertCategory, number> = {
   ZONA: 20,
   LIQUIDACIÓN: 20,
   FLUJO: 120,
+  // Volume spikes come in bursts around news; five minutes keeps a burst from
+  // becoming a stream of system notifications while the feed still lists each one.
+  VOLUMEN: 5,
   // A DCA reminder is daily at most by nature — the schedule itself decides
   // how often it should fire, so the cooldown only needs to block true
   // duplicates within the same day.
@@ -114,6 +117,9 @@ export const DEFAULT_ALERT_PREFERENCES: AlertPreferences = {
     LIQUIDACIÓN: true,
     FLUJO: false,
     DCA: true,
+    // On by default: it is what someone asks for when they say "tell me when
+    // volume is big", and it only fires on the coins the centre already watches.
+    VOLUMEN: true,
   },
 };
 
@@ -318,6 +324,37 @@ export function flowAlert(
   };
 }
 
+
+/** "3,4" — decimal comma without depending on the runtime's locale data. */
+const dec = (value: number, digits = 1) => value.toFixed(digits).replace(".", ",");
+
+function dollars(value: number): string {
+  if (value >= 1e9) return `$${dec(value / 1e9)} mil M`;
+  if (value >= 1e6) return `$${dec(value / 1e6)} M`;
+  return `$${Math.round(value / 1e3)} mil`;
+}
+
+export function volumeAlert(
+  symbol: string,
+  timeframe: string,
+  spike: { multiple: number; quoteVolume: number; changePct: number; closed: boolean; openTime: number },
+  at = Date.now(),
+): Alert {
+  const move = Math.abs(spike.changePct) < 0.05 ? "casi sin cambio" : `${spike.changePct > 0 ? "subiendo +" : "bajando −"}${dec(Math.abs(spike.changePct), 2)}%`;
+  return {
+    // One per candle: the same candle re-evaluated every few minutes must not
+    // raise the same banner again, and the next candle is a new event.
+    id: `volume-${symbol}-${timeframe}-${spike.openTime}`,
+    priority: "IMPORTANTE",
+    category: "VOLUMEN",
+    symbol,
+    title: `${symbol} · volumen ${dec(spike.multiple)}× en ${timeframe}`,
+    body:
+      `La vela de ${timeframe} ${spike.closed ? "cerró" : "va"} ${move} con ${dollars(spike.quoteVolume)} negociados, ` +
+      `${dec(spike.multiple)} veces el promedio de las 20 anteriores. Es actividad, no dice hacia dónde sigue el precio.`,
+    at,
+  };
+}
 
 export function dcaReminderAlert(symbol: string, usdAmount: number, at = Date.now()): Alert {
   return {

@@ -6,13 +6,15 @@ import { publishAlert } from "@/lib/alert-bus";
 import { buildMtfZones } from "@/lib/mtf-zones";
 import { isDueToday, type DcaSchedule } from "@/lib/dca-tracker";
 import { readFibZone } from "@/lib/fib-zone";
-import { loadRows } from "@/lib/market-fetch";
+import { loadRows, TIMEFRAMES } from "@/lib/market-fetch";
+import { detectVolumeSpike } from "@/lib/volume-spike";
 import { parseSwingKlines } from "@/lib/swing-entries";
 import {
   CATEGORY_COOLDOWN_MINUTES,
   dcaReminderAlert,
   describeEvidence,
   fibAlert,
+  volumeAlert,
   zoneAlert,
   createDeliveryState,
   DEFAULT_ALERT_PREFERENCES,
@@ -29,6 +31,7 @@ const CATEGORIES: { id: AlertCategory; label: string; hint: string }[] = [
   { id: "ZONA", label: "ZONAS", hint: "Entrada en demanda, oferta o banda Fibonacci" },
   { id: "LIQUIDACIÓN", label: "LIQUIDACIÓN", hint: "Cercanía a una zona imán" },
   { id: "FLUJO", label: "FLUJO", hint: "Cambios de régimen institucional" },
+  { id: "VOLUMEN", label: "VOLUMEN", hint: "Vela con 3× el volumen normal en BTC, ETH o SOL (15m, 1h, 4h)" },
   { id: "DCA", label: "DCA", hint: "Día programado de compra — te avisa, no compra" },
 ];
 
@@ -89,6 +92,13 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
             if (candles.length >= 40) series.push({ timeframe, candles });
           }
           if (!series.length) continue;
+
+          // Same candles already loaded for the zones: volume needs no extra request.
+          for (const { timeframe, candles } of series) {
+            const frameMs = TIMEFRAMES[timeframe]?.frameMs;
+            const spike = frameMs ? detectVolumeSpike(candles, frameMs, Date.now()) : null;
+            if (spike) found.push(volumeAlert(symbol, timeframe, spike));
+          }
 
           const currentPrice = series[series.length - 1].candles.at(-1)!.close;
           const board = buildMtfZones(series, currentPrice);
