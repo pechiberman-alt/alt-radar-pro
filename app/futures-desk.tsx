@@ -10,6 +10,7 @@ import {
   type FuturesPositionView,
   type FuturesSummaryView,
 } from "@/lib/futures-risk";
+import FuturesLogReport from "./futures-log-report";
 import SignInPrompt from "./sign-in-prompt";
 
 const POLL_MS = 5000;
@@ -229,6 +230,7 @@ export default function FuturesDesk() {
           </p>
         </>
       )}
+      <FuturesLogReport />
     </section>
   );
 }
