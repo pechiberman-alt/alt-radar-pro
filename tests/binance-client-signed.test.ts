@@ -236,3 +236,25 @@ test("friendlyClientError translates the codes people actually hit", () => {
   assert.equal(friendlyClientError(new BinanceClientError("texto de Binance", 400, -9999)), "texto de Binance");
   assert.equal(friendlyClientError("no es un Error"), "No se pudo hablar con Binance.");
 });
+
+// ─── private futures stream ───────────────────────────────────────────────
+import { FUTURES_USER_STREAM_URLS, pingFuturesUserStream, startFuturesUserStream } from "../lib/binance-client-signed.ts";
+
+test("the private stream is started and kept alive with the API key alone — no signature, no secret", async (t) => {
+  setup(t, (req) => (req.method === "userDataStream.start" ? ok({ listenKey: "LK123" }) : ok({ listenKey: "LK123" })));
+  assert.equal(await startFuturesUserStream(KEY), "LK123");
+  await pingFuturesUserStream(KEY);
+  const socket = FakeSocket.instances[0];
+  assert.equal(socket.url, FUTURES);
+  assert.deepEqual(socket.sent.map((r) => r.method), ["userDataStream.start", "userDataStream.ping"]);
+  for (const req of socket.sent) assert.deepEqual(req.params, { apiKey: KEY });
+});
+
+test("a start without a listen key is an error, not an empty stream", async (t) => {
+  setup(t, () => ok({}));
+  await assert.rejects(startFuturesUserStream(KEY), /clave del canal privado/);
+});
+
+test("the stream is read at the /private path first, the old path second", () => {
+  assert.deepEqual(FUTURES_USER_STREAM_URLS("K"), ["wss://fstream.binance.com/private/ws/K", "wss://fstream.binance.com/ws/K"]);
+});

@@ -357,6 +357,29 @@ export async function getFuturesPositions(apiKey: string, apiSecret: string) {
   return futures<RawFuturesPosition[]>("v2/account.position", {}, apiKey, apiSecret);
 }
 
+/**
+ * The account's private futures stream. Starting it needs only the API key
+ * (Binance's USER_STREAM security type: no timestamp, no signature), so the
+ * recorder never has to hold the secret. The key returned is valid for 60
+ * minutes and each ping extends it.
+ */
+export async function startFuturesUserStream(apiKey: string): Promise<string> {
+  const result = (await connectionFor(FUTURES_WS).send("userDataStream.start", { apiKey })) as { listenKey?: string };
+  if (!result?.listenKey) throw new BinanceClientError("Binance no devolvió la clave del canal privado.", 0);
+  return result.listenKey;
+}
+
+export async function pingFuturesUserStream(apiKey: string): Promise<void> {
+  await connectionFor(FUTURES_WS).send("userDataStream.ping", { apiKey });
+}
+
+/** Where the private stream is read. Binance moved it under /private; the old
+ *  path is kept as a fallback in case the new one is refused. */
+export const FUTURES_USER_STREAM_URLS = (listenKey: string) => [
+  `wss://fstream.binance.com/private/ws/${listenKey}`,
+  `wss://fstream.binance.com/ws/${listenKey}`,
+];
+
 export type RawFuturesAccount = {
   totalWalletBalance: string;
   totalUnrealizedProfit: string;

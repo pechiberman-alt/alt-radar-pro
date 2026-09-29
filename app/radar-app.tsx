@@ -38,6 +38,7 @@ import TradeJournalDesk from "./trade-journal-desk";
 import DcaDesk from "./dca-desk";
 import BotDesk from "./bot-desk";
 import FuturesDesk from "./futures-desk";
+import FuturesRecorder from "./futures-recorder";
 import PortfolioRisk from "./portfolio-risk";
 import SpotDesk from "./spot-desk";
 import SentimentDesk from "./sentiment-desk";
@@ -934,6 +935,7 @@ export default function RadarApp() {
           <span className={error ? "offline" : "live"}>● {error ? "DEGRADADO" : "EN VIVO"}</span>
           <AccountPanel />
           <AlertToasts />
+          <FuturesRecorder />
           {installPrompt && <button className="install-app" onClick={installApp}>↓ INSTALAR</button>}
           <button
             aria-label="Activar o desactivar sonido"
