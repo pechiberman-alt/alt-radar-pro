@@ -58,3 +58,29 @@
 .agenda-item span{font:9px var(--font-mono);color:#9aa7a0;text-align:right}
 .agenda-item em{grid-column:2/-1;font:normal 8px var(--font-mono);color:var(--muted)}
 .agenda-foot{display:block;margin-top:8px;font:8px/1.5 var(--font-mono);color:var(--muted)}
+
+/* Trade record and report */
+.bot-journal{margin-top:6px}
+.bj-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px}
+.bj-actions{display:flex;flex-wrap:wrap;gap:8px}
+.bj-actions select{padding:6px 8px;font:9px var(--font-mono);color:#e7efe9;background:#0a110d;border:1px solid var(--line);border-radius:4px}
+.bj-actions button{padding:7px 12px;font:9px var(--font-mono);letter-spacing:.8px;color:#8fe3ba;background:#0a1712;border:1px solid #1f4d38;border-radius:4px;cursor:pointer}
+.bj-actions button:disabled{opacity:.4;cursor:not-allowed}
+.bj-status{margin:4px 0 10px;font:9px/1.5 var(--font-mono);color:#8fe3ba}
+.bj-status.warn{color:#f0c060}
+.bj-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:8px}
+.bj-tiles>div{padding:10px 11px;background:#0a110d;border:1px solid var(--line);border-radius:4px}
+.bj-tiles small{display:block;font:8px var(--font-mono);letter-spacing:1px;color:var(--muted)}
+.bj-tiles b{display:block;margin:3px 0 2px;font:16px var(--font-mono);color:#e7efe9}
+.bj-tiles b.bj-small{font-size:11px}
+.bj-tiles em{font:normal 8px var(--font-mono);color:var(--muted)}
+.bot-journal .up{color:var(--green)}
+.bot-journal .down{color:var(--red)}
+.bj-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin:10px 0}
+.bot-journal table{width:100%;border-collapse:collapse;font:9px var(--font-mono);color:#b5c2ba}
+.bot-journal th{padding:6px 7px;text-align:left;font-weight:normal;letter-spacing:.8px;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap}
+.bot-journal td{padding:6px 7px;border-bottom:1px solid #141e19;white-space:nowrap}
+.bj-groups table,.bj-list{background:#0a110d;border:1px solid var(--line);border-radius:4px}
+.bj-list{max-height:420px;overflow:auto}
+.bj-list thead th{position:sticky;top:0;background:#0a110d}
+.bj-foot{display:block;margin-top:8px;font:8px/1.5 var(--font-mono);color:var(--muted)}
