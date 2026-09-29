@@ -37,6 +37,7 @@ import AlertToasts from "./alert-toasts";
 import TradeJournalDesk from "./trade-journal-desk";
 import DcaDesk from "./dca-desk";
 import BotDesk from "./bot-desk";
+import DiarioDesk from "./diario-desk";
 import FuturesDesk from "./futures-desk";
 import FuturesRecorder from "./futures-recorder";
 import PortfolioRisk from "./portfolio-risk";
@@ -88,6 +89,7 @@ const NAV_ITEMS = [
   { label: "MI CARTERA", mobile: "CARTERA", icon: "◉", id: "cartera" },
   { label: "FUTUROS", mobile: "FUTUROS", icon: "△", id: "futuros" },
   { label: "BOT", mobile: "BOT", icon: "◈", id: "bot" },
+  { label: "DIARIO", mobile: "DIARIO", icon: "▤", id: "diario" },
   { label: "DCA", mobile: "DCA", icon: "⟳", id: "dca" },
   { label: "CONFIGURACIÓN", mobile: "AJUSTES", icon: "⚙", id: "configuracion" },
   { label: "ESTRATEGIA SPOT", mobile: "SPOT", icon: "◎", id: "spot" },
@@ -1214,6 +1216,10 @@ export default function RadarApp() {
 
         <Collapsible id="futuros" label="MI CARTERA · FUTUROS" open={workspace.open["futuros"]} onToggle={workspace.toggle}>
           <FuturesDesk />
+        </Collapsible>
+
+        <Collapsible id="diario" label="DIARIO · MI CUENTA REAL" open={workspace.open["diario"]} onToggle={workspace.toggle}>
+          <DiarioDesk />
         </Collapsible>
 
         <Collapsible id="bot" label="BOT DE FUTUROS · PAPEL" open={workspace.open["bot"]} onToggle={workspace.toggle}>
