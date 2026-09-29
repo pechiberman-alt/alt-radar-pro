@@ -101,6 +101,8 @@ export type PaperTrade = {
   r?: number;
   fees?: number;
   note?: string;
+  /** Timeframe the signal came from, so the record stays right if the setting changes later. */
+  timeframe?: string;
 };
 
 export type Skips = { flow: number; news: number; calendar: number; capacity: number; halted: number; liquidation: number };
@@ -293,6 +295,7 @@ function tryOpen(
     riskUsd: qty * riskPerUnit,
     status: "open",
     barsHeld: 0,
+    timeframe: config.timeframe,
   });
 }
 

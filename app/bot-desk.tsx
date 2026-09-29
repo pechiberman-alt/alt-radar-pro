@@ -5,12 +5,26 @@ import {
   activeBlackout, calendarBlackouts, DEFAULT_NEWS_GUARD, headlineBlackouts, loadCalendar, upcomingEvents,
   type CalendarLoad, type HeadlineLike, type NewsGuardConfig,
 } from "@/lib/econ-calendar";
+import { journalRowFrom, mergeJournal, type JournalRow } from "@/lib/bot-journal";
 import { loadRows, timeframeConfig } from "@/lib/market-fetch";
+import BotJournal from "./bot-journal";
 import {
   botStats, DEFAULT_BOT_CONFIG, newBotState, parseBotKlines, resumeBot, stepBot, type BotConfig, type BotState,
 } from "@/lib/paper-bot";
 
 const STORAGE = "alt-radar-bot-v1";
+const ARCHIVE = "alt-radar-bot-journal-v1";
+/** Rows kept in this browser; the account keeps them all. */
+const ARCHIVE_LIMIT = 3000;
+
+function readArchive(): JournalRow[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(ARCHIVE) ?? "[]") as unknown;
+    return Array.isArray(raw) ? (raw as JournalRow[]) : [];
+  } catch {
+    return [];
+  }
+}
 const POLL_MS = 15_000;
 const CALENDAR_REFRESH_MS = 10 * 60_000;
 const CALENDAR_RETRY_MS = 60_000;
@@ -62,6 +76,23 @@ function BotInner({ news }: { news: HeadlineLike[] }) {
   const [status, setStatus] = useState<{ at: number; error: string | null } | null>(null);
   const [calendar, setCalendar] = useState<CalendarLoad | undefined>(undefined);
   const [now, setNow] = useState(0);
+  // Every trade this browser has seen close, kept across resets of the paper account.
+  const [archive, setArchive] = useState<JournalRow[]>(readArchive);
+  const currentRows = useMemo(
+    () =>
+      state
+        ? state.trades.map((t) => journalRowFrom(t, state.startedAt)).filter((r): r is JournalRow => r !== null)
+        : [],
+    [state],
+  );
+  const journal = useMemo(() => mergeJournal(archive, currentRows), [archive, currentRows]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(ARCHIVE, JSON.stringify(journal.slice(-ARCHIVE_LIMIT)));
+    } catch {
+      // storage full: the account copy (when logged in) still has everything
+    }
+  }, [journal]);
 
   // The polling loop outlives renders; it reads the latest values from refs.
   const configRef = useRef(config);
@@ -151,7 +182,8 @@ function BotInner({ news }: { news: HeadlineLike[] }) {
     setConfig({ ...config, enabled: true });
   };
   const reset = () => {
-    if (!window.confirm("¿Borrar la cuenta de papel y todo su historial? No se puede deshacer.")) return;
+    if (!window.confirm("¿Reiniciar la cuenta de papel? Las posiciones abiertas se descartan; las operaciones cerradas quedan en el registro.")) return;
+    setArchive(journal);
     stateRef.current = null;
     setState(null);
     setPrices({});
@@ -178,7 +210,6 @@ function BotInner({ news }: { news: HeadlineLike[] }) {
   const frameMin = timeframeConfig(config.timeframe).frameMs / 60_000;
 
   const open = state?.trades.filter((t) => t.status === "open") ?? [];
-  const closed = state?.trades.filter((t) => t.status !== "open").slice(-25).reverse() ?? [];
 
   return (
     <section className="panel bot-desk" id="bot">
@@ -296,18 +327,7 @@ function BotInner({ news }: { news: HeadlineLike[] }) {
         </div>
       ) : <p className="bot-none">Sin posiciones abiertas.</p>}
 
-      <h3 className="bot-h">Últimas operaciones cerradas</h3>
-      {closed.length ? (
-        <div className="bot-table">
-          {closed.map((t) => (
-            <div key={t.id} className={(t.pnl ?? 0) >= 0 ? "up" : "down"}>
-              <b>{t.symbol.replace("USDT", "")} · {t.side} · {t.status === "win" ? "OBJETIVO" : t.status === "loss" ? "STOP" : t.status === "news" ? "CERRADA POR NOTICIA" : "TIEMPO"}</b>
-              <span>{px(t.entry)} → {px(t.exit ?? 0)}{t.note ? ` · ${t.note}` : ""} · {new Date(t.exitTime ?? 0).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-              <em className={(t.pnl ?? 0) >= 0 ? "up" : "down"}>{usd(t.pnl ?? 0)} ({(t.r ?? 0) >= 0 ? "+" : ""}{(t.r ?? 0).toLocaleString("es-AR", { maximumFractionDigits: 2 })}R)</em>
-            </div>
-          ))}
-        </div>
-      ) : <p className="bot-none">Todavía no hay operaciones cerradas.</p>}
+      <BotJournal localRows={journal} currentRun={state?.startedAt ?? null} />
 
       {state && <button className="bot-reset" onClick={reset}>REINICIAR CUENTA DE PAPEL</button>}
     </section>
