@@ -332,10 +332,26 @@ export async function getAccountBalances(apiKey: string, apiSecret: string) {
   return { balances: nonZero, updateTime: account.updateTime };
 }
 
-export type BinanceFill = { symbol: string; price: string; qty: string; isBuyer: boolean; time: number };
+export type BinanceFill = {
+  symbol: string;
+  id: number;
+  orderId?: number;
+  price: string;
+  qty: string;
+  quoteQty?: string;
+  commission?: string;
+  commissionAsset?: string;
+  isBuyer: boolean;
+  isMaker?: boolean;
+  time: number;
+};
 
-export async function getMyTrades(apiKey: string, apiSecret: string, symbol: string, limit = 1000) {
-  return spot<BinanceFill[]>("myTrades", { symbol, limit }, apiKey, apiSecret);
+export async function getMyTrades(apiKey: string, apiSecret: string, symbol: string, limit = 1000, fromId?: number) {
+  const extra: Record<string, string | number | boolean> = { symbol, limit };
+  // fromId walks forward from that trade id, which is how a whole history is
+  // read in pages (a time range is capped at 24 hours per call).
+  if (fromId !== undefined) extra.fromId = fromId;
+  return spot<BinanceFill[]>("myTrades", extra, apiKey, apiSecret);
 }
 
 export type RawFuturesPosition = {

@@ -38,6 +38,7 @@ import "./dca-desk.css";
 import "./portfolio-risk.css";
 import "./futures-desk.css";
 import "./bot-desk.css";
+import "./diario-desk.css";
 import "./spot-desk.css";
 import "./sentiment-desk.css";
 import "./settings-desk.css";
