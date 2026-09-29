@@ -116,7 +116,8 @@ function createRecorder() {
     failures += 1;
     const delay = Math.min(5 * 60_000, 5_000 * 2 ** Math.min(failures - 1, 6));
     publish({ state: "reintentando", message: why });
-    retry = setTimeout(() => void connect(), delay);
+    // Before the key is known there is no stream to reopen: start over from the session check.
+    retry = setTimeout(() => void (apiKey ? connect() : boot()), delay);
   };
 
   const connect = async () => {
@@ -179,10 +180,17 @@ function createRecorder() {
     }, 30 * 60_000);
   };
 
-  (async () => {
+  const boot = async () => {
     try {
       const me = await fetch("/api/auth/me", { cache: "no-store" });
-      const body = me.ok ? ((await me.json()) as { user: unknown }) : { user: null };
+      if (!alive) return;
+      // A server error is not "logged out": the database can be down for hours
+      // (D1's free daily limit), and giving up here would silently stop recording.
+      if (!me.ok) {
+        scheduleRetry("No se pudo verificar tu sesión; reintentando.");
+        return;
+      }
+      const body = (await me.json()) as { user: unknown };
       if (!alive) return;
       if (!body.user) {
         publish({ state: "sin-sesion", message: "" });
@@ -191,6 +199,10 @@ function createRecorder() {
       void flush();
       const cred = await fetch("/api/binance/credentials", { cache: "no-store" });
       if (!alive) return;
+      if (cred.status === 401) {
+        publish({ state: "sin-sesion", message: "" });
+        return;
+      }
       if (cred.status === 404) {
         publish({ state: "sin-vincular", message: "" });
         return;
@@ -205,7 +217,8 @@ function createRecorder() {
     } catch {
       if (alive) scheduleRetry("Sin conexión; reintentando.");
     }
-  })();
+  };
+  void boot();
 
   return () => {
     alive = false;
