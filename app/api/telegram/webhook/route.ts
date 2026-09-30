@@ -6,6 +6,7 @@ import { resultsMessage } from "@/lib/signal-plan";
 import { parseCommand, sendMessage, webhookSecret } from "@/lib/telegram";
 import { answerInTelegram, clearChat } from "@/lib/telegram-ai-server";
 import { ensureTelegramSchema } from "@/lib/telegram-server";
+import { handleAlertCommand } from "@/lib/price-alerts-server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ const HELP =
   "Escribime cualquier pregunta sobre el mercado y te respondo con los datos del radar (ej: <i>¿cómo ves BTC?</i>, <i>¿qué señales hay abiertas?</i>).\n\n" +
   "/estado — resumen del momento\n" +
   "/resultados — cuántas señales llegaron a TP1, TP2, TP3 o al SL, por tipo\n" +
+  "/alerta BTC 90000 — te aviso cuando llegue a ese precio · /alertas · /borrar N\n" +
   "/nuevo — empezar una conversación nueva\n" +
   "/stop — dejar de recibir alertas\n\n" +
   "Qué alertas recibir se elige en la app: ALERTAS → Telegram.";
@@ -85,7 +87,19 @@ export async function POST(request: NextRequest) {
         "✅ <b>Vinculado a ALT RADAR PRO.</b>\nVas a recibir señales fuertes, recordatorios de DCA, noticias de alto impacto y extremos de Miedo y Avaricia. Lo ajustás en la app: ALERTAS → Telegram.\n\n" + HELP,
       );
     }
+  } else if (cmd === "alerta" || cmd === "alertas" || cmd === "borrar") {
+    const link = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE chat_id = ?1").bind(chat).first<{ user_id: number }>();
+    if (!link) {
+      await sendMessage(token, chat, "Para usar alertas de precio, vinculá este chat con tu cuenta: en la app, ALERTAS → VINCULAR TELEGRAM.");
+    } else {
+      await handleAlertCommand(env.DB, token, chat, link.user_id, cmd, arg);
+    }
   } else if (cmd === "stop") {
+    // Alerts belong to the link: nobody would receive them anymore.
+    await env.DB.prepare("DELETE FROM telegram_price_alerts WHERE user_id IN (SELECT user_id FROM telegram_links WHERE chat_id = ?1)")
+      .bind(chat)
+      .run()
+      .catch(() => undefined);
     await env.DB.prepare("DELETE FROM telegram_links WHERE chat_id = ?1").bind(chat).run();
     await sendMessage(token, chat, "Listo, no vas a recibir más alertas. Para volver, vinculá de nuevo desde la app.");
   } else if (cmd === "estado") {

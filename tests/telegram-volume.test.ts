@@ -78,3 +78,11 @@ test("NETWORK: a coin whose data can't be fetched is skipped and the others stil
     globalThis.fetch = real;
   }
 });
+
+import { parseCommand } from "../lib/telegram.ts";
+test("the bot understands the alert commands", () => {
+  assert.deepEqual(parseCommand("/alerta btc 90000"), { cmd: "alerta", arg: "btc 90000" });
+  assert.deepEqual(parseCommand("/alertas"), { cmd: "alertas", arg: "" });
+  assert.deepEqual(parseCommand("/borrar 2"), { cmd: "borrar", arg: "2" });
+  assert.deepEqual(parseCommand("/alerta@AltRadarBot sol 120"), { cmd: "alerta", arg: "sol 120" });
+});

@@ -15,6 +15,7 @@ import {
 import { familyOf, kindKey } from "./signal-plan.ts";
 import { ensureSignalPlanColumns, getPlanStatsCached } from "./signal-plan-db.ts";
 import { collectVolumeEvents } from "./telegram-volume.ts";
+import { runPriceAlerts } from "./price-alerts-server.ts";
 import { cached } from "./upstream-cache.ts";
 
 /**
@@ -33,6 +34,14 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
     await db.prepare("SELECT user_id, chat_id, prefs FROM telegram_links").all<{ user_id: number; chat_id: string; prefs: string }>()
   ).results;
   if (!links.length) return { users: 0, sent: 0 };
+
+  // Price alerts first: the person asked for these explicitly, and one failing
+  // coin or send must not hold back the rest of the dispatch.
+  try {
+    await runPriceAlerts(db, token, now);
+  } catch (error) {
+    console.error("[ALT_RADAR_PRICE_ALERTS]", error);
+  }
 
   const shared: TelegramEvent[] = [];
 
