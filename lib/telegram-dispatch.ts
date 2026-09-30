@@ -12,6 +12,7 @@ import {
   TELEGRAM_SCHEMA,
   type TelegramEvent,
 } from "./telegram.ts";
+import { collectVolumeEvents } from "./telegram-volume.ts";
 import { cached } from "./upstream-cache.ts";
 
 /**
@@ -67,6 +68,13 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
     }
   } catch {
     // News down: the other categories still go out.
+  }
+
+  // Unusual volume on the majors (public candles, no database).
+  try {
+    shared.push(...(await collectVolumeEvents(now)));
+  } catch {
+    // Exchange data down: the other categories still go out.
   }
 
   // Fear & Greed, only when it is at an extreme.

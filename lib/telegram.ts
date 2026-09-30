@@ -8,7 +8,9 @@
  * dispatcher (telegram-dispatch.ts) does the I/O.
  */
 
-export type TelegramCategory = "SEÑAL" | "DCA" | "NOTICIAS" | "SENTIMIENTO";
+import { dec, SPIKE_DISCLAIMER, spikeSentence, type VolumeSpike } from "./volume-spike.ts";
+
+export type TelegramCategory = "SEÑAL" | "DCA" | "NOTICIAS" | "SENTIMIENTO" | "VOLUMEN";
 
 export type TelegramPrefs = {
   categories: Record<TelegramCategory, boolean>;
@@ -20,7 +22,8 @@ export type TelegramPrefs = {
 };
 
 export const DEFAULT_TELEGRAM_PREFS: TelegramPrefs = {
-  categories: { "SEÑAL": true, DCA: true, NOTICIAS: true, SENTIMIENTO: true },
+  // A saved preference without VOLUMEN (everyone saved before it existed) reads it as on.
+  categories: { "SEÑAL": true, DCA: true, NOTICIAS: true, SENTIMIENTO: true, VOLUMEN: true },
   // Only the stronger signals by default: a phone that buzzes for every
   // setup gets muted within a day.
   signalMinScore: 75,
@@ -102,6 +105,19 @@ export function newsEvent(n: { url: string; title: string; source: string; categ
       `${esc(n.title)}\n` +
       `<a href="${esc(n.url)}">${esc(n.source)}</a>\n` +
       `<i>El color es el tono del titular, no una predicción.</i>`,
+  };
+}
+
+export function volumeEvent(symbol: string, timeframe: string, spike: VolumeSpike): TelegramEvent {
+  return {
+    // One per candle: the same candle seen again on the next run is not news.
+    key: `volume:${symbol}:${timeframe}:${spike.openTime}`,
+    category: "VOLUMEN",
+    priority: 68,
+    text:
+      `<b>📊 ${esc(symbol.replace("USDT", ""))} · volumen ${dec(spike.multiple)}× en ${esc(timeframe)}</b>\n` +
+      `${esc(spikeSentence(timeframe, spike))}\n` +
+      `<i>${esc(SPIKE_DISCLAIMER)}</i>`,
   };
 }
 
