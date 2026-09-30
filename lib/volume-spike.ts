@@ -53,3 +53,23 @@ export function detectVolumeSpike(
     openTime: last.openTime,
   };
 }
+
+/** "3,4" — decimal comma without depending on the runtime's locale data. */
+export const dec = (value: number, digits = 1) => value.toFixed(digits).replace(".", ",");
+
+export function dollars(value: number): string {
+  if (value >= 1e9) return `$${dec(value / 1e9)} mil M`;
+  if (value >= 1e6) return `$${dec(value / 1e6)} M`;
+  return `$${Math.round(value / 1e3)} mil`;
+}
+
+/** The one sentence every channel (banner, system notification, Telegram) uses. */
+export function spikeSentence(timeframe: string, spike: VolumeSpike): string {
+  const move = Math.abs(spike.changePct) < 0.05 ? "casi sin cambio" : `${spike.changePct > 0 ? "subiendo +" : "bajando −"}${dec(Math.abs(spike.changePct), 2)}%`;
+  return (
+    `La vela de ${timeframe} ${spike.closed ? "cerró" : "va"} ${move} con ${dollars(spike.quoteVolume)} negociados, ` +
+    `${dec(spike.multiple)} veces el promedio de las 20 anteriores.`
+  );
+}
+
+export const SPIKE_DISCLAIMER = "Es actividad, no dice hacia dónde sigue el precio.";

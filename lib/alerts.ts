@@ -25,6 +25,8 @@
  *     adds nothing the first did not already say.
  */
 
+import { dec, SPIKE_DISCLAIMER, spikeSentence, type VolumeSpike } from "./volume-spike.ts";
+
 export type AlertPriority = "CRITICA" | "IMPORTANTE" | "INFORMATIVA";
 export type AlertCategory = "SEÑAL" | "RIESGO" | "ZONA" | "LIQUIDACIÓN" | "FLUJO" | "DCA" | "VOLUMEN";
 
@@ -325,22 +327,12 @@ export function flowAlert(
 }
 
 
-/** "3,4" — decimal comma without depending on the runtime's locale data. */
-const dec = (value: number, digits = 1) => value.toFixed(digits).replace(".", ",");
-
-function dollars(value: number): string {
-  if (value >= 1e9) return `$${dec(value / 1e9)} mil M`;
-  if (value >= 1e6) return `$${dec(value / 1e6)} M`;
-  return `$${Math.round(value / 1e3)} mil`;
-}
-
 export function volumeAlert(
   symbol: string,
   timeframe: string,
-  spike: { multiple: number; quoteVolume: number; changePct: number; closed: boolean; openTime: number },
+  spike: VolumeSpike,
   at = Date.now(),
 ): Alert {
-  const move = Math.abs(spike.changePct) < 0.05 ? "casi sin cambio" : `${spike.changePct > 0 ? "subiendo +" : "bajando −"}${dec(Math.abs(spike.changePct), 2)}%`;
   return {
     // One per candle: the same candle re-evaluated every few minutes must not
     // raise the same banner again, and the next candle is a new event.
@@ -349,9 +341,7 @@ export function volumeAlert(
     category: "VOLUMEN",
     symbol,
     title: `${symbol} · volumen ${dec(spike.multiple)}× en ${timeframe}`,
-    body:
-      `La vela de ${timeframe} ${spike.closed ? "cerró" : "va"} ${move} con ${dollars(spike.quoteVolume)} negociados, ` +
-      `${dec(spike.multiple)} veces el promedio de las 20 anteriores. Es actividad, no dice hacia dónde sigue el precio.`,
+    body: `${spikeSentence(timeframe, spike)} ${SPIKE_DISCLAIMER}`,
     at,
   };
 }

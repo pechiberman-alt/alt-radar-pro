@@ -455,7 +455,13 @@ export default function LiveBookmap({
       }
     };
     void load();
-    const refresh = window.setInterval(() => void load(true), 60_000);
+    // The archive is ~1,500 rows a request (24h of snapshots), and the live feed
+    // already covers whatever happens while the tab is open. Reloading it every
+    // minute, also in a background tab, was a large share of the database's daily
+    // read allowance, so: every 5 minutes, and never while the tab is hidden.
+    const refresh = window.setInterval(() => {
+      if (!document.hidden) void load(true);
+    }, 300_000);
     return () => {
       alive = false;
       controller.abort();
