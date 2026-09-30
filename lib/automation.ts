@@ -1,3 +1,4 @@
+import { evaluatePlansSafely, recordConfluencePlan } from "./signal-plan-record.ts";
 import {
   altseasonScore,
   globalRisk,
@@ -442,6 +443,7 @@ export async function runSignalAutomation(
       continue;
     }
 
+    const signalId = crypto.randomUUID();
     await db
       .prepare(
         `INSERT INTO signal_records (
@@ -454,7 +456,7 @@ export async function runSignalAutomation(
         )`,
       )
       .bind(
-        crypto.randomUUID(),
+        signalId,
         asset.symbol,
         asset.side,
         asset.signal,
@@ -471,7 +473,12 @@ export async function runSignalAutomation(
       )
       .run();
     inserted += 1;
+    // Stop and targets are fixed now, at detection, so the result can be measured later.
+    await recordConfluencePlan(db, signalId, asset.symbol, asset.side as "LONG" | "SHORT", asset.price, now.getTime());
   }
+
+  // Reads the outcome of every signal whose plan is still open.
+  await evaluatePlansSafely(db, now.getTime());
 
   await db
     .prepare(

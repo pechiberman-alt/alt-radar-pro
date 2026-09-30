@@ -1,6 +1,8 @@
 import { env, waitUntil } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { getSecret } from "@/lib/app-settings";
+import { getPlanStatsCached, STATS_DAYS } from "@/lib/signal-plan-db";
+import { resultsMessage } from "@/lib/signal-plan";
 import { parseCommand, sendMessage, webhookSecret } from "@/lib/telegram";
 import { answerInTelegram, clearChat } from "@/lib/telegram-ai-server";
 import { ensureTelegramSchema } from "@/lib/telegram-server";
@@ -11,6 +13,7 @@ const HELP =
   "<b>ALT RADAR PRO</b>\n" +
   "Escribime cualquier pregunta sobre el mercado y te respondo con los datos del radar (ej: <i>¿cómo ves BTC?</i>, <i>¿qué señales hay abiertas?</i>).\n\n" +
   "/estado — resumen del momento\n" +
+  "/resultados — cuántas señales llegaron a TP1, TP2, TP3 o al SL, por tipo\n" +
   "/nuevo — empezar una conversación nueva\n" +
   "/stop — dejar de recibir alertas\n\n" +
   "Qué alertas recibir se elige en la app: ALERTAS → Telegram.";
@@ -103,6 +106,9 @@ export async function POST(request: NextRequest) {
       chat,
       `<b>Estado</b>\n${fg}Señales abiertas: <b>${open?.n ?? "—"}</b>\nAlertas: ${linked ? "activas ✅" : "no vinculado — hacelo desde la app"}`,
     );
+  } else if (cmd === "resultados") {
+    const stats = await getPlanStatsCached(env.DB, Date.now()).catch(() => []);
+    await sendMessage(token, chat, resultsMessage(stats, STATS_DAYS));
   } else {
     await sendMessage(token, chat, HELP);
   }

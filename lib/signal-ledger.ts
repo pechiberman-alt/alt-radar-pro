@@ -1,9 +1,24 @@
 import type { ScoreReason } from "./radar";
 
+import type { KindStats } from "./signal-plan.ts";
+
 export type SignalOutcome = {
   price: number | null;
   returnPct: number | null;
   capturedAt: string | null;
+};
+
+/** Stop, targets and how the signal turned out; absent on signals recorded before plans existed. */
+export type SignalPlanView = {
+  stop: number;
+  tp1: number;
+  tp2: number;
+  tp3: number;
+  outcome: "SL" | "TP1" | "TP2" | "TP3" | "EXPIRED" | null;
+  slAt: string | null;
+  tp1At: string | null;
+  tp2At: string | null;
+  tp3At: string | null;
 };
 
 export type SignalRecord = {
@@ -30,6 +45,7 @@ export type SignalRecord = {
   };
   maxMove: number;
   minMove: number;
+  plan: SignalPlanView | null;
   updatedAt: string;
 };
 
@@ -50,6 +66,8 @@ export type LedgerStats = {
 export type LedgerPayload = {
   records: SignalRecord[];
   stats: LedgerStats;
+  /** How each kind of signal has turned out against its plan (last 90 days). */
+  planStats?: KindStats[];
   automation: {
     lastRun: string | null;
     lastSummary: { inserted?: number; evaluated?: number; universe?: number } | null;

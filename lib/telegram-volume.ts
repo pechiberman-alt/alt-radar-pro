@@ -1,4 +1,5 @@
-import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
+import { fetchKlinesServer } from "./klines-server.ts";
+import type { SwingCandle } from "./swing-entries.ts";
 import { volumeEvent, type TelegramEvent } from "./telegram.ts";
 import { detectVolumeSpike } from "./volume-spike.ts";
 
@@ -15,8 +16,6 @@ export const VOLUME_FRAMES: { interval: string; frameMs: number }[] = [
   { interval: "4h", frameMs: 14_400_000 },
 ];
 
-const BASES = ["https://data-api.binance.vision", "https://api.binance.us", "https://api.binance.com"];
-
 /** Pure part: series in, events out. */
 export function volumeEventsFrom(series: { symbol: string; interval: string; frameMs: number; candles: SwingCandle[] }[], now: number): TelegramEvent[] {
   const events: TelegramEvent[] = [];
@@ -27,22 +26,9 @@ export function volumeEventsFrom(series: { symbol: string; interval: string; fra
   return events;
 }
 
+/** Volume is read from the main market only: see klines-server.ts on why Binance.US is refused. */
 async function fetchCandles(symbol: string, interval: string): Promise<SwingCandle[]> {
-  let lastError: unknown;
-  for (const base of BASES) {
-    try {
-      const r = await fetch(`${base}/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=30`, {
-        signal: AbortSignal.timeout(6_000),
-        headers: { Accept: "application/json" },
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const candles = parseSwingKlines(await r.json());
-      if (candles.length >= 21) return candles;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError ?? new Error("SIN DATOS");
+  return (await fetchKlinesServer(symbol, interval, { limit: 30, minCandles: 21, allowThin: false })).candles;
 }
 
 /** One coin or frame failing must not silence the others. */

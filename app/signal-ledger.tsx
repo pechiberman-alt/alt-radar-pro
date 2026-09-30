@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LedgerPayload, SignalRecord } from "@/lib/signal-ledger";
+import { MIN_SAMPLE, type KindStats } from "@/lib/signal-plan";
 import ActiveSignals from "./active-signals";
 import type { ScoredAsset } from "@/lib/radar";
 import type { DashboardSettings } from "./dashboard-settings";
@@ -73,6 +74,71 @@ function playAlertTone() {
   } catch {
     // Audio alerts are optional and may be blocked by the browser.
   }
+}
+
+const PLAN_LABEL: Record<string, { text: string; tone: string }> = {
+  TP3: { text: "TP3 ✓", tone: "positive" },
+  TP2: { text: "TP2 ✓", tone: "positive" },
+  TP1: { text: "TP1 ✓", tone: "positive" },
+  SL: { text: "STOP ✗", tone: "negative" },
+  EXPIRED: { text: "SIN TOCAR 24H", tone: "muted" },
+};
+
+/** Where the signal stands against its own stop and targets. */
+function PlanResult({ plan }: { plan: SignalRecord["plan"] }) {
+  if (!plan) return <span className="muted">—</span>;
+  if (plan.outcome) {
+    const label = PLAN_LABEL[plan.outcome];
+    const later = plan.outcome !== "SL" && plan.slAt ? " · luego stop" : "";
+    return <span className={label.tone}>{label.text}<small>{later}</small></span>;
+  }
+  const reached = plan.tp2At ? "TP2" : plan.tp1At ? "TP1" : null;
+  return <span className="record-state">{reached ? `EN CURSO · ${reached} ✓` : "EN CURSO"}</span>;
+}
+
+const KIND_LABEL = (kind: string) => {
+  const [family, signal, side] = kind.split("|");
+  return `${family === "SCALP" ? "Scalping" : "Confluencia"} · ${signal} ${side}`;
+};
+const share = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
+
+/** How each kind of signal has turned out against its plan, with the size of the sample beside it. */
+function PlanStatsBlock({ stats }: { stats: KindStats[] }) {
+  if (!stats.length) {
+    return (
+      <p className="plan-stats-empty">
+        WINRATE POR TIPO DE SEÑAL: todavía no hay señales con plan resueltas. Cada señal nueva guarda su stop y sus 3 objetivos al detectarse y se mide con las velas posteriores.
+      </p>
+    );
+  }
+  return (
+    <div className="plan-stats">
+      <h4>WINRATE POR TIPO DE SEÑAL · 90 DÍAS</h4>
+      <table>
+        <thead>
+          <tr><th>TIPO</th><th>SEÑALES</th><th>TP1</th><th>TP2</th><th>TP3</th><th>STOP</th><th>SIN TOCAR</th><th>MUESTRA</th></tr>
+        </thead>
+        <tbody>
+          {stats.map((s) => (
+            <tr key={s.kind}>
+              <td>{KIND_LABEL(s.kind)}</td>
+              <td>{s.n}</td>
+              <td className="positive">{share(s.reachedTp1, s.n)}</td>
+              <td>{share(s.reachedTp2, s.n)}</td>
+              <td>{share(s.reachedTp3, s.n)}</td>
+              <td className="negative">{share(s.sl, s.n)}</td>
+              <td className="muted">{share(s.expired, s.n)}</td>
+              <td className={s.n < MIN_SAMPLE ? "negative" : "muted"}>{s.n < MIN_SAMPLE ? "MÍNIMA" : "RAZONABLE"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <small>
+        «TP1» = el precio llegó al objetivo 1 antes que al stop (no significa que se cerró ahí). Si una vela toca stop y objetivo a la vez, cuenta el stop.
+        El plan se fija al detectar la señal. Con pocas señales los porcentajes engañan.
+      </small>
+    </div>
+  );
 }
 
 function OutcomeCell({ value }: { value: number | null }) {
@@ -459,6 +525,8 @@ export default function SignalLedger({
         />
       </div>
 
+      <PlanStatsBlock stats={payload.planStats ?? []} />
+
       <div className="ledger-table-wrap">
         <ActiveSignals
           records={payload.records}
@@ -472,6 +540,8 @@ export default function SignalLedger({
               <th>TIPO</th>
               <th>SCORE</th>
               <th>ENTRADA</th>
+              <th>SL / TP</th>
+              <th>RESULTADO</th>
               <th>15M</th>
               <th>1H</th>
               <th>4H</th>
@@ -493,6 +563,17 @@ export default function SignalLedger({
                 </td>
                 <td><b>{record.score}</b><small>/100</small></td>
                 <td>{price(record.entryPrice)}</td>
+                <td className="plan-cell">
+                  {record.plan ? (
+                    <>
+                      <span className="negative">SL {price(record.plan.stop)}</span>
+                      <small>TP1 {price(record.plan.tp1)} · TP2 {price(record.plan.tp2)} · TP3 {price(record.plan.tp3)}</small>
+                    </>
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
+                <td><PlanResult plan={record.plan} /></td>
                 <td><OutcomeCell value={record.outcomes.m15.returnPct} /></td>
                 <td><OutcomeCell value={record.outcomes.h1.returnPct} /></td>
                 <td><OutcomeCell value={record.outcomes.h4.returnPct} /></td>

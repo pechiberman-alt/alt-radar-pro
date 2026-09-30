@@ -12,6 +12,8 @@ import {
   TELEGRAM_SCHEMA,
   type TelegramEvent,
 } from "./telegram.ts";
+import { familyOf, kindKey } from "./signal-plan.ts";
+import { ensureSignalPlanColumns, getPlanStatsCached } from "./signal-plan-db.ts";
 import { collectVolumeEvents } from "./telegram-volume.ts";
 import { cached } from "./upstream-cache.ts";
 
@@ -25,6 +27,7 @@ import { cached } from "./upstream-cache.ts";
  */
 export async function runTelegramDispatch(db: D1Database, token: string, now = Date.now()) {
   for (const sql of TELEGRAM_SCHEMA) await db.prepare(sql).run();
+  await ensureSignalPlanColumns(db).catch(() => undefined);
 
   const links = (
     await db.prepare("SELECT user_id, chat_id, prefs FROM telegram_links").all<{ user_id: number; chat_id: string; prefs: string }>()
@@ -39,18 +42,40 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
   if (!since) {
     await db.prepare("INSERT OR REPLACE INTO telegram_state (key, value) VALUES ('signals_since', ?1)").bind(nowIso).run();
   } else {
-    const rows = (
-      await db
+    type SignalRow = {
+      id: string; symbol: string; side: string; signal: string; score: number; entry_price: number; timeframe: string; detected_at: string;
+      stop_price?: number | null; tp1_price?: number | null; tp2_price?: number | null; tp3_price?: number | null;
+    };
+    // A signal is sent once its plan has had time to be written next to it (the plan
+    // goes in right after the signal, a few seconds later); the newer ones wait one run.
+    const settled = new Date(now - 90_000).toISOString();
+    const fetchRows = (extra: string) =>
+      db
         .prepare(
-          `SELECT id, symbol, side, signal, score, entry_price, timeframe, detected_at
-             FROM signal_records WHERE detected_at > ?1 ORDER BY detected_at DESC LIMIT 30`,
+          `SELECT id, symbol, side, signal, score, entry_price, timeframe, detected_at${extra}
+             FROM signal_records WHERE detected_at > ?1 AND detected_at <= ?2 ORDER BY detected_at DESC LIMIT 30`,
         )
-        .bind(since.value)
-        .all<{ id: string; symbol: string; side: string; signal: string; score: number; entry_price: number; timeframe: string; detected_at: string }>()
-        .catch(() => ({ results: [] as never[] }))
+        .bind(since.value, settled)
+        .all<SignalRow>();
+    // Without the plan columns (they could not be added) the signals still go out, plain.
+    const rows = (
+      await fetchRows(", stop_price, tp1_price, tp2_price, tp3_price")
+        .catch(() => fetchRows(""))
+        .catch(() => ({ results: [] as SignalRow[] }))
     ).results;
+    const stats = rows.length ? await getPlanStatsCached(db, now).catch(() => []) : [];
     for (const r of rows) {
-      shared.push(signalEvent({ id: r.id, symbol: r.symbol, side: r.side, signal: r.signal, score: r.score, entryPrice: r.entry_price, timeframe: r.timeframe }));
+      const plan =
+        r.stop_price != null && r.tp1_price != null && r.tp2_price != null && r.tp3_price != null
+          ? { stop: r.stop_price, tp1: r.tp1_price, tp2: r.tp2_price, tp3: r.tp3_price }
+          : null;
+      shared.push(
+        signalEvent({
+          id: r.id, symbol: r.symbol, side: r.side, signal: r.signal, score: r.score, entryPrice: r.entry_price, timeframe: r.timeframe,
+          plan,
+          stats: stats.find((k) => k.kind === kindKey(familyOf(r.timeframe), r.signal, r.side)) ?? null,
+        }),
+      );
     }
     if (rows.length) {
       await db.prepare("UPDATE telegram_state SET value = ?1 WHERE key = 'signals_since'").bind(rows[0].detected_at).run();

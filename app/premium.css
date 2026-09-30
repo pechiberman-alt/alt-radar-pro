@@ -475,3 +475,16 @@ footer {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
+
+/* Signal plan: stop / targets beside each signal, and the win rate by kind. */
+.ledger-table .plan-cell{white-space:nowrap}
+.ledger-table .plan-cell span{display:block;font:10px var(--font-mono)}
+.ledger-table .plan-cell small{display:block;margin-top:2px;font:8px var(--font-mono);color:#7a8e83}
+.ledger-table td small{margin-left:4px}
+.plan-stats{margin:10px 0 14px;padding:12px 14px;background:#0a110d;border:1px solid var(--line);border-radius:5px;overflow-x:auto}
+.plan-stats h4{margin:0 0 8px;font:9px var(--font-mono);letter-spacing:1.2px;color:#a99cff}
+.plan-stats table{width:100%;border-collapse:collapse;font:10px var(--font-mono);color:#b5c2ba}
+.plan-stats th{padding:5px 8px;text-align:left;font-weight:normal;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap}
+.plan-stats td{padding:5px 8px;border-bottom:1px solid #141e19;white-space:nowrap}
+.plan-stats small{display:block;margin-top:8px;font:8px/1.6 var(--font-mono);color:var(--muted)}
+.plan-stats-empty{margin:10px 0;font:9px/1.6 var(--font-mono);color:#9aa7a0}

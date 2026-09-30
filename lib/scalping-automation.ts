@@ -1,3 +1,4 @@
+import { recordScalpPlan } from "./signal-plan-record.ts";
 import { appendBrainAuditEvent, ensureBrainSecuritySchema, registerBrainManifest } from "./brain-security";
 import { evaluateOpenSignals, ensureSignalSchema, loadMarket, loadRiskScore } from "./automation";
 import { parseBinanceKlines, type Candle } from "./market-brain";
@@ -136,6 +137,7 @@ export async function runScalpingAutomation(db: D1Database): Promise<ScalpingAut
       JSON.stringify(signal.reasons),
       JSON.stringify(signal.penalties),
     ).run();
+    await recordScalpPlan(db, eventId, side, (signal.entryLow + signal.entryHigh) / 2, signal);
     await appendBrainAuditEvent(db, {
       eventKey: `scalp-automation:${eventId}`,
       eventType: "SCALP_OBSERVATION",
