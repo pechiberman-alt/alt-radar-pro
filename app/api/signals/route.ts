@@ -1,3 +1,4 @@
+import { ensureSignalPlanColumns, getPlanStatsCached } from "@/lib/signal-plan-db";
 import { env } from "cloudflare:workers";
 import {
   ensureSignalSchema,
@@ -13,6 +14,15 @@ import type {
 export const dynamic = "force-dynamic";
 
 type SignalRow = {
+  stop_price?: number | null;
+  tp1_price?: number | null;
+  tp2_price?: number | null;
+  tp3_price?: number | null;
+  plan_outcome?: "SL" | "TP1" | "TP2" | "TP3" | "EXPIRED" | null;
+  sl_at?: string | null;
+  tp1_at?: string | null;
+  tp2_at?: string | null;
+  tp3_at?: string | null;
   id: string;
   symbol: string;
   side: "LONG" | "SHORT";
@@ -73,6 +83,20 @@ function mapRow(row: SignalRow): SignalRecord {
     source: row.source,
     timeframe: row.timeframe,
     detectedAt: row.detected_at,
+    plan:
+      row.stop_price != null && row.tp1_price != null && row.tp2_price != null && row.tp3_price != null
+        ? {
+            stop: row.stop_price,
+            tp1: row.tp1_price,
+            tp2: row.tp2_price,
+            tp3: row.tp3_price,
+            outcome: row.plan_outcome ?? null,
+            slAt: row.sl_at ?? null,
+            tp1At: row.tp1_at ?? null,
+            tp2At: row.tp2_at ?? null,
+            tp3At: row.tp3_at ?? null,
+          }
+        : null,
     status: row.status,
     reasons: parseReasons(row.reasons),
     penalties: parseReasons(row.penalties),
@@ -139,6 +163,8 @@ function statsFrom(row: LedgerStatsRow | null): LedgerStats {
 async function readLedger(): Promise<LedgerPayload> {
   if (!env.DB) throw new Error("D1_UNAVAILABLE");
   await ensureSignalSchema(env.DB);
+  await ensureSignalPlanColumns(env.DB).catch(() => undefined);
+  const planStats = await getPlanStatsCached(env.DB).catch(() => []);
   const [rowsResult, statsRow, lastRun, lastSummary] = await Promise.all([
     env.DB.prepare(
       `SELECT * FROM signal_records
@@ -175,6 +201,7 @@ async function readLedger(): Promise<LedgerPayload> {
   return {
     records,
     stats: statsFrom(statsRow),
+    planStats,
     automation: {
       lastRun: lastRun?.value ?? null,
       lastSummary: summary,

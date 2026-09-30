@@ -8,6 +8,7 @@
  * dispatcher (telegram-dispatch.ts) does the I/O.
  */
 
+import { MIN_SAMPLE, planLines, ratesText, type KindStats } from "./signal-plan.ts";
 import { dec, SPIKE_DISCLAIMER, spikeSentence, type VolumeSpike } from "./volume-spike.ts";
 
 export type TelegramCategory = "SEÑAL" | "DCA" | "NOTICIAS" | "SENTIMIENTO" | "VOLUMEN";
@@ -67,8 +68,13 @@ export function signalEvent(s: {
   score: number;
   entryPrice: number;
   timeframe: string;
+  /** Stop and targets fixed when the signal was detected; absent for older signals. */
+  plan?: { stop: number; tp1: number; tp2: number; tp3: number } | null;
+  /** How signals of this kind have turned out so far. */
+  stats?: KindStats | null;
 }): TelegramEvent {
   const arrow = s.side === "LONG" ? "🟢 LONG" : "🔴 SHORT";
+  const history = s.stats && s.stats.n > 0 ? ratesText(s.stats) : null;
   return {
     key: `signal:${s.id}`,
     category: "SEÑAL",
@@ -78,7 +84,13 @@ export function signalEvent(s: {
       `<b>${esc(s.symbol.replace("USDT", ""))} · ${arrow}</b>\n` +
       `${esc(s.signal)} · convicción <b>${s.score}%</b> · ${esc(s.timeframe)}\n` +
       `Entrada ${px(s.entryPrice)}\n` +
-      `<i>Objetivo y riesgo en ALT RADAR → HISTORIAL. No es una orden.</i>`,
+      (s.plan ? `${planLines(s.entryPrice, s.plan, px).join("\n")}\n` : "") +
+      (history && s.stats
+        ? `📊 Historial de este tipo: ${history} · ${s.stats.n} señales${s.stats.n < MIN_SAMPLE ? " (muestra mínima)" : ""}\n`
+        : "") +
+      (s.plan
+        ? `<i>Plan fijado al detectar la señal. No es una orden.</i>`
+        : `<i>Objetivo y riesgo en ALT RADAR → HISTORIAL. No es una orden.</i>`),
   };
 }
 
@@ -156,7 +168,7 @@ export function selectForUser(
   return { send: eligible.slice(0, cap), rest, suppressed: rest.length };
 }
 
-export type BotCommand = { cmd: "start" | "stop" | "estado" | "nuevo" | "ayuda" | "texto"; arg: string };
+export type BotCommand = { cmd: "start" | "stop" | "estado" | "nuevo" | "ayuda" | "texto" | "resultados"; arg: string };
 
 export function parseCommand(text: string | undefined): BotCommand {
   const raw = (text ?? "").trim();
@@ -168,6 +180,7 @@ export function parseCommand(text: string | undefined): BotCommand {
   if (name === "start") return { cmd: "start", arg };
   if (name === "stop") return { cmd: "stop", arg };
   if (name === "estado") return { cmd: "estado", arg };
+  if (name === "resultados" || name === "resultado" || name === "winrate") return { cmd: "resultados", arg };
   if (name === "nuevo" || name === "new" || name === "reset") return { cmd: "nuevo", arg };
   return { cmd: "ayuda", arg };
 }
