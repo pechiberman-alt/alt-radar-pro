@@ -35,6 +35,7 @@ import {
 import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
+import { analyzeTrend, latestBreak, lineAt } from "@/lib/trendlines";
 import { findSweeps, sweepStats } from "@/lib/liquidity-sweeps";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
 import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
@@ -74,7 +75,7 @@ type DisplayCandle = {
   /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
   takerBuy?: number;
 };
-type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
+type LayerKey = "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
 /** Footprint needs individual trades: legible and fetchable only on short frames. */
 const FOOTPRINT_FRAMES = new Set(["1m", "3m", "5m", "15m"]);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -88,6 +89,7 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   calor: true,
   reversion: true,
   patrones: true,
+  tendencia: true,
   liquidez: true,
   ob: false,
   breaker: false,
@@ -108,6 +110,7 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["calor", "CALOR"],
   ["reversion", "REVERSIÓN"],
   ["patrones", "PATRONES"],
+  ["tendencia", "TENDENCIA"],
   ["liquidez", "LIQUIDEZ"],
   ["reales", "LIQ. REALES"],
   ["volumen", "VOLUMEN"],
@@ -1203,6 +1206,15 @@ export default function LiquidationHeatmapDesk() {
   // a candle moves is a repainting signal — the one kind that can't be
   // trusted or measured. Only closed candles ever signal.
   const scalpSeries = useMemo(() => patternSeries.slice(0, -1), [patternSeries]);
+  // Trendlines and breakouts on the closed candles of the whole loaded series
+  // (so zooming never changes them). Fewer candles on each side of a swing on
+  // the daily-and-up frames, where a swing is a bigger event and there are
+  // fewer candles to find one in.
+  const trend = useMemo(() => {
+    if (!layers.tendencia || scalpSeries.length < 30) return null;
+    const pivotN = ["1m", "3m", "5m", "15m", "30m"].includes(timeframe) ? 5 : ["1h", "2h", "4h"].includes(timeframe) ? 4 : 3;
+    return analyzeTrend(scalpSeries, { pivotN });
+  }, [layers.tendencia, scalpSeries, timeframe]);
   const scalpSignals = useMemo(
     () => (layers.scalp ? findScalpSignals(scalpSeries, { horizon: SCALP_HORIZON }) : []),
     [layers.scalp, scalpSeries],
@@ -1684,6 +1696,25 @@ export default function LiquidationHeatmapDesk() {
             </div>
           )}
 
+          {layers.tendencia && trend && (
+            <div className="liq-pstrip" title="Una ruptura es un cierre fuera de la línea (la mecha sola no cuenta). «Con volumen» = al menos 1,3 veces el promedio de las 20 velas anteriores.">
+              <span className={trend.lines.length ? "rev" : "none"}>
+                TENDENCIA · {plural(trend.lines.filter((l) => l.side === "RESISTENCIA").length, "resistencia")} ↘ · {plural(trend.lines.filter((l) => l.side === "SOPORTE").length, "soporte")} ↗
+              </span>
+              {(() => {
+                const lb = latestBreak(trend);
+                const ago = lb ? scalpSeries.length - 1 - lb.i : 0;
+                if (!lb || ago > 40) return <span className="none">sin rupturas recientes</span>;
+                return (
+                  <span className={lb.direction === "ALCISTA" ? "up" : "down"}>
+                    RUPTURA {lb.direction} ({lb.kind === "LÍNEA" ? "línea" : "rango"}) · {ago === 0 ? "en la última vela cerrada" : `hace ${plural(ago, "vela")}`}
+                    {lb.volumeMultiple !== null && ` · ${lb.volumeMultiple.toFixed(1).replace(".", ",")}× vol${lb.confirmed ? " ✓" : ""}`}
+                  </span>
+                );
+              })()}
+            </div>
+          )}
+
           {layers.footprint && verdict && (
             <div className={`fp-strip ${verdict.winner === "COMPRADORES" ? "up" : verdict.winner === "VENDEDORES" ? "down" : "flat"}`}>
               <span>QUIÉN VA GANANDO</span>
@@ -1935,6 +1966,67 @@ export default function LiquidationHeatmapDesk() {
                         </g>
                       );
                     })}
+                  </g>
+                );
+              })()}
+
+              {/* Trendlines and breakouts. Series indices are shifted into the visible
+                  window the same way the flags are; lines extend to the right edge. */}
+              {layers.tendencia && trend && (() => {
+                const slot = layout.candles.length > 1 ? layout.x(1) - layout.x(0) : 12;
+                const xi = (i: number) => layout.x(0) + slot * (i - patternOffset);
+                const endX = MARGIN.left + layout.candleAreaW;
+                const iEnd = patternOffset + (endX - layout.x(0)) / slot;
+                const visibleBreaks = trend.breaks.filter((b) => b.i >= patternOffset).slice(-10);
+                const visibleRanges = trend.ranges.filter((r) => r.i >= patternOffset).slice(-8);
+                const mult = (v: number | null) => (v === null ? "" : ` ${v.toFixed(1).replace(".", ",")}×`);
+                const mark = (key: string, i: number, dir: "ALCISTA" | "BAJISTA", label: string, confirmed: boolean, outcome: string) => {
+                  const candle = layout.series[i];
+                  if (!candle) return null;
+                  const up = dir === "ALCISTA";
+                  const cx = xi(i);
+                  const cy = up ? layout.y(candle.low) + 11 : layout.y(candle.high) - 11;
+                  const tri = up ? `${cx},${cy - 5} ${cx - 5},${cy + 4} ${cx + 5},${cy + 4}` : `${cx},${cy + 5} ${cx - 5},${cy - 4} ${cx + 5},${cy - 4}`;
+                  return (
+                    <g key={key}>
+                      <polygon points={tri} className={`tl-mark ${up ? "up" : "down"} ${confirmed ? "solid" : "hollow"} ${outcome === "FALLIDA" ? "failed" : ""}`}>
+                        <title>{`${label} · ${dir}${confirmed ? " con volumen" : " sin volumen"} · ${outcome === "RECIÉN" ? "todavía muy reciente para saber si se sostiene" : outcome === "FALLIDA" ? "volvió adentro: ruptura fallida" : "se sostuvo 3 velas"}`}</title>
+                      </polygon>
+                      <text x={cx} y={up ? cy + 17 : cy - 10} className={`tl-lbl ${up ? "up" : "down"}`}>{label}</text>
+                    </g>
+                  );
+                };
+                return (
+                  <g className="tl-layer" clipPath="url(#liq-price-clip)">
+                    {visibleBreaks.map((b) => {
+                      const from = Math.max(b.line.a, patternOffset);
+                      return (
+                        <line key={`bl-${b.i}`} x1={xi(from)} y1={layout.y(lineAt(b.line, from))} x2={xi(b.i)} y2={layout.y(b.linePrice)} className="tl-broken" />
+                      );
+                    })}
+                    {visibleRanges.map((r) => (
+                      <line key={`rl-${r.i}`} x1={xi(Math.max(r.i - 20, patternOffset))} x2={xi(r.i)} y1={layout.y(r.level)} y2={layout.y(r.level)} className="tl-broken" />
+                    ))}
+                    {trend.lines.map((l) => {
+                      const from = Math.max(l.a, patternOffset);
+                      const res = l.side === "RESISTENCIA";
+                      const yEnd = layout.y(lineAt(l, iEnd));
+                      return (
+                        <g key={`${l.side}-${l.a}-${l.b}`}>
+                          <line x1={xi(from)} y1={layout.y(lineAt(l, from))} x2={endX} y2={yEnd} className={`tl-line ${res ? "res" : "sup"}`}>
+                            <title>{`${l.side} · ${l.touches} toques · de ${l.priceA.toLocaleString("es-AR", { maximumFractionDigits: 6 })} a ${l.priceB.toLocaleString("es-AR", { maximumFractionDigits: 6 })}`}</title>
+                          </line>
+                          {[l.a, l.b].filter((i) => i >= patternOffset).map((i) => (
+                            <circle key={i} cx={xi(i)} cy={layout.y(i === l.a ? l.priceA : l.priceB)} r={2.6} className={`tl-dot ${res ? "res" : "sup"}`} />
+                          ))}
+                          <text x={endX - 4} y={Math.min(layout.y(layout.lo) - 4, Math.max(MARGIN.top + 10, yEnd + (res ? -5 : 11)))} className={`tl-tag ${res ? "res" : "sup"}`}>
+                            {res ? "↘ RES" : "↗ SOP"} ×{l.touches}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {visibleBreaks.map((b) => mark(`b-${b.i}`, b.i, b.direction, `RUP${mult(b.volumeMultiple)}`, b.confirmed, b.outcome))}
+                    {visibleRanges.map((r) => mark(`r-${r.i}`, r.i, r.direction, `BO${mult(r.volumeMultiple)}`, r.confirmed, r.outcome))}
                   </g>
                 );
               })()}
