@@ -34,6 +34,7 @@ import {
 } from "@/lib/footprint";
 import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
+import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
 import { findSweeps, sweepStats } from "@/lib/liquidity-sweeps";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
 import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
@@ -73,9 +74,10 @@ type DisplayCandle = {
   /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
   takerBuy?: number;
 };
-type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "tomas" | "scalp";
+type LayerKey = "calor" | "reversion" | "patrones" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
 /** Footprint needs individual trades: legible and fetchable only on short frames. */
 const FOOTPRINT_FRAMES = new Set(["1m", "3m", "5m", "15m"]);
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
 /**
  * Fewer layers on by default. Order blocks, gaps and Fibonacci are the noisiest
@@ -95,6 +97,9 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   rsi: true,
   macd: true,
   footprint: false,
+  // Only drawn where trades are loaded, i.e. with the footprint on: on by
+  // default so turning the footprint on shows them without a second click.
+  burbujas: true,
   tomas: true,
   scalp: true,
   reales: true,
@@ -109,6 +114,7 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["tomas", "TOMAS DE LIQ."],
   ["scalp", "SCALP"],
   ["footprint", "FOOTPRINT"],
+  ["burbujas", "BURBUJAS"],
   ["rsi", "RSI"],
   ["macd", "MACD"],
   ["ob", "OB"],
@@ -341,6 +347,8 @@ export default function LiquidationHeatmapDesk() {
   const tradesRef = useRef<Map<number, Trade>>(new Map());
   const tradesDirty = useRef(false);
   const [trades, setTrades] = useState<Trade[]>([]);
+  /** Minimum bubble size in dollars; null = automatic (top 0,5% of what is on screen). */
+  const [bubbleMin, setBubbleMin] = useState<number | null>(null);
   const [cross, setCross] = useState<{ i: number; y: number } | null>(null);
   const [feed, setFeed] = useState<FeedStatus>({ state: "conectando", source: null, lastUpdate: null });
 
@@ -1230,6 +1238,16 @@ export default function LiquidationHeatmapDesk() {
     [footprintMode, layout, footprints],
   );
 
+  const bubbles = useMemo(() => {
+    if (!footprintMode || !layers.burbujas || !layout || !trades.length || !layout.candles.length) return null;
+    const frameMs = FRAME_MS[timeframe] ?? 60_000;
+    const first = layout.candles[0].time;
+    const picked = pickBubbles(trades, { from: first, to: layout.candles[layout.candles.length - 1].time + frameMs, minNotional: bubbleMin });
+    const index = new Map(layout.candles.map((c, i) => [c.time, i] as const));
+    const largest = picked.bubbles.reduce((m, b) => Math.max(m, b.notional), 0);
+    return { ...picked, index, frameMs, first, largest };
+  }, [footprintMode, layers.burbujas, layout, trades, timeframe, bubbleMin]);
+
   const reversalZones = useMemo<ReversalZone[]>(() => {
     if (!layout || livePrice === null) return [];
     const p = livePrice;
@@ -1573,6 +1591,30 @@ export default function LiquidationHeatmapDesk() {
               </button>
             ))}
           </div>
+
+          {layers.burbujas && (
+            <div className="liq-pools tb-bar" role="group" aria-label="Tamaño mínimo de las burbujas">
+              <span className="lp-title">BURBUJAS</span>
+              {footprintMode ? (
+                <>
+                  {([null, 10_000, 50_000, 250_000, 1_000_000] as const).map((v) => (
+                    <button key={String(v)} className={bubbleMin === v ? "on" : ""} aria-pressed={bubbleMin === v} onClick={() => setBubbleMin(v)}>
+                      {v === null ? "AUTO" : `≥${dollarsShort(v)}`}
+                    </button>
+                  ))}
+                  <span className="lp-note">
+                    {!bubbles || bubbles.threshold === null
+                      ? "Pocas órdenes en pantalla para elegir las grandes en automático."
+                      : `Órdenes a mercado desde ${dollarsShort(bubbles.threshold)} · ` +
+                        `${plural(bubbles.bubbles.filter((b) => b.side === "COMPRA").length, "compra")} · ` +
+                        `${plural(bubbles.bubbles.filter((b) => b.side === "VENTA").length, "venta")}. Es actividad, no dirección.`}
+                  </span>
+                </>
+              ) : (
+                <span className="lp-note">Se ven con FOOTPRINT activado en 1m, 3m, 5m o 15m (usan las operaciones una por una).</span>
+              )}
+            </div>
+          )}
 
           {layers.calor && layout && (
             <div className="liq-pools">
@@ -2174,6 +2216,14 @@ export default function LiquidationHeatmapDesk() {
                           {delta >= 0 ? `+${q(delta)}` : `-${q(-delta)}`}
                         </text>
                       )}
+                      {/* The rest of the candle's order flow, when there is room:
+                          total traded and the share that was aggressive buying. */}
+                      {colW >= 40 && fp.buy + fp.sell > 0 && (
+                        <text x={xPos} y={layout.y(candle.low) + 21} className="fp-stats">
+                          <title>Volumen operado en la vela y qué parte fue compra agresiva (C)</title>
+                          VOL {q(fp.buy + fp.sell)} · {Math.round((fp.buy / (fp.buy + fp.sell)) * 100)}% C
+                        </text>
+                      )}
                       {/* Stacked imbalance: several consecutive footprint
                           levels imbalanced the same direction — the actual
                           footprint signal, as opposed to one isolated cell.
@@ -2292,6 +2342,41 @@ export default function LiquidationHeatmapDesk() {
                     </g>
                   );
                 })()}
+
+              {/* Trade bubbles: each large market order where and when it
+                  printed inside its candle's column, area by dollars. */}
+              {bubbles && bubbles.bubbles.length > 0 && (
+                <g className="tb-layer" clipPath="url(#liq-price-clip)">
+                  {(() => {
+                    const slot = layout.candles.length > 1 ? layout.x(1) - layout.x(0) : 20;
+                    const colW = Math.max(3, slot * 0.88);
+                    const rMax = Math.max(6, Math.min(20, slot * 0.6));
+                    const labelFrom = bubbles.bubbles.length > 3 ? bubbles.bubbles[bubbles.bubbles.length - 3].notional : 0;
+                    return bubbles.bubbles.map((b) => {
+                      const open = Math.floor((b.time - bubbles.first) / bubbles.frameMs) * bubbles.frameMs + bubbles.first;
+                      const i = bubbles.index.get(open);
+                      if (i === undefined) return null;
+                      const frac = Math.min(0.999, Math.max(0, (b.time - open) / bubbles.frameMs));
+                      const cx = layout.x(i) - colW / 2 + frac * colW;
+                      const cy = layout.y(b.price);
+                      const r = bubbleRadius(b.notional, bubbles.largest, 3, rMax);
+                      const buy = b.side === "COMPRA";
+                      return (
+                        <g key={b.id}>
+                          <circle cx={cx} cy={cy} r={r} className={`tb-bubble ${buy ? "buy" : "sell"}`}>
+                            <title>
+                              {`${buy ? "Compra" : "Venta"} agresiva ${dollarsShort(b.notional)} · ${b.qty.toLocaleString("es-AR", { maximumFractionDigits: 4 })} a ${b.price.toLocaleString("es-AR", { maximumFractionDigits: 6 })} · ${new Date(b.time).toLocaleTimeString("es-AR", { hour12: false })}`}
+                            </title>
+                          </circle>
+                          {r >= 10 && b.notional >= labelFrom && (
+                            <text x={cx} y={cy + 3} className="tb-label">{dollarsShort(b.notional)}</text>
+                          )}
+                        </g>
+                      );
+                    });
+                  })()}
+                </g>
+              )}
 
               {/* Real liquidations, as they print. Bubble area follows size;
                   red = longs forced out, green = shorts. Only the three
