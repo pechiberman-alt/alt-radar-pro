@@ -636,3 +636,12 @@
 /* Chart labels sit on top of the liquidation columns now; a dark outline keeps
    them legible over yellow and green without a box behind every word. */
 .liq-svg text:not(.liq-axis-tag-text):not(.liq-axis-label){paint-order:stroke;stroke:rgba(5,10,8,.9);stroke-width:3px;stroke-linejoin:round}
+
+/* Trade bubbles and per-candle order-flow stats */
+.tb-bubble{stroke-width:1.2;cursor:help}
+.tb-bubble.buy{fill:rgba(57,242,154,.26);stroke:#39f29a}
+.tb-bubble.sell{fill:rgba(255,89,100,.26);stroke:#ff5964}
+.tb-bubble:hover{stroke-width:2.2}
+.tb-label{font:8px var(--font-mono);font-weight:700;fill:#e7efe9;text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:#050a08;stroke-width:2px}
+.fp-stats{font:6.5px var(--font-mono);fill:#9aa7a0;text-anchor:middle}
+.tb-bar .lp-note{margin-left:6px;font:8px var(--font-mono);color:#8b9a92}
