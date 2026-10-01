@@ -1,4 +1,4 @@
-import { fetchKlinesServer, GLOBAL_BASES } from "./klines-server.ts";
+import { fetchKlinesServer, FUTURES_BASES_SERVER, GLOBAL_BASES, marketOf } from "./klines-server.ts";
 import {
   ALERT_USAGE, createdMessage, directionFor, firstTouch, listMessage, LOOKBACK_MINUTES, MAX_ALERTS_PER_USER, parseAlertArgs, parseTarget,
   triggeredMessage, type AlertDirection, type PriceAlert,
@@ -42,12 +42,13 @@ export async function listUserAlerts(db: D1Database, userId: number): Promise<Pr
   return rows.map(toAlert);
 }
 
-/** Current spot price; null when Binance says the pair doesn't exist. Throws when Binance can't be reached. */
+/** Current price (spot, or futures for the metals); null when Binance says the pair doesn't exist. Throws when Binance can't be reached. */
 export async function fetchSpotPrice(symbol: string): Promise<number | null> {
+  const futures = marketOf(symbol) === "futures";
   let lastError: unknown;
-  for (const base of GLOBAL_BASES) {
+  for (const base of futures ? FUTURES_BASES_SERVER : GLOBAL_BASES) {
     try {
-      const r = await globalThis.fetch(`${base}/api/v3/ticker/price?symbol=${encodeURIComponent(symbol)}`, { signal: AbortSignal.timeout(6_000) });
+      const r = await globalThis.fetch(`${base}${futures ? "/fapi/v1" : "/api/v3"}/ticker/price?symbol=${encodeURIComponent(symbol)}`, { signal: AbortSignal.timeout(6_000) });
       if (r.status === 400) return null;
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const price = Number(((await r.json()) as { price?: string }).price);
@@ -121,7 +122,7 @@ export async function handleAlertCommand(
     return;
   }
   if (price === null) {
-    await reply(`No encontré ${args.symbol} en Binance spot. Probá con el nombre de la moneda (ej: /alerta SOL 120).`);
+    await reply(`No encontré ${args.symbol} en Binance. Probá con el nombre de la moneda (ej: /alerta SOL 120, /alerta XAU 4200).`);
     return;
   }
   const level = parseTarget(args.target, price);

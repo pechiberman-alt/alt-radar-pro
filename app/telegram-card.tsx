@@ -16,7 +16,7 @@ const CATS: [TelegramCategory, string, string][] = [
   ["DCA", "DCA", "Tu día programado de compra, a las 9 de tu hora"],
   ["NOTICIAS", "NOTICIAS", "Sólo las de alto impacto"],
   ["SENTIMIENTO", "MIEDO Y AVARICIA", "Sólo cuando entra en extremo"],
-  ["VOLUMEN", "VOLUMEN", "Vela con 3× el volumen normal en BTC, ETH o SOL (15m, 1h, 4h)"],
+  ["VOLUMEN", "VOLUMEN", "Vela con 3× el volumen normal en BTC, ETH, SOL (15m, 1h, 4h) y XAU (1h, 4h)"],
 ];
 
 /** Links the signed-in account to a Telegram chat and sets what gets sent. */
