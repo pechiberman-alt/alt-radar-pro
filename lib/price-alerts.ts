@@ -1,3 +1,4 @@
+import { FUTURES_ONLY } from "./klines-server.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
 /**
@@ -37,8 +38,15 @@ export const MIN_DISTANCE = 0.0005;
 
 const QUOTES = ["USDT", "USDC", "FDUSD", "BTC", "ETH", "BNB"];
 
+/** Names people use for the metals, mapped to Binance's perpetuals. */
+const ALIASES: Record<string, string> = {
+  XAU: "XAUUSDT", XAUUSD: "XAUUSDT", ORO: "XAUUSDT", GOLD: "XAUUSDT",
+  XAG: "XAGUSDT", XAGUSD: "XAGUSDT", PLATA: "XAGUSDT", SILVER: "XAGUSDT",
+};
+
 export function normalizeSymbol(raw: string): string | null {
   const s = raw.toUpperCase().replace(/[\s/_-]/g, "");
+  if (ALIASES[s]) return ALIASES[s];
   if (!/^[A-Z0-9]{2,20}$/.test(s)) return null;
   const full = QUOTES.some((q) => s.length > q.length && s.endsWith(q)) ? s : `${s}USDT`;
   return full.length <= 20 ? full : null;
@@ -106,7 +114,8 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const group = (int: string) => int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 /** Argentine format without depending on the runtime's locale data. */
 export function px(v: number): string {
-  const digits = v >= 1000 ? 0 : v >= 100 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 8;
+  // Two decimals above 1.000 too: gold at 4.123,50 must not read as 4.124.
+  const digits = v >= 100 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 8;
   const [int, frac] = v.toFixed(digits).split(".");
   const trimmed = (frac ?? "").replace(/0+$/, "");
   return trimmed ? `${group(int)},${trimmed}` : group(int);
@@ -128,6 +137,9 @@ export function createdMessage(alert: Pick<PriceAlert, "symbol" | "target" | "di
   return (
     `✅ <b>Alerta creada: ${coin(alert.symbol)} ${arrow(alert.direction)} ${px(alert.target)}</b>\n` +
     `Ahora está en ${px(price)} (falta ${pct(distance)}). Te aviso cuando ${alert.direction === "ARRIBA" ? "suba" : "baje"} hasta ahí.\n` +
+    (FUTURES_ONLY.has(alert.symbol)
+      ? `<i>Precio del perpetuo ${esc(alert.symbol)} de Binance: sigue al ${alert.symbol.startsWith("XAU") ? "oro" : "metal"}, pero puede diferir unos dólares del de tu broker, y con el mercado cerrado (fin de semana) se mueve poco.</i>\n`
+      : "") +
     `<i>Se revisa cada 5 minutos con las velas de 1 minuto, así que también cuentan las mechas.</i>`
   );
 }
