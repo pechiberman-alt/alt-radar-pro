@@ -645,3 +645,22 @@
 .tb-label{font:8px var(--font-mono);font-weight:700;fill:#e7efe9;text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:#050a08;stroke-width:2px}
 .fp-stats{font:6.5px var(--font-mono);fill:#9aa7a0;text-anchor:middle}
 .tb-bar .lp-note{margin-left:6px;font:8px var(--font-mono);color:#8b9a92}
+
+/* Trendlines and breakouts */
+.tl-line{stroke-width:1.5;stroke-dasharray:7 4;fill:none}
+.tl-line.res{stroke:#ff7a85}
+.tl-line.sup{stroke:#5ff5b0}
+.tl-dot{stroke-width:1.2;fill:#08110d}
+.tl-dot.res{stroke:#ff7a85}
+.tl-dot.sup{stroke:#5ff5b0}
+.tl-broken{stroke:#8b9a92;stroke-width:1;stroke-dasharray:2 3;opacity:.7}
+.tl-tag{font:8px var(--font-mono);font-weight:700;text-anchor:end;paint-order:stroke;stroke:#050a08;stroke-width:2.5px}
+.tl-tag.res{fill:#ff7a85}
+.tl-tag.sup{fill:#5ff5b0}
+.tl-mark{stroke-width:1.4;cursor:help}
+.tl-mark.up{stroke:#39f29a}.tl-mark.down{stroke:#ff5964}
+.tl-mark.up.solid{fill:#39f29a}.tl-mark.down.solid{fill:#ff5964}
+.tl-mark.hollow{fill:none}
+.tl-mark.failed{stroke:#8b9a92;fill:none;opacity:.8}
+.tl-lbl{font:7.5px var(--font-mono);font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#050a08;stroke-width:2.5px;pointer-events:none}
+.tl-lbl.up{fill:#7dffc0}.tl-lbl.down{fill:#ff8c94}
