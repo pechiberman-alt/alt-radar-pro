@@ -34,7 +34,8 @@ import {
 } from "@/lib/footprint";
 import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
-import { keyLevels as supportResistance } from "@/lib/key-levels";
+import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSource } from "@/lib/level-engine";
+import type { SwingCandle } from "@/lib/swing-entries";
 import { findInducements, idmStats } from "@/lib/inducement";
 import { onMapSymbol } from "@/lib/account-events";
 import { findLvSignals, flushSeries, lvStats, resolveLv, type LvTrade } from "@/lib/liq-vol-signals";
@@ -128,7 +129,7 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
 const simpleLayers = (): Record<LayerKey, boolean> =>
   Object.fromEntries(Object.keys(DEFAULT_LAYERS).map((k) => [k, SIMPLE_ON.has(k)])) as Record<LayerKey, boolean>;
 const LAYER_LABELS: [LayerKey, string][] = [
-  ["sr", "S/R CLAVE"],
+  ["sr", "NIVELES"],
   ["liqvol", "LIQ+VOL"],
   ["idm", "INDUCCIÓN"],
   ["calor", "CALOR"],
@@ -340,6 +341,10 @@ export default function LiquidationHeatmapDesk() {
   const [symbols, setSymbols] = useState<string[]>(FALLBACK_SYMBOLS);
   const [symbolQuery, setSymbolQuery] = useState("");
   const [htfPools, setHtfPools] = useState<{ timeframe: string; pools: LiquidityPool[] }[]>([]);
+  /** The same larger-frame candles, kept for the level engine. */
+  const [htfCandles, setHtfCandles] = useState<{ timeframe: string; candles: SwingCandle[] }[]>([]);
+  /** Daily candles for yesterday's and last week's references. */
+  const [daily, setDaily] = useState<SwingCandle[] | null>(null);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>(DEFAULT_LAYERS);
   const [simple, setSimple] = useState(false);
   // Deferred read, same as the workspace: the server and the first client
@@ -501,16 +506,32 @@ export default function LiquidationHeatmapDesk() {
     let alive = true;
     (async () => {
       const out: { timeframe: string; pools: LiquidityPool[] }[] = [];
+      const kept: { timeframe: string; candles: SwingCandle[] }[] = [];
       for (const tf of higherTimeframes(timeframe)) {
         try {
           const rows = await loadRows(symbol, tf, 300, controller.signal);
           const candles = parseSwingKlines(rows);
-          if (candles.length >= 20) out.push({ timeframe: tf, pools: findLiquidityPools(candles) });
+          if (candles.length >= 20) {
+            out.push({ timeframe: tf, pools: findLiquidityPools(candles) });
+            kept.push({ timeframe: tf, candles });
+          }
         } catch {
           // A missing larger frame only means fewer confluences, not an error.
         }
       }
-      if (alive) setHtfPools(out);
+      if (alive) {
+        setHtfPools(out);
+        setHtfCandles(kept);
+      }
+      // Yesterday's and last week's references, unless the chart is already daily or above.
+      if ((FRAME_MS[timeframe] ?? 0) < 86_400_000) {
+        try {
+          const rows = await loadRows(symbol, "1d", 40, controller.signal);
+          if (alive) setDaily(parseSwingKlines(rows));
+        } catch {
+          if (alive) setDaily(null);
+        }
+      } else if (alive) setDaily(null);
     })();
     return () => {
       alive = false;
@@ -1289,11 +1310,36 @@ export default function LiquidationHeatmapDesk() {
     [scalpSeries, scalpSignals],
   );
 
-  // Key support and resistance on the closed candles of the loaded series.
-  const levels = useMemo(
-    () => (layers.sr && scalpSeries.length >= 30 ? supportResistance(scalpSeries, { perSide: 3, span: ["1m", "3m", "5m", "15m", "30m"].includes(timeframe) ? 5 : 3 }) : []),
-    [layers.sr, scalpSeries, timeframe],
-  );
+  // The level engine: structure on this and the larger frames, day and week
+  // references, volume profile, round numbers and liquidity, grouped and scored.
+  const levelInput = useMemo(() => {
+    if (!layers.sr || scalpSeries.length < 30) return null;
+    const frameMs = FRAME_MS[timeframe] ?? 3_600_000;
+    return {
+      current: { frame: timeframe, candles: scalpSeries, frameMs, weight: 1 },
+      higher: htfCandles.map((h, i) => ({ frame: h.timeframe, candles: h.candles, frameMs: FRAME_MS[h.timeframe] ?? frameMs * 4, weight: 2 + i })),
+      daily,
+      span: ["1m", "3m", "5m", "15m", "30m"].includes(timeframe) ? 5 : 3,
+    };
+  }, [layers.sr, scalpSeries, timeframe, htfCandles, daily]);
+  const levels = useMemo<Level[]>(() => {
+    if (!levelInput) return [];
+    const last = scalpSeries[scalpSeries.length - 1];
+    const liquidity: LevelSource[] = [
+      ...[data?.heatmap.topZoneAbove, data?.heatmap.topZoneBelow]
+        .filter((z): z is NonNullable<typeof z> => Boolean(z))
+        .map((z) => ({ kind: "IMÁN", label: "imán de liquidaciones", price: z.price, weight: 2 })),
+      ...htfPools.flatMap((h) =>
+        h.pools.filter((p) => !p.swept).map((p) => ({ kind: `POOL ${h.timeframe}`, label: `liquidez de ${h.timeframe} sin barrer (${p.touches} toques)`, price: p.price, weight: 1.5 })),
+      ),
+    ];
+    const now = last.openTime + levelInput.current.frameMs;
+    return buildLevels([...sourcesAt({ ...levelInput, now }), ...liquidity], last.close, atrOf(scalpSeries), { perSide: 4 });
+  }, [levelInput, scalpSeries, data, htfPools]);
+  // Does it work here? The engine replayed on this coin's own history.
+  const levelReplay = useMemo(() => (levelInput && scalpSeries.length >= 200 ? replayLevels(levelInput) : null), [levelInput, scalpSeries.length]);
+  const levelTag = (l: Level) => l.sources.slice(0, 3).map((x) => x.kind).join(" + ");
+
   // LIQ+VOL, with the liquidation model's flush when the model is loaded,
   // replayed and resolved on this very series: the record is of this coin
   // and this timeframe, not of a backtest somewhere else.
@@ -1791,8 +1837,8 @@ export default function LiquidationHeatmapDesk() {
                     const sp = levels.find((l) => l.kind === "SOPORTE");
                     return (
                       <p>
-                        {r ? <>El <b className="down">techo</b> más cercano está en {priceLabel(r.price)} (+{r.distancePct.toFixed(1).replace(".", ",")}%, el precio giró {r.touches} veces ahí). </> : "No hay un techo claro cerca. "}
-                        {sp ? <>El <b className="up">piso</b> más cercano está en {priceLabel(sp.price)} ({sp.distancePct.toFixed(1).replace(".", ",")}%, {sp.touches} giros). </> : "No hay un piso claro cerca. "}
+                        {r ? <>El <b className="down">techo</b> más cercano está en {priceLabel(r.price)} (+{r.distancePct.toFixed(1).replace(".", ",")}%, {"★".repeat(r.stars)}: {r.sources.slice(0, 2).map((x) => x.label).join(" y ")}). </> : "No hay un techo claro cerca. "}
+                        {sp ? <>El <b className="up">piso</b> más cercano está en {priceLabel(sp.price)} ({sp.distancePct.toFixed(1).replace(".", ",")}%, {"★".repeat(sp.stars)}: {sp.sources.slice(0, 2).map((x) => x.label).join(" y ")}). </> : "No hay un piso claro cerca. "}
                         Cerca de un techo conviene no comprar apurado; cerca de un piso, no vender apurado.
                       </p>
                     );
@@ -1835,12 +1881,11 @@ export default function LiquidationHeatmapDesk() {
           )}
 
           {layers.sr && levels.length > 0 && (
-            <div className="liq-pstrip" title="Niveles donde el precio giró varias veces (máximos y mínimos a menos de media ATR cuentan como el mismo nivel). Un nivel para mirar, no una promesa de giro.">
+            <div className="liq-pstrip" title="Cada nivel junta las razones por las que se mira ese precio (estructura de este y de marcos mayores, máximos/mínimos de ayer y la semana pasada, aperturas, perfil de volumen, números redondos, liquidez). Más razones = más estrellas. Un nivel para mirar, no una promesa de giro.">
               {levels.map((l, i) => (
                 <span key={`sr-${i}`} className={l.kind === "RESISTENCIA" ? "down" : "up"}>
                   {l.kind === "RESISTENCIA" ? "R" : "S"}
-                  {levels.filter((x) => x.kind === l.kind).indexOf(l) + 1} · {priceLabel(l.price)} · {l.touches} toques · {l.strength.toLowerCase()}
-                  {l.flipped ? " · cambió de rol" : ""}
+                  {levels.filter((x) => x.kind === l.kind).indexOf(l) + 1} · {priceLabel(l.price)} · {"★".repeat(l.stars)} · {levelTag(l)}
                 </span>
               ))}
             </div>
@@ -2577,13 +2622,13 @@ export default function LiquidationHeatmapDesk() {
                   const n = levels.filter((x) => x.kind === l.kind).indexOf(l) + 1;
                   const res = l.kind === "RESISTENCIA";
                   return (
-                    <g key={`srb-${i}`} className={`sr-level ${res ? "res" : "sup"} ${l.strength === "DÉBIL" ? "weak" : ""}`}>
+                    <g key={`srb-${i}`} className={`sr-level ${res ? "res" : "sup"} ${l.stars === 1 ? "weak" : ""} s${l.stars}`}>
                       <rect x={MARGIN.left} y={Math.min(yTop, yBot)} width={layout.candleAreaW} height={Math.max(2, Math.abs(yBot - yTop))} />
                       <line x1={MARGIN.left} x2={right} y1={layout.y(l.price)} y2={layout.y(l.price)} />
                       {/* Past the IMÁN / POOL captions, which sit at the left edge. */}
                       <text x={MARGIN.left + 118} y={layout.y(l.price) - 3}>
                         {res ? "R" : "S"}
-                        {n} {priceLabel(l.price)} · {l.touches} toques
+                        {n} {priceLabel(l.price)} {"★".repeat(l.stars)} {levelTag(l)}
                       </text>
                     </g>
                   );
@@ -3307,6 +3352,33 @@ export default function LiquidationHeatmapDesk() {
                   ? "FOOTPRINT: cargando operaciones…"
                   : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
             </p>
+          )}
+
+          {layers.sr && levels.length > 0 && (
+            <div className="div-list sc-list lvl-list">
+              <h4>NIVELES · {timeframe.toUpperCase()}</h4>
+              {levels.map((l, i) => (
+                <div key={`lvl-${i}`} className={l.kind === "RESISTENCIA" ? "down" : "up"}>
+                  <b>
+                    {l.kind === "RESISTENCIA" ? "R" : "S"}
+                    {levels.filter((x) => x.kind === l.kind).indexOf(l) + 1} · {priceLabel(l.price)} · {"★".repeat(l.stars)}
+                    <span className="lvl-dist"> {l.distancePct >= 0 ? "+" : ""}{l.distancePct.toFixed(2).replace(".", ",")}%</span>
+                  </b>
+                  <span>{l.sources.map((x) => x.label).join(" · ")}</span>
+                </div>
+              ))}
+              <small>
+                Más estrellas = más razones independientes en el mismo precio (★ una, ★★ varias, ★★★ muchas o muy fuertes: estructura de marcos
+                mayores y la semana pasada pesan más).{" "}
+                {levelReplay && levelReplay.some((b) => b.rate !== null)
+                  ? `Medido en esta moneda y temporalidad, reconstruyendo los niveles en el pasado sin mirar el futuro: ${levelReplay
+                      .filter((b) => b.rate !== null)
+                      .map((b) => `${"★".repeat(b.stars)} aguantaron ${b.held} de ${b.held + b.broke} (${Math.round((b.rate ?? 0) * 100)}%)`)
+                      .join(" · ")}. «Aguantó» = el precio se alejó una ATR antes de cerrar del otro lado. Si las de más estrellas no aguantan más acá, las estrellas no te están diciendo nada en esta moneda.`
+                  : "Todavía no hay historia suficiente cargada para medir cuánto aguantan."}{" "}
+                Niveles para mirar, no promesas. No es asesoramiento financiero.
+              </small>
+            </div>
           )}
 
           {layers.idm && (
