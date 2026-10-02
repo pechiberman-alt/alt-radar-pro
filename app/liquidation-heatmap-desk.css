@@ -697,3 +697,8 @@
 .idm.down line{stroke:#f0a060}.idm.down text{fill:#f0a060}
 .idm.swept line{opacity:.55}
 .idm .idm-x{font-size:10px;text-anchor:middle}
+
+/* Level engine */
+.sr-level.s3 line{stroke-width:2;stroke-dasharray:none}
+.sr-level.s3 rect{opacity:.16}
+.lvl-list .lvl-dist{font-weight:normal;color:var(--muted)}
