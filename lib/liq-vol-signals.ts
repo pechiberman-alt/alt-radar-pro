@@ -151,7 +151,7 @@ export type LvStats = {
   confidence: "SIN MUESTRA" | "MUESTRA MÍNIMA" | "MUESTRA RAZONABLE";
 };
 
-export function lvStats(trades: LvTrade[]): LvStats {
+export function lvStats(trades: { r: number | null }[]): LvStats {
   const done = trades.filter((t) => t.r !== null);
   const gains = done.filter((t) => (t.r as number) > 0).reduce((s, t) => s + (t.r as number), 0);
   const losses = done.filter((t) => (t.r as number) < 0).reduce((s, t) => s - (t.r as number), 0);
