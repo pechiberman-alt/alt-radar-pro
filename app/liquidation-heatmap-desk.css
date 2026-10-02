@@ -664,3 +664,28 @@
 .tl-mark.failed{stroke:#8b9a92;fill:none;opacity:.8}
 .tl-lbl{font:7.5px var(--font-mono);font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#050a08;stroke-width:2.5px;pointer-events:none}
 .tl-lbl.up{fill:#7dffc0}.tl-lbl.down{fill:#ff8c94}
+
+/* Key support/resistance */
+.sr-level rect{opacity:.10}
+.sr-level line{stroke-width:1.2;stroke-dasharray:6 4}
+.sr-level text{font:8.5px var(--font-mono);font-weight:700;paint-order:stroke;stroke:#050a08;stroke-width:2.5px}
+.sr-level.res rect{fill:#ff5964}.sr-level.res line{stroke:#ff5964}.sr-level.res text{fill:#ff8a92}
+.sr-level.sup rect{fill:#39f29a}.sr-level.sup line{stroke:#39f29a}.sr-level.sup text{fill:#7df5bd}
+.sr-level.weak line{stroke-dasharray:2 4;opacity:.7}
+/* LIQ+VOL */
+.lv-mark{stroke-width:1.4;cursor:help}
+.lv-mark.up{stroke:#39f29a}.lv-mark.down{stroke:#ff5964}
+.lv-mark.won.up{fill:#39f29a}.lv-mark.won.down{fill:#ff5964}
+.lv-mark.lost{fill:transparent;opacity:.75}
+.lv-mark.open{fill:#f0c060}
+.lv-csv{margin-left:8px;padding:2px 7px;font:8px var(--font-mono);color:#8fe3ba;background:transparent;border:1px solid #1f4d38;border-radius:3px;cursor:pointer}
+/* Simple mode */
+.liq-layers .liq-simple{color:#0b120e;background:#f0c060;border-color:#f0c060;font-weight:700}
+.liq-layers .liq-simple.on{background:#39f29a;border-color:#39f29a}
+.lv-guide{margin:8px 0 10px;padding:12px 14px;background:#0a110d;border:1px solid #2a4a3a;border-left:3px solid #39f29a;border-radius:5px}
+.lv-guide h4{margin:0 0 8px;font:9px var(--font-mono);letter-spacing:1.2px;color:#a99cff}
+.lv-guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.lv-guide-grid>div{padding:9px 10px;background:#0c1511;border:1px solid var(--line);border-radius:4px}
+.lv-guide-grid b{font:10px var(--font-mono);color:#e7efe9}
+.lv-guide-grid p{margin:6px 0 0;font:11px/1.55 system-ui,sans-serif;color:#c4d0c9}
+.lv-guide-grid p.warn{color:#f0c060}.lv-guide-grid .up{color:#39f29a}.lv-guide-grid .down{color:#ff8a92}
