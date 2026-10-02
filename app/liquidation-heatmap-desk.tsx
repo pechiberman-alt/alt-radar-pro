@@ -36,6 +36,7 @@ import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { keyLevels as supportResistance } from "@/lib/key-levels";
 import { findInducements, idmStats } from "@/lib/inducement";
+import { onMapSymbol } from "@/lib/account-events";
 import { findLvSignals, flushSeries, lvStats, resolveLv, type LvTrade } from "@/lib/liq-vol-signals";
 import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
 import { analyzeTrend, latestBreak, lineAt } from "@/lib/trendlines";
@@ -577,6 +578,20 @@ export default function LiquidationHeatmapDesk() {
     setVisibleCandles(70);
     setSymbol(next);
   };
+  // Another panel (SUBEN SOLAS) can ask the map to show a coin.
+  useEffect(
+    () =>
+      onMapSymbol((next) => {
+        setSymbolQuery("");
+        setLoading(true);
+        setError("");
+        setData(null);
+        setRefreshKey(0);
+        setVisibleCandles(70);
+        setSymbol(next);
+      }),
+    [],
+  );
   const selectTimeframe = (next: string) => {
     setLoading(true);
     setError("");

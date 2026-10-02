@@ -1,0 +1,20 @@
+/* SUBEN SOLAS: coins rising on their own while BTC and ETH don't. */
+.dc-controls{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.dc-controls button{padding:7px 12px;font:9px var(--font-mono);letter-spacing:.9px;color:#9aa7a0;background:#0a110d;border:1px solid var(--line);border-radius:4px;cursor:pointer}
+.dc-controls button.on{color:#e7efe9;border-color:#3b5f4d;background:#12241b}
+.dc-context{margin:6px 0 10px;padding:8px 10px;font:10px/1.6 var(--font-mono);color:#b5c2ba;background:#0a110d;border:1px solid var(--line);border-left:3px solid #39f29a;border-radius:4px}
+.dc-context.warn{border-left-color:#f0c060;color:#f0d69a}
+.dc-table{overflow-x:auto;background:#0a110d;border:1px solid var(--line);border-radius:5px}
+.dc-table table{width:100%;min-width:560px;border-collapse:collapse;font:10px var(--font-mono);color:#c4d0c9}
+.dc-table th{padding:7px 8px;text-align:left;font-weight:normal;letter-spacing:.8px;color:var(--muted);border-bottom:1px solid var(--line)}
+.dc-table td{padding:7px 8px;border-bottom:1px solid #141e19;white-space:nowrap}
+.dc-table .up{color:var(--green)}.dc-table .down{color:var(--red)}
+.dc-coin{padding:0;font:700 11px var(--font-mono);color:#e7efe9;background:none;border:0;cursor:pointer}
+.dc-coin:hover{color:#8fe3ba}
+.dc-flags{display:flex;flex-wrap:wrap;gap:4px}
+.dc-flags i{padding:2px 6px;font:normal 8px var(--font-mono);border-radius:3px;border:1px solid var(--line)}
+.dc-flags i.up{color:#7df5bd;border-color:#1f4d38}
+.dc-flags i.warn{color:#f0c060;border-color:#5a4a1e}
+.dc-record{margin:10px 0 6px;font:9.5px/1.6 var(--font-mono);color:#9aa7a0}
+.dc-record.up{color:#7df5bd}.dc-record.down{color:#ff8a92}.dc-record.warn{color:#f0c060}
+.dc-foot{display:block;margin-top:6px;font:8.5px/1.6 var(--font-mono);color:var(--muted)}
