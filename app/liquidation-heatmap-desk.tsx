@@ -35,6 +35,7 @@ import {
 import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { keyLevels as supportResistance } from "@/lib/key-levels";
+import { findInducements, idmStats } from "@/lib/inducement";
 import { findLvSignals, flushSeries, lvStats, resolveLv, type LvTrade } from "@/lib/liq-vol-signals";
 import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
 import { analyzeTrend, latestBreak, lineAt } from "@/lib/trendlines";
@@ -77,7 +78,7 @@ type DisplayCandle = {
   /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
   takerBuy?: number;
 };
-type LayerKey = "sr" | "liqvol" | "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
+type LayerKey = "sr" | "liqvol" | "idm" | "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
 /** Footprint needs individual trades: legible and fetchable only on short frames. */
 const FOOTPRINT_FRAMES = new Set(["1m", "3m", "5m", "15m"]);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -102,6 +103,7 @@ const SIMPLE_ON = new Set(["sr", "liqvol", "calor", "tendencia", "volumen"]);
 const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   sr: true,
   liqvol: true,
+  idm: true,
   calor: true,
   reversion: true,
   patrones: true,
@@ -127,6 +129,7 @@ const simpleLayers = (): Record<LayerKey, boolean> =>
 const LAYER_LABELS: [LayerKey, string][] = [
   ["sr", "S/R CLAVE"],
   ["liqvol", "LIQ+VOL"],
+  ["idm", "INDUCCIÓN"],
   ["calor", "CALOR"],
   ["reversion", "REVERSIÓN"],
   ["patrones", "PATRONES"],
@@ -1285,6 +1288,13 @@ export default function LiquidationHeatmapDesk() {
     const trades = resolveLv(scalpSeries, findLvSignals(scalpSeries, { flush }), LV_HORIZON);
     return { trades, stats: lvStats(trades), withModel: Boolean(flush) };
   }, [layers.liqvol, scalpSeries, data]);
+  // Inducements (SMC): first real pullback after a break of structure.
+  const idms = useMemo(
+    () => (layers.idm && scalpSeries.length >= 40 ? findInducements(scalpSeries, { majorSpan: ["1m", "3m", "5m", "15m", "30m"].includes(timeframe) ? 5 : 3 }) : []),
+    [layers.idm, scalpSeries, timeframe],
+  );
+  const idmSt = useMemo(() => idmStats(idms), [idms]);
+  const lastIdm = idms.length ? idms.reduce((a, b) => (b.idmIndex > a.idmIndex ? b : a)) : null;
   const liveLv: LvTrade | null = lv && lv.trades.length && lv.trades[lv.trades.length - 1].result === "ABIERTA" ? lv.trades[lv.trades.length - 1] : null;
 
   // Who is winning, over the candles in view: from the aggressive-buy volume
@@ -1830,6 +1840,22 @@ export default function LiquidationHeatmapDesk() {
                 {lv.stats.winRate === null
                   ? "sin operaciones resueltas"
                   : `WR ${Math.round(lv.stats.winRate * 100)}% · PF ${lv.stats.profitFactor === Infinity ? "∞" : (lv.stats.profitFactor ?? 0).toFixed(2)} · ${ops(lv.stats.resolved)} · ${lv.stats.confidence.toLowerCase()}`}
+              </span>
+            </div>
+          )}
+
+          {layers.idm && lastIdm && (
+            <div className="liq-pstrip" title="Inducción (IDM): el primer retroceso real después de una ruptura de estructura. Ahí entran temprano y dejan sus stops; el mercado suele barrerlo antes de seguir.">
+              <span className={lastIdm.side === "ALCISTA" ? "up" : "down"}>
+                INDUCCIÓN {lastIdm.side.toLowerCase()} · {priceLabel(lastIdm.level)}{" "}
+                {lastIdm.sweptIndex === null
+                  ? `pendiente (${(((lastIdm.level - scalpSeries[scalpSeries.length - 1].close) / scalpSeries[scalpSeries.length - 1].close) * 100).toFixed(1).replace(".", ",")}%)`
+                  : `barrida hace ${scalpSeries.length - 1 - lastIdm.sweptIndex} velas`}
+              </span>
+              <span className={idmSt.rate === null ? "none" : idmSt.rate >= 0.5 ? "up" : "down"}>
+                {idmSt.rate === null
+                  ? "sin barridas resueltas"
+                  : `tras la barrida siguió ${idmSt.continued} de ${idmSt.resolved} · ${idmSt.confidence.toLowerCase()}`}
               </span>
             </div>
           )}
@@ -2589,6 +2615,30 @@ export default function LiquidationHeatmapDesk() {
                   );
                 })()}
 
+              {/* Inducements: a dotted line from the pullback to where it was
+                  swept (✕), or to the right edge while it is still pending. */}
+              {layers.idm &&
+                idms
+                  .filter((x) => (x.sweptIndex ?? scalpSeries.length) - patternOffset >= 0)
+                  .slice(-6)
+                  .map((x) => {
+                    const right = MARGIN.left + layout.candleAreaW;
+                    const x0 = Math.max(MARGIN.left, layout.x(x.idmIndex - patternOffset));
+                    const x1 = x.sweptIndex === null ? right : layout.x(x.sweptIndex - patternOffset);
+                    const y = layout.y(x.level);
+                    const up = x.side === "ALCISTA";
+                    return (
+                      <g key={`idm-${x.side}-${x.idmIndex}`} className={`idm ${up ? "up" : "down"} ${x.sweptIndex === null ? "pending" : "swept"}`}>
+                        <line x1={x0} x2={x1} y1={y} y2={y} />
+                        <text x={x0 + 2} y={up ? y + 10 : y - 4}>IDM</text>
+                        {x.sweptIndex !== null && (
+                          <text x={x1} y={y + 3} className="idm-x">✕</text>
+                        )}
+                        <title>{`Inducción ${x.side.toLowerCase()} en ${priceLabel(x.level)} · ${x.sweptIndex === null ? "pendiente" : `barrida · ${x.outcome === "CONTINUÓ" ? "la tendencia siguió" : x.outcome === "FALLÓ" ? "la estructura falló" : "sin resolver"}`}`}</title>
+                      </g>
+                    );
+                  })}
+
               {/* Scalping signals: an arrow on the candle that triggered, and for
                   the newest one still inside its horizon, the entry, stop and
                   target it defined — the box a trader would actually place. */}
@@ -3242,6 +3292,41 @@ export default function LiquidationHeatmapDesk() {
                   ? "FOOTPRINT: cargando operaciones…"
                   : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
             </p>
+          )}
+
+          {layers.idm && (
+            <div className="div-list sc-list idm-list">
+              <h4>INDUCCIONES · {timeframe.toUpperCase()}</h4>
+              {idms.length ? (
+                idms
+                  .slice(-6)
+                  .reverse()
+                  .map((x) => (
+                    <div key={`idml-${x.side}-${x.idmIndex}`} className={x.side === "ALCISTA" ? "up" : "down"}>
+                      <b>
+                        IDM {x.side.toLowerCase()} · {priceLabel(x.level)} ·{" "}
+                        {x.sweptIndex === null ? "pendiente" : x.outcome === "CONTINUÓ" ? "barrida → siguió" : x.outcome === "FALLÓ" ? "barrida → falló" : "barrida, sin resolver"}
+                      </b>
+                      <span>
+                        ruptura de {priceLabel(x.brokenLevel)} · origen del tramo {priceLabel(x.legOrigin)}
+                      </span>
+                      <em>hace {scalpSeries.length - 1 - x.idmIndex} velas</em>
+                    </div>
+                  ))
+              ) : (
+                <p className="div-none">Sin rupturas de estructura con retroceso en las velas cargadas.</p>
+              )}
+              <small>
+                Qué es: cuando el precio rompe la estructura (cierra arriba del último máximo o abajo del último mínimo), el primer retroceso deja
+                un mínimo (o máximo) fácil donde muchos entran temprano y ponen el stop. Esa es la inducción: el mercado suele barrerla antes de
+                seguir, y la zona de interés que queda detrás gana validez. Para principiantes: no entres en el primer retroceso; esperá que barra
+                la IDM y reaccione.{" "}
+                {idmSt.rate === null
+                  ? "Todavía no hay barridas resueltas para medir."
+                  : `En esta serie, después de barrer la IDM la tendencia siguió ${idmSt.continued} de ${idmSt.resolved} veces (${Math.round(idmSt.rate * 100)}%, ${idmSt.confidence.toLowerCase()}).`}{" "}
+                Es una lectura, no asesoramiento financiero.
+              </small>
+            </div>
           )}
 
           {layers.liqvol && lv && (

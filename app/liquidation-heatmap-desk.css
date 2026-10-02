@@ -689,3 +689,11 @@
 .lv-guide-grid b{font:10px var(--font-mono);color:#e7efe9}
 .lv-guide-grid p{margin:6px 0 0;font:11px/1.55 system-ui,sans-serif;color:#c4d0c9}
 .lv-guide-grid p.warn{color:#f0c060}.lv-guide-grid .up{color:#39f29a}.lv-guide-grid .down{color:#ff8a92}
+
+/* Inducement (IDM) */
+.idm line{stroke-width:1.2;stroke-dasharray:1 3}
+.idm text{font:8px var(--font-mono);font-weight:700;paint-order:stroke;stroke:#050a08;stroke-width:2.5px}
+.idm.up line{stroke:#5fd3f3}.idm.up text{fill:#5fd3f3}
+.idm.down line{stroke:#f0a060}.idm.down text{fill:#f0a060}
+.idm.swept line{opacity:.55}
+.idm .idm-x{font-size:10px;text-anchor:middle}
