@@ -702,3 +702,17 @@
 .sr-level.s3 line{stroke-width:2;stroke-dasharray:none}
 .sr-level.s3 rect{opacity:.16}
 .lvl-list .lvl-dist{font-weight:normal;color:var(--muted)}
+
+/* ROBOT MM */
+.mm-mark{stroke-width:1.6;cursor:help}
+.mm-mark.up{stroke:#5fd3f3}.mm-mark.down{stroke:#f0a060}
+.mm-mark.won.up{fill:#5fd3f3}.mm-mark.won.down{fill:#f0a060}
+.mm-mark.lost{fill:transparent;opacity:.8}.mm-mark.open{fill:#f0c060}
+.mm-idea{margin:4px 0 8px;font:10.5px/1.55 system-ui,sans-serif;color:#c4d0c9}
+.mm-verdict{margin:6px 0;font:9.5px/1.6 var(--font-mono)}
+.mm-verdict.up{color:#7df5bd}.mm-verdict.warn{color:#f0c060}
+.mm-table{overflow-x:auto;margin:6px 0 8px}
+.mm-table table{width:100%;min-width:480px;border-collapse:collapse;font:9px var(--font-mono);color:#b5c2ba}
+.mm-table th{padding:5px 6px;text-align:left;font-weight:normal;color:var(--muted);border-bottom:1px solid var(--line)}
+.mm-table td{padding:5px 6px;border-bottom:1px solid #141e19}
+.mm-table tr.up td{color:#7df5bd}

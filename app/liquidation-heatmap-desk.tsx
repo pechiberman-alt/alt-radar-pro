@@ -37,6 +37,7 @@ import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSource } from "@/lib/level-engine";
 import type { SwingCandle } from "@/lib/swing-entries";
 import { findInducements, idmStats } from "@/lib/inducement";
+import { mmEvents, runMm, studyMm, type MmTrade } from "@/lib/mm-robot";
 import { onMapSymbol } from "@/lib/account-events";
 import { findLvSignals, flushSeries, lvStats, resolveLv, type LvTrade } from "@/lib/liq-vol-signals";
 import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
@@ -80,7 +81,7 @@ type DisplayCandle = {
   /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
   takerBuy?: number;
 };
-type LayerKey = "sr" | "liqvol" | "idm" | "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
+type LayerKey = "sr" | "liqvol" | "idm" | "robot" | "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
 /** Footprint needs individual trades: legible and fetchable only on short frames. */
 const FOOTPRINT_FRAMES = new Set(["1m", "3m", "5m", "15m"]);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -106,6 +107,7 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   sr: true,
   liqvol: true,
   idm: true,
+  robot: true,
   calor: true,
   reversion: true,
   patrones: true,
@@ -132,6 +134,7 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["sr", "NIVELES"],
   ["liqvol", "LIQ+VOL"],
   ["idm", "INDUCCIÓN"],
+  ["robot", "ROBOT MM"],
   ["calor", "CALOR"],
   ["reversion", "REVERSIÓN"],
   ["patrones", "PATRONES"],
@@ -1356,6 +1359,18 @@ export default function LiquidationHeatmapDesk() {
   );
   const idmSt = useMemo(() => idmStats(idms), [idms]);
   const lastIdm = idms.length ? idms.reduce((a, b) => (b.idmIndex > a.idmIndex ? b : a)) : null;
+  // ROBOT MM: studies sweep-and-target-the-liquidity variants on this series
+  // (chosen on the first 60%, validated on the last 40%) and trades on paper
+  // only the one that won in both parts.
+  const mm = useMemo(() => {
+    if (!layers.robot || scalpSeries.length < 200 || !data?.lives?.length) return null;
+    const flush = flushSeries(scalpSeries.map((c) => c.openTime), data.lives);
+    const events = mmEvents(scalpSeries, data.lives, flush);
+    const study = studyMm(scalpSeries, events);
+    const trades: MmTrade[] = study.best ? runMm(scalpSeries, events, study.best.filter) : [];
+    const live = trades.length && trades[trades.length - 1].result === "ABIERTA" ? trades[trades.length - 1] : null;
+    return { study, trades, live };
+  }, [layers.robot, scalpSeries, data]);
   const liveLv: LvTrade | null = lv && lv.trades.length && lv.trades[lv.trades.length - 1].result === "ABIERTA" ? lv.trades[lv.trades.length - 1] : null;
 
   // Who is winning, over the candles in view: from the aggressive-buy volume
@@ -2634,6 +2649,44 @@ export default function LiquidationHeatmapDesk() {
                   );
                 })}
 
+              {/* ROBOT MM: a ring on each paper trade of the approved variant, and
+                  the open one's entry, stop and liquidity target. */}
+              {layers.robot &&
+                mm &&
+                (() => {
+                  const right = MARGIN.left + layout.candleAreaW;
+                  const live = mm.live && mm.live.event.index - patternOffset >= 0 ? mm.live : null;
+                  return (
+                    <g>
+                      {live && (
+                        <g>
+                          <line x1={layout.x(live.event.index - patternOffset)} x2={right} y1={layout.y(live.event.entry)} y2={layout.y(live.event.entry)} className="sc-line entry" />
+                          <line x1={layout.x(live.event.index - patternOffset)} x2={right} y1={layout.y(live.event.stop)} y2={layout.y(live.event.stop)} className="sc-line stop" />
+                          <line x1={layout.x(live.event.index - patternOffset)} x2={right} y1={layout.y(live.target)} y2={layout.y(live.target)} className="sc-line target" />
+                          <text x={right - 4} y={layout.y(live.target) + (live.event.side === "LONG" ? -3 : 10)} className="sc-tag target">ROBOT · OBJETIVO {priceLabel(live.target)} (liquidez)</text>
+                        </g>
+                      )}
+                      {mm.trades
+                        .filter((t) => t.event.index - patternOffset >= 0)
+                        .map((t) => {
+                          const c = patternSeries[t.event.index];
+                          const long = t.event.side === "LONG";
+                          return (
+                            <circle
+                              key={`mm-${t.event.index}`}
+                              cx={layout.x(t.event.index - patternOffset)}
+                              cy={long ? layout.y(c.low) + 22 : layout.y(c.high) - 22}
+                              r={5}
+                              className={`mm-mark ${long ? "up" : "down"} ${t.result === "OBJETIVO" ? "won" : t.result === "ABIERTA" ? "open" : "lost"}`}
+                            >
+                              <title>{`ROBOT MM ${long ? "COMPRA" : "VENTA"} · ${t.result.toLowerCase()}${t.r !== null ? ` · ${t.r >= 0 ? "+" : ""}${t.r.toFixed(2)}R` : ""}`}</title>
+                            </circle>
+                          );
+                        })}
+                    </g>
+                  );
+                })()}
+
               {/* LIQ+VOL: a diamond on each signal candle (filled = reached the
                   target, hollow = stopped or timed out, amber = open), and the
                   open trade's entry, stop and target. */}
@@ -3352,6 +3405,67 @@ export default function LiquidationHeatmapDesk() {
                   ? "FOOTPRINT: cargando operaciones…"
                   : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
             </p>
+          )}
+
+          {layers.robot && (
+            <div className="div-list sc-list mm-list">
+              <h4>ROBOT MM · {timeframe.toUpperCase()} · {mm?.study.best ? "ARMADO EN PAPEL" : "EN ESTUDIO"}</h4>
+              <p className="mm-idea">
+                Piensa como un market maker: espera que el precio barra un máximo o mínimo (donde están los stops y las liquidaciones), que
+                vuelva adentro, y apunta al mayor pool de liquidez que queda del otro lado. Antes de operar se estudia: elige en el 60% más
+                viejo de la historia y comprueba en el 40% más nuevo, que no usó para elegir.
+              </p>
+              {!mm ? (
+                <p className="div-none">Hace falta el mapa de liquidaciones y al menos 200 velas cargadas.</p>
+              ) : (
+                <>
+                  <p className={mm.study.best ? "mm-verdict up" : "mm-verdict warn"}>
+                    {mm.study.best
+                      ? `Aprobada: «${mm.study.best.name}». Ganó en las dos partes (validación: profit factor ${(mm.study.best.outSample.profitFactor ?? 0) === Infinity ? "∞" : (mm.study.best.outSample.profitFactor ?? 0).toFixed(2).replace(".", ",")} en ${mm.study.best.outSample.resolved} operaciones). Opera solo en papel.`
+                      : "Ninguna variante ganó en las dos partes de la historia: en esta moneda y temporalidad el robot no opera. Eso también es un resultado."}
+                  </p>
+                  <div className="mm-table">
+                    <table>
+                      <thead><tr><th>Variante</th><th>Estudio (60%)</th><th>Validación (40%)</th><th></th></tr></thead>
+                      <tbody>
+                        {mm.study.variants.slice(0, 6).map((v) => {
+                          const fmt = (st: typeof v.inSample) =>
+                            st.resolved ? `PF ${st.profitFactor === Infinity ? "∞" : (st.profitFactor ?? 0).toFixed(2).replace(".", ",")} · ${Math.round((st.winRate ?? 0) * 100)}% · ${st.resolved}` : "sin operaciones";
+                          return (
+                            <tr key={v.name} className={v.approved ? "up" : ""}>
+                              <td>{v.name}</td>
+                              <td>{fmt(v.inSample)}</td>
+                              <td>{fmt(v.outSample)}</td>
+                              <td>{v.approved ? "✓" : ""}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {mm.live && (
+                    <p className="mm-verdict up">
+                      SEÑAL ABIERTA (papel): {mm.live.event.side === "LONG" ? "COMPRA" : "VENTA"} en {priceLabel(mm.live.event.entry)} · stop {priceLabel(mm.live.event.stop)} · objetivo {priceLabel(mm.live.target)}.
+                    </p>
+                  )}
+                  {mm.trades.slice(-6).reverse().map((t) => (
+                    <div key={`mmr-${t.event.index}`} className={t.r === null ? "" : t.r > 0 ? "up" : "down"}>
+                      <b>
+                        {t.event.side === "LONG" ? "COMPRA" : "VENTA"} · {priceLabel(t.event.entry)} → {t.result === "ABIERTA" ? "abierta" : t.result.toLowerCase()}
+                        {t.r !== null ? ` · ${t.r >= 0 ? "+" : ""}${t.r.toFixed(2).replace(".", ",")}R` : ""}
+                      </b>
+                      <span>objetivo {priceLabel(t.target)} · liquidez a favor {t.event.imbalance === null ? "—" : t.event.imbalance === Infinity ? "toda" : `${t.event.imbalance.toFixed(1).replace(".", ",")}×`}{t.event.index >= mm.study.split ? " · en la parte de validación" : ""}</span>
+                      <em>hace {scalpSeries.length - 1 - t.event.index} velas</em>
+                    </div>
+                  ))}
+                  <small>
+                    Peor caso primero (si una vela toca stop y objetivo, cuenta el stop), una posición a la vez, comisiones descontadas, sin mirar
+                    el futuro. Con 16 variantes alguna puede salir bien por suerte en el estudio: por eso solo se aprueba si también gana en la
+                    validación. Para operar en real hace falta que se sostenga con más historia; por ahora es papel. No es asesoramiento financiero.
+                  </small>
+                </>
+              )}
+            </div>
           )}
 
           {layers.sr && levels.length > 0 && (
