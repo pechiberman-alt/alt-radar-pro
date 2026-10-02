@@ -34,6 +34,8 @@ import {
 } from "@/lib/footprint";
 import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
+import { keyLevels as supportResistance } from "@/lib/key-levels";
+import { findLvSignals, flushSeries, lvStats, resolveLv, type LvTrade } from "@/lib/liq-vol-signals";
 import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
 import { analyzeTrend, latestBreak, lineAt } from "@/lib/trendlines";
 import { findSweeps, sweepStats } from "@/lib/liquidity-sweeps";
@@ -75,17 +77,31 @@ type DisplayCandle = {
   /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
   takerBuy?: number;
 };
-type LayerKey = "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
+type LayerKey = "sr" | "liqvol" | "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
 /** Footprint needs individual trades: legible and fetchable only on short frames. */
 const FOOTPRINT_FRAMES = new Set(["1m", "3m", "5m", "15m"]);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/** "1 operación" / "3 operaciones" (Spanish plural that plain "+s" gets wrong). */
+const ops = (n: number) => `${n} ${n === 1 ? "operación" : "operaciones"}`;
 const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
+const SIMPLE_KEY = "alt-radar-pro:map-simple:v1";
+/** Candles a LIQ+VOL trade is given to reach its stop or target. */
+const LV_HORIZON = 24;
+/**
+ * What someone starting out sees: price, the nearest floors and ceilings,
+ * where the liquidation fuel sits (the side profile, without the coloured
+ * columns), the trend, volume and one measured setup. Everything else is one
+ * click away, and leaving the mode restores the layers that were on before.
+ */
+const SIMPLE_ON = new Set(["sr", "liqvol", "calor", "tendencia", "volumen"]);
 /**
  * Fewer layers on by default. Order blocks, gaps and Fibonacci are the noisiest
  * and their levels already feed the reversal zones, so a reader who never
  * turns them on still gets their information where it has been cross-checked.
  */
 const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
+  sr: true,
+  liqvol: true,
   calor: true,
   reversion: true,
   patrones: true,
@@ -106,7 +122,11 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   scalp: true,
   reales: true,
 };
+const simpleLayers = (): Record<LayerKey, boolean> =>
+  Object.fromEntries(Object.keys(DEFAULT_LAYERS).map((k) => [k, SIMPLE_ON.has(k)])) as Record<LayerKey, boolean>;
 const LAYER_LABELS: [LayerKey, string][] = [
+  ["sr", "S/R CLAVE"],
+  ["liqvol", "LIQ+VOL"],
   ["calor", "CALOR"],
   ["reversion", "REVERSIÓN"],
   ["patrones", "PATRONES"],
@@ -317,6 +337,7 @@ export default function LiquidationHeatmapDesk() {
   const [symbolQuery, setSymbolQuery] = useState("");
   const [htfPools, setHtfPools] = useState<{ timeframe: string; pools: LiquidityPool[] }[]>([]);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>(DEFAULT_LAYERS);
+  const [simple, setSimple] = useState(false);
   // Deferred read, same as the workspace: the server and the first client
   // paint must agree, so the saved choice is applied right after hydration.
   useEffect(() => {
@@ -324,12 +345,31 @@ export default function LiquidationHeatmapDesk() {
       try {
         const saved = JSON.parse(window.localStorage.getItem(LAYERS_KEY) ?? "null");
         if (saved && typeof saved === "object") setLayers({ ...DEFAULT_LAYERS, ...saved });
+        if (window.localStorage.getItem(SIMPLE_KEY) === "1") setSimple(true);
       } catch {
         // Keep the defaults.
       }
     }, 0);
     return () => window.clearTimeout(t);
   }, []);
+  const toggleSimple = () => {
+    const next = !simple;
+    let nextLayers: Record<LayerKey, boolean> = simpleLayers();
+    try {
+      if (next) {
+        window.localStorage.setItem(`${SIMPLE_KEY}:before`, JSON.stringify(layers));
+      } else {
+        const before = JSON.parse(window.localStorage.getItem(`${SIMPLE_KEY}:before`) ?? "null");
+        nextLayers = before && typeof before === "object" ? { ...DEFAULT_LAYERS, ...before } : DEFAULT_LAYERS;
+      }
+      window.localStorage.setItem(SIMPLE_KEY, next ? "1" : "0");
+      window.localStorage.setItem(LAYERS_KEY, JSON.stringify(nextLayers));
+    } catch {
+      if (!next) nextLayers = DEFAULT_LAYERS;
+    }
+    setSimple(next);
+    setLayers(nextLayers);
+  };
   const toggleLayer = (key: LayerKey) => {
     if (key === "footprint") setVisibleCandles((v) => (layers.footprint ? Math.max(v, 25) : Math.min(v, 12)));
     setLayers((current) => {
@@ -1159,7 +1199,7 @@ export default function LiquidationHeatmapDesk() {
    * footprint mode, where the candles' own price cells need the space.
    */
   const columnImage = useMemo(() => {
-    if (!layers.calor || !layout || !data?.lives?.length || typeof document === "undefined") return null;
+    if (simple || !layers.calor || !layout || !data?.lives?.length || typeof document === "undefined") return null;
     if (layers.footprint && FOOTPRINT_FRAMES.has(timeframe)) return null;
     const times = layout.candles.map((c) => c.time);
     const rows = Math.max(40, Math.min(170, Math.round(layout.plotH / 4)));
@@ -1199,7 +1239,7 @@ export default function LiquidationHeatmapDesk() {
     }
     ctx.putImageData(image, 0, 0);
     return canvas.toDataURL();
-  }, [layers.calor, layers.footprint, layout, data, timeframe, tiers]);
+  }, [simple, layers.calor, layers.footprint, layout, data, timeframe, tiers]);
 
   // Scalping signals run on the whole loaded series, minus its last candle:
   // that one is still forming, and a signal that can appear and vanish while
@@ -1230,6 +1270,22 @@ export default function LiquidationHeatmapDesk() {
     () => scalpStats(scalpSeries, scalpSignals, { horizon: SCALP_HORIZON }),
     [scalpSeries, scalpSignals],
   );
+
+  // Key support and resistance on the closed candles of the loaded series.
+  const levels = useMemo(
+    () => (layers.sr && scalpSeries.length >= 30 ? supportResistance(scalpSeries, { perSide: 3, span: ["1m", "3m", "5m", "15m", "30m"].includes(timeframe) ? 5 : 3 }) : []),
+    [layers.sr, scalpSeries, timeframe],
+  );
+  // LIQ+VOL, with the liquidation model's flush when the model is loaded,
+  // replayed and resolved on this very series: the record is of this coin
+  // and this timeframe, not of a backtest somewhere else.
+  const lv = useMemo(() => {
+    if (!layers.liqvol || scalpSeries.length < 40) return null;
+    const flush = data?.lives?.length ? flushSeries(scalpSeries.map((c) => c.openTime), data.lives) : null;
+    const trades = resolveLv(scalpSeries, findLvSignals(scalpSeries, { flush }), LV_HORIZON);
+    return { trades, stats: lvStats(trades), withModel: Boolean(flush) };
+  }, [layers.liqvol, scalpSeries, data]);
+  const liveLv: LvTrade | null = lv && lv.trades.length && lv.trades[lv.trades.length - 1].result === "ABIERTA" ? lv.trades[lv.trades.length - 1] : null;
 
   // Who is winning, over the candles in view: from the aggressive-buy volume
   // Binance publishes on every kline, so it exists on every timeframe.
@@ -1597,6 +1653,9 @@ export default function LiquidationHeatmapDesk() {
           {/* Layers, as in any charting tool: the map had grown to seven
               overlays at once, and a chart showing everything shows nothing. */}
           <div className="liq-layers" role="group" aria-label="Capas del mapa">
+            <button className={`liq-simple ${simple ? "on" : ""}`} onClick={toggleSimple} aria-pressed={simple} title="Muestra solo lo esencial y explica qué mirar. Al apagarlo vuelven tus capas.">
+              {simple ? "✓ MODO SIMPLE" : "MODO SIMPLE"}
+            </button>
             {LAYER_LABELS.map(([key, label]) => (
               <button key={key} className={layers[key] ? "on" : ""} onClick={() => toggleLayer(key)} aria-pressed={layers[key]}>
                 {label}
@@ -1692,6 +1751,85 @@ export default function LiquidationHeatmapDesk() {
               )}
               <span className={reversalZones.length ? "rev" : "none"}>
                 REVERSIÓN · {reversalZones.filter((z) => z.side === "SOPORTE").length}↑ {reversalZones.filter((z) => z.side === "RESISTENCIA").length}↓
+              </span>
+            </div>
+          )}
+
+          {simple && layout && (
+            <div className="lv-guide">
+              <h4>GUÍA RÁPIDA · {timeframe.toUpperCase()}</h4>
+              <div className="lv-guide-grid">
+                <div>
+                  <b>1 · Dónde está el precio</b>
+                  {(() => {
+                    const r = levels.find((l) => l.kind === "RESISTENCIA");
+                    const sp = levels.find((l) => l.kind === "SOPORTE");
+                    return (
+                      <p>
+                        {r ? <>El <b className="down">techo</b> más cercano está en {priceLabel(r.price)} (+{r.distancePct.toFixed(1).replace(".", ",")}%, el precio giró {r.touches} veces ahí). </> : "No hay un techo claro cerca. "}
+                        {sp ? <>El <b className="up">piso</b> más cercano está en {priceLabel(sp.price)} ({sp.distancePct.toFixed(1).replace(".", ",")}%, {sp.touches} giros). </> : "No hay un piso claro cerca. "}
+                        Cerca de un techo conviene no comprar apurado; cerca de un piso, no vender apurado.
+                      </p>
+                    );
+                  })()}
+                </div>
+                <div>
+                  <b>2 · Hacia dónde tira la liquidez</b>
+                  <p>
+                    Las barras de la derecha muestran dónde quedarían liquidados los que operan apalancados. El precio suele ir a buscar las zonas más cargadas:
+                    {layout.heatmap.topZoneAbove ? <> arriba en {priceLabel(layout.heatmap.topZoneAbove.price)}</> : null}
+                    {layout.heatmap.topZoneAbove && layout.heatmap.topZoneBelow ? " y" : ""}
+                    {layout.heatmap.topZoneBelow ? <> abajo en {priceLabel(layout.heatmap.topZoneBelow.price)}</> : null}. Es una estimación, no un destino seguro.
+                  </p>
+                </div>
+                <div>
+                  <b>3 · La señal LIQ+VOL</b>
+                  {liveLv ? (
+                    <p>
+                      <b className={liveLv.signal.side === "LONG" ? "up" : "down"}>{liveLv.signal.side === "LONG" ? "COMPRA" : "VENTA"}</b> en {priceLabel(liveLv.signal.entry)} · stop {priceLabel(liveLv.signal.stop)} · objetivo {priceLabel(liveLv.signal.target)}. Si toca el stop perdés 1 parte; si llega al objetivo ganás 2.
+                    </p>
+                  ) : (
+                    <p>Ahora no hay señal abierta. Aparece cuando el precio barre un piso o un techo anterior, vuelve adentro y lo hace con volumen fuerte.</p>
+                  )}
+                  {lv && (
+                    <p className={lv.stats.confidence !== "MUESTRA RAZONABLE" ? "warn" : (lv.stats.profitFactor ?? 0) < 1 ? "down" : "up"}>
+                      {lv.stats.confidence !== "MUESTRA RAZONABLE"
+                        ? `En esta moneda y temporalidad hay solo ${ops(lv.stats.resolved)} medida${lv.stats.resolved === 1 ? "" : "s"}: es poco para confiar. Tomalo como práctica.`
+                        : (lv.stats.profitFactor ?? 0) < 1
+                          ? `Acá viene perdiendo (profit factor ${(lv.stats.profitFactor ?? 0).toFixed(2).replace(".", ",")} en ${ops(lv.stats.resolved)}). Mejor no seguirla en esta moneda y temporalidad.`
+                          : `Acá viene ganando (profit factor ${lv.stats.profitFactor === Infinity ? "∞" : (lv.stats.profitFactor ?? 0).toFixed(2).replace(".", ",")} en ${ops(lv.stats.resolved)}). Igual nada garantiza la próxima.`}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <b>4 · Reglas para no quemar la cuenta</b>
+                  <p>Arriesgá como máximo 1% de tu cuenta por operación, poné siempre el stop y calculá el tamaño en DIARIO → CALCULADORA. No es asesoramiento financiero.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {layers.sr && levels.length > 0 && (
+            <div className="liq-pstrip" title="Niveles donde el precio giró varias veces (máximos y mínimos a menos de media ATR cuentan como el mismo nivel). Un nivel para mirar, no una promesa de giro.">
+              {levels.map((l, i) => (
+                <span key={`sr-${i}`} className={l.kind === "RESISTENCIA" ? "down" : "up"}>
+                  {l.kind === "RESISTENCIA" ? "R" : "S"}
+                  {levels.filter((x) => x.kind === l.kind).indexOf(l) + 1} · {priceLabel(l.price)} · {l.touches} toques · {l.strength.toLowerCase()}
+                  {l.flipped ? " · cambió de rol" : ""}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {layers.liqvol && lv && (
+            <div className="liq-pstrip" title="Barrida de un máximo o mínimo previo que cierra de vuelta adentro, con volumen ≥1,5× y liquidaciones barridas sobre el promedio. Medida en esta misma serie, peor caso primero y con comisiones.">
+              <span className={liveLv ? (liveLv.signal.side === "LONG" ? "up" : "down") : "none"}>
+                LIQ+VOL · {liveLv ? `${liveLv.signal.side === "LONG" ? "COMPRA" : "VENTA"} hace ${scalpSeries.length - 1 - liveLv.signal.index} velas` : "sin señal abierta"}
+              </span>
+              <span className={lv.stats.profitFactor === null ? "none" : lv.stats.profitFactor >= 1 ? "up" : "down"}>
+                {lv.stats.winRate === null
+                  ? "sin operaciones resueltas"
+                  : `WR ${Math.round(lv.stats.winRate * 100)}% · PF ${lv.stats.profitFactor === Infinity ? "∞" : (lv.stats.profitFactor ?? 0).toFixed(2)} · ${ops(lv.stats.resolved)} · ${lv.stats.confidence.toLowerCase()}`}
               </span>
             </div>
           )}
@@ -2388,6 +2526,69 @@ export default function LiquidationHeatmapDesk() {
                     );
                   })}
 
+              {/* Key support and resistance: a band per level, labelled at the left. */}
+              {layers.sr &&
+                levels.map((l, i) => {
+                  const right = MARGIN.left + layout.candleAreaW;
+                  const yTop = layout.y(l.high);
+                  const yBot = layout.y(l.low);
+                  if (yBot < MARGIN.top || yTop > MARGIN.top + layout.plotH) return null;
+                  const n = levels.filter((x) => x.kind === l.kind).indexOf(l) + 1;
+                  const res = l.kind === "RESISTENCIA";
+                  return (
+                    <g key={`srb-${i}`} className={`sr-level ${res ? "res" : "sup"} ${l.strength === "DÉBIL" ? "weak" : ""}`}>
+                      <rect x={MARGIN.left} y={Math.min(yTop, yBot)} width={layout.candleAreaW} height={Math.max(2, Math.abs(yBot - yTop))} />
+                      <line x1={MARGIN.left} x2={right} y1={layout.y(l.price)} y2={layout.y(l.price)} />
+                      {/* Past the IMÁN / POOL captions, which sit at the left edge. */}
+                      <text x={MARGIN.left + 118} y={layout.y(l.price) - 3}>
+                        {res ? "R" : "S"}
+                        {n} {priceLabel(l.price)} · {l.touches} toques
+                      </text>
+                    </g>
+                  );
+                })}
+
+              {/* LIQ+VOL: a diamond on each signal candle (filled = reached the
+                  target, hollow = stopped or timed out, amber = open), and the
+                  open trade's entry, stop and target. */}
+              {layers.liqvol &&
+                lv &&
+                (() => {
+                  const right = MARGIN.left + layout.candleAreaW;
+                  const live = liveLv && liveLv.signal.index - patternOffset >= 0 ? liveLv.signal : null;
+                  return (
+                    <g>
+                      {live && (
+                        <g>
+                          <line x1={layout.x(live.index - patternOffset)} x2={right} y1={layout.y(live.entry)} y2={layout.y(live.entry)} className="sc-line entry" />
+                          <line x1={layout.x(live.index - patternOffset)} x2={right} y1={layout.y(live.stop)} y2={layout.y(live.stop)} className="sc-line stop" />
+                          <line x1={layout.x(live.index - patternOffset)} x2={right} y1={layout.y(live.target)} y2={layout.y(live.target)} className="sc-line target" />
+                          <text x={right - 4} y={layout.y(live.entry) - 3} className="sc-tag">LIQ+VOL {live.side === "LONG" ? "COMPRA" : "VENTA"} {priceLabel(live.entry)}</text>
+                          <text x={right - 4} y={live.side === "LONG" ? layout.y(live.stop) + 10 : layout.y(live.stop) - 3} className="sc-tag stop">STOP {priceLabel(live.stop)}</text>
+                          <text x={right - 4} y={live.side === "LONG" ? layout.y(live.target) - 3 : layout.y(live.target) + 10} className="sc-tag target">OBJ {priceLabel(live.target)} · 2R</text>
+                        </g>
+                      )}
+                      {lv.trades
+                        .filter((t) => t.signal.index - patternOffset >= 0)
+                        .map((t) => {
+                          const c = patternSeries[t.signal.index];
+                          const xi = layout.x(t.signal.index - patternOffset);
+                          const long = t.signal.side === "LONG";
+                          const yi = long ? layout.y(c.low) + 12 : layout.y(c.high) - 12;
+                          return (
+                            <path
+                              key={`lv-${t.signal.index}-${t.signal.side}`}
+                              d={`M ${xi} ${yi - 6} l 6 6 l -6 6 l -6 -6 z`}
+                              className={`lv-mark ${long ? "up" : "down"} ${t.result === "OBJETIVO" ? "won" : t.result === "ABIERTA" ? "open" : "lost"}`}
+                            >
+                              <title>{`LIQ+VOL ${long ? "COMPRA" : "VENTA"} · ${t.result.toLowerCase()}${t.r !== null ? ` · ${t.r >= 0 ? "+" : ""}${t.r.toFixed(2)}R` : ""} · volumen ${t.signal.rvol.toFixed(1)}×${t.signal.flushRatio !== null ? ` · liquidaciones ${t.signal.flushRatio.toFixed(1)}×` : ""}`}</title>
+                            </path>
+                          );
+                        })}
+                    </g>
+                  );
+                })()}
+
               {/* Scalping signals: an arrow on the candle that triggered, and for
                   the newest one still inside its horizon, the entry, stop and
                   target it defined — the box a trader would actually place. */}
@@ -3041,6 +3242,62 @@ export default function LiquidationHeatmapDesk() {
                   ? "FOOTPRINT: cargando operaciones…"
                   : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
             </p>
+          )}
+
+          {layers.liqvol && lv && (
+            <div className="div-list sc-list lv-list">
+              <h4>
+                REGISTRO LIQ+VOL · {timeframe.toUpperCase()}
+                {lv.trades.length > 0 && (
+                  <button
+                    className="lv-csv"
+                    onClick={() => {
+                      const rows = lv.trades.map((t) =>
+                        [new Date(t.signal.time).toISOString(), t.signal.side, t.signal.entry, t.signal.stop, t.signal.target, t.result, t.r === null ? "" : t.r.toFixed(3), t.signal.rvol.toFixed(2), t.signal.flushRatio === null ? "" : t.signal.flushRatio.toFixed(2)].join(";"),
+                      );
+                      const blob = new Blob([`\uFEFFfecha;lado;entrada;stop;objetivo;resultado;R;volumen_x;liquidaciones_x\r\n${rows.join("\r\n")}\r\n`], { type: "text/csv;charset=utf-8" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `liqvol-${timeframe}.csv`;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    }}
+                  >
+                    CSV
+                  </button>
+                )}
+              </h4>
+              {lv.trades.length ? (
+                lv.trades
+                  .slice(-12)
+                  .reverse()
+                  .map((t) => (
+                    <div key={`lvr-${t.signal.index}-${t.signal.side}`} className={t.r === null ? "" : t.r > 0 ? "up" : "down"}>
+                      <b>
+                        {t.signal.side === "LONG" ? "COMPRA" : "VENTA"} · {priceLabel(t.signal.entry)} → {t.result === "ABIERTA" ? "abierta" : t.result.toLowerCase()}
+                        {t.r !== null ? ` · ${t.r >= 0 ? "+" : ""}${t.r.toFixed(2).replace(".", ",")}R` : ""}
+                      </b>
+                      <span>
+                        stop {priceLabel(t.signal.stop)} · objetivo {priceLabel(t.signal.target)} · volumen {t.signal.rvol.toFixed(1).replace(".", ",")}×
+                        {t.signal.flushRatio !== null ? ` · liquidaciones ${t.signal.flushRatio.toFixed(1).replace(".", ",")}×` : ""}
+                      </span>
+                      <em>hace {scalpSeries.length - 1 - t.signal.index} velas</em>
+                    </div>
+                  ))
+              ) : (
+                <p className="div-none">Sin señales LIQ+VOL en las velas cargadas.</p>
+              )}
+              <small>
+                Cada operación se mide con las velas que vinieron después: si una vela toca stop y objetivo, cuenta el stop; las que no se
+                resuelven en {LV_HORIZON} velas se cierran a precio de cierre; comisiones descontadas.{" "}
+                {lv.stats.winRate === null
+                  ? "Todavía no hay operaciones resueltas."
+                  : `Resultado: ${plural(lv.stats.wins, "ganadora")} y ${plural(lv.stats.losses, "perdedora")} · win rate ${Math.round(lv.stats.winRate * 100)}% · profit factor ${lv.stats.profitFactor === Infinity ? "∞" : (lv.stats.profitFactor ?? 0).toFixed(2).replace(".", ",")} · total ${lv.stats.totalR >= 0 ? "+" : ""}${lv.stats.totalR.toFixed(1).replace(".", ",")}R.`}{" "}
+                {lv.withModel ? "Usa el mapa de liquidaciones." : "Sin el mapa de liquidaciones cargado: solo barrida y volumen."} El win rate de equilibrio a 2R es 33%. Es
+                una medición, no asesoramiento financiero.
+              </small>
+            </div>
           )}
 
           {layers.scalp && (
