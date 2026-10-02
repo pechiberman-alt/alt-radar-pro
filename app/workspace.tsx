@@ -80,6 +80,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   { id: "futuros", label: "MI CARTERA · FUTUROS", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "bot", label: "BOT DE FUTUROS · PAPEL", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "diario", label: "DIARIO · MI CUENTA REAL", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
+  { id: "desacople", label: "SUBEN SOLAS · DESACOPLE DE BTC", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "dca", label: "DCA", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "configuracion", label: "CONFIGURACIÓN", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
 ];

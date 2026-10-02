@@ -63,3 +63,20 @@ export function onShowSection(cb: (id: string) => void) {
   window.addEventListener(SHOW, handler);
   return () => window.removeEventListener(SHOW, handler);
 }
+
+const MAP_SYMBOL = "alt-radar:map-symbol";
+
+/** Opens a coin on the liquidation map and scrolls to it. */
+export function openInMap(symbol: string) {
+  window.dispatchEvent(new CustomEvent(MAP_SYMBOL, { detail: { symbol } }));
+  showSection("liquidaciones");
+}
+
+export function onMapSymbol(cb: (symbol: string) => void) {
+  const handler = (e: Event) => {
+    const symbol = (e as CustomEvent).detail?.symbol;
+    if (typeof symbol === "string" && /^[A-Z0-9]{2,24}$/.test(symbol)) cb(symbol);
+  };
+  window.addEventListener(MAP_SYMBOL, handler);
+  return () => window.removeEventListener(MAP_SYMBOL, handler);
+}
