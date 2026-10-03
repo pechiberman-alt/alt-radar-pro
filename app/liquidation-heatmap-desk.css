@@ -721,3 +721,7 @@
 .mm-wide>b{font:9px var(--font-mono);letter-spacing:1px;color:#a99cff}
 .mm-coins{margin:4px 0 6px;font:8.5px/1.6 var(--font-mono);color:#9aa7a0}
 .mm-age{font:normal 8px var(--font-mono);color:var(--muted)}
+/* ROBOT MM card: its study block and tables are panels, not two-column rows of
+   .div-list (that rule squeezed them into a thin column). */
+.mm-list>div.mm-wide,.mm-list>div.mm-table{display:block;border-left-width:1px}
+.mm-wide .mm-table{margin-bottom:6px}
