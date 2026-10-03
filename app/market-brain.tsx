@@ -1,5 +1,7 @@
 "use client";
 
+import { everyVisible } from "@/lib/visible-interval";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BRAIN_TIMEFRAMES,
@@ -264,11 +266,11 @@ export default function MarketBrain(props: MarketBrainProps) {
       }
     };
     const delay = setTimeout(() => void load(), 180);
-    const refresh = setInterval(() => void load(true), 60_000);
+    const stopRefresh = everyVisible(() => void load(true), 60_000);
     return () => {
       alive = false;
       clearTimeout(delay);
-      clearInterval(refresh);
+      stopRefresh();
       controller.abort();
     };
   }, [props.symbol, props.venue, publishBrainDerivatives, timeframe]);

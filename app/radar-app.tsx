@@ -37,6 +37,7 @@ import DcaDesk from "./dca-desk";
 import BotDesk from "./bot-desk";
 import DiarioDesk from "./diario-desk";
 import DecouplingDesk from "./decoupling-desk";
+import { everyVisible } from "@/lib/visible-interval";
 import RobotSignalsDesk from "./robot-signals-desk";
 import FuturesDesk from "./futures-desk";
 import FuturesRecorder from "./futures-recorder";
@@ -45,7 +46,7 @@ import SpotDesk from "./spot-desk";
 import SentimentDesk from "./sentiment-desk";
 import SettingsDesk from "./settings-desk";
 import SwingDesk from "./swing-desk";
-import { Collapsible, WelcomeHint, WorkspaceBar, useWorkspace } from "./workspace";
+import { Collapsible, WelcomeHint, WorkspaceBar, useWorkspace, isVisibleSection, useAdvanced } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
 import type { PumpReading } from "@/lib/pump-radar";
 import type { CorrelationInsights } from "./correlation-watch";
@@ -565,6 +566,7 @@ export default function RadarApp() {
   const [structureTrend, setStructureTrend] = useState<AssistantContext["structureTrend"]>(null);
   const { settings, update: updateSettings } = useDashboardSettings();
   const workspace = useWorkspace();
+  const advanced = useAdvanced();
   const profileInterval = TRADING_PROFILES[profile].interval;
 
   const refresh = useCallback(async () => {
@@ -669,10 +671,10 @@ export default function RadarApp() {
 
   useEffect(() => {
     const boot = window.setTimeout(refresh, 0);
-    const interval = window.setInterval(refresh, 30_000);
+    const stopPolling = everyVisible(refresh, 30_000);
     return () => {
       window.clearTimeout(boot);
-      window.clearInterval(interval);
+      stopPolling();
     };
   }, [refresh]);
 
@@ -721,10 +723,10 @@ export default function RadarApp() {
       }
     };
     const boot = window.setTimeout(load, 200);
-    const interval = window.setInterval(load, 120_000);
+    const stopPolling = everyVisible(load, 120_000);
     return () => {
       window.clearTimeout(boot);
-      window.clearInterval(interval);
+      stopPolling();
     };
   }, []);
 
@@ -913,7 +915,7 @@ export default function RadarApp() {
           </div>
         </div>
         <nav className="desktop-nav" aria-label="Navegación principal">
-          {NAV_ITEMS.map(({ label, id }) => (
+          {NAV_ITEMS.filter(({ id }) => isVisibleSection(id, advanced)).map(({ label, id }) => (
             <button
               key={label}
               className={tab === label ? "active" : ""}
@@ -1322,7 +1324,7 @@ export default function RadarApp() {
       )}
 
       <nav className="mobile-nav" aria-label="Navegación móvil">
-        {NAV_ITEMS.map(({ label, mobile, icon, id }) => (
+        {NAV_ITEMS.filter(({ id }) => isVisibleSection(id, advanced)).map(({ label, mobile, icon, id }) => (
           <button
             key={label}
             className={tab === label ? "active" : ""}
