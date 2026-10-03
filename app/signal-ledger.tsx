@@ -262,8 +262,14 @@ export default function SignalLedger({
 
   useEffect(() => {
     const boot = window.setTimeout(syncNow, 600);
-    const readInterval = window.setInterval(loadLedger, 60_000);
-    const syncInterval = window.setInterval(syncNow, 5 * 60_000);
+    // Each read is a scan of the ledger in D1 (cached 5 min on the server):
+    // every 5 minutes to read, every 15 to re-grade, never while hidden.
+    const readInterval = window.setInterval(() => {
+      if (!document.hidden) void loadLedger();
+    }, 5 * 60_000);
+    const syncInterval = window.setInterval(() => {
+      if (!document.hidden) void syncNow();
+    }, 15 * 60_000);
     return () => {
       window.clearTimeout(boot);
       window.clearInterval(readInterval);

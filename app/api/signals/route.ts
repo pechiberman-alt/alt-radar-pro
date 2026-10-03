@@ -1,10 +1,7 @@
 import { ensureSignalPlanColumns, getPlanStatsCached } from "@/lib/signal-plan-db";
 import { env } from "cloudflare:workers";
-import {
-  ensureSignalSchema,
-  runSignalAutomation,
-  syncOpenSignals,
-} from "@/lib/automation";
+import { ensureSignalSchema, syncOpenSignals } from "@/lib/automation";
+import { dropShared, sharedJson } from "@/lib/shared-cache";
 import type {
   LedgerPayload,
   LedgerStats,
@@ -212,7 +209,8 @@ async function readLedger(): Promise<LedgerPayload> {
 
 export async function GET() {
   try {
-    return Response.json(await readLedger(), {
+    // Two scans of the ledger per read: shared by every tab for 5 minutes.
+    return Response.json(await sharedJson("ledger", 300, readLedger), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
@@ -243,10 +241,12 @@ export async function POST(request: Request) {
       } | null;
       syncOnly = payload?.mode === "sync" || payload?.mode === "browser";
     }
-    const automation = syncOnly
-      ? await syncOpenSignals(env.DB)
-      : await runSignalAutomation(env.DB);
-    const ledger = await readLedger();
+    // The confluence engine no longer opens signals (3/10/2026): whatever a
+    // caller asks, this only re-grades the open ones.
+    void syncOnly;
+    const automation = await syncOpenSignals(env.DB);
+    await Promise.all([dropShared("ledger"), dropShared("performance")]);
+    const ledger = await sharedJson("ledger", 300, readLedger);
     return Response.json({ ...ledger, run: automation });
   } catch (error) {
     console.error("[ALT_RADAR_AUTOMATION]", error);
