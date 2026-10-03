@@ -517,6 +517,17 @@ export async function runSignalAutomation(
  * browser can ask for is this: re-check the open signals against prices the
  * server fetches itself.
  */
+/**
+ * Closes what is still open — signals against current prices, then their
+ * stop/target plans — without opening anything new. What the cron runs now that
+ * the confluence and scalping engines are off.
+ */
+export async function windDownSignals(db: D1Database) {
+  const result = await syncOpenSignals(db);
+  await evaluatePlansSafely(db, Date.now());
+  return result;
+}
+
 export async function syncOpenSignals(db: D1Database): Promise<AutomationResult> {
   await ensureSignalSchema(db);
   const now = new Date();

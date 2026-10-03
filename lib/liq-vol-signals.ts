@@ -63,6 +63,11 @@ function ratioToRecent(values: number[], i: number, window: number, min = window
   return mean > 0 ? (values[i] ?? 0) / mean : null;
 }
 
+/** Liquidations flushed by candle i on the side a signal would sweep, over its recent average; null when unknown. */
+export function flushRatioAt(flush: FlushSeries, side: LvSide, i: number): number | null {
+  return ratioToRecent(side === "LONG" ? flush.long : flush.short, i, 50, 20);
+}
+
 export function findLvSignals(candles: SwingCandle[], options: LvOptions & { flush?: FlushSeries | null } = {}): LvSignal[] {
   const span = options.span ?? 3;
   const maxWait = options.maxWait ?? 80;

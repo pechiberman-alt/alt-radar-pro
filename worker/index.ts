@@ -3,9 +3,8 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import { getSecret } from "../lib/app-settings";
 import { runTelegramDispatch } from "../lib/telegram-dispatch";
 import handler from "vinext/server/app-router-entry";
-import { runSignalAutomation } from "../lib/automation";
+import { windDownSignals } from "../lib/automation";
 import { archiveCoreLiquidity } from "../lib/liquidity-archive";
-import { runScalpingAutomation } from "../lib/scalping-automation";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
 
@@ -105,9 +104,12 @@ const worker = {
     }
     if (controller.cron === "*/15 * * * *") {
       ctx.waitUntil(
-        runSignalAutomation(env.DB).catch((error) => {
+        // The confluence and scalping engines no longer open signals (Uri,
+        // 3/10/2026: measured, they were losing; signals now come only from the
+        // ROBOT MM). This only closes the ones still open — stop, targets,
+        // plans — and becomes a no-op once there are none.
+        windDownSignals(env.DB).catch((error) => {
           console.error("[ALT_RADAR_SCHEDULED]", error);
-          // The next scheduled run retries automatically. No synthetic records are written.
         }),
       );
       ctx.waitUntil(
@@ -126,14 +128,7 @@ const worker = {
           }),
       );
     }
-    if (controller.cron === "*/5 * * * *") {
-      ctx.waitUntil(
-        runScalpingAutomation(env.DB).catch((error) => {
-          console.error("[ALT_RADAR_SCALPING_SCHEDULED]", error);
-          // No record is created when public market data is unavailable.
-        }),
-      );
-    }
+    // Scalping automation: switched off with the confluence engine (see above).
   },
 };
 

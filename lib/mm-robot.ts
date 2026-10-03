@@ -1,4 +1,4 @@
-import { findLvSignals, lvStats, type FlushSeries, type LvStats } from "./liq-vol-signals.ts";
+import { findLvSignals, flushRatioAt, lvStats, type FlushSeries, type LvStats } from "./liq-vol-signals.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
 /**
@@ -91,7 +91,10 @@ function ema(values: number[], n: number): number[] {
 
 /** Every sweep-and-reclaim, with the liquidity picture at that moment. Filters come later. */
 export function mmEvents(candles: SwingCandle[], levels: LiveLevel[], flush: FlushSeries | null): MmEvent[] {
-  const base = findLvSignals(candles, { flush, minRvol: 0, minFlushRatio: 0 });
+  // Every sweep counts; an unknown liquidation reading only matters to the
+  // variants that require liquidations (it then fails that filter), it must
+  // not erase the sweep for all the others.
+  const base = findLvSignals(candles, { minRvol: 0 });
   const trend = ema(candles.map((c) => c.close), 100);
   return base.map((s) => {
     const liq = liquidityAt(levels, s.time, s.entry);
@@ -101,7 +104,8 @@ export function mmEvents(candles: SwingCandle[], levels: LiveLevel[], flush: Flu
     const i = s.index;
     const slope = i >= 10 ? trend[i] - trend[i - 10] : 0;
     return {
-      index: i, time: s.time, side: s.side, entry: s.entry, stop: s.stop, risk: s.risk, rvol: s.rvol, flushRatio: s.flushRatio,
+      index: i, time: s.time, side: s.side, entry: s.entry, stop: s.stop, risk: s.risk, rvol: s.rvol,
+      flushRatio: flush ? flushRatioAt(flush, s.side, i) : null,
       above: liq.above, below: liq.below,
       imbalance: same > 0 ? target / same : target > 0 ? Infinity : null,
       pool: long ? liq.poolAbove : liq.poolBelow,

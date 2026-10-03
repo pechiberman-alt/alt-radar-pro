@@ -37,8 +37,9 @@ import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSource } from "@/lib/level-engine";
 import type { SwingCandle } from "@/lib/swing-entries";
 import { findInducements, idmStats } from "@/lib/inducement";
-import { mmEvents, runMm, studyMm, studyMmPooled, type MmFilter, type MmTrade } from "@/lib/mm-robot";
+import { mmEvents, runMm, studyMm, studyMmPooled, type MmTrade } from "@/lib/mm-robot";
 import { eligible } from "@/lib/decoupling";
+import { MM_WIDE_KEY, MM_WIDE_TTL, type WideSummary, type WideVariant } from "@/lib/robot-signals";
 import type { LvStats } from "@/lib/liq-vol-signals";
 import { onMapSymbol } from "@/lib/account-events";
 import { findLvSignals, flushSeries, lvStats, resolveLv, type LvTrade } from "@/lib/liq-vol-signals";
@@ -91,19 +92,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const ops = (n: number) => `${n} ${n === 1 ? "operación" : "operaciones"}`;
 const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
 const SIMPLE_KEY = "alt-radar-pro:map-simple:v1";
-const WIDE_KEY = "alt-radar-pro:mm-wide:v1";
-/** A wide study is trusted for a week; markets change. */
-const WIDE_TTL = 7 * 86_400_000;
-type WideVariant = { name: string; filter: MmFilter; approved: boolean; inSample: LvStats; outSample: LvStats; breadth: { tested: number; positive: number } };
-type WideSummary = {
-  timeframe: string;
-  at: number;
-  coins: number;
-  events: number;
-  best: WideVariant | null;
-  variants: WideVariant[];
-  perCoin: { symbol: string; trades: number; totalR: number }[];
-};
+const WIDE_KEY = MM_WIDE_KEY;
+const WIDE_TTL = MM_WIDE_TTL;
 /** Candles a LIQ+VOL trade is given to reach its stop or target. */
 const LV_HORIZON = 24;
 /**
@@ -426,6 +416,8 @@ export default function LiquidationHeatmapDesk() {
         const next = { ...prev, [tf]: summary };
         try {
           window.localStorage.setItem(WIDE_KEY, JSON.stringify(next));
+          // The SEÑALES panel listens for this and starts scanning with the new study.
+          window.setTimeout(() => window.dispatchEvent(new Event("alt-radar:mm-wide")), 0);
         } catch {
           // kept for this session only
         }

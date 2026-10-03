@@ -1,0 +1,12 @@
+/* SEÑALES · ROBOT MM */
+.rs-frames{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.rs-frames span{padding:3px 8px;font:9px var(--font-mono);border:1px solid var(--line);border-radius:3px}
+.rs-frames .up{color:#7df5bd;border-color:#1f4d38}.rs-frames .warn{color:#f0c060;border-color:#5a4a1e}
+.rs-empty{padding:10px 12px;background:#0a110d;border:1px solid var(--line);border-left:3px solid #f0c060;border-radius:4px}
+.rs-empty p{margin:0 0 8px;font:11px/1.6 system-ui,sans-serif;color:#c4d0c9}
+.rs-list{display:grid;gap:6px}
+.rs-list>div{display:grid;grid-template-columns:auto auto 1fr auto;gap:10px;align-items:center;padding:8px 10px;background:#0a110d;border:1px solid var(--line);border-radius:4px;font:10px var(--font-mono);color:#c4d0c9}
+.rs-list>div.up{border-left:3px solid #39f29a}.rs-list>div.down{border-left:3px solid #ff5964}
+.rs-list em{font-style:normal;color:var(--muted)}
+.rs-meta{margin:10px 0 4px;font:9px var(--font-mono);color:var(--muted)}
+@media (max-width:640px){.rs-list>div{grid-template-columns:1fr 1fr}.rs-list span{grid-column:1/-1}}
