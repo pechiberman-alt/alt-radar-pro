@@ -716,3 +716,8 @@
 .mm-table th{padding:5px 6px;text-align:left;font-weight:normal;color:var(--muted);border-bottom:1px solid var(--line)}
 .mm-table td{padding:5px 6px;border-bottom:1px solid #141e19}
 .mm-table tr.up td{color:#7df5bd}
+
+.mm-wide{margin:6px 0 10px;padding:9px 10px;background:#0c1511;border:1px solid #2a4a3a;border-radius:4px}
+.mm-wide>b{font:9px var(--font-mono);letter-spacing:1px;color:#a99cff}
+.mm-coins{margin:4px 0 6px;font:8.5px/1.6 var(--font-mono);color:#9aa7a0}
+.mm-age{font:normal 8px var(--font-mono);color:var(--muted)}

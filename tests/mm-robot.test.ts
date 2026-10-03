@@ -97,3 +97,44 @@ test("events carry the liquidity picture of their own moment", () => {
   assert.equal(e.imbalance, 6.5);
   assert.ok(e.pool !== null && Math.abs(e.pool - 103) < 0.3);
 });
+
+import { studyMmPooled } from "../lib/mm-robot.ts";
+
+/** A coin whose trades all win (or all lose), one every 10 candles, split 60/40 like the study. */
+function coin(symbol: string, outcome: "win" | "lose" | "winThenLose", n = 400) {
+  const c = flat(n);
+  const events: MmEvent[] = [];
+  for (let i = 5; i < n - 5; i += 10) {
+    events.push(ev({ index: i, pool: null }));
+    const win = outcome === "win" || (outcome === "winThenLose" && i < n * 0.6);
+    c[i + 1] = win ? { ...c[i + 1], high: 102.5 } : { ...c[i + 1], low: 98.5 };
+  }
+  return { symbol, candles: c, events };
+}
+
+test("pooled study: trades of every coin add up, each coin split on its own", () => {
+  const s = studyMmPooled([coin("A", "win"), coin("B", "win"), coin("C", "lose")], { minIn: 10, minOut: 5 });
+  const v = s.variants.find((x) => x.name === "solo barrida")!;
+  assert.equal(v.inSample.resolved, 24 * 3);
+  assert.equal(v.outSample.resolved, 15 * 3);
+  assert.deepEqual(v.perCoin.map((p) => [p.symbol, p.outSample.wins, p.outSample.losses]), [["A", 15, 0], ["B", 15, 0], ["C", 0, 15]]);
+  assert.deepEqual(v.breadth, { tested: 3, positive: 2 });
+  assert.equal(v.approved, true, "two of three coins win in validation and the pool makes money");
+  assert.equal(s.events, 39 * 3);
+});
+
+test("pooled study: one lucky coin carrying the pool is not enough", () => {
+  // One coin wins big, three lose: the pool can still look fine, breadth says no.
+  const big = coin("A", "win");
+  big.events = big.events.map((e) => ({ ...e, pool: 104 }));
+  big.candles = big.candles.map((c, i) => (big.events.some((e) => e.index + 1 === i) ? { ...c, high: 104.5 } : c));
+  const s = studyMmPooled([big, coin("B", "lose"), coin("C", "lose"), coin("D", "lose")], { minIn: 10, minOut: 5 });
+  const v = s.variants.find((x) => x.name === "solo barrida")!;
+  assert.ok((v.outSample.profitFactor ?? 0) < 1.1 || v.breadth.positive * 2 < v.breadth.tested);
+  assert.equal(v.approved, false);
+});
+
+test("pooled study: what only worked in the older part is rejected; too few trades is rejected", () => {
+  assert.equal(studyMmPooled([coin("A", "winThenLose"), coin("B", "winThenLose")], { minIn: 10, minOut: 5 }).best, null);
+  assert.equal(studyMmPooled([coin("A", "win")]).best, null, "defaults need 40 + 20 trades");
+});

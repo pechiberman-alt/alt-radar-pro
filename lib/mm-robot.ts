@@ -184,3 +184,50 @@ export function studyMm(candles: SwingCandle[], events: MmEvent[], opts: { minIn
   variants.sort((a, b) => Number(b.approved) - Number(a.approved) || (b.approved ? (b.outSample.expectancyR ?? -9) - (a.outSample.expectancyR ?? -9) : (b.inSample.expectancyR ?? -9) - (a.inSample.expectancyR ?? -9)));
   return { split, variants, best: variants[0]?.approved ? variants[0] : null };
 }
+
+export type CoinStudyInput = { symbol: string; candles: SwingCandle[]; events: MmEvent[] };
+export type CoinResult = { symbol: string; inSample: LvStats; outSample: LvStats };
+export type PooledVariant = MmVariant & {
+  perCoin: CoinResult[];
+  /** Coins with at least 2 validation trades, and how many of them made money there. */
+  breadth: { tested: number; positive: number };
+};
+export type PooledStudy = { coins: number; events: number; variants: PooledVariant[]; best: PooledVariant | null };
+
+/**
+ * The same study over several coins at once. Each coin is split on its own
+ * (oldest 60% to choose, newest 40% to validate) and the trades of all coins
+ * are pooled. On top of making money in both parts, a variant must make money
+ * in the validation part on at least half of the coins that traded it: a
+ * result carried by one lucky coin is not a robot.
+ */
+export function studyMmPooled(coins: CoinStudyInput[], opts: { minIn?: number; minOut?: number } = {}): PooledStudy {
+  const minIn = opts.minIn ?? 40;
+  const minOut = opts.minOut ?? 20;
+  const variants: PooledVariant[] = [];
+  for (let m = 0; m < 16; m += 1) {
+    const filter = { vol: Boolean(m & 1), flush: Boolean(m & 2), imbalance: Boolean(m & 4), trend: Boolean(m & 8) };
+    const allIn: MmTrade[] = [];
+    const allOut: MmTrade[] = [];
+    const perCoin: CoinResult[] = [];
+    for (const c of coins) {
+      const split = Math.floor(c.candles.length * 0.6);
+      const tin = runMm(c.candles, c.events, filter, { to: split });
+      const tout = runMm(c.candles, c.events, filter, { from: split });
+      allIn.push(...tin);
+      allOut.push(...tout);
+      perCoin.push({ symbol: c.symbol, inSample: lvStats(tin), outSample: lvStats(tout) });
+    }
+    const inSample = lvStats(allIn);
+    const outSample = lvStats(allOut);
+    const tested = perCoin.filter((p) => p.outSample.resolved >= 2);
+    const breadth = { tested: tested.length, positive: tested.filter((p) => p.outSample.totalR > 0).length };
+    const approved =
+      inSample.resolved >= minIn && (inSample.profitFactor ?? 0) >= 1.2 &&
+      outSample.resolved >= minOut && (outSample.profitFactor ?? 0) >= 1.1 && (outSample.expectancyR ?? 0) > 0 &&
+      breadth.tested > 0 && breadth.positive * 2 >= breadth.tested;
+    variants.push({ filter, name: filterName(filter), inSample, outSample, approved, perCoin, breadth });
+  }
+  variants.sort((a, b) => Number(b.approved) - Number(a.approved) || (b.approved ? (b.outSample.expectancyR ?? -9) - (a.outSample.expectancyR ?? -9) : (b.inSample.expectancyR ?? -9) - (a.inSample.expectancyR ?? -9)));
+  return { coins: coins.length, events: coins.reduce((s, c) => s + c.events.length, 0), variants, best: variants[0]?.approved ? variants[0] : null };
+}
