@@ -40,6 +40,7 @@ import "./futures-desk.css";
 import "./bot-desk.css";
 import "./diario-desk.css";
 import "./decoupling-desk.css";
+import "./robot-signals-desk.css";
 import "./spot-desk.css";
 import "./sentiment-desk.css";
 import "./settings-desk.css";

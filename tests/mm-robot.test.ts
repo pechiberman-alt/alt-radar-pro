@@ -138,3 +138,15 @@ test("pooled study: what only worked in the older part is rejected; too few trad
   assert.equal(studyMmPooled([coin("A", "winThenLose"), coin("B", "winThenLose")], { minIn: 10, minOut: 5 }).best, null);
   assert.equal(studyMmPooled([coin("A", "win")]).best, null, "defaults need 40 + 20 trades");
 });
+
+test("a sweep with no liquidation reading still counts; only the liquidation variants drop it", () => {
+  const c: SwingCandle[] = Array.from({ length: 80 }, (_, i) => ({ openTime: i, open: 100, high: 100.5, low: 99.5, close: 100.2, volume: i === 45 ? 400 : 100, quoteVolume: 0 }));
+  c[35] = { ...c[35], low: 98 };
+  c[45] = { ...c[45], open: 99.3, high: 99.6, low: 97.5, close: 99 };
+  const zeros = { long: new Array(80).fill(0), short: new Array(80).fill(0) };
+  const [e] = mmEvents(c, [], zeros);
+  assert.ok(e, "the sweep is kept");
+  assert.equal(e.flushRatio, null);
+  assert.equal(passes(e, { vol: false, flush: true, imbalance: false, trend: false }), false);
+  assert.equal(passes(e, { vol: true, flush: false, imbalance: false, trend: false }), true);
+});

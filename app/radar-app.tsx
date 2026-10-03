@@ -7,7 +7,6 @@ const ENRICHMENT_INTERVAL_MS = 150_000;
 import type { RadarPayload, ScoredAsset } from "@/lib/radar";
 import {
   altseasonScore,
-  diagnoseSignals,
   globalRisk,
   rotation,
   scoreAssets,
@@ -15,7 +14,6 @@ import {
 import { useDashboardSettings } from "./dashboard-settings";
 import LiveBookmap, { type BookmapBrainReadings } from "./live-bookmap";
 import SignalLedger from "./signal-ledger";
-import ScalpingDesk from "./scalping-desk";
 import CompareChart from "./compare-chart";
 import CorrelationWatch from "./correlation-watch";
 import PumpRadar from "./pump-radar";
@@ -39,6 +37,7 @@ import DcaDesk from "./dca-desk";
 import BotDesk from "./bot-desk";
 import DiarioDesk from "./diario-desk";
 import DecouplingDesk from "./decoupling-desk";
+import RobotSignalsDesk from "./robot-signals-desk";
 import FuturesDesk from "./futures-desk";
 import FuturesRecorder from "./futures-recorder";
 import PortfolioRisk from "./portfolio-risk";
@@ -76,7 +75,6 @@ const STABLE_BASES = new Set([
 const NAV_ITEMS = [
   { label: "RESUMEN", mobile: "INICIO", icon: "⌂", id: "resumen" },
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
-  { label: "SCALPING", mobile: "SCALP", icon: "↯", id: "scalping" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
   { label: "LIQUIDACIONES", mobile: "MAPA", icon: "▨", id: "liquidaciones" },
   { label: "OFERTA PENDIENTE", mobile: "OFERTA", icon: "◷", id: "desbloqueos" },
@@ -838,16 +836,6 @@ export default function RadarApp() {
     [allScored, universeSymbols],
   );
   const rotationState = useMemo(() => rotation(data?.market ?? []), [data]);
-  const diagnostic = useMemo(
-    () =>
-      diagnoseSignals(scored, {
-        watch: settings.watch,
-        setup: settings.setup,
-        trigger: settings.trigger,
-        minimumQuoteVolume: settings.minimumQuoteVolume,
-      }),
-    [scored, settings],
-  );
   const active = scored.filter((asset) => asset.signal !== "NO SIGNAL").slice(0, 6);
   const scannerRows = (assetSearch
     ? allScored.filter((asset) => asset.symbol.includes(assetSearch))
@@ -1077,107 +1065,8 @@ export default function RadarApp() {
           </section>
         </Collapsible>
 
-        <Collapsible id="inteligencia" label="SEÑALES" open={workspace.open["inteligencia"]} onToggle={workspace.toggle}>
-        <section className="signals-section" id="inteligencia">
-            <div className="section-head">
-              <div><p className="eyebrow">MOTOR DE CONFLUENCIA</p><h2>Inteligencia activa</h2></div>
-              <span>
-                {active.length
-                  ? `${active.length} CONFIGURACIONES CALIFICADAS`
-                  : "SIN SEÑALES DE ALTA CONVICCIÓN"}
-              </span>
-            </div>
-            {active.length ? (
-              <div className="signal-cards">
-                {active.slice(0, 3).map((asset) => (
-                  <button
-                    className={asset.riskAdvisory ? "signal-card risk-flagged" : "signal-card"}
-                    key={asset.symbol}
-                    onClick={() => setSelected(asset)}
-                  >
-                    <div>
-                      <span className={`signal-pill ${asset.signal.toLowerCase()}`}>{asset.signal}</span>
-                      <span className={`side-pill ${asset.side.toLowerCase()}`}>{asset.side}</span>
-                      <small>{assetName(asset.symbol)}/USDT · 15M/1H</small>
-                    </div>
-                    {asset.riskAdvisory && (
-                      <span className="risk-flag">⚠ CONTEXTO MACRO EXTREMO</span>
-                    )}
-                    <strong>{asset.score}<em>/100</em></strong>
-                    <p>
-                      {asset.reasons
-                        .filter((reason) => reason.points >= 10)
-                        .slice(0, 4)
-                        .map((reason) => <span key={reason.label}>✓ {reason.label}</span>)}
-                    </p>
-                    <div>
-                      <b>{percentage(asset.change24h)} <small>24H</small></b>
-                      <b>{asset.liquidity} <small>LIQUIDEZ</small></b>
-                      <i>VER TRAZA →</i>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="no-signals">
-                <div>◎</div><h3>SIN SEÑALES DE ALTA CONVICCIÓN</h3>
-                <p>El cerebro está monitoreando. No fabricará operaciones sin confirmaciones independientes.</p>
-                {diagnostic.topScore !== null && (
-                  <div className="signal-diagnostic">
-                    <p className="diagnostic-title">POR QUÉ NO HAY SEÑALES AHORA</p>
-                    <div className="diagnostic-grid">
-                      <div>
-                        <span>MEJOR CANDIDATO</span>
-                        <b>
-                          {assetName(diagnostic.topSymbol ?? "")} · {diagnostic.topScore}/100
-                        </b>
-                      </div>
-                      <div>
-                        <span>LE FALTA PARA WATCH</span>
-                        <b>{diagnostic.pointsToWatch} PUNTOS</b>
-                      </div>
-                      <div>
-                        <span>COBERTURA 1H + 4H</span>
-                        <b
-                          className={
-                            diagnostic.partialDataPct > 50 ? "negative" : undefined
-                          }
-                        >
-                          {(100 - diagnostic.partialDataPct).toFixed(0)}% DEL UNIVERSO
-                        </b>
-                      </div>
-                    </div>
-                    {diagnostic.blockers.length > 0 && (
-                      <div className="diagnostic-blockers">
-                        {diagnostic.blockers.map((blocker) => (
-                          <span key={blocker.label}>
-                            {blocker.label} <em>{blocker.count}/20</em>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {diagnostic.partialDataPct > 50 && (
-                      <p className="diagnostic-warning">
-                        Más de la mitad del universo no tiene confirmación 1H/4H. Esto es una
-                        limitación de datos, no una lectura de mercado: los scores están
-                        penalizados por información incompleta.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-        </Collapsible>
-
-        <Collapsible id="scalping" label="SCALPING" open={workspace.open["scalping"]} onToggle={workspace.toggle}>
-  <ScalpingDesk
-            market={data.market}
-            riskScore={risk.score}
-            killSwitch={risk.killSwitch}
-            altseasonScore={altseason.final}
-            minimumQuoteVolume={settings.minimumQuoteVolume}
-          />
+        <Collapsible id="inteligencia" label="SEÑALES · ROBOT MM" open={workspace.open["inteligencia"]} onToggle={workspace.toggle}>
+          <RobotSignalsDesk />
         </Collapsible>
 
         <Collapsible id="pumpeo" label="PUMPEO" open={workspace.open["pumpeo"]} onToggle={workspace.toggle}>
