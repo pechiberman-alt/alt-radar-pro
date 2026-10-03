@@ -9,6 +9,10 @@ import {
   type PumpReading,
   type PumpStage,
 } from "@/lib/pump-radar";
+import { pumpPlan, type PumpPlan } from "@/lib/pump-plan";
+
+/** A reading with its trade plan for the stage. */
+type Reading = PumpReading & { plan: PumpPlan | null };
 import { fetchKlineRows } from "./binance-klines";
 
 type Props = {
@@ -65,7 +69,37 @@ function MetricBar({ label, value, cap }: { label: string; value: number; cap: n
   );
 }
 
-function PumpCard({ reading }: { reading: PumpReading }) {
+const pctFrom = (from: number, to: number) => `${to >= from ? "+" : ""}${(((to - from) / from) * 100).toFixed(1).replace(".", ",")}%`;
+
+function PlanBox({ plan }: { plan: PumpPlan }) {
+  const { entry, stop } = plan;
+  const r = entry !== null && stop !== null ? entry - stop : null;
+  return (
+    <div className={`pump-plan ${plan.action === "NO ENTRAR" ? "no" : plan.action === "ENTRADA" ? "go" : ""}`}>
+      <b>PLAN · {plan.action}</b>
+      {entry !== null && stop !== null && r !== null && (
+        <div className="pump-plan-rows">
+          <span>
+            ENTRADA {plan.orderType === "stop" ? "(compra stop)" : plan.orderType === "limit" ? "(compra límite)" : "(al precio)"} <b>{formatPrice(entry)}</b>
+          </span>
+          <span>
+            STOP <b>{formatPrice(stop)}</b> <em>{pctFrom(entry, stop)}</em>
+          </span>
+          {plan.targets.map((t, i) => (
+            <span key={i}>
+              TP{i + 1} <b>{formatPrice(t)}</b> <em>{pctFrom(entry, t)} · {((t - entry) / r).toFixed(1).replace(".", ",")}R</em>
+            </span>
+          ))}
+        </div>
+      )}
+      <small>
+        {plan.note} Plan por reglas, todavía sin medir con historia: arriesgá como máximo 1% y calculá el tamaño en DIARIO → CALCULADORA.
+      </small>
+    </div>
+  );
+}
+
+function PumpCard({ reading }: { reading: Reading }) {
   const { metrics } = reading;
   return (
     <article className={`pump-card stage-${STAGE_ORDER[reading.stage]}`}>
@@ -123,6 +157,8 @@ function PumpCard({ reading }: { reading: PumpReading }) {
 
       <p className="pump-note">{STAGE_NOTE[reading.stage]}</p>
 
+      {reading.plan && <PlanBox plan={reading.plan} />}
+
       {reading.reasons.length > 0 && (
         <div className="pump-reasons">
           {reading.reasons.map((reason) => (
@@ -142,7 +178,7 @@ function PumpCard({ reading }: { reading: PumpReading }) {
 }
 
 export default function PumpRadar({ market, minimumQuoteVolume, onReadings }: Props) {
-  const [readings, setReadings] = useState<PumpReading[]>([]);
+  const [readings, setReadings] = useState<Reading[]>([]);
   const [scanned, setScanned] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -178,7 +214,8 @@ export default function PumpRadar({ market, minimumQuoteVolume, onReadings }: Pr
       const settled = await Promise.allSettled(
         candidates.map(async (candidate) => {
           const candles = await fetchKlines(candidate.asset.symbol);
-          return analyzePump(candidate.asset, candles);
+          const reading = analyzePump(candidate.asset, candles);
+          return reading ? { ...reading, plan: pumpPlan(reading.stage, candles) } : null;
         }),
       );
       if (runId.current !== id) return;
