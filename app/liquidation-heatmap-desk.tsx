@@ -37,6 +37,7 @@ import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSource } from "@/lib/level-engine";
 import type { SwingCandle } from "@/lib/swing-entries";
 import { findInducements, idmStats } from "@/lib/inducement";
+import { readPreBreak, replayPreBreakout } from "@/lib/pre-breakout";
 import { mmEvents, runMm, studyMm, studyMmPooled, type MmTrade } from "@/lib/mm-robot";
 import { eligible } from "@/lib/decoupling";
 import { MM_WIDE_KEY, MM_WIDE_TTL, type WideSummary, type WideVariant } from "@/lib/robot-signals";
@@ -1439,6 +1440,9 @@ export default function LiquidationHeatmapDesk() {
     const live = trades.length && trades[trades.length - 1].result === "ABIERTA" ? trades[trades.length - 1] : null;
     return { study, trades, live, active };
   }, [layers.robot, scalpSeries, data, wide]);
+  // A PUNTO DE ROMPER for this coin, and how often it was followed by a big move here.
+  const pre = useMemo(() => (scalpSeries.length >= 80 ? readPreBreak(scalpSeries) : null), [scalpSeries]);
+  const preReplay = useMemo(() => (scalpSeries.length >= 200 ? replayPreBreakout(scalpSeries) : null), [scalpSeries]);
   const liveLv: LvTrade | null = lv && lv.trades.length && lv.trades[lv.trades.length - 1].result === "ABIERTA" ? lv.trades[lv.trades.length - 1] : null;
 
   // Who is winning, over the candles in view: from the aggressive-buy volume
@@ -2000,6 +2004,21 @@ export default function LiquidationHeatmapDesk() {
                   ? "sin barridas resueltas"
                   : `tras la barrida siguió ${idmSt.continued} de ${idmSt.resolved} · ${idmSt.confidence.toLowerCase()}`}
               </span>
+            </div>
+          )}
+
+          {pre && (
+            <div className="liq-pstrip" title="Compresión + precio a menos de 1 ATR de un nivel con 2 o más toques (+ estructura). Puede moverse fuerte; la dirección es la más probable, no segura.">
+              <span className={pre.state === "A PUNTO" ? (pre.side === "BAJISTA" ? "down" : "up") : "none"}>
+                {pre.state === "A PUNTO" ? "⚡ A PUNTO DE ROMPER" : pre.state === "ARMÁNDOSE" ? "ARMÁNDOSE" : "SIN COMPRESIÓN"} · {pre.score}/100
+                {pre.side !== "SIN DIRECCIÓN" ? ` · ${pre.side === "ALCISTA" ? "▲" : "▼"} ${priceLabel(pre.level ?? 0)} (${pre.touches} toques)` : ""}
+                {pre.reasons.length ? ` · ${pre.reasons.join(" · ")}` : ""}
+              </span>
+              {preReplay && preReplay.rate !== null && preReplay.baseRate !== null && (
+                <span className={preReplay.rate > preReplay.baseRate + 0.1 ? "up" : "none"}>
+                  medido acá: tras {preReplay.alerts} avisos hubo movimiento de 2 ATR en {Math.round(preReplay.rate * 100)}% vs {Math.round(preReplay.baseRate * 100)}% en cualquier momento · {preReplay.confidence.toLowerCase()}
+                </span>
+              )}
             </div>
           )}
 

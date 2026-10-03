@@ -39,6 +39,7 @@ import DiarioDesk from "./diario-desk";
 import DecouplingDesk from "./decoupling-desk";
 import { everyVisible } from "@/lib/visible-interval";
 import RobotSignalsDesk from "./robot-signals-desk";
+import PreBreakDesk from "./prebreak-desk";
 import FuturesDesk from "./futures-desk";
 import FuturesRecorder from "./futures-recorder";
 import PortfolioRisk from "./portfolio-risk";
@@ -91,6 +92,7 @@ const NAV_ITEMS = [
   { label: "BOT", mobile: "BOT", icon: "◈", id: "bot" },
   { label: "DIARIO", mobile: "DIARIO", icon: "▤", id: "diario" },
   { label: "SUBEN SOLAS", mobile: "SOLAS", icon: "⇡", id: "desacople" },
+  { label: "POR ROMPER", mobile: "ROMPE", icon: "⚡", id: "rompe" },
   { label: "DCA", mobile: "DCA", icon: "⟳", id: "dca" },
   { label: "CONFIGURACIÓN", mobile: "AJUSTES", icon: "⚙", id: "configuracion" },
   { label: "ESTRATEGIA SPOT", mobile: "SPOT", icon: "◎", id: "spot" },
@@ -1109,6 +1111,10 @@ export default function RadarApp() {
 
         <Collapsible id="futuros" label="MI CARTERA · FUTUROS" open={workspace.open["futuros"]} onToggle={workspace.toggle}>
           <FuturesDesk />
+        </Collapsible>
+
+        <Collapsible id="rompe" label="A PUNTO DE ROMPER · AVISOS" open={workspace.open["rompe"]} onToggle={workspace.toggle}>
+          <PreBreakDesk />
         </Collapsible>
 
         <Collapsible id="desacople" label="SUBEN SOLAS · DESACOPLE DE BTC" open={workspace.open["desacople"]} onToggle={workspace.toggle}>
