@@ -80,6 +80,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   { id: "bot", label: "BOT DE FUTUROS · PAPEL", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "diario", label: "DIARIO · MI CUENTA REAL", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "desacople", label: "SUBEN SOLAS · DESACOPLE DE BTC", primary: false, group: "SEÑALES Y ENTRADAS" },
+  { id: "rompe", label: "A PUNTO DE ROMPER", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "dca", label: "DCA", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "configuracion", label: "CONFIGURACIÓN", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
 ];
@@ -92,7 +93,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
  * They live under AVANZADO, one tap away, and opening any of them from
  * elsewhere in the app turns AVANZADO on by itself.
  */
-export const ESSENTIAL_IDS = new Set(["resumen", "inteligencia", "liquidaciones", "desacople", "alertas", "diario", "configuracion"]);
+export const ESSENTIAL_IDS = new Set(["resumen", "inteligencia", "liquidaciones", "rompe", "desacople", "alertas", "diario", "configuracion"]);
 const ADVANCED_KEY = "alt-radar-pro:workspace:advanced:v1";
 const ADVANCED_EVENT = "alt-radar:advanced";
 

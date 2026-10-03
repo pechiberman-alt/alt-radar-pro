@@ -1,0 +1,9 @@
+/* A PUNTO DE ROMPER */
+.pb-list{display:grid;gap:6px}
+.pb-list>div{display:grid;grid-template-columns:auto auto 150px 1fr;gap:8px 12px;align-items:center;padding:8px 10px;background:#0a110d;border:1px solid var(--line);border-left:3px solid #2a4a3a;border-radius:4px;font:10px var(--font-mono);color:#c4d0c9}
+.pb-list>div.hot{border-left-color:#f0c060;background:#13110a}
+.pb-list b.up{color:#39f29a}.pb-list b.down{color:#ff5964}
+.pb-list em{grid-column:1/-1;font-style:normal;color:var(--muted)}
+.pb-bar{position:relative;display:block;height:14px;background:#13201a;border-radius:3px;font:9px/14px var(--font-mono);text-align:right;padding-right:4px;color:#e7efe9;overflow:hidden}
+.pb-bar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#1f4d38,#f0c060);opacity:.7}
+@media (max-width:640px){.pb-list>div{grid-template-columns:1fr 1fr}.pb-list>div>span:last-of-type{grid-column:1/-1}}
