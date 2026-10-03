@@ -37,7 +37,9 @@ import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSource } from "@/lib/level-engine";
 import type { SwingCandle } from "@/lib/swing-entries";
 import { findInducements, idmStats } from "@/lib/inducement";
-import { mmEvents, runMm, studyMm, type MmTrade } from "@/lib/mm-robot";
+import { mmEvents, runMm, studyMm, studyMmPooled, type MmFilter, type MmTrade } from "@/lib/mm-robot";
+import { eligible } from "@/lib/decoupling";
+import type { LvStats } from "@/lib/liq-vol-signals";
 import { onMapSymbol } from "@/lib/account-events";
 import { findLvSignals, flushSeries, lvStats, resolveLv, type LvTrade } from "@/lib/liq-vol-signals";
 import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
@@ -89,6 +91,19 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const ops = (n: number) => `${n} ${n === 1 ? "operación" : "operaciones"}`;
 const LAYERS_KEY = "alt-radar-pro:map-layers:v1";
 const SIMPLE_KEY = "alt-radar-pro:map-simple:v1";
+const WIDE_KEY = "alt-radar-pro:mm-wide:v1";
+/** A wide study is trusted for a week; markets change. */
+const WIDE_TTL = 7 * 86_400_000;
+type WideVariant = { name: string; filter: MmFilter; approved: boolean; inSample: LvStats; outSample: LvStats; breadth: { tested: number; positive: number } };
+type WideSummary = {
+  timeframe: string;
+  at: number;
+  coins: number;
+  events: number;
+  best: WideVariant | null;
+  variants: WideVariant[];
+  perCoin: { symbol: string; trades: number; totalR: number }[];
+};
 /** Candles a LIQ+VOL trade is given to reach its stop or target. */
 const LV_HORIZON = 24;
 /**
@@ -350,6 +365,9 @@ export default function LiquidationHeatmapDesk() {
   const [daily, setDaily] = useState<SwingCandle[] | null>(null);
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>(DEFAULT_LAYERS);
   const [simple, setSimple] = useState(false);
+  /** ROBOT MM wide studies, by timeframe, and the progress of one running. */
+  const [wideStudies, setWideStudies] = useState<Record<string, WideSummary>>({});
+  const [wideRun, setWideRun] = useState<string | null>(null);
   // Deferred read, same as the workspace: the server and the first client
   // paint must agree, so the saved choice is applied right after hydration.
   useEffect(() => {
@@ -358,12 +376,67 @@ export default function LiquidationHeatmapDesk() {
         const saved = JSON.parse(window.localStorage.getItem(LAYERS_KEY) ?? "null");
         if (saved && typeof saved === "object") setLayers({ ...DEFAULT_LAYERS, ...saved });
         if (window.localStorage.getItem(SIMPLE_KEY) === "1") setSimple(true);
+        const stored = JSON.parse(window.localStorage.getItem(WIDE_KEY) ?? "null") as Record<string, WideSummary> | null;
+        if (stored && typeof stored === "object") {
+          // Studies older than a week are dropped: markets change.
+          const fresh = Object.fromEntries(Object.entries(stored).filter(([, v]) => v && Date.now() - v.at < WIDE_TTL));
+          setWideStudies(fresh);
+        }
       } catch {
         // Keep the defaults.
       }
     }, 0);
     return () => window.clearTimeout(t);
   }, []);
+  const wide = wideStudies[timeframe] ?? null;
+  const runWideStudy = async () => {
+    if (wideRun) return;
+    const tf = timeframe;
+    const frameMs = FRAME_MS[tf] ?? 3_600_000;
+    setWideRun("Buscando las monedas más operadas…");
+    try {
+      const ranked = await loadTopSymbols(new AbortController().signal);
+      const symbols = ["BTCUSDT", "ETHUSDT", ...(ranked ?? []).filter(eligible).slice(0, 10)];
+      const coins: { symbol: string; candles: SwingCandle[]; events: ReturnType<typeof mmEvents> }[] = [];
+      for (const [k, sym] of symbols.entries()) {
+        setWideRun(`Estudiando ${sym.replace(/USDT$/, "")} (${k + 1} de ${symbols.length})…`);
+        try {
+          const rows = await loadRows(sym, tf, 1500, new AbortController().signal);
+          const now = Date.now();
+          const candles = parseSwingKlines(rows).filter((c) => c.openTime + frameMs <= now);
+          if (candles.length >= 300) {
+            // Two price samples per candle instead of four: plenty at this scale, half the work.
+            const lives = buildLiquidationLives(sym, candles, { samples: 2 });
+            coins.push({ symbol: sym, candles, events: mmEvents(candles, lives, flushSeries(candles.map((c) => c.openTime), lives)) });
+          }
+        } catch {
+          // a coin that can't be read is left out of the study
+        }
+        await new Promise((r) => setTimeout(r, 0)); // keep the page responsive between coins
+      }
+      const study = studyMmPooled(coins);
+      const pick = (v: (typeof study.variants)[number]): WideVariant => ({ name: v.name, filter: v.filter, approved: v.approved, inSample: v.inSample, outSample: v.outSample, breadth: v.breadth });
+      const summary: WideSummary = {
+        timeframe: tf, at: Date.now(), coins: study.coins, events: study.events,
+        best: study.best ? pick(study.best) : null,
+        variants: study.variants.slice(0, 6).map(pick),
+        perCoin: (study.best ?? study.variants[0]).perCoin.map((p) => ({ symbol: p.symbol, trades: p.outSample.resolved, totalR: p.outSample.totalR })),
+      };
+      setWideStudies((prev) => {
+        const next = { ...prev, [tf]: summary };
+        try {
+          window.localStorage.setItem(WIDE_KEY, JSON.stringify(next));
+        } catch {
+          // kept for this session only
+        }
+        return next;
+      });
+      setWideRun(null);
+    } catch {
+      setWideRun(null);
+      setError("No se pudo completar el estudio amplio. Probá de nuevo en un rato.");
+    }
+  };
   const toggleSimple = () => {
     const next = !simple;
     let nextLayers: Record<LayerKey, boolean> = simpleLayers();
@@ -1367,10 +1440,13 @@ export default function LiquidationHeatmapDesk() {
     const flush = flushSeries(scalpSeries.map((c) => c.openTime), data.lives);
     const events = mmEvents(scalpSeries, data.lives, flush);
     const study = studyMm(scalpSeries, events);
-    const trades: MmTrade[] = study.best ? runMm(scalpSeries, events, study.best.filter) : [];
+    // A variant approved across many coins carries more evidence than one
+    // approved on this chart alone, so it takes precedence.
+    const active = wide?.best ? { filter: wide.best.filter, name: wide.best.name, source: "amplio" as const } : study.best ? { filter: study.best.filter, name: study.best.name, source: "este gráfico" as const } : null;
+    const trades: MmTrade[] = active ? runMm(scalpSeries, events, active.filter) : [];
     const live = trades.length && trades[trades.length - 1].result === "ABIERTA" ? trades[trades.length - 1] : null;
-    return { study, trades, live };
-  }, [layers.robot, scalpSeries, data]);
+    return { study, trades, live, active };
+  }, [layers.robot, scalpSeries, data, wide]);
   const liveLv: LvTrade | null = lv && lv.trades.length && lv.trades[lv.trades.length - 1].result === "ABIERTA" ? lv.trades[lv.trades.length - 1] : null;
 
   // Who is winning, over the candles in view: from the aggressive-buy volume
@@ -3409,12 +3485,58 @@ export default function LiquidationHeatmapDesk() {
 
           {layers.robot && (
             <div className="div-list sc-list mm-list">
-              <h4>ROBOT MM · {timeframe.toUpperCase()} · {mm?.study.best ? "ARMADO EN PAPEL" : "EN ESTUDIO"}</h4>
+              <h4>ROBOT MM · {timeframe.toUpperCase()} · {mm?.active ? "ARMADO EN PAPEL" : "EN ESTUDIO"}</h4>
               <p className="mm-idea">
                 Piensa como un market maker: espera que el precio barra un máximo o mínimo (donde están los stops y las liquidaciones), que
                 vuelva adentro, y apunta al mayor pool de liquidez que queda del otro lado. Antes de operar se estudia: elige en el 60% más
                 viejo de la historia y comprueba en el 40% más nuevo, que no usó para elegir.
               </p>
+              <div className="mm-wide">
+                <b>ESTUDIO AMPLIO · 12 MONEDAS · 1.500 VELAS</b>
+                {wideRun ? (
+                  <p className="mm-verdict">{wideRun}</p>
+                ) : wide ? (
+                  <>
+                    <p className={wide.best ? "mm-verdict up" : "mm-verdict warn"}>
+                      {wide.best
+                        ? `Aprobada: «${wide.best.name}». Validación: profit factor ${(wide.best.outSample.profitFactor ?? 0) === Infinity ? "∞" : (wide.best.outSample.profitFactor ?? 0).toFixed(2).replace(".", ",")} en ${wide.best.outSample.resolved} operaciones · gana en ${wide.best.breadth.positive} de ${wide.best.breadth.tested} monedas. El robot de este gráfico usa esta variante.`
+                        : `Ninguna variante pasó con ${wide.coins} monedas y ${wide.events} barridas: en ${wide.timeframe.toUpperCase()} el robot no opera.`}
+                    </p>
+                    <div className="mm-table">
+                      <table>
+                        <thead><tr><th>Variante</th><th>Estudio (60%)</th><th>Validación (40%)</th><th>Monedas</th></tr></thead>
+                        <tbody>
+                          {wide.variants.map((v) => {
+                            const fmt = (st: LvStats) => (st.resolved ? `PF ${st.profitFactor === Infinity ? "∞" : (st.profitFactor ?? 0).toFixed(2).replace(".", ",")} · ${Math.round((st.winRate ?? 0) * 100)}% · ${st.resolved}` : "sin operaciones");
+                            return (
+                              <tr key={v.name} className={v.approved ? "up" : ""}>
+                                <td>{v.approved ? "✓ " : ""}{v.name}</td>
+                                <td>{fmt(v.inSample)}</td>
+                                <td>{fmt(v.outSample)}</td>
+                                <td>{v.breadth.tested ? `${v.breadth.positive}/${v.breadth.tested}` : "—"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="mm-coins">
+                      Validación por moneda ({wide.best ? "variante aprobada" : "mejor variante del estudio"}):{" "}
+                      {wide.perCoin.map((p) => `${p.symbol.replace(/USDT$/, "")} ${p.trades ? `${p.totalR >= 0 ? "+" : ""}${p.totalR.toFixed(1).replace(".", ",")}R (${p.trades})` : "—"}`).join(" · ")}
+                    </p>
+                    <button className="lv-csv" onClick={() => void runWideStudy()}>VOLVER A ESTUDIAR</button>
+                    <em className="mm-age"> estudiado {new Date(wide.at).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</em>
+                  </>
+                ) : (
+                  <>
+                    <p className="mm-verdict">
+                      Estudia la caza de liquidez en BTC, ETH y las 10 monedas más operadas a la vez, con 1.500 velas de {timeframe.toUpperCase()} cada una. Tarda
+                      alrededor de un minuto. Una variante se aprueba solo si gana en el estudio, en la validación y en al menos la mitad de las monedas.
+                    </p>
+                    <button className="lv-csv" onClick={() => void runWideStudy()}>ESTUDIAR 12 MONEDAS</button>
+                  </>
+                )}
+              </div>
               {!mm ? (
                 <p className="div-none">Hace falta el mapa de liquidaciones y al menos 200 velas cargadas.</p>
               ) : (
