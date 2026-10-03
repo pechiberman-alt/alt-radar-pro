@@ -330,3 +330,13 @@ small {
 
 /* ".ws-welcome button" (the close ✕) outranked the CTA and flattened it into plain grey text. */
 .ws-welcome .ws-welcome-cta{display:block;width:100%;margin-top:10px;padding:10px 12px;background:#0c251a;border:1px solid #2d6a4d;border-radius:4px;color:var(--green);font:10px var(--font-mono);letter-spacing:.8px;text-align:center}
+
+/* Essential mode toggle and first steps */
+.ws-actions .ws-advanced{border-color:#5a4a1e;color:#f0c060}
+.ws-actions .ws-advanced.on{border-color:#1f4d38;color:#7df5bd}
+.ws-steps{display:grid;gap:6px;font:12px/1.55 system-ui,sans-serif;color:#c4d0c9}
+.ws-steps>b{font:10px var(--font-mono);letter-spacing:1.2px;color:#39f29a}
+.ws-steps ol{margin:0;padding-left:20px;display:grid;gap:3px}
+.ws-steps code{font:11px var(--font-mono);color:#5fd3f3}
+.ws-steps span{display:flex;flex-wrap:wrap;gap:8px}
+.ws-steps small{font:9px var(--font-mono);color:var(--muted)}
