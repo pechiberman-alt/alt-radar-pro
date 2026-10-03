@@ -209,7 +209,10 @@ export default function BookmapTimeframeChart({
       }
     };
     void load();
-    const refresh = window.setInterval(() => void load(), 60_000);
+    // Ledger totals move slowly; every 10 minutes, and not while the tab is hidden.
+    const refresh = window.setInterval(() => {
+      if (!document.hidden) void load();
+    }, 600_000);
     return () => {
       alive = false;
       window.clearInterval(refresh);
