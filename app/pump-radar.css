@@ -75,3 +75,12 @@
 .pump-toggle{margin:0 14px 4px;width:calc(100% - 28px)}
 .pump-footnote{padding:14px 14px 18px}
 }
+
+/* Pump trade plan */
+.pump-plan{margin:8px 0 4px;padding:9px 10px;border:1px solid #2a4a3a;border-left:3px solid #f0c060;border-radius:4px;background:#0c1511;font:10px var(--font-mono);color:#c4d0c9}
+.pump-plan.go{border-left-color:#39f29a}.pump-plan.no{border-left-color:#ff5964}
+.pump-plan>b{display:block;margin-bottom:6px;letter-spacing:1px;color:#f0c060}
+.pump-plan.go>b{color:#39f29a}.pump-plan.no>b{color:#ff8a92}
+.pump-plan-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 10px;margin-bottom:6px}
+.pump-plan-rows b{color:#e7efe9}.pump-plan-rows em{font-style:normal;color:var(--muted)}
+.pump-plan small{display:block;font:9px/1.5 var(--font-mono);color:var(--muted)}
