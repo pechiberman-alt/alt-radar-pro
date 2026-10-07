@@ -315,7 +315,8 @@ const coin = (s: string) => s.replace(/USDT$/, "");
  * says which one answered, so every reading, signal and lesson can say it.
  */
 export async function coreCandles(symbol: string, limit: number, minCandles: number, now: number): Promise<{ candles: SwingCandle[]; feed: Feed }> {
-  const r = await fetchKlinesServer(symbol, CORE_TF, { limit, minCandles, market: "futures", outside: true });
+  // Three hours without a new candle means that exchange stopped trading the coin: no data beats stale data.
+  const r = await fetchKlinesServer(symbol, CORE_TF, { limit, minCandles, market: "futures", outside: true, maxAgeMs: 3 * CORE_FRAME, now });
   return { candles: closedOnly(r.candles, CORE_FRAME, now), feed: { venue: r.venue, binance: r.binance, at: now } };
 }
 

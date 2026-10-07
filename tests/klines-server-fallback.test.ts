@@ -180,3 +180,26 @@ test("names and parsers: Kraken's and Coinbase's pairs, errors and bad rows", ()
   assert.deepEqual(c.map((x) => x.openTime), [3_600_000, 7_200_000]);
   assert.equal(c[1].quoteVolume, 4 * ((3 + 1 + 2.5) / 3), "typical price × volume");
 });
+
+test("a stale source is skipped: an exchange that stopped trading a coin never passes for today's price", async () => {
+  resetKlinesServerState();
+  const now = Date.UTC(2026, 9, 7, 18, 30);
+  const hour = Math.floor(now / 3_600_000) * 3_600_000;
+  const oldEnd = Math.floor((hour - 100 * 3_600_000) / 1000);
+  let coinbaseFresh = true;
+  const m = mock((u) => {
+    if (isBinance(u)) return new Response("blocked", { status: 403 });
+    if (u.includes("kraken")) return new Response(kraken(300, oldEnd - 299 * 3600, "TONUSD"));
+    return new Response(coinbase(300, coinbaseFresh ? Math.floor(hour / 1000) : oldEnd));
+  });
+  try {
+    const opts = { limit: 300, minCandles: 200, outside: true, maxAgeMs: 3 * 3_600_000, now };
+    assert.equal((await fetchKlinesServer("TONUSDT", "1h", opts)).venue, "COINBASE", "Kraken's candles end 100 hours ago");
+    coinbaseFresh = false;
+    await assert.rejects(fetchKlinesServer("TONUSDT", "1h", opts), (e: Error) => /Kraken: velas viejas/.test(e.message) && /Coinbase: velas viejas/.test(e.message));
+    assert.equal((await fetchKlinesServer("TONUSDT", "1h", { ...opts, maxAgeMs: undefined })).venue, "KRAKEN", "without the check, the old behaviour");
+  } finally {
+    m.restore();
+    resetKlinesServerState();
+  }
+});
