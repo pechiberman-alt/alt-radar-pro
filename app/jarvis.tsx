@@ -23,7 +23,7 @@ import { fmtExpect, learnSpeech, venuesSpeech } from "@/lib/jarvis-learn";
 import { DEFAULT_NEURAL, NEURAL_VOICES, neuralVoice } from "@/lib/jarvis-voice";
 import { earcon, neuralModel, neuralState, onNeural, probeNeural, speakNeural, stopNeural, unlockAudio } from "./jarvis-voice-player";
 import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
-import { ECHO_MS, HandsFree, MAX_SPEECH_MS } from "@/lib/hands-free";
+import { ECHO_MS, HandsFree, MAX_SPEECH_MS, type MicPermission } from "@/lib/hands-free";
 
 /**
  * JARVIS: a voice assistant over the whole app. It listens (Web Speech API,
@@ -279,6 +279,24 @@ function buzz(): void {
   }
 }
 
+/** Chrome on Android: its recognizer has rules of its own (lib/hands-free.ts). */
+function onAndroid(): boolean {
+  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+}
+
+/** The microphone permission as the browser reports it, kept up to date. "unknown" where it does not say. */
+function watchMicPermission(onChange: (p: MicPermission) => void): void {
+  const perms = (navigator as Navigator & { permissions?: Permissions }).permissions;
+  if (!perms?.query) return onChange("unknown");
+  perms
+    .query({ name: "microphone" as PermissionName })
+    .then((status) => {
+      onChange(status.state);
+      status.onchange = () => onChange(status.state);
+    })
+    .catch(() => onChange("unknown"));
+}
+
 function letGoAwake(ref: WakeLockRef): void {
   const lock = ref.current;
   ref.current = null;
@@ -362,6 +380,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   const speakingRef = useRef(false);
   /** JARVIS has the floor: from the moment a reply is given until its voice ends. The hands-free microphone stays closed. */
   const floorRef = useRef(false);
+  /** The microphone permission as the browser reports it (to tell a missing permission from a busy recognizer). */
+  const micPermRef = useRef<MicPermission>("unknown");
   /** The last thing JARVIS was asked came by voice (for the follow-up turn). */
   const lastVoiceRef = useRef(false);
   const listenRef = useRef<(() => void) | null>(null);
@@ -445,6 +465,14 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
         known.current = new Set((list ?? []).map((s) => s.replace(/USDT$/, "")));
       })
       .catch(() => undefined);
+  }, []);
+
+  // The browser's word on the microphone permission, to tell a real denial from Android's busy recognizer.
+  useEffect(() => {
+    watchMicPermission((p) => {
+      micPermRef.current = p;
+      handsOf(handsRef).setPermission(p);
+    });
   }, []);
 
   // The section on screen changes when the person scrolls or taps the menu; JARVIS also sets it when it opens one.
@@ -796,7 +824,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
     const hands = handsOf(handsRef);
     const next = hands.ended();
     if (next.type === "restart") {
-      window.setTimeout(() => engineFnsRef.current?.startEngine(), next.inMs);
+      // Android's recognizer needs a moment to be free again after a session (otherwise: "not-allowed").
+      window.setTimeout(() => engineFnsRef.current?.startEngine(), onAndroid() ? Math.max(next.inMs, 400) : next.inMs);
       return;
     }
     stopEngine();
@@ -811,7 +840,9 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
     const rec = recognizer();
     if (!rec) return;
     rec.lang = "es-AR";
-    rec.continuous = true;
+    // On Android continuous mode hands every partial guess over as final ("jarvis analizame" before "… SOL"):
+    // there the engine hears one whole phrase per session, and the rules restart it.
+    rec.continuous = !onAndroid();
     rec.interimResults = true;
     engineRef.current = rec;
     hands.started();
@@ -850,6 +881,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       setMode((m) => (m === "listening" ? "idle" : m));
       setHandsText(hands.status(Date.now()));
       if (verdict.reason === "permiso") latestRef.current.speak("Necesito permiso para usar el micrófono.");
+      if (verdict.reason === "ocupado") latestRef.current.speak("El micrófono está ocupado por otra app. Cuando se libere, reactivá manos libres.");
     };
     rec.onend = () => {
       if (engineRef.current !== rec) return;
@@ -895,7 +927,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       latestRef.current.handle(finalText, true);
     };
     rec.onerror = (e) => {
-      if (e.error === "not-allowed") latestRef.current.speak("Necesito permiso para usar el micrófono.");
+      // On Android "not-allowed" is also a recognizer still busy: with the permission granted, that is what it is.
+      if (e.error === "not-allowed") latestRef.current.speak(micPermRef.current === "granted" ? "El micrófono estaba ocupado. Tocá de nuevo." : "Necesito permiso para usar el micrófono.");
     };
     rec.onend = () => {
       oneShotRef.current = false;
@@ -935,6 +968,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       if (!live) return;
       if (prefs.wake && supportsListen) {
         hands.enable();
+        hands.setPermission(micPermRef.current);
         engineFnsRef.current?.startEngine();
       } else {
         hands.disable();
