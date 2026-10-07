@@ -4,19 +4,20 @@ import { getSecret } from "@/lib/app-settings";
 import { getPlanStatsCached, STATS_DAYS } from "@/lib/signal-plan-db";
 import { resultsMessage } from "@/lib/signal-plan";
 import { parseCommand, sendMessage, webhookSecret } from "@/lib/telegram";
-import { answerInTelegram, clearChat } from "@/lib/telegram-ai-server";
+import { answerInTelegram, answerVoiceInTelegram, clearChat } from "@/lib/telegram-ai-server";
 import { ensureTelegramSchema } from "@/lib/telegram-server";
 import { handleAlertCommand } from "@/lib/price-alerts-server";
 import { coreStatusSpeech, GRADE_LABEL } from "@/lib/jarvis-core";
 import { coreSnapshot } from "@/lib/jarvis-core-db";
 import { learnSpeech } from "@/lib/jarvis-learn";
 import { sharedJson } from "@/lib/shared-cache";
+import type { TgVoice } from "@/lib/telegram-voice";
 
 export const dynamic = "force-dynamic";
 
 const HELP =
   "<b>ALT RADAR PRO</b>\n" +
-  "Escribime cualquier pregunta sobre el mercado y te respondo con los datos del radar (ej: <i>¿cómo ves BTC?</i>, <i>¿qué señales hay abiertas?</i>).\n\n" +
+  "Escribime cualquier pregunta sobre el mercado, o mandame una nota de voz: te respondo con los datos del radar (ej: <i>¿cómo ves BTC?</i>, <i>¿qué señales hay abiertas?</i>).\n\n" +
   "/estado — resumen del momento\n" +
   "/resultados — cuántas señales llegaron a TP1, TP2, TP3 o al SL, por tipo\n" +
   "/jarvis — estado del núcleo 24/7, señales abiertas y registro\n" +
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const update = (await request.json().catch(() => null)) as { update_id?: number; message?: { chat?: { id?: number }; text?: string } } | null;
+  const update = (await request.json().catch(() => null)) as { update_id?: number; message?: { chat?: { id?: number }; text?: string; voice?: TgVoice } } | null;
   const chatId = update?.message?.chat?.id;
   if (!chatId) return NextResponse.json({ ok: true });
   const chat = String(chatId);
@@ -52,6 +53,18 @@ export async function POST(request: NextRequest) {
       .bind(`upd:${update.update_id}`, Date.now())
       .run();
     if (!fresh.meta.changes) return NextResponse.json({ ok: true });
+  }
+
+  // A voice note is a question too: heard, then answered in the same thread (lib/telegram-voice.ts).
+  const voice = update?.message?.voice;
+  if (voice) {
+    const link = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE chat_id = ?1").bind(chat).first<{ user_id: number }>();
+    if (!link) {
+      await sendMessage(token, chat, "Para hablarme, vinculá este chat con tu cuenta: en la app, ALERTAS → VINCULAR TELEGRAM.");
+      return NextResponse.json({ ok: true });
+    }
+    waitUntil(answerVoiceInTelegram(env.DB, env, token, chat, link.user_id, voice));
+    return NextResponse.json({ ok: true });
   }
 
   if (cmd === "texto") {

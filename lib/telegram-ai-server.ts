@@ -12,6 +12,9 @@ import { coreContext } from "./jarvis-core.ts";
 import { coreSnapshot } from "./jarvis-core-db.ts";
 import { sharedJson } from "./shared-cache.ts";
 import { listMemory, memoryBlock } from "./jarvis-memory.ts";
+import { DEFAULT_NEURAL, VOICE_MAX_CHARS } from "./jarvis-voice.ts";
+import { addUsage, allowance, synthesize, usageToday } from "./jarvis-voice-server.ts";
+import { downloadVoice, escapeHtml, sendVoiceNote, speechFor, transcribe, voiceProblem, type TgVoice } from "./telegram-voice.ts";
 
 const SYSTEM =
   buildSystemPrompt(KNOWLEDGE) +
@@ -90,7 +93,7 @@ export async function clearChat(db: D1Database, chatId: string) {
  * background (the webhook has already answered Telegram), so every failure
  * ends in a message to the user rather than a silent drop.
  */
-export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?: AiLike }, token: string, chatId: string, userId: number, question: string) {
+export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?: AiLike }, token: string, chatId: string, userId: number, question: string): Promise<string | null> {
   try {
     await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => undefined);
 
@@ -125,7 +128,7 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?:
           ? "Por hoy se terminaron las respuestas de IA (Claude y las gratuitas); mañana vuelven. Mientras tanto /jarvis y los demás comandos siguen andando, y en la app JARVIS responde con su motor local sin límite."
           : "La IA no pudo responder ahora. Probá de nuevo en un rato.",
       );
-      return;
+      return null;
     }
 
     const html = markdownToTelegramHtml(answer.text) + (answer.brain === "claude" ? "" : `\n<i>Respondió: ${BRAIN_LABEL[answer.brain]}.</i>`);
@@ -140,8 +143,62 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?:
       db.prepare("INSERT INTO telegram_chat (chat_id, at, role, content) VALUES (?1, ?2, 'assistant', ?3)").bind(chatId, now + 1, answer.text.slice(0, 1500)),
       db.prepare("DELETE FROM telegram_chat WHERE at < ?1").bind(now - 2 * 86_400_000),
     ]);
+    return answer.text;
   } catch (error) {
     console.error("[ALT_RADAR_TELEGRAM_AI]", error);
     await sendMessage(token, chatId, "Hubo un error respondiendo. Probá de nuevo.").catch(() => undefined);
+    return null;
   }
+}
+
+/**
+ * A voice note to JARVIS: heard with Whisper, then answered like a typed
+ * question, in the same thread. The transcript goes first, so a misheard word
+ * shows at once. Every failure ends in a message the person can read.
+ */
+export async function answerVoiceInTelegram(db: D1Database, env: SettingsEnv & { AI?: AiLike }, token: string, chatId: string, userId: number, voice: TgVoice) {
+  try {
+    await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => undefined);
+    const problem = voiceProblem(voice);
+    if (problem) {
+      await sendMessage(token, chatId, problem);
+      return;
+    }
+    const groq = await getSecret(db, env, "groq_api_key");
+    if (!groq.value) {
+      await sendMessage(token, chatId, "Todavía no puedo escucharte: falta configurar el reconocimiento de voz. Mientras tanto, escribime la pregunta.");
+      return;
+    }
+    const audio = await downloadVoice(token, voice.file_id);
+    const heard = audio ? await transcribe(groq.value, audio) : null;
+    if (!heard) {
+      await sendMessage(token, chatId, "No te entendí la nota. Probá de nuevo, más despacio, o escribime.");
+      return;
+    }
+    await sendMessage(token, chatId, `🎙 Escuché: <i>${escapeHtml(heard)}</i>`);
+    const answer = await answerInTelegram(db, env, token, chatId, userId, heard);
+    if (answer) await replyWithVoice(db, env, token, chatId, userId, answer);
+  } catch (error) {
+    // The bot token and the file's address never reach the log: only the kind of error.
+    console.error("[ALT_RADAR_TELEGRAM_VOICE]", error instanceof Error ? error.name : "error");
+    await sendMessage(token, chatId, "Hubo un error con tu nota de voz. Probá de nuevo.").catch(() => undefined);
+  }
+}
+
+/**
+ * The answer as a voice note too, within the voice allowance of the app
+ * (lib/jarvis-voice-server.ts). Quietly skipped when the allowance or the voice
+ * is out: the text is already in the chat.
+ */
+async function replyWithVoice(db: D1Database, env: { AI?: AiLike }, token: string, chatId: string, userId: number, answer: string) {
+  const model = env.AI ?? null;
+  const text = speechFor(answer, VOICE_MAX_CHARS);
+  if (!model || !text) return;
+  const day = new Date().toISOString().slice(0, 10);
+  const allow = allowance(await usageToday(db, day, userId), text.length);
+  if (!allow.allowed) return;
+  const out = await synthesize(model, text, DEFAULT_NEURAL.male, allow.premium);
+  if (!out) return;
+  await addUsage(db, day, userId, text.length, out.model === "aura");
+  await sendVoiceNote(token, chatId, out.audio);
 }
