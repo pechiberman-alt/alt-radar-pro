@@ -25,6 +25,8 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
 - Las llamadas firmadas con claves del usuario se hacen solo desde el navegador, por la API WebSocket
   (`lib/binance-client-signed.ts`). REST firmado no funciona: CORS en el navegador y firewall de Binance en el Worker.
 - Datos públicos desde el Worker: `GLOBAL_BASES` de `lib/klines-server.ts`. Nunca Binance.US para volumen (es mínimo).
+- Binance responde 403 a los crons del Worker (oct 2026). Con `outside: true`, `fetchKlinesServer` sigue con Kraken y Coinbase
+  en USD: solo para precio y estructura, siempre diciendo la fuente (`venue`). Nunca para alertas de volumen ni para XAU/XAG.
 
 ## Honestidad (marca url.fx)
 - Ninguna probabilidad inventada. Todo porcentaje va con su tamaño de muestra (menos de 15 = "muestra mínima").
