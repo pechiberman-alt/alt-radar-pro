@@ -13,6 +13,7 @@ import {
   type Regime,
   type Ridge,
 } from "./jarvis-learn.ts";
+import { isOutside, VENUE_LABEL, type BinanceStatus, type Venue } from "./klines-server.ts";
 import type { LvStats } from "./liq-vol-signals.ts";
 import type { Magnet, MagnetEvent } from "./magnet-watch.ts";
 import { readPreBreak, type PreBreak } from "./pre-breakout.ts";
@@ -200,7 +201,8 @@ export function shadowStats(byKey: Record<string, CoreCounters>): LvStats {
   return countersToStats(sum(byKey["ROMPE~SOMBRA"] ?? ZERO, byKey["IMÁN~SOMBRA"] ?? ZERO));
 }
 
-export type Tick = { at: number; task: string; ok: boolean; note: string };
+/** `feed`: the exchange whose candles the job read (klines-server.ts). */
+export type Tick = { at: number; task: string; ok: boolean; note: string; feed?: Venue };
 export type CoreHeartbeat = Tick & { ring?: Tick[] };
 
 /** The core counts as alive if it ticked within the last 5 minutes (it ticks every minute). */
@@ -217,16 +219,21 @@ export function withTick(prev: CoreHeartbeat | null, t: Tick, keep = 15): CoreHe
  * as "near" (max of 0,4% and half an ATR) and that candle's sweeps — what the
  * Telegram dispatch needs, so it never rebuilds a map itself.
  */
-export type MindMagnet = { lastTime: number; at: number; price: number; above: Magnet | null; below: Magnet | null; nearPct?: number; sweeps?: MagnetEvent[] };
+export type MindMagnet = { lastTime: number; at: number; price: number; above: Magnet | null; below: Magnet | null; nearPct?: number; sweeps?: MagnetEvent[]; venue?: Venue };
+/**
+ * Where the core's candles come from: Binance when it answers the server;
+ * Kraken or Coinbase, in dollars, when its firewall refuses the cron.
+ */
+export type Feed = { venue: Venue; binance: BinanceStatus; at: number };
 /** What the core knows about the market right now. */
-export type Mind = { readings: Record<string, Reading>; btc: { regime: Regime; change24: number | null; at: number } | null; magnets: Record<string, MindMagnet> };
-export const emptyMind = (): Mind => ({ readings: {}, btc: null, magnets: {} });
+export type Mind = { readings: Record<string, Reading>; btc: { regime: Regime; change24: number | null; at: number } | null; magnets: Record<string, MindMagnet>; feed?: Feed | null };
+export const emptyMind = (): Mind => ({ readings: {}, btc: null, magnets: {}, feed: null });
 
 export function parseMind(raw: string | null | undefined): Mind {
   if (!raw) return emptyMind();
   try {
     const m = JSON.parse(raw) as Mind;
-    return { readings: m.readings ?? {}, btc: m.btc ?? null, magnets: m.magnets ?? {} };
+    return { readings: m.readings ?? {}, btc: m.btc ?? null, magnets: m.magnets ?? {}, feed: m.feed ?? null };
   } catch {
     return emptyMind();
   }
@@ -245,6 +252,26 @@ export type CoreSnapshot = {
 
 const coin = (s: string) => s.replace(/USDT$/, "");
 const fmtRWords = (r: number) => `${r >= 0 ? "más" : "menos"} ${Math.abs(r).toFixed(1).replace(".", ",")} R`;
+
+/** Why the candles are not Binance's, in words. */
+const binanceWhy = (b: BinanceStatus) => (b === "BLOQUEADO" ? "Binance bloquea al servidor" : "Binance no responde al servidor");
+
+/**
+ * One sentence on where the candles come from, only when they are not
+ * Binance's (null otherwise): the price is practically the same, the volume
+ * is that exchange's own.
+ */
+export function feedSpeech(feed: Pick<Feed, "venue" | "binance"> | null | undefined): string | null {
+  if (!feed || !isOutside(feed.venue)) return null;
+  const name = VENUE_LABEL[feed.venue];
+  return `Leo las velas de ${name}, en dólares, porque ${binanceWhy(feed.binance)}. El precio es prácticamente el mismo; el volumen es el de ${name}.`;
+}
+
+/** Short label for the app: "Kraken (USD) · Binance bloquea al servidor", or "Binance futuros". */
+export function feedLabel(feed: Pick<Feed, "venue" | "binance"> | null | undefined): string | null {
+  if (!feed) return null;
+  return isOutside(feed.venue) ? `${VENUE_LABEL[feed.venue]} (USD) · ${binanceWhy(feed.binance)}` : VENUE_LABEL[feed.venue];
+}
 
 /**
  * What JARVIS says about the core's activity since `since`: signals it took
@@ -277,7 +304,7 @@ export function awaySpeech(signals: CoreSignal[], since: number): string | null 
 }
 
 /** A short status line: alive or not, what it watches, its health, record and learning. */
-export function coreStatusSpeech(snap: Pick<CoreSnapshot, "heartbeat" | "stats" | "open" | "learning">, now: number): string {
+export function coreStatusSpeech(snap: Pick<CoreSnapshot, "heartbeat" | "stats" | "open" | "learning"> & { mind?: Mind | null }, now: number): string {
   if (!coreOnline(snap.heartbeat, now)) {
     return snap.heartbeat
       ? `El núcleo no da señales de vida desde hace ${Math.round((now - snap.heartbeat.at) / 60_000)} minutos. Sigo funcionando desde tu navegador.`
@@ -292,6 +319,9 @@ export function coreStatusSpeech(snap: Pick<CoreSnapshot, "heartbeat" | "stats" 
     }.`,
     `Vigilo ${CORE_COINS.length} monedas en una hora, las veinticuatro horas.`,
   ];
+  const feed = snap.mind?.feed;
+  const fromElsewhere = feed && now - feed.at < 30 * 60_000 ? feedSpeech(feed) : null;
+  if (fromElsewhere) parts.push(fromElsewhere);
   const open = snap.open.filter((s) => s.taken !== false);
   if (open.length) parts.push(`Tengo ${open.length} ${open.length === 1 ? "señal abierta" : "señales abiertas"}.`);
   const st = snap.stats;
@@ -337,6 +367,7 @@ export function coreContext(snap: CoreSnapshot, now: number) {
       enLinea: coreOnline(snap.heartbeat, now),
       ultimoLatidoMin: snap.heartbeat ? Math.round((now - snap.heartbeat.at) / 60_000) : null,
       vigila: `${CORE_COINS.map(coin).join(",")} en ${CORE_TF}; imanes de ${CORE_MAGNETS.map(coin).join(",")}`,
+      datos: mind?.feed ? { velasDe: VENUE_LABEL[mind.feed.venue], enDolares: isOutside(mind.feed.venue), binance: mind.feed.binance, aclaracion: feedSpeech(mind.feed) } : null,
       registro: {
         cerradas: st.resolved,
         abiertas: snap.open.filter((s) => s.taken !== false).length,
@@ -352,6 +383,7 @@ export function coreContext(snap: CoreSnapshot, now: number) {
             señalesEnVivoAprendidas: snap.learning.liveCases,
             velasPorEstudiar: snap.learning.backlog,
             lecciones: [...snap.learning.sources.ROMPE.lessons, ...snap.learning.sources["IMÁN"].lessons],
+            casosPorFuente: snap.learning.venues ?? {},
           }
         : null,
       mercado: mind

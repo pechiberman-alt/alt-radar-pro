@@ -20,13 +20,15 @@ import {
   type CoreHeartbeat,
   type CoreSignal,
   type CoreSnapshot,
+  type Feed,
   type MagnetPairLite,
   type MindMagnet,
 } from "./jarvis-core.ts";
 import { addCase, btcSeries, compactModel, encode, parseModel, replayRompe, summarizeModel, type Features, type Grade, type LearnModel } from "./jarvis-learn.ts";
-import { fetchKlinesServer } from "./klines-server.ts";
+import { fetchKlinesServer, isOutside, VENUE_LABEL, type Venue } from "./klines-server.ts";
 import { buildLiquidationHeatmap } from "./liquidation-heatmap.ts";
 import { atrPct, strongestMagnets } from "./magnet-watch.ts";
+import type { SwingCandle } from "./swing-entries.ts";
 import { loadOiDelta, timeframeConfig } from "./market-fetch.ts";
 
 /**
@@ -283,27 +285,31 @@ export async function coreSnapshot(db: D1Database, now: number): Promise<CoreSna
 const coin = (s: string) => s.replace(/USDT$/, "");
 
 /**
- * Candles for the core: USDT-M futures first (the same market the app's map
- * reads, and reachable from the Worker), spot as fallback. From the cron's
- * data centre the spot hosts answered 403.
+ * Candles for the core: Binance's USDT-M futures first (the market the app's
+ * map reads), then spot, then — because Binance's firewall refuses the cron's
+ * data centres — Kraken and Coinbase in dollars (klines-server.ts). `feed`
+ * says which one answered, so every reading, signal and lesson can say it.
  */
-async function coreCandles(symbol: string, limit: number, minCandles = Math.min(limit, 120)) {
-  try {
-    return (await fetchKlinesServer(symbol, CORE_TF, { limit, minCandles, market: "futures" })).candles;
-  } catch {
-    return (await fetchKlinesServer(symbol, CORE_TF, { limit, minCandles })).candles;
-  }
+async function coreCandles(symbol: string, limit: number, minCandles: number, now: number): Promise<{ candles: SwingCandle[]; feed: Feed }> {
+  const r = await fetchKlinesServer(symbol, CORE_TF, { limit, minCandles, market: "futures", outside: true });
+  return { candles: closedOnly(r.candles, CORE_FRAME, now), feed: { venue: r.venue, binance: r.binance, at: now } };
 }
 
-type JobResult = { ok: boolean; note: string };
+/** Signals from another exchange's candles say so: their prices are in dollars, not USDT. */
+function withVenue<T extends CoreSignal>(s: T, venue: Venue): T {
+  return isOutside(venue) ? { ...s, note: `${s.note} · precios de ${VENUE_LABEL[venue]} (USD)` } : s;
+}
+
+type JobResult = { ok: boolean; note: string; feed?: Feed };
 
 /** Studies a step of this coin's history into the model; returns a short note. */
-function study(model: LearnModel, symbol: string, closed: ReturnType<typeof closedOnly>, max: number): string {
+function study(model: LearnModel, symbol: string, closed: SwingCandle[], max: number, venue: Venue): string {
   const rep = replayRompe(symbol, closed, model.cursors[symbol] ?? null, model.btc, CORE_FRAME, max, CORE_TF);
   for (const c of rep.cases) addCase(model.ridge.ROMPE, encode(c.features), c.r);
   model.cursors[symbol] = rep.cursor;
   model.backlog[symbol] = rep.backlog;
   model.historyCases += rep.cases.length;
+  if (rep.cases.length) model.venues[venue] = (model.venues[venue] ?? 0) + rep.cases.length;
   if (rep.waitingForBtc) return "espera a BTC para estudiar";
   return rep.studied ? `estudió ${rep.studied} velas (+${rep.cases.length} casos)` : "historia al día";
 }
@@ -315,15 +321,19 @@ async function scanJob(db: D1Database, symbols: string[], now: number): Promise<
   const fresh: CoreSignal[] = [];
   const mindFields: [string, unknown][] = [];
   let failures = 0;
+  let feed: Feed | undefined;
   for (const symbol of symbols) {
-    let closed;
+    let got: { candles: SwingCandle[]; feed: Feed };
     try {
-      closed = closedOnly(await coreCandles(symbol, 1000, 260), CORE_FRAME, now);
+      got = await coreCandles(symbol, 1000, 260, now);
     } catch (error) {
       failures += 1;
       notes.push(`${coin(symbol)} sin datos (${error instanceof Error ? error.message : "error"})`);
       continue;
     }
+    const closed = got.candles;
+    const venue = got.feed.venue;
+    feed = got.feed;
     if (symbol === "BTCUSDT") {
       model.btc = btcSeries(closed, CORE_FRAME);
       const last = closed[closed.length - 1];
@@ -334,27 +344,31 @@ async function scanJob(db: D1Database, symbols: string[], now: number): Promise<
     if (reading) mindFields.push([`$.readings.${symbol}`, reading]);
     let line = `${coin(symbol)}: ${reading ? reading.state.toLowerCase() : "sin lectura"}`;
     if (signal && !(await isBusy(db, symbol, "ROMPE"))) {
-      fresh.push(signal);
+      fresh.push(withVenue(signal, venue));
       line += signal.taken ? ` → señal ${signal.grade?.toLowerCase()}` : " → señal en sombra";
     }
-    notes.push(`${line}, ${study(model, symbol, closed, 30)}`);
+    notes.push(`${line}, ${study(model, symbol, closed, 30, venue)}`);
   }
+  // Nothing was read: nothing changed, nothing to write.
+  if (failures === symbols.length) return { ok: false, note: notes.join(" · ") };
   await recordCoreSignals(db, fresh, now);
   const saved = await saveModel(db, model, { rev: model.rev, exists: loaded.exists }, now);
+  if (feed) mindFields.push(["$.feed", feed]);
   await setMind(db, mindFields);
-  return { ok: failures < symbols.length, note: `${notes.join(" · ")}${saved ? "" : " · modelo ocupado, se reintenta"}` };
+  return { ok: true, note: `${notes.join(" · ")}${saved ? "" : " · modelo ocupado, se reintenta"}`, feed };
 }
 
 async function magnetJob(db: D1Database, symbol: string, now: number): Promise<JobResult> {
   const mind = await readMind(db);
-  const all = closedOnly(await coreCandles(symbol, 500, 220), CORE_FRAME, now);
-  if (all.length < 200) return { ok: true, note: `imanes ${coin(symbol)}: pocas velas` };
+  const { candles: all, feed } = await coreCandles(symbol, 500, 220, now);
+  if (all.length < 200) return { ok: true, note: `imanes ${coin(symbol)}: pocas velas`, feed };
   const last = all[all.length - 1];
   const prev = mind.magnets[symbol];
-  if (prev && prev.lastTime === last.openTime) return { ok: true, note: `imanes ${coin(symbol)}: sin vela nueva` };
+  if (prev && prev.lastTime === last.openTime) return { ok: true, note: `imanes ${coin(symbol)}: sin vela nueva`, feed };
   const cfg = timeframeConfig(CORE_TF);
   const opts = { halfLifeCandles: cfg.halfLife, priceRangePct: cfg.priceRange };
-  const oi = await loadOiDelta(symbol, CORE_TF, all.map((c) => c.openTime), AbortSignal.timeout(6000)).catch(() => null);
+  // Open interest is Binance futures' own series: only with Binance futures candles (it shares their times and their firewall).
+  const oi = feed.venue === "BINANCE_FUTURES" ? await loadOiDelta(symbol, CORE_TF, all.map((c) => c.openTime), AbortSignal.timeout(6000)).catch(() => null) : null;
   const nowMap = buildLiquidationHeatmap(symbol, all, last.close, { ...opts, oiDeltaByIndex: oi ?? undefined });
   const nowPair: MagnetPairLite = nowMap ? strongestMagnets(nowMap, last.close) : { above: null, below: null };
   // The map as it stood before the last candle is the one stored an hour ago.
@@ -367,15 +381,18 @@ async function magnetJob(db: D1Database, symbol: string, now: number): Promise<J
   if (before && sweeps.length) {
     const { model } = await loadModel(db);
     const found = liveMagnets(symbol, all, before, nowPair, model);
-    const free = found.length && !(await isBusy(db, symbol, "IMÁN")) ? found.slice(0, 1) : [];
+    const free = found.length && !(await isBusy(db, symbol, "IMÁN")) ? found.slice(0, 1).map((s) => withVenue(s, feed.venue)) : [];
     const added = await recordCoreSignals(db, free, now);
     note = `imanes ${coin(symbol)}: barrida${sweeps.some((e) => e.kind === "BARRIDA" && e.closedBack) ? " con rechazo" : " de largo"}${
       added.length ? ` → señal ${added[0].taken ? added[0].grade?.toLowerCase() : "en sombra"}` : ""
     }`;
   }
-  const mm: MindMagnet = { lastTime: last.openTime, at: now, price: last.close, above: nowPair.above, below: nowPair.below, nearPct: Math.max(0.4, atrPct(all) / 2), sweeps };
-  await setMind(db, [[`$.magnets.${symbol}`, mm]]);
-  return { ok: true, note };
+  const mm: MindMagnet = { lastTime: last.openTime, at: now, price: last.close, above: nowPair.above, below: nowPair.below, nearPct: Math.max(0.4, atrPct(all) / 2), sweeps, venue: feed.venue };
+  await setMind(db, [
+    [`$.magnets.${symbol}`, mm],
+    ["$.feed", feed],
+  ]);
+  return { ok: true, note, feed };
 }
 
 async function resolveJob(db: D1Database, now: number): Promise<JobResult> {
@@ -383,11 +400,13 @@ async function resolveJob(db: D1Database, now: number): Promise<JobResult> {
   const bySymbol = new Map<string, CoreSignal[]>();
   for (const s of open) bySymbol.set(s.symbol, [...(bySymbol.get(s.symbol) ?? []), s]);
   const updated: CoreSignal[] = [];
+  let feed: Feed | undefined;
   // At most 12 coins per minute: the free plan allows 50 outside requests per run.
   for (const [symbol, list] of [...bySymbol].slice(0, 12)) {
     try {
-      const closed = closedOnly(await coreCandles(symbol, 200, 1), CORE_FRAME, now);
-      for (const s of list) updated.push(resolveSignal(s, closed, CORE_FRAME) as CoreSignal);
+      const got = await coreCandles(symbol, 200, 1, now);
+      feed = got.feed;
+      for (const s of list) updated.push(resolveSignal(s, got.candles, CORE_FRAME) as CoreSignal);
     } catch {
       // Try again next cycle.
     }
@@ -403,7 +422,7 @@ async function resolveJob(db: D1Database, now: number): Promise<JobResult> {
     const saved = await saveModel(db, loaded.model, { rev: loaded.model.rev, exists: loaded.exists }, now);
     learned = saved ? `, aprendió de ${lessons.length} ${lessons.length === 1 ? "barrida" : "barridas"}` : ", modelo ocupado";
   }
-  return { ok: true, note: `${open.length} abiertas, ${closedNow.length} cerradas ahora${learned}` };
+  return { ok: true, note: `${open.length} abiertas, ${closedNow.length} cerradas ahora${learned}`, feed };
 }
 
 /** Extra study for the coin with the most history left (BTC first while its series is missing). */
@@ -413,11 +432,11 @@ async function studyJob(db: D1Database, now: number): Promise<JobResult> {
   const pending = CORE_COINS.filter((s) => !(s in model.cursors));
   const symbol = !model.btc ? "BTCUSDT" : (pending[0] ?? Object.entries(model.backlog).sort((a, b) => b[1] - a[1]).find(([, n]) => n > 0)?.[0] ?? null);
   if (!symbol) return { ok: true, note: "historia al día: nada pendiente" };
-  const closed = closedOnly(await coreCandles(symbol, 1000, 260), CORE_FRAME, now);
+  const { candles: closed, feed } = await coreCandles(symbol, 1000, 260, now);
   if (symbol === "BTCUSDT") model.btc = btcSeries(closed, CORE_FRAME);
-  const note = `${coin(symbol)}: ${study(model, symbol, closed, 60)}`;
+  const note = `${coin(symbol)}: ${study(model, symbol, closed, 60, feed.venue)}`;
   const saved = await saveModel(db, model, { rev: model.rev, exists: loaded.exists }, now);
-  return { ok: true, note: saved ? note : `${note} · modelo ocupado, se reintenta` };
+  return { ok: true, note: saved ? note : `${note} · modelo ocupado, se reintenta`, feed };
 }
 
 /**
@@ -441,7 +460,7 @@ export async function runCoreTick(db: D1Database, now = Date.now()): Promise<Cor
     result = { ok: false, note: `error: ${error instanceof Error ? error.message : String(error)}` };
   }
   const prev = await readHeartbeat(db).catch(() => null);
-  const hb = withTick(prev, { at: now, task: task.kind, ok: result.ok, note: result.note.slice(0, 300) });
+  const hb = withTick(prev, { at: now, task: task.kind, ok: result.ok, note: result.note.slice(0, 300), ...(result.feed ? { feed: result.feed.venue } : {}) });
   await writeHeartbeat(db, hb).catch(() => undefined);
   return hb;
 }

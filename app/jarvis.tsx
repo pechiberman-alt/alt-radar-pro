@@ -12,8 +12,8 @@ import { magnetEvents, strongestMagnets } from "@/lib/magnet-watch";
 import { parseSwingKlines } from "@/lib/swing-entries";
 import { everyVisible } from "@/lib/visible-interval";
 import { pickVoice } from "@/lib/browser-voice";
-import { awaySpeech, breakoutsFromMind, coreContext, coreOnline, coreStatusSpeech, GRADE_LABEL, reviveSnapshot, type CoreSignal, type CoreSnapshot } from "@/lib/jarvis-core";
-import { fmtExpect, learnSpeech } from "@/lib/jarvis-learn";
+import { awaySpeech, breakoutsFromMind, coreContext, coreOnline, coreStatusSpeech, feedLabel, feedSpeech, GRADE_LABEL, reviveSnapshot, type CoreSignal, type CoreSnapshot } from "@/lib/jarvis-core";
+import { fmtExpect, learnSpeech, venuesSpeech } from "@/lib/jarvis-learn";
 import { DEFAULT_NEURAL, NEURAL_VOICES, neuralVoice } from "@/lib/jarvis-voice";
 import { earcon, neuralModel, neuralState, onNeural, probeNeural, speakNeural, stopNeural, unlockAudio } from "./jarvis-voice-player";
 import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
@@ -723,7 +723,13 @@ function JarvisInner() {
             <button
               className={`jv-core ${coreUp ? "on" : "off"}`}
               onClick={() => void run({ kind: "CORE" })}
-              title={core?.heartbeat ? `Núcleo 24/7 · último latido ${new Date(core.heartbeat.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} · ${core.heartbeat.note}` : "Núcleo 24/7 en el servidor"}
+              title={
+                core?.heartbeat
+                  ? `Núcleo 24/7 · último latido ${new Date(core.heartbeat.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} · ${core.heartbeat.note}${
+                      core.mind?.feed ? ` · velas: ${feedLabel(core.mind.feed)}` : ""
+                    }`
+                  : "Núcleo 24/7 en el servidor"
+              }
             >
               <i />NÚCLEO
             </button>
@@ -824,7 +830,8 @@ function JarvisInner() {
                   <small>
                     Cómo aprende: recorre la historia de 20 monedas vela por vela con la misma regla que usa en vivo y solo las velas de ese momento, y anota el resultado de
                     las 48 siguientes. Con eso estima cuánto rinde cada tipo de señal según el contexto (BTC a favor o en contra, volatilidad, horario, fuerza) y cuán seguro
-                    está. Una señal desfavorable queda en sombra: se mide igual pero no se anuncia. Sin pocos casos no opina. No es asesoramiento financiero.
+                    está. Una señal desfavorable queda en sombra: se mide igual pero no se anuncia. Con pocos casos no opina. {venuesSpeech(l?.venues) ?? ""}{" "}
+                    {feedSpeech(core?.mind?.feed) ?? ""} No es asesoramiento financiero.
                   </small>
                 </div>
               );
@@ -896,7 +903,9 @@ function JarvisInner() {
                   Cada señal queda con su plan desde que la doy y se resuelve con las velas siguientes: si una vela toca stop y objetivo, cuenta el stop; a las 48 velas
                   se cierra a mercado; comisiones descontadas. Nada se borra ni se corrige después.{" "}
                   {onCore
-                    ? `El núcleo corre en el servidor las 24 horas: ${core.heartbeat ? `último latido ${new Date(core.heartbeat.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} (${core.heartbeat.note})` : "todavía sin latido"}. Las señales en sombra se miden aparte y no cuentan en el registro.`
+                    ? `El núcleo corre en el servidor las 24 horas: ${core.heartbeat ? `último latido ${new Date(core.heartbeat.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} (${core.heartbeat.note})` : "todavía sin latido"}. ${
+                        feedSpeech(core.mind?.feed) ?? ""
+                      } Las señales en sombra se miden aparte y no cuentan en el registro.`
                     : "Guardado en este equipo."}{" "}
                   No es asesoramiento financiero.
                 </small>

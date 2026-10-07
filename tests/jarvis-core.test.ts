@@ -4,6 +4,7 @@ import {
   awaySpeech,
   breakoutsFromMind,
   closedOnly,
+  coreContext,
   CORE_COINS,
   CORE_MAGNETS,
   coreOnline,
@@ -307,6 +308,109 @@ test("magnet job: one map per run — the first is stored, the next hour judges 
     const later = await runCoreTick(db, (minute + 60) * M);
     assert.doesNotMatch(later.note, /mapa guardado/, "the stored map judges the new candle");
     assert.equal((await readMind(db)).magnets.BTCUSDT.lastTime, next);
+  } finally {
+    globalThis.fetch = realFetch;
+    resetKlinesServerState();
+  }
+});
+
+/** Kraken's OHLC answer for these candles (seconds, strings, vwap = close), plus the candle still forming. */
+const krakenOf = (cs: SwingCandle[], forming?: SwingCandle) =>
+  JSON.stringify({
+    error: [],
+    result: { XXBTZUSD: [...cs, ...(forming ? [forming] : [])].map((c) => [c.openTime / 1000, String(c.open), String(c.high), String(c.low), String(c.close), String(c.close), String(c.volume), 3]), last: 0 },
+  });
+
+test("Binance refuses the cron: the core reads Kraken without looking ahead, and says so in its mind, signals and lessons", { skip: !sqlite }, async () => {
+  const db = makeDb();
+  resetKlinesServerState();
+  const past = setupAt(320, 250);
+  const tail = setupAt(200, 199).map((c) => ({ ...c, openTime: c.openTime + 320 * H }));
+  const all = [...past, ...tail];
+  const lastOpen = all[all.length - 1].openTime;
+  // Kraken always sends the candle still forming last; reading it would be reading the future.
+  const forming: SwingCandle = { openTime: lastOpen + H, open: all[all.length - 1].close, high: all[all.length - 1].close * 1.5, low: all[all.length - 1].close * 0.6, close: all[all.length - 1].close * 1.4, volume: 99, quoteVolume: 99 };
+  let minute = Math.ceil((lastOpen + H + 2 * M) / M);
+  while (minute % 15 !== 0) minute += 1;
+  assert.ok(minute * M < forming.openTime + H, "the forming candle is still open at the tick");
+  const realFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = (async (url: string) => {
+    const u = String(url);
+    calls.push(u);
+    if (u.includes("binance")) return new Response("blocked", { status: 403 });
+    if (u.includes("api.kraken.com")) return new Response(krakenOf(all, forming));
+    return new Response("[]");
+  }) as typeof fetch;
+  try {
+    const hb = await runCoreTick(db, minute * M);
+    assert.equal(hb.task, "SCAN");
+    assert.equal(hb.ok, true, hb.note);
+    assert.equal(hb.feed, "KRAKEN");
+    assert.ok(calls.length <= 6, `3 refusals, then one Kraken request per coin: ${calls.length}`);
+    const mind = await readMind(db);
+    assert.equal(mind.readings.BTCUSDT.at, lastOpen, "the reading ends at the last closed candle");
+    assert.deepEqual({ venue: mind.feed?.venue, binance: mind.feed?.binance }, { venue: "KRAKEN", binance: "BLOQUEADO" });
+    const open = await openCoreSignals(db);
+    assert.equal(open.length, 2);
+    assert.ok(open.every((s) => s.note.endsWith(" · precios de Kraken (USD)")), open.map((s) => s.note).join(" | "));
+    const snap = await coreSnapshot(db, minute * M);
+    assert.match(coreStatusSpeech(snap, minute * M), /Leo las velas de Kraken, en dólares, porque Binance bloquea al servidor\. El precio es prácticamente el mismo; el volumen es el de Kraken\./);
+    assert.equal(coreContext(snap, minute * M).nucleo.datos?.velasDe, "Kraken");
+    let learned = 0;
+    for (let k = 1; k <= 6 && !learned; k++) {
+      await runCoreTick(db, (minute + 15 * k) * M);
+      learned = (await loadModel(db)).model.historyCases;
+    }
+    const model = (await loadModel(db)).model;
+    assert.ok(learned >= 1);
+    assert.deepEqual(model.venues, { KRAKEN: model.historyCases }, "every lesson knows where its candles came from");
+  } finally {
+    globalThis.fetch = realFetch;
+    resetKlinesServerState();
+  }
+});
+
+test("a scan that could read nothing writes nothing and says what each exchange answered", { skip: !sqlite }, async () => {
+  const db = makeDb();
+  resetKlinesServerState();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => (String(url).includes("binance") ? new Response("blocked", { status: 403 }) : new Response("down", { status: 503 }))) as typeof fetch;
+  try {
+    const hb = await runCoreTick(db, 1_000_000 * 15 * M);
+    assert.equal(hb.task, "SCAN");
+    assert.equal(hb.ok, false);
+    assert.match(hb.note, /BTC sin datos \(Binance futuros HTTP 403 · Binance HTTP 403 · Kraken HTTP 503 · Coinbase HTTP 503\)/);
+    assert.equal(hb.feed, undefined);
+    assert.equal((await loadModel(db)).exists, false, "no empty model saved");
+    assert.deepEqual((await readMind(db)).readings, {});
+  } finally {
+    globalThis.fetch = realFetch;
+    resetKlinesServerState();
+  }
+});
+
+test("magnet job on Kraken's candles: no open-interest request (Binance futures' own series), the map says its source", { skip: !sqlite }, async () => {
+  const db = makeDb();
+  resetKlinesServerState();
+  const candles = setupAt(500, 300, (j) => 100 + Math.sin(j / 3));
+  let minute = Math.ceil((candles[499].openTime + H + M) / M);
+  while (minute % 15 !== 10) minute += 1;
+  const realFetch = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = (async (url: string) => {
+    calls.push(String(url));
+    return String(url).includes("binance") ? new Response("blocked", { status: 403 }) : new Response(krakenOf(candles));
+  }) as typeof fetch;
+  try {
+    const hb = await runCoreTick(db, minute * M);
+    assert.equal(hb.task, "MAGNET");
+    assert.equal(hb.feed, "KRAKEN");
+    assert.match(hb.note, /imanes BTC: mapa guardado/);
+    assert.ok(!calls.some((c) => c.includes("openInterest")), calls.join("\n"));
+    const mind = await readMind(db);
+    assert.equal(mind.magnets.BTCUSDT.venue, "KRAKEN");
+    assert.equal(mind.feed?.venue, "KRAKEN");
   } finally {
     globalThis.fetch = realFetch;
     resetKlinesServerState();

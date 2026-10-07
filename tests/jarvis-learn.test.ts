@@ -20,6 +20,7 @@ import {
   replayRompe,
   sessionOf,
   summarizeModel,
+  venuesSpeech,
   volRegime,
   type Features,
 } from "../lib/jarvis-learn.ts";
@@ -195,4 +196,23 @@ test("summary and speech: how much it studied, what is left, what it learned", (
   assert.match(say, /^Estudié 400 situaciones de la historia de 2 monedas\. Me quedan 150 velas por estudiar; sigo aprendiendo cada minuto\. Rupturas en general/);
   assert.match(say, /Con BTC (a favor|en contra)/);
   assert.doesNotMatch(say, /Barridas de imán: llevo 0/, "nothing to say about magnets yet: silence, not noise");
+});
+
+test("where the lessons come from: said when not Binance, counted per exchange, old models start at zero", () => {
+  assert.equal(venuesSpeech({}), null);
+  assert.equal(venuesSpeech({ BINANCE_FUTURES: 300, BINANCE: 20 }), null, "Binance's own candles: nothing to explain");
+  assert.equal(venuesSpeech({ KRAKEN: 640 }), "Las estudié con velas de Kraken en dólares, porque Binance no deja leer al servidor.");
+  assert.equal(
+    venuesSpeech({ BINANCE_FUTURES: 300, KRAKEN: 1200, COINBASE: 0 }),
+    "De esas, 1.200 salen de velas de Kraken en dólares y 300 de Binance: cuando Binance no deja leer al servidor, uso otra fuente.",
+  );
+  const old = { ...emptyModel(), historyCases: 3 } as Partial<ReturnType<typeof emptyModel>>;
+  delete old.venues;
+  assert.deepEqual(parseModel(JSON.stringify(old)).venues, {}, "a model saved before this existed");
+  const m = emptyModel();
+  m.historyCases = 640;
+  m.venues = { KRAKEN: 640 };
+  const s = summarizeModel(m);
+  assert.deepEqual(s.venues, { KRAKEN: 640 });
+  assert.match(learnSpeech(s), /^Estudié 640 situaciones de la historia de 0 monedas\. Las estudié con velas de Kraken en dólares, porque Binance no deja leer al servidor\./);
 });
