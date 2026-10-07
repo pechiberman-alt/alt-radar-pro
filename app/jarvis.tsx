@@ -183,6 +183,39 @@ type SpeechRec = {
   start: () => void;
   stop: () => void;
 };
+/** The thread lives on the server for signed-in people. If the server says they are not signed in, it stops asking. */
+let threadOpen = true;
+
+/** One turn of the conversation, kept on the server so a reload does not lose it. Fire and forget. */
+function keepTurn(role: "user" | "assistant", text: string) {
+  if (!threadOpen) return;
+  void fetch("/api/jarvis/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ turns: [{ role, text }] }),
+  })
+    .then((r) => {
+      if (r.status === 401) threadOpen = false;
+    })
+    .catch(() => undefined);
+}
+
+/** The last hours of the conversation, from the server. Empty when signed out or offline. */
+async function readThreadLines(): Promise<Line[]> {
+  if (!threadOpen) return [];
+  try {
+    const r = await fetch("/api/jarvis/chat", { cache: "no-store" });
+    if (r.status === 401) {
+      threadOpen = false;
+      return [];
+    }
+    const d = (await r.json().catch(() => ({}))) as { turns?: { role: string; text: string }[] };
+    return (d.turns ?? []).map((x): Line => ({ who: x.role === "user" ? "yo" : "jarvis", text: x.text }));
+  } catch {
+    return [];
+  }
+}
+
 /** The hands-free rules, created on first use. */
 function handsOf(ref: { current: HandsFree | null }): HandsFree {
   if (!ref.current) ref.current = new HandsFree();
@@ -424,6 +457,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
 
   const speak = useCallback(
     (text: string, tag?: string) => {
+      keepTurn("assistant", text);
       setLines((l) => [...l, { who: "jarvis" as const, text, ...(tag ? { tag } : {}) }].slice(-40));
       if (!prefs.voice) {
         setMode("idle");
@@ -679,6 +713,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       const clean = text.trim();
       if (!clean) return;
       lastVoiceRef.current = byVoice;
+      keepTurn("user", clean);
       setLines((l) => [...l, { who: "yo" as const, text: clean }].slice(-40));
       void run(parseCommand(clean, known.current));
     },
@@ -947,14 +982,28 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
     else void loadCore();
   }, [ledgerTab, loadCore, resolveOpen]);
 
+  /** "Nueva charla": the conversation starts again. The notes JARVIS keeps (jarvis-memory) stay. */
+  const newThread = () => {
+    hush();
+    setLines([]);
+    setInterim("");
+    if (threadOpen) void fetch("/api/jarvis/chat", { method: "DELETE" }).catch(() => undefined);
+  };
+
   const openPanel = () => {
     setOpen(true);
     unlockAudio();
     void probeNeural();
     void resolveOpen();
     void (async () => {
-      const snap = await loadCore();
+      // A conversation of the last hours goes on where it was; only a new one gets the briefing.
+      const [snap, past] = await Promise.all([loadCore(), lines.length ? Promise.resolve<Line[]>([]) : readThreadLines()]);
       const away = snap ? takeAway(snap) : null;
+      if (past.length) {
+        setLines((l) => (l.length ? l : past));
+        if (away) speak(away);
+        return;
+      }
       if (!lines.length) {
         const today = new Date().toISOString().slice(0, 10);
         if (prefs.lastBriefing !== today) {
@@ -1280,6 +1329,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             )}
             {handsText && <p className="jv-hf" role="status">{handsText}</p>}
             <label title="Cada 5 minutos revisa 20 monedas y las barridas de imanes de BTC, ETH y SOL; te avisa en voz y registra cada señal con su resultado"><input type="checkbox" checked={prefs.watch} onChange={(e) => setPrefs({ watch: e.target.checked })} /> Vigilancia</label>
+            <button type="button" className="jv-link" title="Empieza una conversación nueva. Las notas que JARVIS guarda de vos siguen." onClick={newThread}>Nueva charla</button>
             <button type="button" className={`jv-voicebtn${showVoice ? " on" : ""}`} onClick={() => {
                 setShowVoice((v) => !v);
                 setShowLedger(false);

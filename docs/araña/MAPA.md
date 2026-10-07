@@ -4,17 +4,18 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 435 · objetivos: 15 · sin objetivo: 0
-- Tablas D1: 40 · secretos: 3 · variables de entorno: 8 · rutas /api: 45 · hosts: 50
+- Archivos: 438 · objetivos: 15 · sin objetivo: 0
+- Tablas D1: 41 · secretos: 3 · variables de entorno: 8 · rutas /api: 46 · hosts: 50
 - Código de navegador: 52 archivos con "use client" que alcanzan 138 · problemas: 0
-- Lib sin prueba directa: 21 de 131
+- Lib sin prueba directa: 21 de 132
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (33)
+### jarvis — JARVIS, la IA propia del software (35)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: la usan MENTE y las notas de voz de Telegram.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
+- `app/api/jarvis/chat/route.ts` — exporta: dynamic, GET, POST, DELETE
 - `app/api/jarvis/core/route.ts` — exporta: dynamic, GET
 - `app/api/jarvis/memory/route.ts` — exporta: dynamic, GET, POST, DELETE
 - `app/api/jarvis/voice/route.ts` — exporta: dynamic, GET, POST
@@ -34,6 +35,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: la usan MENTE y las
 - `lib/browser-voice.ts` — Picks the best Spanish voice the browser has.
 - `lib/hands-free.ts` — Manos libres: the rules behind JARVIS's listening mode in the browser.
 - `lib/jarvis-analyst.ts` — exporta: Frames, Scenario, Analysis, analyzeAsset, analysisText, analysisForAi
+- `lib/jarvis-chat.ts` — The conversation with JARVIS in the app, kept for each signed-in person, so a reload does not lose the thread.
 - `lib/jarvis-core-db.ts` — exporta: ensureCoreSchema, rowToSignal, readCoreStats, recordCoreSignals, openCoreSignals, isBusy (+12)
 - `lib/jarvis-core.ts` — exporta: CORE_TF, CORE_FRAME, CORE_COINS, CORE_MAGNETS, CYCLE_MIN, CoreTask (+36)
 - `lib/jarvis-learn.ts` — exporta: Regime, Features, DIMS, D, ALPHA, MIN_CASES (+37)
@@ -289,7 +291,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+38)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (105)
+### calidad — Pruebas (106)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
@@ -332,6 +334,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/inducement.test.ts` — pruebas: bullish: BOS on the close above the swing high, the first real pullback is the I, swept and then structure failed: a close below the leg origin, not swept yet: pending, no outcome (+1)
 - `tests/institutional-flows.test.ts` — pruebas: parseFlowDays drops rows that are not reported sessions, parseFlowDays returns days oldest first regardless of source order, a holiday does not extend a streak across it (+1)
 - `tests/jarvis-analyst.test.ts` — pruebas: the analyst never reads a candle still forming, on any timeframe (no lookahead), a steady advance reads alcista on every timeframe, with the evidence listed and , a coil under a level is reported as about to break, and too little history gives
+- `tests/jarvis-chat.test.ts` — pruebas: only question and answer turns are kept, trimmed and bounded, the thread comes back in order, and only to its owner, a thread older than six hours starts fresh, as the Telegram thread does (+1)
 - `tests/jarvis-core.test.ts` — pruebas: the 15-minute cycle covers 20 coins, 3 magnets, one resolution and a study minut, live reading: no lookahead, the same 200-candle window as the history walk, grad, magnet sweeps from the stored previous map: swept and closed back = reversal sig (+1)
 - `tests/jarvis-learn.test.ts` — pruebas: encoding: one column per non-baseline value,, the regression recovers real effects, and says, incremental sums equal the batch, whatever the order (+1)
 - `tests/jarvis-ledger.test.ts` — pruebas: breakout: long at the close, stop under the recent lows (1–2,5 ATR), target 2R, magnet: only a swept-and-rejected zone on the last candle; reversal toward the o, resolution: target, stop, both in one candle = stop, time exit, untouched stays  (+1)
@@ -516,6 +519,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `brain_security_events` — crea: db/schema.ts, lib/brain-security.ts · usa: lib/brain-security.ts · índices: brain_security_events_time_idx, brain_security_events_symbol_idx
 - `dca_purchases` — crea: lib/dca-tracker.ts · usa: app/api/dca/route.ts · índices: dca_purchases_user_idx
 - `dca_schedules` — crea: lib/dca-tracker.ts · usa: app/api/dca/schedule/route.ts, lib/telegram-dispatch.ts · sin índice visible en el código
+- `jarvis_chat` — crea: lib/jarvis-chat.ts · usa: lib/jarvis-chat.ts, tests/jarvis-chat.test.ts · índices: jarvis_chat_user
 - `jarvis_core_signals` — crea: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · usa: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · índices: jarvis_core_open, jarvis_core_created, jarvis_core_closed, jarvis_core_busy
 - `jarvis_core_state` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts, lib/jarvis-mind-db.ts, lib/jarvis-world.ts, tests/jarvis-mind.test.ts · sin índice visible en el código
 - `jarvis_core_stats` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts · sin índice visible en el código
@@ -581,6 +585,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/etf-flows` [GET] — app/api/etf-flows/route.ts · datos-mercado
 - `/api/exchange-flows` [GET] — app/api/exchange-flows/route.ts · datos-mercado
 - `/api/institutional` [GET] — app/api/institutional/route.ts · datos-mercado
+- `/api/jarvis/chat` [GET, POST, DELETE] — app/api/jarvis/chat/route.ts · jarvis
 - `/api/jarvis/core` [GET] — app/api/jarvis/core/route.ts · jarvis
 - `/api/jarvis/memory` [GET, POST, DELETE] — app/api/jarvis/memory/route.ts · jarvis
 - `/api/jarvis/voice` [GET, POST] — app/api/jarvis/voice/route.ts · jarvis

@@ -37,6 +37,7 @@ f56379f0953b	52	app/api/diario/fills/route.ts
 7409f2aa8952	75	app/api/etf-flows/route.ts
 dbf4555e4b39	35	app/api/exchange-flows/route.ts
 a18fb46bcc50	42	app/api/institutional/route.ts
+ca07248c2d46	37	app/api/jarvis/chat/route.ts
 e3ef06d45c39	23	app/api/jarvis/core/route.ts
 ec39df2aab15	38	app/api/jarvis/memory/route.ts
 25a268c2dab7	54	app/api/jarvis/voice/route.ts
@@ -104,8 +105,8 @@ def492abf855	146	app/install-panel.tsx
 08966d25ae55	67	app/institutional-desk.css
 58e9409bb2ba	192	app/institutional-desk.tsx
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
-a751f161bc10	120	app/jarvis.css
-f4e655ee97a7	1383	app/jarvis.tsx
+39c4819ab1a5	121	app/jarvis.css
+26c55637480e	1433	app/jarvis.tsx
 aa4d7c876c20	51	app/laptop.css
 d6020ed94c96	129	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -226,6 +227,7 @@ dfc52ea472c0	115	lib/futures-risk.ts
 619425206c2d	149	lib/inducement.ts
 cd4af39e8ba8	322	lib/institutional-flows.ts
 f83a7c4a72ca	222	lib/jarvis-analyst.ts
+f61124d7437f	79	lib/jarvis-chat.ts
 67c2bd6e8989	495	lib/jarvis-core-db.ts
 104f734141fd	467	lib/jarvis-core.ts
 e65cb00f1d4d	483	lib/jarvis-learn.ts
@@ -366,6 +368,7 @@ d6031202b073	89	tests/footprint-sweeps.test.ts
 adcae854588e	101	tests/inducement.test.ts
 edf787ad8d65	124	tests/institutional-flows.test.ts
 cf22fb64056e	59	tests/jarvis-analyst.test.ts
+6d6b9ed4fa70	68	tests/jarvis-chat.test.ts
 45b5ffc94ac0	474	tests/jarvis-core.test.ts
 2ca97216ec48	219	tests/jarvis-learn.test.ts
 2cba958a1dba	78	tests/jarvis-ledger.test.ts
