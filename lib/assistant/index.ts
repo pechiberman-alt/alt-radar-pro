@@ -89,28 +89,35 @@ export type AssistantAnswer = {
 
 const UNAVAILABLE = "SIN DATOS";
 
+/**
+ * Numbers the Argentine way, as the rest of the app writes them: "$94,20" is
+ * ninety-four dollars. The English "$94.200" read here as ninety-four thousand,
+ * on screen and aloud (JARVIS said "ciento dieciséis mil" for SOL at 116).
+ */
+const ar = (value: number, digits: number) => value.toLocaleString("es-AR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
 const pct = (value: number | null | undefined, digits = 2) =>
   value === null || value === undefined || !Number.isFinite(value)
     ? UNAVAILABLE
-    : `${value >= 0 ? "+" : ""}${value.toFixed(digits)}%`;
+    : `${value >= 0 ? "+" : ""}${ar(value, digits)}%`;
 
 const plain = (value: number | null | undefined, digits = 2) =>
   value === null || value === undefined || !Number.isFinite(value)
     ? UNAVAILABLE
-    : value.toFixed(digits);
+    : ar(value, digits);
 
 const price = (value: number) =>
   value >= 1000
-    ? `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+    ? `$${ar(value, 0)}`
     : value >= 1
-      ? `$${value.toFixed(3)}`
-      : `$${value.toPrecision(4)}`;
+      ? `$${ar(value, 2)}`
+      : `$${value.toLocaleString("es-AR", { maximumSignificantDigits: 4 })}`;
 
 const cap = (value: number | null | undefined) => {
   if (value === null || value === undefined || !Number.isFinite(value)) return UNAVAILABLE;
-  if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
-  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
-  return `$${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e12) return `$${ar(value / 1e12, 2)}T`;
+  if (value >= 1e9) return `$${ar(value / 1e9, 1)}B`;
+  return `$${ar(value / 1e6, 1)}M`;
 };
 
 const assetName = (symbol: string) => symbol.replace("USDT", "");
@@ -267,7 +274,7 @@ const INTENTS: Intent[] = [
         .slice(0, 4)
         .map(
           (pump) =>
-            `${assetName(pump.symbol)} en ${pump.stage} (${pump.score}/100, volumen ${pump.metrics.relativeVolume.toFixed(1)}× su mediana, ${pct(pump.metrics.runFromBase, 1)} desde la base)`,
+            `${assetName(pump.symbol)} en ${pump.stage} (${pump.score}/100, volumen ${ar(pump.metrics.relativeVolume, 1)}× su mediana, ${pct(pump.metrics.runFromBase, 1)} desde la base)`,
         )
         .join("; ");
       return {
@@ -337,7 +344,7 @@ const INTENTS: Intent[] = [
 
       const describe = (change: number | null, name: string, invert = false) => {
         if (change === null) return `${name}: sin serie suficiente.`;
-        if (Math.abs(change) < 0.05) return `${name} lateral (${change >= 0 ? "+" : ""}${change.toFixed(2)} pp).`;
+        if (Math.abs(change) < 0.05) return `${name} lateral (${change >= 0 ? "+" : ""}${ar(change, 2)} pp).`;
         const rising = change > 0;
         const reading = invert
           ? rising
@@ -346,13 +353,13 @@ const INTENTS: Intent[] = [
           : rising
             ? "BTC ganando terreno"
             : "capital rotando fuera de BTC";
-        return `${name} ${rising ? "subiendo" : "bajando"} ${change >= 0 ? "+" : ""}${change.toFixed(2)} pp: ${reading}.`;
+        return `${name} ${rising ? "subiendo" : "bajando"} ${change >= 0 ? "+" : ""}${ar(change, 2)} pp: ${reading}.`;
       };
 
       const total =
         trend.totalChangePct === null
           ? ""
-          : ` La capitalización total varió ${trend.totalChangePct >= 0 ? "+" : ""}${trend.totalChangePct.toFixed(2)}% en el período.`;
+          : ` La capitalización total varió ${trend.totalChangePct >= 0 ? "+" : ""}${ar(trend.totalChangePct, 2)}% en el período.`;
 
       return {
         text: `Sobre ${trend.samples} lecturas propias de las últimas ${trend.hours}h: ${describe(trend.btcChange, "BTC.D")} ${describe(trend.usdtChange, "USDT.D", true)}${total} Esta serie la construye la app: ninguna fuente gratuita publica el histórico de dominancia.`,
@@ -440,7 +447,7 @@ const INTENTS: Intent[] = [
         };
       }
       return {
-        text: `Historial registrado: ${ledger.total} señales, ${ledger.evaluated4h} ya evaluadas a 4H. Win rate ${ledger.winRate4h === null ? UNAVAILABLE : `${ledger.winRate4h.toFixed(1)}%`}, profit factor ${plain(ledger.profitFactor4h)}, retorno medio ${pct(ledger.averageReturn4h)}. Cada señal se guarda al detectarse y se mide después con lo que realmente pasó, sin elegir velas hacia atrás. No son operaciones ejecutadas: no incluyen comisiones ni deslizamiento.`,
+        text: `Historial registrado: ${ledger.total} señales, ${ledger.evaluated4h} ya evaluadas a 4H. Win rate ${ledger.winRate4h === null ? UNAVAILABLE : `${ar(ledger.winRate4h, 1)}%`}, profit factor ${plain(ledger.profitFactor4h)}, retorno medio ${pct(ledger.averageReturn4h)}. Cada señal se guarda al detectarse y se mide después con lo que realmente pasó, sin elegir velas hacia atrás. No son operaciones ejecutadas: no incluyen comisiones ni deslizamiento.`,
         confidence: ledger.evaluated4h >= 20 ? "ALTA" : "MEDIA",
         sources: ["Signal Ledger · Cloudflare D1"],
         followUps: ["¿Qué es la validación walk-forward?", "¿Cuál es la mejor señal?"],
@@ -647,7 +654,7 @@ function assetAnswer(
 
   if (pump && pump.stage !== "SIN PUMP") {
     parts.push(
-      `El radar de pumpeo lo marca en ${pump.stage} (${pump.score}/100), con volumen ${pump.metrics.relativeVolume.toFixed(1)}× su mediana.`,
+      `El radar de pumpeo lo marca en ${pump.stage} (${pump.score}/100), con volumen ${ar(pump.metrics.relativeVolume, 1)}× su mediana.`,
     );
   }
 

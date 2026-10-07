@@ -131,7 +131,7 @@ test("reports institutional patterns from the live order flow", () => {
 test("answers where the strongest floor is, with its confluence", () => {
   const answer = ask("donde esta el piso mas fuerte?", withFlow);
   assert.equal(answer.intent, "estructura");
-  assert.ok(answer.text.includes("77057.5") || answer.text.includes("77,057") || answer.text.includes("77057"));
+  assert.ok(answer.text.includes("77.057,5"), `el piso en formato argentino: ${answer.text}`);
   assert.ok(answer.text.includes("Punto de control"), "debe citar en qué se apoya");
   assert.ok(answer.text.includes("88/100"));
 });
@@ -233,14 +233,15 @@ test("a dominance question reaches the dominance intent, not a ticker", () => {
   };
   const answer = ask("como esta la dominancia?", withCollisions);
   assert.equal(answer.intent, "dominancia");
-  assert.ok(answer.text.includes("6.95"), "debe responder con USDT.D real");
+  assert.ok(answer.text.includes("6,95"), "debe responder con USDT.D real");
 });
 
 test("answers about a named asset with its real figures", () => {
   const answer = ask("como viene SOL?", context);
   assert.equal(answer.intent, "activo");
   assert.ok(answer.text.includes("SOL/USDT"));
-  assert.ok(answer.text.includes("$94.200"), `faltó el precio real: ${answer.text}`);
+  assert.ok(answer.text.includes("$94,20"), `faltó el precio real: ${answer.text}`);
+  assert.ok(!answer.text.includes("$94.200"), "94 dólares no se escribe como 94 mil");
   assert.ok(answer.text.includes("SETUP"));
   assert.ok(answer.text.includes("Momentum alineado"), "debe citar la razón principal");
 });
@@ -256,14 +257,14 @@ test("summarises the market from the snapshot", () => {
   assert.equal(answer.intent, "resumen");
   assert.ok(answer.text.includes("38/100"));
   assert.ok(answer.text.includes("EXTREMO"));
-  assert.ok(answer.text.includes("$2.63T"));
+  assert.ok(answer.text.includes("$2,63T"));
 });
 
 test("reports dominance including USDT.D and what it means", () => {
   const answer = ask("como esta la dominancia?", context);
   assert.equal(answer.intent, "dominancia");
-  assert.ok(answer.text.includes("6.95"), "debe incluir USDT.D");
-  assert.ok(answer.text.includes("$2.63T"));
+  assert.ok(answer.text.includes("6,95"), "debe incluir USDT.D");
+  assert.ok(answer.text.includes("$2,63T"));
   assert.ok(/media-alta|alta|habitual|baja/.test(answer.text), "debe interpretar la banda");
 });
 
@@ -272,7 +273,7 @@ test("reports the pump radar with its stages", () => {
   assert.equal(answer.intent, "pumpeo");
   assert.ok(answer.text.includes("NEIRO"));
   assert.ok(answer.text.includes("IGNICIÓN"));
-  assert.ok(answer.text.includes("5.9"), "debe citar el volumen relativo real");
+  assert.ok(answer.text.includes("5,9"), "debe citar el volumen relativo real");
 });
 
 test("explains that macro risk annotates rather than blocks", () => {
@@ -284,7 +285,7 @@ test("explains that macro risk annotates rather than blocks", () => {
 test("reports recorded performance without overstating it", () => {
   const answer = ask("como viene el rendimiento?", context);
   assert.equal(answer.intent, "rendimiento");
-  assert.ok(answer.text.includes("42.4%"));
+  assert.ok(answer.text.includes("42,4%"));
   assert.ok(
     answer.text.includes("No son operaciones ejecutadas"),
     "debe aclarar que no incluye comisiones ni deslizamiento",

@@ -191,7 +191,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 51c941d7f026	362	lib/alerts.ts
 524aacbc59f1	153	lib/app-settings.ts
 025856e9b96a	181	lib/asset-read.ts
-8a4b83f86a11	736	lib/assistant/index.ts
+8b7646335b22	743	lib/assistant/index.ts
 861e6e35ec57	309	lib/assistant/knowledge.ts
 8a6007d98642	154	lib/auth.ts
 ce2df8339d2c	551	lib/automation.ts
@@ -286,7 +286,7 @@ fbdd7e3e2195	192	lib/signal-confluence.ts
 8e2f0a70ca9e	154	lib/signal-plan-db.ts
 a34a2cc0c0c0	54	lib/signal-plan-record.ts
 ab88433a8df5	215	lib/signal-plan.ts
-4be1cbd2d876	215	lib/speech-text.ts
+5c5d69d9fd82	223	lib/speech-text.ts
 7e1138f29089	78	lib/spot-plan-client.ts
 cfaa28b61f98	182	lib/spot-strategy.ts
 9057e303a855	189	lib/squeeze.ts
@@ -337,7 +337,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 1dd438218685	96	tests/app-settings.test.ts
 a97845f99e5f	189	tests/arana.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
-e12f35caeca1	385	tests/assistant.test.ts
+8dffdd6b09f6	386	tests/assistant.test.ts
 dff2674006ae	17	tests/auth-pbkdf2.test.ts
 c9269f098959	107	tests/big-trades.test.ts
 d3752b5c0eee	221	tests/binance-account.test.ts
@@ -415,7 +415,7 @@ de58453ca449	139	tests/scenario-analysis.test.ts
 0acb179e0c9c	133	tests/signal-confluence.test.ts
 b49ac1298da8	141	tests/signal-plan-db.test.ts
 f57d24eadbd3	213	tests/signal-plan.test.ts
-80a0973704a2	78	tests/speech-text.test.ts
+2897707d62d0	102	tests/speech-text.test.ts
 c71a0865f0b2	97	tests/spot-strategy.test.ts
 6fd2182c77cc	59	tests/structure-archive.test.ts
 faea7e4c1e9c	152	tests/supply-demand.test.ts

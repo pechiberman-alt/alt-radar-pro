@@ -75,3 +75,27 @@ test("prices said like a person: rounded by size; timeframes and symbols in word
   assert.match(t, /en una hora, estóp ciento ocho coma uno, objetivo ciento once coma ocho a en quince minutos, más o menos dos coma cuarenta y cinco por ciento/);
   assert.equal(normalizeSpanish("1d, 3d, 1w, 4h"), "un día, tres días, una semana, cuatro horas");
 });
+
+test("what the local engine writes is said as a person says it: capital timeframes, money with a scale, scores, pairs", async () => {
+  const { normalizeSpanish } = await import("../lib/speech-text.ts");
+  const said = normalizeSpanish("SOL/USDT cotiza $116,13 (-3,90% 24H, 1H +0,20%, 4H). Volumen 24H $500M. Score 47/100. Volumen 2,5×. Total $2,63T, cap $1,2B, $85K. 1D y 15m. USDT.D 6,95%.");
+  for (const bad of ["H ", "dólaresM", "dólaresB", "dólaresK", "cuarenta y siete cien", "u ese de te cotiza", "por ,", "mil ciento"]) {
+    assert.ok(!said.includes(bad), `no debe decir «${bad}»: ${said}`);
+  }
+  for (const good of [
+    "sol cotiza ciento dieciséis coma uno dólares",
+    "veinticuatro horas",
+    "una hora",
+    "cuatro horas",
+    "quinientos millones de dólares",
+    "cuarenta y siete de cien",
+    "dos coma cinco veces",
+    "dos coma sesenta y tres billones de dólares",
+    "uno coma dos mil millones de dólares",
+    "ochenta y cinco mil dólares",
+    "un día y quince minutos",
+    "dominancia de u ese de te",
+  ]) {
+    assert.ok(said.includes(good), `debe decir «${good}»: ${said}`);
+  }
+});

@@ -69,6 +69,8 @@ export function readNumber(raw: string): string {
 
 /** Trading English and names as a Spanish speaker says them, written for Spanish rules. */
 const LEXICON: [RegExp, string][] = [
+  [/\bUSDT\.D\b/g, "dominancia de u ese de te"],
+  [/\bBTC\.D\b/g, "dominancia de bítcoin"],
   [/\bwin ?rate\b/gi, "uin réit"],
   [/\bprofit factor\b/gi, "prófit fáctor"],
   [/\btake profit\b/gi, "téik prófit"],
@@ -148,17 +150,23 @@ const UNIT_WORDS: Record<string, [string, string, "f" | "m"]> = {
 /** Everything JARVIS might write, as words a Spanish reader would say. */
 export function normalizeSpanish(text: string): string {
   let t = text.normalize("NFC");
+  // Ticker pairs and coins first, before the lexicon spells "USDT": "SOLUSDT" or "SOL/USDT" → "sol", "ETHUSDT" → "éter".
+  t = t.replace(/\b([A-Z]{2,6})\/?USDT\b/g, (_, c: string) => c);
   for (const [re, rep] of LEXICON) t = t.replace(re, rep);
   // Symbols the voice would skip or spell.
-  t = t.replace(/\s*·\s*/g, ", ").replace(/\s*→\s*/g, " a ").replace(/\s*×\s*/g, " por ").replace(/\s*±\s*/g, " más o menos ").replace(/≈\s*/g, "cerca de ");
-  // Timeframes: "1h" → "una hora", "15m" → "quince minutos", "4h" → "cuatro horas".
-  t = t.replace(/\b(\d{1,2})([hmdw])\b/g, (_, n: string, u: string) => {
+  // "2,5×" is "dos coma cinco veces"; a lone "×" between things is "por".
+  t = t.replace(/(\d)\s*×/g, "$1 veces").replace(/\s*·\s*/g, ", ").replace(/\s*→\s*/g, " a ").replace(/\s*×\s*/g, " por ").replace(/\s*±\s*/g, " más o menos ").replace(/≈\s*/g, "cerca de ");
+  // Scores: "47/100" → "47 de 100".
+  t = t.replace(/(\d)\s?\/\s?(100|10|5)\b/g, "$1 de $2");
+  // Money with a scale: "$500M" → "500 millones de dólares", "$1,2B" → "1,2 mil millones", "$85K", "$2,63T" (billones).
+  t = t.replace(/(?:US)?\$\s?([\d.,]+)\s?([KMBT])\b/g, (_, n: string, k: string) => `${n} ${{ K: "mil", M: "millones de", B: "mil millones de", T: "billones de" }[k]} dólares`);
+  // Timeframes: "1h" → "una hora", "15m" → "quince minutos", "4H" → "cuatro horas", "1D" → "un día". A capital M is millions, never minutes.
+  t = t.replace(/\b(\d{1,2})([hmdwHDW])\b/g, (_, n: string, raw: string) => {
+    const u = raw.toLowerCase();
     const [one, many, g] = UNIT_WORDS[u];
     const k = Number(n);
     return k === 1 ? `${g === "f" ? "una" : "un"} ${one}` : `${numberToWords(k)} ${many}`;
   });
-  // Ticker pairs and coins: "SOLUSDT" → "sol", "ETHUSDT" → "éter".
-  t = t.replace(/\b([A-Z]{2,6})USDT\b/g, (_, c: string) => c);
   t = t.replace(/US\$\s?([\d.,]+)/g, "$1 dólares").replace(/\$\s?([\d.,]+)/g, "$1 dólares");
   t = t.replace(/([\d.,]+)\s?%/g, "$1 por ciento");
   t = t.replace(/(^|[\s(])\+(?=\d)/g, "$1más ").replace(/(^|[\s(])[-−](?=\d)/g, "$1menos ");
