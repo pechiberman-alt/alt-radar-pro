@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { afterWake, ECHO_MS, HandsFree, WAKE_WINDOW_MS, words } from "../lib/hands-free.ts";
+import { ABORTED_WAIT_MS, afterWake, ECHO_MS, HandsFree, WAKE_WINDOW_MS, words } from "../lib/hands-free.ts";
 
 const T0 = Date.UTC(2026, 9, 7, 18, 52, 0);
 
@@ -129,13 +129,14 @@ test("a heard phrase resets the failures, so a flaky connection does not stop it
   assert.deepEqual(m.ended(), { type: "restart", inMs: 250 });
 });
 
-test("a missing permission stops it at once, and a missing microphone after the second try", () => {
+test("a missing permission stops it at once, and a missing microphone after the third try", () => {
   const denied = on();
   assert.deepEqual(denied.error("not-allowed"), { type: "stop", reason: "permiso" });
   assert.match(denied.status(T0), /SIN PERMISO DEL MICRÓFONO/);
 
   const mic = on();
   assert.deepEqual(mic.error("audio-capture"), { type: "none" }, "one try is not a verdict");
+  assert.deepEqual(mic.error("audio-capture"), { type: "none" }, "Android can hold the microphone a moment longer");
   assert.deepEqual(mic.error("audio-capture"), { type: "stop", reason: "micrófono" });
 });
 
@@ -197,4 +198,28 @@ test("switching it off stops everything, and nothing is heard", () => {
   assert.equal(m.final(1, "analizá BTC", T0 + 1_000).type, "none");
   assert.equal(m.ended().type, "none");
   assert.equal(m.status(T0 + 1_000), "", "off, with nothing wrong, says nothing");
+});
+
+test("the browser taking the microphone back ('aborted', Android) never stops hands-free: it waits a second and goes on", () => {
+  const m = new HandsFree();
+  m.enable();
+  for (let i = 0; i < 20; i += 1) {
+    assert.deepEqual(m.error("aborted"), { type: "none" });
+    assert.deepEqual(m.ended(), { type: "restart", inMs: ABORTED_WAIT_MS });
+  }
+  assert.deepEqual(m.ended(), { type: "restart", inMs: 250 }, "after the wait, a normal restart");
+  for (let i = 0; i < 5; i += 1) m.error("network");
+  m.error("aborted");
+  assert.deepEqual(m.error("network"), { type: "stop", reason: "red" }, "aborts in between do not hide a dead connection");
+});
+
+test("the same words in a new engine session are a new request, not a delivery of the old one", () => {
+  const m = new HandsFree();
+  m.enable();
+  m.started();
+  assert.equal(m.final(0, "Jarvis ayuda", T0).type, "command");
+  m.busy(true, T0 + 100, "Podés decirme: informe del mercado.");
+  m.busy(false, T0 + 600);
+  m.started();
+  assert.deepEqual(m.final(0, "ayuda", T0 + 2_000), { type: "command", text: "ayuda" }, "asked again right after a short answer");
 });

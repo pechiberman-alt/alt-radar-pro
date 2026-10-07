@@ -43,6 +43,8 @@ export type MindReading = {
   tesis: MindThesis[];
   /** Theses the AI proposed that did not pass the checks, with why. */
   descartadas: { moneda: string; motivo: string }[];
+  /** Sentences of the AI taken out because a number or a level in them is not in the data (verifyReading). */
+  quitadas?: string[];
 };
 
 export const MIND_MAX_THESES = 3;
@@ -61,7 +63,8 @@ REGLAS
 5. Calibrá la confianza con TU HISTORIAL (en DATOS): si tus tesis vienen perdiendo, sé más exigente y bajá la confianza. Con menos de 15 tesis cerradas la muestra es mínima: decilo si opinás sobre tu rendimiento.
 6. Distinguí lo medido (precios, volumen) de lo estimado (imanes de liquidación = modelo). No prometas resultados; no es asesoramiento financiero.
 7. Español rioplatense, claro y directo.
-8. Los números de DATOS ya vienen en formato argentino, con punto de miles y coma decimal: "82.920" son ochenta y dos mil, "11,066" es once, "0,7042" es menos de uno. Copialos así: nunca cambies puntos por comas ni comas por puntos. Los cambios ("c24", "c7d") y las distancias ya son porcentajes: "-2,99" se escribe -2,99%.`;
+8. Los números de DATOS ya vienen en formato argentino, con punto de miles y coma decimal: "82.920" son ochenta y dos mil, "11,066" es once, "0,7042" es menos de uno. Copialos así: nunca cambies puntos por comas ni comas por puntos. Los cambios ("c24", "c7d") y las distancias ya son porcentajes: "-2,99" se escribe -2,99%.
+9. Soporte y resistencia son SOLO los de "sop" y "res" de cada moneda. Los "imanes" son zonas de liquidación estimadas: llamalos imán o zona de liquidaciones, nunca soporte ni resistencia. Si una moneda no tiene "sop", no le inventes un soporte. Cada frase con un número o un nivel que no esté en DATOS se borra antes de publicarse.`;
 
 const coin = (s: string) => s.replace(/USDT$/, "");
 const r2 = (v: number | null | undefined) => (v === null || v === undefined ? null : Number(v.toFixed(2)));
@@ -161,6 +164,114 @@ export function readingText(raw: RawMind) {
     riesgos: strs(raw.riesgos, 4, 240),
     vigilar: strs(raw.vigilar, 4, 240),
   };
+}
+
+// ── The reading's numbers, checked against the data before anything is published ──
+
+/** What the data says about one coin, to check the AI's sentences about it. */
+export type CoinFacts = { precio: number; sop: number[]; res: number[]; imanes: number[] };
+type MagnetLike = { precio: number } | null;
+/** The part of the dossier the check reads (mindDossier gives it, numbers still as numbers). */
+export type MindFacts = { monedas: { m: string; precio: number; sop: number[]; res: number[] }[]; imanes: Record<string, { arriba: MagnetLike; abajo: MagnetLike }> };
+
+const NUM_TOKEN = /-?\d[\d.,]*\d|-?\d/g;
+const AR_NUMBER = /^-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?$/;
+
+/** A number written the Argentine way ("82.920", "2.564,3", "-2,44"), or null when it is not one ("1,146,2", "2.99"). */
+export function readArNumber(token: string): number | null {
+  return AR_NUMBER.test(token) ? Number(token.replace(/\./g, "").replace(",", ".")) : null;
+}
+
+/** The written number is the data's number, as rounded as it was written (or within 0,2%). */
+function sameLevel(token: string, written: number, data: number): boolean {
+  const decimals = token.includes(",") ? token.split(",")[1].length : 0;
+  const diff = Math.abs(written - data);
+  return diff <= 0.51 * 10 ** -decimals || diff <= Math.abs(data) * 0.002;
+}
+
+const LABEL = /\b(soportes?|resistencias?|im[aá]n(?:es)?)\b/gi;
+/** Words that mean the next number belongs to something else ("pierde el soporte y busca el imán de 82.480"). */
+const OTHER_THING = /im[aá]n|liquidac|zona|objetivo|rango|m[ií]nimo|m[aá]ximo|precio|hacia|hasta|soporte|resistencia|\by\b|\bo\b/i;
+/** After a number, these say it is not a price: a percentage, a multiple, hours, candles, touches… */
+const NOT_A_PRICE = /^\s*(%|x\b|veces|r\b|h\b|horas|d[ií]as|velas|toques|min|puntos|de\s+(?:cada|las)\b)/i;
+
+/**
+ * Why a sentence cannot be published, or null when it can: a number that is
+ * not a number ("1,146,2"), a price of a coin off by more than 3 times (the
+ * "11.066,4" for a coin of 11), or a support, resistance or magnet at a
+ * price where the data has none (a magnet called support).
+ */
+export function sentenceProblem(sentence: string, coin: CoinFacts | null): string | null {
+  const tokens = [...sentence.matchAll(NUM_TOKEN)].map((m) => ({ text: m[0], at: m.index ?? 0, value: readArNumber(m[0]) }));
+  for (const t of tokens) if (t.value === null) return `número mal escrito: ${t.text}`;
+  if (!coin || !(coin.precio > 0)) return null;
+  for (const t of tokens) {
+    const v = t.value as number;
+    const after = sentence.slice(t.at + t.text.length);
+    const year = !/[.,]/.test(t.text) && v >= 1990 && v <= 2100;
+    const priceLike = v > 0 && !year && (/[.,]/.test(t.text) || t.text.length >= 4);
+    if (!priceLike || NOT_A_PRICE.test(after)) continue;
+    if (v / coin.precio > 3 || v / coin.precio < 1 / 3) return `precio fuera de escala: ${t.text}`;
+  }
+  for (const label of sentence.matchAll(LABEL)) {
+    const end = (label.index ?? 0) + label[0].length;
+    const next = tokens.find((t) => t.at >= end);
+    if (!next) continue;
+    const between = sentence.slice(end, next.at);
+    if (between.length > 30 || OTHER_THING.test(between) || NOT_A_PRICE.test(sentence.slice(next.at + next.text.length))) continue;
+    const kind = label[1].toLowerCase();
+    const levels = kind.startsWith("sop") ? coin.sop : kind.startsWith("res") ? coin.res : coin.imanes;
+    if (!levels.some((l) => sameLevel(next.text, next.value as number, l))) return `${kind} en ${next.text} no está en los datos`;
+  }
+  return null;
+}
+
+/**
+ * The reading with every sentence that fails sentenceProblem taken out, and
+ * the list of what was taken out. Brand rule: an unknown number is never
+ * published as if it were measured. A coin left with nothing to say is
+ * dropped; a summary left empty says why.
+ */
+export function verifyReading(text: ReturnType<typeof readingText>, facts: MindFacts): { text: ReturnType<typeof readingText>; quitadas: string[] } {
+  const byCoin = new Map<string, CoinFacts>();
+  for (const c of facts.monedas) {
+    const mag = facts.imanes[c.m];
+    byCoin.set(c.m, { precio: c.precio, sop: c.sop, res: c.res, imanes: [mag?.arriba?.precio, mag?.abajo?.precio].filter((x): x is number => typeof x === "number") });
+  }
+  const names = [...byCoin.keys()].filter((m) => /^[A-Z0-9]+$/.test(m));
+  const mentioned = names.length ? new RegExp(`\\b(${names.join("|")})\\b`, "g") : null;
+  const quitadas: string[] = [];
+  const clean = (s: string, coinName: string | null) =>
+    s
+      .split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿¡"«0-9])/)
+      .filter((sentence) => {
+        const own = coinName ?? (() => {
+          const found = new Set([...(mentioned ? sentence.matchAll(mentioned) : [])].map((m) => m[1]));
+          return found.size === 1 ? [...found][0] : null;
+        })();
+        const problem = sentenceProblem(sentence, own ? (byCoin.get(own) ?? null) : null);
+        if (problem) quitadas.push(`${sentence.slice(0, 160)} (${problem})`);
+        return !problem;
+      })
+      .join(" ")
+      .trim();
+  const resumen = clean(text.resumen, null);
+  return {
+    text: {
+      sesgo: text.sesgo,
+      resumen: resumen || (text.resumen ? "Sin resumen esta hora: el texto de la IA traía números que no están en los datos y se quitó." : ""),
+      activos: text.activos.map((a) => ({ moneda: a.moneda, lectura: clean(a.lectura, byCoin.has(a.moneda) ? a.moneda : null) })).filter((a) => a.lectura),
+      riesgos: text.riesgos.map((r) => clean(r, null)).filter(Boolean),
+      vigilar: text.vigilar.map((v) => clean(v, null)).filter(Boolean),
+    },
+    quitadas: quitadas.slice(0, 12),
+  };
+}
+
+/** One sentence-checked text about one coin (a thesis's "why"). */
+export function verifyCoinText(text: string, coinName: string, facts: MindFacts): string {
+  const one = verifyReading({ sesgo: "NEUTRAL", resumen: "", activos: [{ moneda: coinName, lectura: text }], riesgos: [], vigilar: [] }, facts);
+  return one.text.activos[0]?.lectura ?? "";
 }
 
 export function rawTheses(raw: RawMind): RawThesis[] {

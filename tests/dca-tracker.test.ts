@@ -89,6 +89,12 @@ test("no purchases for a symbol yields no position, not an empty shell", () => {
 
 /* ── isDueToday ── */
 
+/** Noon of a calendar day in the machine's own time zone: the tests mean that day wherever they run. */
+const day = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d, 12);
+};
+
 const sched = (patch: Partial<import("../lib/dca-tracker.ts").DcaSchedule> = {}) => ({
   symbol: "BTCUSDT",
   usdAmount: 50,
@@ -100,28 +106,28 @@ const sched = (patch: Partial<import("../lib/dca-tracker.ts").DcaSchedule> = {})
 
 test("a disabled schedule never fires, regardless of frequency", async () => {
   const { isDueToday } = await import("../lib/dca-tracker.ts");
-  assert.equal(isDueToday(sched({ frequency: "DIARIO", enabled: false }), new Date("2026-09-21")), false);
+  assert.equal(isDueToday(sched({ frequency: "DIARIO", enabled: false }), day("2026-09-21")), false);
 });
 
 test("DIARIO fires every day", async () => {
   const { isDueToday } = await import("../lib/dca-tracker.ts");
-  for (const day of ["2026-09-21", "2026-09-22", "2026-09-27"]) {
-    assert.equal(isDueToday(sched({ frequency: "DIARIO" }), new Date(day)), true);
+  for (const d of ["2026-09-21", "2026-09-22", "2026-09-27"]) {
+    assert.equal(isDueToday(sched({ frequency: "DIARIO" }), day(d)), true);
   }
 });
 
 test("SEMANAL fires only on the configured weekday", async () => {
   const { isDueToday } = await import("../lib/dca-tracker.ts");
   const schedule = sched({ frequency: "SEMANAL", weekday: 1 }); // Monday
-  assert.equal(isDueToday(schedule, new Date("2026-09-21")), true, "21 sep 2026 es lunes");
-  assert.equal(isDueToday(schedule, new Date("2026-09-22")), false, "martes no");
+  assert.equal(isDueToday(schedule, day("2026-09-21")), true, "21 sep 2026 es lunes");
+  assert.equal(isDueToday(schedule, day("2026-09-22")), false, "martes no");
 });
 
 test("QUINCENAL fires on the right weekday but only every other week", async () => {
   const { isDueToday } = await import("../lib/dca-tracker.ts");
   const schedule = sched({ frequency: "QUINCENAL", weekday: 1 });
   const mondays = ["2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28"].map(
-    (d) => isDueToday(schedule, new Date(d)),
+    (d) => isDueToday(schedule, day(d)),
   );
   // Exactly half of four consecutive Mondays should fire, alternating.
   assert.equal(mondays.filter(Boolean).length, 2);
@@ -132,6 +138,18 @@ test("QUINCENAL fires on the right weekday but only every other week", async () 
 test("MENSUAL fires on the 1st regardless of the weekday field", async () => {
   const { isDueToday } = await import("../lib/dca-tracker.ts");
   const schedule = sched({ frequency: "MENSUAL", weekday: 4 }); // irrelevant here
-  assert.equal(isDueToday(schedule, new Date("2026-10-01")), true);
-  assert.equal(isDueToday(schedule, new Date("2026-10-02")), false);
+  assert.equal(isDueToday(schedule, day("2026-10-01")), true);
+  assert.equal(isDueToday(schedule, day("2026-10-02")), false);
+});
+
+test("QUINCENAL gives the same answer all day long, in any time zone", async () => {
+  const { isDueToday } = await import("../lib/dca-tracker.ts");
+  // A Wednesday schedule: late on Wednesday in Buenos Aires it is already Thursday in UTC, when the epoch weeks turn.
+  const schedule = sched({ frequency: "QUINCENAL", weekday: 3 });
+  for (const iso of ["2026-09-23", "2026-09-30"]) {
+    const [y, m, d] = iso.split("-").map(Number);
+    const early = isDueToday(schedule, new Date(y, m - 1, d, 0, 30));
+    const late = isDueToday(schedule, new Date(y, m - 1, d, 23, 30));
+    assert.equal(early, late, `${iso}: the same day cannot be due and not due`);
+  }
 });

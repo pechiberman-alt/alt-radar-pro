@@ -106,7 +106,7 @@ def492abf855	146	app/install-panel.tsx
 58e9409bb2ba	192	app/institutional-desk.tsx
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
 39c4819ab1a5	121	app/jarvis.css
-d8ea7cab312a	1433	app/jarvis.tsx
+551dfe35c6df	1499	app/jarvis.tsx
 aa4d7c876c20	51	app/laptop.css
 d6020ed94c96	129	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -183,7 +183,7 @@ e0459b113cf2	42	eslint.config.mjs
 6b197acd00d5	559	lib/account-journal.ts
 f3bdeb0d1172	66	lib/ai-analyst-server.ts
 009e4bbb2f90	158	lib/ai-analyst.ts
-227d05231cf3	181	lib/ai-brains.ts
+d42a4a08e452	193	lib/ai-brains.ts
 ca2b9e224c43	81	lib/ai-cascade.ts
 b8e38621b74b	46	lib/ai-numbers.ts
 054288014395	51	lib/ai-probe.ts
@@ -209,7 +209,7 @@ ea70fec09fd1	203	lib/brain-security.ts
 22867caddefc	328	lib/chart-patterns.ts
 11dfd70c8233	87	lib/cost-basis.ts
 8d5433fd5fdf	148	lib/crypto-news.ts
-6c76baac5b89	154	lib/dca-tracker.ts
+ed5b22c91c14	157	lib/dca-tracker.ts
 c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
@@ -223,7 +223,7 @@ da42f6c9e464	311	lib/fair-value-gaps.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
 dfc52ea472c0	115	lib/futures-risk.ts
-4e61af9d8ee6	206	lib/hands-free.ts
+415055cca73b	238	lib/hands-free.ts
 619425206c2d	149	lib/inducement.ts
 cd4af39e8ba8	322	lib/institutional-flows.ts
 f83a7c4a72ca	222	lib/jarvis-analyst.ts
@@ -234,8 +234,8 @@ e65cb00f1d4d	483	lib/jarvis-learn.ts
 5df49d023ff9	179	lib/jarvis-ledger.ts
 b94bb1c8ddff	98	lib/jarvis-local.ts
 a3cb05342414	82	lib/jarvis-memory.ts
-74809e9f97e6	198	lib/jarvis-mind-db.ts
-461a85eb6982	226	lib/jarvis-mind.ts
+ec2fc7019671	204	lib/jarvis-mind-db.ts
+c4b51bfec404	337	lib/jarvis-mind.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
 4b677046fbed	39	lib/jarvis-voice.ts
 e5d7beaeb1fb	53	lib/jarvis-world.ts
@@ -294,13 +294,13 @@ b0595f550a8b	175	lib/structure-archive.ts
 bf7335d9b46e	223	lib/supply-demand.ts
 604f5d668d1b	320	lib/swing-entries.ts
 c9fd83f39ff3	171	lib/swing-liquidity-filter.ts
-2b422f80d994	205	lib/telegram-ai-server.ts
+3cc25afb9b10	225	lib/telegram-ai-server.ts
 3acc6d8fd900	68	lib/telegram-ai.ts
 be11df97b79f	224	lib/telegram-dispatch.ts
 62d9d72f629e	122	lib/telegram-jarvis.ts
 e9e4bb168a91	53	lib/telegram-magnets.ts
 52681c774025	31	lib/telegram-server.ts
-306d00e3e9bd	116	lib/telegram-voice.ts
+26e6999dc403	166	lib/telegram-voice.ts
 05101ed6c6c5	55	lib/telegram-volume.ts
 c9c116b50f57	242	lib/telegram.ts
 ba55aa5bdb5b	143	lib/token-unlocks.ts
@@ -349,7 +349,7 @@ c230ab327c5d	127	tests/binance-import.test.ts
 4cf0e9d5e358	122	tests/breaker-blocks.test.ts
 0c6817af6bb4	138	tests/chart-patterns.test.ts
 e954e10a7eec	85	tests/cost-basis.test.ts
-1f1b2857a8e0	138	tests/dca-tracker.test.ts
+6cc784f01e52	156	tests/dca-tracker.test.ts
 3bfb5918410f	140	tests/decoupling.test.ts
 bb85a3e6fff1	57	tests/diario-db.test.ts
 d8e87b00e33b	126	tests/econ-calendar.test.ts
@@ -363,7 +363,7 @@ d6031202b073	89	tests/footprint-sweeps.test.ts
 79b36d34e65f	119	tests/footprint-verdict.test.ts
 6ef376781704	137	tests/futures-log.test.ts
 4ea64afcb20f	108	tests/futures-risk.test.ts
-268a189056a0	201	tests/hands-free.test.ts
+e092c0680fc5	226	tests/hands-free.test.ts
 42f4e5fce8fd	17	tests/helpers/fake-d1.ts
 27b5bf9632d2	26	tests/helpers/setups.ts
 adcae854588e	101	tests/inducement.test.ts
@@ -375,6 +375,7 @@ cf22fb64056e	59	tests/jarvis-analyst.test.ts
 2cba958a1dba	78	tests/jarvis-ledger.test.ts
 f509b7eb53bb	45	tests/jarvis-local.test.ts
 137800480401	49	tests/jarvis-memory.test.ts
+1fe4f8532904	88	tests/jarvis-mind-verify.test.ts
 66e7d8e4f1e8	167	tests/jarvis-mind.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
 edec96598b0d	72	tests/jarvis.test.ts
@@ -422,7 +423,7 @@ b8fae29bf022	203	tests/swing-entries.test.ts
 124ea19d3a2a	116	tests/swing-liquidity-filter.test.ts
 f6b24002aa76	40	tests/telegram-ai.test.ts
 1c8c9494916f	144	tests/telegram-signals.test.ts
-caf14877a076	90	tests/telegram-voice.test.ts
+4237b7bb32db	210	tests/telegram-voice.test.ts
 e349da481884	89	tests/telegram-volume.test.ts
 e11b754e2adf	80	tests/telegram.test.ts
 be4820285ec6	54	tests/timeframes.test.ts

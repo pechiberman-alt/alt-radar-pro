@@ -1,5 +1,5 @@
 import { buildSystemPrompt, buildUserMessage, type ChatTurn } from "./ai-analyst.ts";
-import { BRAIN_LABEL, type AiLike } from "./ai-brains.ts";
+import { addFreeNeurons, BRAIN_LABEL, FREE_DAILY_NEURONS, freeUsage, type AiLike } from "./ai-brains.ts";
 import { answerWithBrains } from "./ai-cascade.ts";
 import { getSecret, type SettingsEnv } from "./app-settings.ts";
 import { KNOWLEDGE } from "./assistant/knowledge.ts";
@@ -14,7 +14,7 @@ import { sharedJson } from "./shared-cache.ts";
 import { listMemory, memoryBlock } from "./jarvis-memory.ts";
 import { DEFAULT_NEURAL, VOICE_MAX_CHARS } from "./jarvis-voice.ts";
 import { addUsage, allowance, synthesize, usageToday } from "./jarvis-voice-server.ts";
-import { downloadVoice, escapeHtml, sendVoiceNote, speechFor, transcribe, voiceProblem, type TgVoice } from "./telegram-voice.ts";
+import { downloadVoice, escapeHtml, sendVoiceNote, speechFor, transcribe, transcribeWorkers, voiceProblem, whisperNeurons, type TgVoice } from "./telegram-voice.ts";
 
 const SYSTEM =
   buildSystemPrompt(KNOWLEDGE) +
@@ -155,6 +155,10 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?:
  * A voice note to JARVIS: heard with Whisper, then answered like a typed
  * question, in the same thread. The transcript goes first, so a misheard word
  * shows at once. Every failure ends in a message the person can read.
+ *
+ * Whisper on Groq when there is a key; otherwise, or when Groq fails, Whisper
+ * on Workers AI, paid from the free brain's daily neurons (about 47 a minute
+ * of audio): with no key at all, voice notes still work.
  */
 export async function answerVoiceInTelegram(db: D1Database, env: SettingsEnv & { AI?: AiLike }, token: string, chatId: string, userId: number, voice: TgVoice) {
   try {
@@ -165,12 +169,28 @@ export async function answerVoiceInTelegram(db: D1Database, env: SettingsEnv & {
       return;
     }
     const groq = await getSecret(db, env, "groq_api_key");
-    if (!groq.value) {
+    const ai = env.AI ?? null;
+    if (!groq.value && !ai) {
       await sendMessage(token, chatId, "Todavía no puedo escucharte: falta configurar el reconocimiento de voz. Mientras tanto, escribime la pregunta.");
       return;
     }
     const audio = await downloadVoice(token, voice.file_id);
-    const heard = audio ? await transcribe(groq.value, audio) : null;
+    if (!audio) {
+      await sendMessage(token, chatId, "No pude bajar tu nota de Telegram. Probá de nuevo en un rato, o escribime.");
+      return;
+    }
+    let heard = groq.value ? await transcribe(groq.value, audio) : null;
+    if (!heard && ai) {
+      const day = new Date().toISOString().slice(0, 10);
+      const cost = whisperNeurons(voice.duration);
+      const used = await freeUsage(db, day, userId);
+      if (used.neuronsAll + cost > FREE_DAILY_NEURONS) {
+        await sendMessage(token, chatId, "Por hoy se terminó el cupo gratis para escuchar notas de voz; mañana vuelve. Mientras tanto, escribime la pregunta.");
+        return;
+      }
+      heard = await transcribeWorkers(ai, audio);
+      await addFreeNeurons(db, day, cost);
+    }
     if (!heard) {
       await sendMessage(token, chatId, "No te entendí la nota. Probá de nuevo, más despacio, o escribime.");
       return;

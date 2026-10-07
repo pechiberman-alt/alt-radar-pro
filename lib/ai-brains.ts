@@ -174,6 +174,18 @@ export async function addFreeUsage(db: D1Database, day: string, userId: number, 
   await db.prepare("DELETE FROM ai_free_usage WHERE day < ?1").bind(new Date(Date.parse(day) - 3 * 86_400_000).toISOString().slice(0, 10)).run();
 }
 
+/**
+ * Neurons spent on something that is not an answer (hearing a Telegram voice
+ * note): they come out of the same daily share, but no answer is counted.
+ */
+export async function addFreeNeurons(db: D1Database, day: string, neurons: number) {
+  await db.prepare(FREE_SCHEMA).run();
+  await db
+    .prepare("INSERT INTO ai_free_usage (day, user_id, answers, neurons) VALUES (?1, 0, 0, ?2) ON CONFLICT(day, user_id) DO UPDATE SET neurons = neurons + ?2")
+    .bind(day, neurons)
+    .run();
+}
+
 /** What the free brains may still do today for this person. */
 export function freeAllowance(u: FreeUsage) {
   return { groq: u.answers < FREE_USER_DAILY, cloudflare: u.answers < FREE_USER_DAILY && u.neuronsAll < FREE_DAILY_NEURONS };

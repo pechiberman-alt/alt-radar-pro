@@ -28,6 +28,8 @@ import {
   rawTheses,
   readingText,
   thesisRecord,
+  verifyCoinText,
+  verifyReading,
   thesisSignal,
   type MindReading,
   type MindThesis,
@@ -136,8 +138,10 @@ export async function runMindHour(db: D1Database, env: SettingsEnv & { AI?: AiLi
     return null;
   }
 
+  // Every sentence with a number or a level that is not in the data is taken out before it is stored (jarvis-mind.ts).
+  const checked = verifyReading(readingText(raw), dossier);
+  const text = checked.text;
   // Theses: checked against the price of the last closed candle, one open per coin, three at most.
-  const text = readingText(raw);
   const accepted: CoreSignal[] = [];
   const kept: MindThesis[] = [];
   const dropped: { moneda: string; motivo: string }[] = [];
@@ -165,9 +169,10 @@ export async function runMindHour(db: D1Database, env: SettingsEnv & { AI?: AiLi
       continue;
     }
     const venueNote = isOutside(candle.venue) ? ` · precios de ${VENUE_LABEL[candle.venue]} (USD)` : "";
-    const s = thesisSignal(symbol, candle.openTime, candle.close, c, venueNote);
+    const ok = { ...c, porque: verifyCoinText(c.porque, coinName, dossier) };
+    const s = thesisSignal(symbol, candle.openTime, candle.close, ok, venueNote);
     accepted.push(s);
-    kept.push({ id: s.id, moneda: coinName, lado: c.lado, entrada: candle.close, objetivo: c.objetivo, invalidacion: c.invalidacion, confianza: c.confianza, porque: c.porque });
+    kept.push({ id: s.id, moneda: coinName, lado: ok.lado, entrada: candle.close, objetivo: ok.objetivo, invalidacion: ok.invalidacion, confianza: ok.confianza, porque: ok.porque });
   }
   await recordCoreSignals(db, accepted, now);
 
@@ -179,11 +184,12 @@ export async function runMindHour(db: D1Database, env: SettingsEnv & { AI?: AiLi
     sesgoAnterior: previous?.sesgo ?? null,
     tesis: kept,
     descartadas: dropped,
+    ...(checked.quitadas.length ? { quitadas: checked.quitadas } : {}),
   };
   await db.prepare("INSERT INTO jarvis_mind (at, body) VALUES (?1, ?2)").bind(now, JSON.stringify(reading)).run();
   const cut = await db.prepare(`SELECT id FROM jarvis_mind ORDER BY id DESC LIMIT 1 OFFSET ${MIND_KEEP}`).first<{ id: number }>();
   if (cut) await db.prepare("DELETE FROM jarvis_mind WHERE id <= ?1").bind(cut.id).run();
-  await setStatus(db, { at: now, ok: true, brain: got.brain, tesis: kept.length, descartadas: dropped.length });
+  await setStatus(db, { at: now, ok: true, brain: got.brain, tesis: kept.length, descartadas: dropped.length, quitadas: checked.quitadas.length });
   return reading;
 }
 

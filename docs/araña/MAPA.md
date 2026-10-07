@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 440 · objetivos: 15 · sin objetivo: 0
+- Archivos: 441 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 41 · secretos: 3 · variables de entorno: 8 · rutas /api: 46 · hosts: 50
 - Código de navegador: 52 archivos con "use client" que alcanzan 138 · problemas: 0
-- Lib sin prueba directa: 21 de 133
+- Lib sin prueba directa: 20 de 133
 
 ## Objetivos
 
@@ -26,7 +26,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: la usan MENTE y las
 - `app/jarvis.tsx` — exporta: Jarvis, default
 - `lib/ai-analyst-server.ts` — exporta: quotaFor, consumeQuota, alternate, askClaude
 - `lib/ai-analyst.ts` — exporta: AI_MODEL, AI_DAILY_LIMIT, AI_MAX_OUTPUT, compactSnapshot, buildSystemPrompt, buildUserMessage (+4)
-- `lib/ai-brains.ts` — exporta: Brain, BRAIN_LABEL, Usage, BrainResult, AiLike, WORKERS_MODEL (+22)
+- `lib/ai-brains.ts` — exporta: Brain, BRAIN_LABEL, Usage, BrainResult, AiLike, WORKERS_MODEL (+23)
 - `lib/ai-cascade.ts` — exporta: CascadeOk, CascadeFail, answerWithBrains
 - `lib/ai-numbers.ts` — Numbers for the AIs, already written the Argentine way ("82.920", "11,066", "0,7042", "-2,99").
 - `lib/ai-probe.ts` — exporta: PROBE_SCHEMA, Probe, readProbe, probeFreeBrain, resetProbe
@@ -43,7 +43,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: la usan MENTE y las
 - `lib/jarvis-local.ts` — exporta: Focus, pointsAtScreen, SCREEN_TOPIC, SECTION_SCREEN, withFocus, localAnswer
 - `lib/jarvis-memory.ts` — What a person asked JARVIS to remember ("Jarvis, recordá que opero solo BTC y SOL").
 - `lib/jarvis-mind-db.ts` — exporta: MIND_MINUTE, MindDeps, runMindHour, mindStatus
-- `lib/jarvis-mind.ts` — exporta: MindThesis, MindReading, MIND_MAX_THESES, MIND_MAX_OUTPUT, MIND_SYSTEM, thesisRecord (+8)
+- `lib/jarvis-mind.ts` — exporta: MindThesis, MindReading, MIND_MAX_THESES, MIND_MAX_OUTPUT, MIND_SYSTEM, thesisRecord (+14)
 - `lib/jarvis-voice-server.ts` — exporta: AiLike, VoiceModel, Bytes, Synth, AURA, MELO (+11)
 - `lib/jarvis-voice.ts` — JARVIS's neural voice, shared by the server route and the app.
 - `lib/jarvis-world.ts` — exporta: WorldNews, World, worldDigest, readWorld, saveWorld
@@ -292,7 +292,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+38)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (107)
+### calidad — Pruebas (108)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
@@ -341,6 +341,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/jarvis-ledger.test.ts` — pruebas: breakout: long at the close, stop under the recent lows (1–2,5 ATR), target 2R, magnet: only a swept-and-rejected zone on the last candle; reversal toward the o, resolution: target, stop, both in one candle = stop, time exit, untouched stays  (+1)
 - `tests/jarvis-local.test.ts` — pruebas: the screen made explicit: the PUMP tab, the map of the coin in focus, or nothing, with no AI, the local analyst answers: the asset
 - `tests/jarvis-memory.test.ts` — pruebas: notes are kept tidy: no leading, memory: per person, the same note once, the oldest dropped past the limit, forgo, every brain gets the notes as one block; none, nothing (+1)
+- `tests/jarvis-mind-verify.test.ts` — pruebas: numbers are read the Argentine way, and broken ones are not numbers, the 19:17 reading: the broken number and the magnet called support are taken out, a price off by thousands (the old (+1)
 - `tests/jarvis-mind.test.ts` — pruebas: the answer, a thesis is kept only as a real plan from the current price, the hourly mind: once an hour from hh:17, with fresh reads only, theses checked  (+1)
 - `tests/jarvis-voice.test.ts` — pruebas: voices: Cloudflare, synthesis: premium voice first; the simpler one if premium fails or is not allow, allowance: per person and premium for everyone, per UTC day (+1)
 - `tests/jarvis.test.ts` — pruebas: normalize strips accents, punctuation and the case, coins by name, ticker or alias; ambiguous Spanish words need a cue, timeframes in words or short form (+1)
@@ -506,7 +507,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Tablas D1
 
-- `ai_free_usage` — crea: lib/ai-brains.ts · usa: lib/ai-brains.ts, tests/ai-brains.test.ts, tests/jarvis-mind.test.ts · sin índice visible en el código
+- `ai_free_usage` — crea: lib/ai-brains.ts, tests/telegram-voice.test.ts · usa: lib/ai-brains.ts, tests/ai-brains.test.ts, tests/jarvis-mind.test.ts, tests/telegram-voice.test.ts · sin índice visible en el código
 - `ai_probe` — crea: lib/ai-probe.ts · usa: lib/ai-probe.ts · sin índice visible en el código
 - `ai_usage` — crea: lib/ai-analyst-server.ts · usa: lib/ai-analyst-server.ts, tests/ai-brains.test.ts · sin índice visible en el código
 - `app_settings` — crea: lib/app-settings.ts · usa: lib/app-settings.ts, tests/app-settings.test.ts, tests/binance-account.test.ts · sin índice visible en el código
@@ -671,4 +672,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-ai-server.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

@@ -126,7 +126,10 @@ CREATE TABLE IF NOT EXISTS dca_schedules (
  *
  * QUINCENAL alternates by counting whole weeks since the Unix epoch — an
  * arbitrary but fixed anchor, so the same schedule always lands on the same
- * weeks rather than drifting depending on when it was created.
+ * weeks rather than drifting depending on when it was created. The weeks are
+ * counted on the date's calendar day (the same fields getDay reads), not on
+ * its instant: late on a Wednesday in Buenos Aires it is already Thursday in
+ * UTC, and the answer must not change in the middle of the person's day.
  *
  * MENSUAL fires on the 1st of the month. The schedule's `weekday` field has
  * no meaning for a monthly cadence — the UI never collects one for it —
@@ -142,7 +145,7 @@ export function isDueToday(schedule: DcaSchedule, date: Date): boolean {
       return date.getDay() === schedule.weekday;
     case "QUINCENAL": {
       if (date.getDay() !== schedule.weekday) return false;
-      const daysSinceEpoch = Math.floor(date.getTime() / 86_400_000);
+      const daysSinceEpoch = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
       return Math.floor(daysSinceEpoch / 7) % 2 === 0;
     }
     case "MENSUAL":
