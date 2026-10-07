@@ -671,7 +671,8 @@ export default function LiquidationHeatmapDesk() {
   // Another panel (SUBEN SOLAS) can ask the map to show a coin.
   useEffect(
     () =>
-      onMapSymbol((next) => {
+      onMapSymbol((next, tf) => {
+        if (tf && TIMEFRAME_ORDER.includes(tf)) setTimeframe(tf);
         setSymbolQuery("");
         setLoading(true);
         setError("");

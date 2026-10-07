@@ -42,6 +42,7 @@ import "./diario-desk.css";
 import "./decoupling-desk.css";
 import "./robot-signals-desk.css";
 import "./prebreak-desk.css";
+import "./jarvis.css";
 import "./spot-desk.css";
 import "./sentiment-desk.css";
 import "./settings-desk.css";

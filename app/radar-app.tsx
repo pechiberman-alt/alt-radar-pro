@@ -40,6 +40,7 @@ import DecouplingDesk from "./decoupling-desk";
 import { everyVisible } from "@/lib/visible-interval";
 import RobotSignalsDesk from "./robot-signals-desk";
 import PreBreakDesk from "./prebreak-desk";
+import Jarvis from "./jarvis";
 import FuturesDesk from "./futures-desk";
 import FuturesRecorder from "./futures-recorder";
 import PortfolioRisk from "./portfolio-risk";
@@ -1328,6 +1329,8 @@ export default function RadarApp() {
           risk={risk.score}
         />
       )}
+
+      <Jarvis />
 
       <nav className="mobile-nav" aria-label="Navegación móvil">
         {NAV_ITEMS.filter(({ id }) => isVisibleSection(id, advanced)).map(({ label, mobile, icon, id }) => (
