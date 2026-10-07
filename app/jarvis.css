@@ -93,3 +93,15 @@
 @keyframes jvbeat{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.8)}}
 .jv-ledger .jv-ltabs{min-height:30px;overflow:visible;margin-bottom:2px}
 .jv-head em{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jv-ltabs.three{grid-template-columns:1fr 1fr 1fr}
+.jv-learn{display:grid;gap:3px;font-size:10px;color:#cfeff8;line-height:1.35}
+.jv-learn p{margin:0}
+.jv-learn b{color:#5fd3f3;letter-spacing:.06em}
+.jv-learn ul{margin:0;padding-left:14px;display:grid;gap:2px;color:#9cc9d4}
+.jv-sigs p.shadow{opacity:.55}
+.jv-grade{font-style:normal;font-size:8.5px;letter-spacing:.06em;padding:1px 6px;border-radius:999px;border:1px solid #2a5b68;color:#9cc9d4;white-space:nowrap}
+.jv-grade.g-favorable{border-color:#1f6b55;color:#7ff0c4}
+.jv-grade.g-desfavorable,.jv-grade.g-sombra{border-color:#6b2a2a;color:#f0a0a0}
+.jv-grade.g-neutra{border-color:#5a5a2a;color:#e8dc9a}
+.jv-sigs p .jv-grade{grid-column:1/-1;justify-self:start}
+.jv-voice small.err{color:#ff9a9a}

@@ -115,10 +115,48 @@ function pronounceable(w: string): boolean {
   return onset.length <= 1 || /^(PR|PL|BR|BL|TR|DR|CR|CL|GR|GL|FR|FL|CH|LL)$/.test(onset);
 }
 
+/** "84.523,7" / "108,121" / "0.5" → the number (es-AR: dot for thousands, comma for decimals). */
+export function parseEsNumber(raw: string): number {
+  if (/,/.test(raw)) return Number(raw.replace(/\./g, "").replace(",", "."));
+  if (/^\d{1,3}(\.\d{3})+$/.test(raw)) return Number(raw.replace(/\./g, ""));
+  return Number(raw);
+}
+
+/**
+ * A number as a person says it: prices of thousands without decimals, of
+ * hundreds with one, units with two, below one with four significant
+ * figures. "108,121" is said "ciento ocho coma doce", not to the last digit.
+ */
+export function roundSpoken(raw: string): string {
+  const v = parseEsNumber(raw);
+  if (!Number.isFinite(v)) return raw;
+  const a = Math.abs(v);
+  const digits = a >= 1000 ? 0 : a >= 100 ? 1 : a >= 1 ? 2 : a === 0 ? 0 : Math.min(8, 3 - Math.floor(Math.log10(a)));
+  const fixed = v.toFixed(digits);
+  // Trailing zeros are not said ("1,50" → "1,5"), and the separator is a comma again.
+  const trimmed = fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
+  return trimmed.replace(".", ",");
+}
+
+const UNIT_WORDS: Record<string, [string, string, "f" | "m"]> = {
+  h: ["hora", "horas", "f"],
+  m: ["minuto", "minutos", "m"],
+  d: ["día", "días", "m"],
+  w: ["semana", "semanas", "f"],
+};
+
 /** Everything JARVIS might write, as words a Spanish reader would say. */
 export function normalizeSpanish(text: string): string {
   let t = text.normalize("NFC");
   for (const [re, rep] of LEXICON) t = t.replace(re, rep);
+  // Symbols the voice would skip or spell.
+  t = t.replace(/\s*·\s*/g, ", ").replace(/\s*→\s*/g, " a ").replace(/\s*×\s*/g, " por ").replace(/\s*±\s*/g, " más o menos ").replace(/≈\s*/g, "cerca de ");
+  // Timeframes: "1h" → "una hora", "15m" → "quince minutos", "4h" → "cuatro horas".
+  t = t.replace(/\b(\d{1,2})([hmdw])\b/g, (_, n: string, u: string) => {
+    const [one, many, g] = UNIT_WORDS[u];
+    const k = Number(n);
+    return k === 1 ? `${g === "f" ? "una" : "un"} ${one}` : `${numberToWords(k)} ${many}`;
+  });
   // Ticker pairs and coins: "SOLUSDT" → "sol", "ETHUSDT" → "éter".
   t = t.replace(/\b([A-Z]{2,6})USDT\b/g, (_, c: string) => c);
   t = t.replace(/US\$\s?([\d.,]+)/g, "$1 dólares").replace(/\$\s?([\d.,]+)/g, "$1 dólares");
@@ -128,7 +166,7 @@ export function normalizeSpanish(text: string): string {
   t = t.replace(/(\d{1,2}):(\d{2})\b/g, (_, h: string, m: string) => `${numberToWords(Number(h))}${m === "00" ? "" : ` y ${readNumber(m)}`}`);
   t = t.replace(/\d+(?:[.,]\d+)*/g, (m) => {
     const trimmed = m.replace(/[.,]$/, "");
-    return readNumber(trimmed) + m.slice(trimmed.length);
+    return readNumber(roundSpoken(trimmed)) + m.slice(trimmed.length);
   });
   // Unpronounceable acronyms ("PF", "RSI") are spelled; words in caps ("ALT", "PRO", "IMANES") are read.
   t = t.replace(/\b[A-ZÑ]{2,5}\b/g, (w) => (pronounceable(w) ? w.toLowerCase() : w.toLowerCase().split("").map((c) => LETTER_NAMES[c] ?? c).join(" ")));

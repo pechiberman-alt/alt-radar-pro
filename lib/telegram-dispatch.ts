@@ -113,9 +113,9 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
     // Exchange data down: the other categories still go out.
   }
 
-  // Liquidation magnets on the majors (public candles + OI, no database).
+  // Liquidation magnets on the majors, from the map JARVIS CORE keeps (one row).
   try {
-    shared.push(...(await collectMagnetEvents(now)));
+    shared.push(...(await collectMagnetEvents(db, now)));
   } catch {
     // Exchange data down: the other categories still go out.
   }

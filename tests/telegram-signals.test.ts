@@ -35,6 +35,9 @@ test("a big enough sample drops the caveat; no stats means no history line; no p
 test("/resultados and its aliases are commands; other text is still a question for the analyst", () => {
   for (const t of ["/resultados", "/resultado", "/winrate", "/resultados@altbot"]) assert.equal(parseCommand(t).cmd, "resultados", t);
   assert.equal(parseCommand("/estado").cmd, "estado");
+  assert.equal(parseCommand("/jarvis").cmd, "jarvis");
+  assert.equal(parseCommand("/nucleo@AltRadarBot").cmd, "jarvis");
+  assert.equal(parseCommand("/aprendizaje").cmd, "aprendizaje");
   assert.equal(parseCommand("resultados?").cmd, "texto");
 });
 

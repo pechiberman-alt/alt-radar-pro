@@ -169,7 +169,7 @@ export function selectForUser(
   return { send: eligible.slice(0, cap), rest, suppressed: rest.length };
 }
 
-export type BotCommand = { cmd: "start" | "stop" | "estado" | "nuevo" | "ayuda" | "texto" | "resultados" | "alerta" | "alertas" | "borrar"; arg: string };
+export type BotCommand = { cmd: "start" | "stop" | "estado" | "nuevo" | "ayuda" | "texto" | "resultados" | "alerta" | "alertas" | "borrar" | "jarvis" | "aprendizaje"; arg: string };
 
 export function parseCommand(text: string | undefined): BotCommand {
   const raw = (text ?? "").trim();
@@ -186,6 +186,8 @@ export function parseCommand(text: string | undefined): BotCommand {
   if (name === "alerta") return { cmd: "alerta", arg };
   if (name === "alertas") return { cmd: "alertas", arg };
   if (name === "borrar" || name === "borraralerta") return { cmd: "borrar", arg };
+  if (name === "jarvis" || name === "nucleo") return { cmd: "jarvis", arg };
+  if (name === "aprendizaje" || name === "aprendi" || name === "lecciones") return { cmd: "aprendizaje", arg };
   return { cmd: "ayuda", arg };
 }
 
