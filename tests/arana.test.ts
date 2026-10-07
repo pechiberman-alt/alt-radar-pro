@@ -133,6 +133,7 @@ test("secrets and hosts are listed per file, and a secret read in browser code i
   const problemas = index.cliente.problemas.map((p: { tipo: string; archivo: string }) => `${p.tipo}:${p.archivo}`).sort();
   assert.deepEqual(problemas, ["api:app/cliente-api.tsx", "secreto:lib/c.ts"]);
   const secreto = index.cliente.problemas.find((p: { tipo: string }) => p.tipo === "secreto");
+  assert.ok(secreto, "the secret read in browser code is reported");
   assert.deepEqual(secreto.cadena, ["app/chico.tsx", "lib/c.ts"]);
 });
 
@@ -147,6 +148,7 @@ test("the check fails when the map is stale, and names the lines that differ", (
   const r = chequear(index, "# Mapa viejo\n");
   assert.equal(r.mapaViejo, true);
   assert.equal(r.ok, false);
+  assert.ok(r.dif, "the difference between the maps is named");
   assert.ok(r.dif.agregadas.length > 0);
   assert.ok(r.dif.quitadas.includes("# Mapa viejo"));
 });

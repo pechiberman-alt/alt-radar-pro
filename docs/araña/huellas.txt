@@ -104,8 +104,8 @@ def492abf855	146	app/install-panel.tsx
 08966d25ae55	67	app/institutional-desk.css
 58e9409bb2ba	192	app/institutional-desk.tsx
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
-4a395d206456	119	app/jarvis.css
-b0bf298cb690	1239	app/jarvis.tsx
+a751f161bc10	120	app/jarvis.css
+f4e655ee97a7	1383	app/jarvis.tsx
 aa4d7c876c20	51	app/laptop.css
 d6020ed94c96	129	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -222,6 +222,7 @@ da42f6c9e464	311	lib/fair-value-gaps.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
 dfc52ea472c0	115	lib/futures-risk.ts
+8cc2b513dfa3	206	lib/hands-free.ts
 619425206c2d	149	lib/inducement.ts
 cd4af39e8ba8	322	lib/institutional-flows.ts
 f83a7c4a72ca	222	lib/jarvis-analyst.ts
@@ -331,7 +332,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
-5b3974f1eb7a	187	tests/arana.test.ts
+a97845f99e5f	189	tests/arana.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
 e12f35caeca1	385	tests/assistant.test.ts
 dff2674006ae	17	tests/auth-pbkdf2.test.ts
@@ -359,6 +360,7 @@ d6031202b073	89	tests/footprint-sweeps.test.ts
 79b36d34e65f	119	tests/footprint-verdict.test.ts
 6ef376781704	137	tests/futures-log.test.ts
 4ea64afcb20f	108	tests/futures-risk.test.ts
+268a189056a0	201	tests/hands-free.test.ts
 42f4e5fce8fd	17	tests/helpers/fake-d1.ts
 27b5bf9632d2	26	tests/helpers/setups.ts
 adcae854588e	101	tests/inducement.test.ts

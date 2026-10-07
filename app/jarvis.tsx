@@ -23,6 +23,7 @@ import { fmtExpect, learnSpeech, venuesSpeech } from "@/lib/jarvis-learn";
 import { DEFAULT_NEURAL, NEURAL_VOICES, neuralVoice } from "@/lib/jarvis-voice";
 import { earcon, neuralModel, neuralState, onNeural, probeNeural, speakNeural, stopNeural, unlockAudio } from "./jarvis-voice-player";
 import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
+import { ECHO_MS, HandsFree } from "@/lib/hands-free";
 
 /**
  * JARVIS: a voice assistant over the whole app. It listens (Web Speech API,
@@ -182,6 +183,33 @@ type SpeechRec = {
   start: () => void;
   stop: () => void;
 };
+/** The hands-free rules, created on first use. */
+function handsOf(ref: { current: HandsFree | null }): HandsFree {
+  if (!ref.current) ref.current = new HandsFree();
+  return ref.current;
+}
+
+type WakeLockRef = { current: { release: () => Promise<void> } | null };
+
+/** Keeps the screen on while the engine listens. Not every browser has it: then the screen may sleep. */
+function keepAwake(ref: WakeLockRef): void {
+  const nav = navigator as unknown as { wakeLock?: { request: (kind: "screen") => Promise<{ release: () => Promise<void> }> } };
+  if (!nav.wakeLock || ref.current) return;
+  nav.wakeLock.request("screen").then((lock) => {
+    ref.current = lock;
+  }).catch(() => {
+    // Refused: the engine still listens while the screen is on.
+  });
+}
+
+function letGoAwake(ref: WakeLockRef): void {
+  const lock = ref.current;
+  ref.current = null;
+  if (lock) void lock.release().catch(() => {
+    // Already released by the browser.
+  });
+}
+
 function recognizer(): SpeechRec | null {
   const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
   const C = w.SpeechRecognition ?? w.webkitSpeechRecognition;
@@ -246,13 +274,19 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   const awayRef = useRef<string | null>(null);
   const ledgerRef = useRef(ledger);
   const recRef = useRef<SpeechRec | null>(null);
+  /** Manos libres: the rules live in lib/hands-free.ts; these refs keep the engine's state between events. */
+  const handsRef = useRef<HandsFree | null>(null);
+  const engineRef = useRef<SpeechRec | null>(null);
+  const oneShotRef = useRef(false);
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+  const engineFnsRef = useRef<{ startEngine: () => void } | null>(null);
+  const [handsText, setHandsText] = useState("");
   const speakGen = useRef(0);
   const speakingRef = useRef(false);
   /** The last thing JARVIS was asked came by voice (for the follow-up turn). */
   const lastVoiceRef = useRef(false);
-  const listenRef = useRef<((wake: boolean) => void) | null>(null);
+  const listenRef = useRef<(() => void) | null>(null);
   const neural = useSyncExternalStore(onNeural, neuralSnapshot, neuralServer);
-  const wakeRef = useRef(false);
   const known = useRef<Set<string>>(new Set());
   /** The coin JARVIS last opened or talked about, so "analizalo" knows what "lo" is. */
   const focusRef = useRef<{ symbol: string | null; timeframe: string | null }>({ symbol: null, timeframe: null });
@@ -383,6 +417,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   const hush = useCallback(() => {
     speakGen.current += 1;
     speakingRef.current = false;
+    handsRef.current?.busy(false, Date.now());
     stopNeural();
     if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
   }, []);
@@ -400,17 +435,20 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       const onStart = () => {
         if (speakGen.current !== mine) return;
         speakingRef.current = true;
+        handsOf(handsRef).busy(true, Date.now(), text);
         setMode("speaking");
       };
       const onEnd = () => {
         if (ended || speakGen.current !== mine) return;
         ended = true;
         speakingRef.current = false;
-        setMode(wakeRef.current ? "listening" : "idle");
-        // Something asked by voice gets one more turn of listening, like a conversation.
-        if (prefs.followUp && lastVoiceRef.current && !wakeRef.current) {
+        handsOf(handsRef).busy(false, Date.now());
+        const listening = handsOf(handsRef).active;
+        setMode(listening ? "listening" : "idle");
+        // Something asked by voice gets one more turn of listening, like a conversation. It waits out the echo first.
+        if (prefs.followUp && lastVoiceRef.current && !listening) {
           lastVoiceRef.current = false;
-          window.setTimeout(() => listenRef.current?.(false), 350);
+          window.setTimeout(() => listenRef.current?.(), ECHO_MS);
         }
       };
       const ns = neuralState();
@@ -647,91 +685,196 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
     [run],
   );
 
-  // Listening: one phrase, or continuous with the wake word "Jarvis".
-  const startListening = useCallback(
-    (wake: boolean) => {
-      recRef.current?.stop();
-      const rec = recognizer();
-      if (!rec) return speak("Tu navegador no permite dictado por voz. Probá con Chrome, o escribime.");
-      rec.lang = "es-AR";
-      rec.continuous = wake;
-      rec.interimResults = true;
-      wakeRef.current = wake;
-      rec.onresult = (e) => {
-        // While JARVIS talks the microphone hears it too: never answer itself.
-        if (speakingRef.current) return;
-        let finalText = "";
-        let partial = "";
-        for (let i = e.resultIndex; i < e.results.length; i += 1) {
-          const t = e.results[i][0].transcript;
-          if (e.results[i].isFinal) finalText += t;
-          else partial += t;
-        }
-        setInterim(partial);
-        if (!finalText) return;
-        setInterim("");
-        if (wake) {
-          const m = finalText.match(/jarvis[,:]?\s*(.*)$/i);
-          if (!m) return;
-          setOpen(true);
-          earcon("stop");
-          if (m[1].trim()) handle(m[1], true);
-          else {
-            lastVoiceRef.current = true;
-            speak(`Te escucho, ${prefs.name}.`);
-          }
-        } else {
-          earcon("stop");
-          handle(finalText, true);
-        }
-      };
-      rec.onerror = (e) => {
-        if (e.error === "not-allowed") {
-          wakeRef.current = false;
-          setPrefs({ wake: false });
-          speak("Necesito permiso para usar el micrófono.");
-        }
-      };
-      rec.onend = () => {
-        if (wakeRef.current) {
-          try {
-            rec.start();
-          } catch {
-            // already restarting
-          }
-        } else setMode((m) => (m === "listening" ? "idle" : m));
-      };
-      recRef.current = rec;
-      try {
-        rec.start();
-        setMode("listening");
-        if (!wake) earcon("listen");
-      } catch {
-        // already started
-      }
-    },
-    [handle, prefs.name, setPrefs, speak],
-  );
+  // The browser's events come from recognizers made earlier: they must call the newest handle, speak and name.
+  const latestRef = useRef({ handle, speak, name: prefs.name });
   useEffect(() => {
-    listenRef.current = startListening;
-  }, [startListening]);
+    latestRef.current = { handle, speak, name: prefs.name };
+  }, [handle, speak, prefs.name]);
+
+  /** Stops the hands-free engine for good: nothing restarts it until it is switched on again. */
+  const stopEngine = useCallback(() => {
+    const rec = engineRef.current;
+    engineRef.current = null;
+    if (rec) {
+      rec.onend = null;
+      rec.onerror = null;
+      rec.onresult = null;
+      try {
+        rec.stop();
+      } catch {
+        // not running
+      }
+    }
+    letGoAwake(wakeLockRef);
+  }, []);
+
+  /** The engine stopped on its own: the rules say whether it starts again, or stays off and the panel says why. */
+  const decideAfterEnd = useCallback(() => {
+    const hands = handsOf(handsRef);
+    const next = hands.ended();
+    if (next.type === "restart") {
+      window.setTimeout(() => engineFnsRef.current?.startEngine(), next.inMs);
+      return;
+    }
+    stopEngine();
+    setMode((m) => (m === "listening" ? "idle" : m));
+    setHandsText(hands.status(Date.now()));
+  }, [stopEngine]);
+
+  /** The hands-free engine: one continuous recognition. The browser ends it now and then; the rules decide the next one. */
+  const startEngine = useCallback(() => {
+    const hands = handsOf(handsRef);
+    if (!hands.active || oneShotRef.current || engineRef.current) return;
+    const rec = recognizer();
+    if (!rec) return;
+    rec.lang = "es-AR";
+    rec.continuous = true;
+    rec.interimResults = true;
+    engineRef.current = rec;
+    hands.started();
+    rec.onresult = (e) => {
+      // While JARVIS talks, the microphone hears it: those results never reach the rules.
+      if (engineRef.current !== rec || speakingRef.current) return;
+      const latest = latestRef.current;
+      let partial = "";
+      for (let i = e.resultIndex; i < e.results.length; i += 1) {
+        const r = e.results[i];
+        if (!r.isFinal) {
+          partial += r[0].transcript;
+          continue;
+        }
+        const heard = hands.final(i, r[0].transcript, Date.now());
+        if (heard.type === "none") continue;
+        setOpen(true);
+        earcon("stop");
+        if (heard.type === "awake") latest.speak(`Te escucho, ${latest.name}.`);
+        else latest.handle(heard.text, true);
+      }
+      setInterim(partial);
+      setHandsText(hands.status(Date.now()));
+    };
+    rec.onerror = (e) => {
+      if (engineRef.current !== rec) return;
+      const verdict = hands.error(e.error);
+      if (verdict.type !== "stop") return;
+      stopEngine();
+      setMode((m) => (m === "listening" ? "idle" : m));
+      setHandsText(hands.status(Date.now()));
+      if (verdict.reason === "permiso") latestRef.current.speak("Necesito permiso para usar el micrófono.");
+    };
+    rec.onend = () => {
+      if (engineRef.current !== rec) return;
+      engineRef.current = null;
+      decideAfterEnd();
+    };
+    keepAwake(wakeLockRef);
+    try {
+      rec.start();
+      setMode((m) => (m === "idle" ? "listening" : m));
+    } catch {
+      // The browser still holds an earlier session: that counts as a failure, and the rules back off.
+      engineRef.current = null;
+      hands.error("aborted");
+      decideAfterEnd();
+    }
+  }, [decideAfterEnd, stopEngine]);
+
+  /** One phrase, for the mic button and Alt+J. It takes the microphone from the engine, which comes back after it. */
+  const listenOnce = useCallback(() => {
+    if (oneShotRef.current) return;
+    stopEngine();
+    const rec = recognizer();
+    if (!rec) return latestRef.current.speak("Tu navegador no permite dictado por voz. Probá con Chrome, o escribime.");
+    rec.lang = "es-AR";
+    rec.continuous = false;
+    rec.interimResults = true;
+    oneShotRef.current = true;
+    rec.onresult = (e) => {
+      if (speakingRef.current) return;
+      let finalText = "";
+      let partial = "";
+      for (let i = e.resultIndex; i < e.results.length; i += 1) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += t;
+        else partial += t;
+      }
+      setInterim(partial);
+      if (!finalText) return;
+      setInterim("");
+      earcon("stop");
+      latestRef.current.handle(finalText, true);
+    };
+    rec.onerror = (e) => {
+      if (e.error === "not-allowed") latestRef.current.speak("Necesito permiso para usar el micrófono.");
+    };
+    rec.onend = () => {
+      oneShotRef.current = false;
+      if (recRef.current === rec) recRef.current = null;
+      setMode((m) => (m === "listening" ? "idle" : m));
+      engineFnsRef.current?.startEngine();
+    };
+    recRef.current = rec;
+    try {
+      rec.start();
+      setMode("listening");
+      earcon("listen");
+    } catch {
+      oneShotRef.current = false;
+      recRef.current = null;
+      engineFnsRef.current?.startEngine();
+    }
+  }, [stopEngine]);
 
   useEffect(() => {
-    if (prefs.wake && supportsListen) {
-      void (async () => {
-        await Promise.resolve();
-        startListening(true);
-      })();
-    } else if (!prefs.wake) {
-      wakeRef.current = false;
-      recRef.current?.stop();
-    }
+    engineFnsRef.current = { startEngine };
+    listenRef.current = listenOnce;
+  }, [listenOnce, startEngine]);
+
+  // The checkbox switches the engine on and off. A browser that cannot listen never switches it on.
+  useEffect(() => {
+    const hands = handsOf(handsRef);
+    let live = true;
+    void (async () => {
+      await Promise.resolve();
+      if (!live) return;
+      if (prefs.wake && supportsListen) {
+        hands.enable();
+        engineFnsRef.current?.startEngine();
+      } else {
+        hands.disable();
+        setMode((m) => (m === "listening" ? "idle" : m));
+      }
+      setHandsText(hands.status(Date.now()));
+    })();
     return () => {
-      wakeRef.current = false;
-      recRef.current?.stop();
+      live = false;
+      hands.disable();
+      stopEngine();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the wake setting changes
+  }, [prefs.wake, stopEngine, supportsListen]);
+
+  // While hands-free is on, the status line follows the state: the follow-up window closes by itself.
+  useEffect(() => {
+    if (!prefs.wake) return;
+    const id = window.setInterval(() => setHandsText(handsOf(handsRef).status(Date.now())), 1000);
+    return () => window.clearInterval(id);
   }, [prefs.wake]);
+
+  // The browser takes the microphone with the page: stop when it is hidden, go on when it is visible again.
+  useEffect(() => {
+    const onVisibility = () => {
+      const hands = handsOf(handsRef);
+      const change = hands.setVisible(!document.hidden);
+      if (change === "abort") {
+        stopEngine();
+        setMode((m) => (m === "listening" ? "idle" : m));
+      }
+      if (change === "start") engineFnsRef.current?.startEngine();
+      setHandsText(hands.status(Date.now()));
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [stopEngine]);
 
   // Watch mode. With the core online it speaks what the core opens and closes
   // (the server already scans 24/7); without it, the browser scans as before.
@@ -791,13 +934,13 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       if (e.altKey && e.key.toLowerCase() === "j") {
         e.preventDefault();
         setOpen(true);
-        startListening(false);
+        listenOnce();
       }
       if (e.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [startListening]);
+  }, [listenOnce]);
 
   const refreshLedger = useCallback(() => {
     if (ledgerTab === "local") void resolveOpen();
@@ -1120,8 +1263,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                 unlockAudio();
                 // Tapping while JARVIS talks interrupts it and listens, like any assistant.
                 if (mode === "speaking") hush();
-                if (mode === "listening" && !prefs.wake) recRef.current?.stop();
-                else startListening(false);
+                if (oneShotRef.current) recRef.current?.stop();
+                else listenOnce();
               }}
               aria-label="Hablar"
             >
@@ -1133,8 +1276,9 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
           <div className="jv-opts">
             <label><input type="checkbox" checked={prefs.voice} onChange={(e) => setPrefs({ voice: e.target.checked })} /> Voz</label>
             {supportsListen && (
-              <label title="Queda escuchando: decí «Jarvis» y tu pedido"><input type="checkbox" checked={prefs.wake} onChange={(e) => setPrefs({ wake: e.target.checked })} /> Manos libres</label>
+              <label title="Escucha con la pantalla encendida: decí «Jarvis» y tu pedido. Con la app en segundo plano no escucha: escribile por Telegram"><input type="checkbox" checked={prefs.wake} onChange={(e) => setPrefs({ wake: e.target.checked })} /> Manos libres</label>
             )}
+            {handsText && <p className="jv-hf" role="status">{handsText}</p>}
             <label title="Cada 5 minutos revisa 20 monedas y las barridas de imanes de BTC, ETH y SOL; te avisa en voz y registra cada señal con su resultado"><input type="checkbox" checked={prefs.watch} onChange={(e) => setPrefs({ watch: e.target.checked })} /> Vigilancia</label>
             <button type="button" className={`jv-voicebtn${showVoice ? " on" : ""}`} onClick={() => {
                 setShowVoice((v) => !v);
