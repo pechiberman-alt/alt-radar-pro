@@ -1,0 +1,52 @@
+/* JARVIS — HUD voice assistant */
+.jv-orb{position:fixed;right:18px;bottom:96px;z-index:60;width:58px;height:58px;padding:0;border-radius:50%;border:1px solid #5fd3f3;background:radial-gradient(circle,#0b2a33 0%,#050a0d 70%);box-shadow:0 0 18px rgba(95,211,243,.45),inset 0 0 12px rgba(95,211,243,.35);cursor:pointer}
+.jv-orb span{position:absolute;inset:14px;border-radius:50%;background:radial-gradient(circle,#e6fbff 0%,#5fd3f3 40%,rgba(95,211,243,0) 72%);animation:jv-breathe 3.2s ease-in-out infinite}
+.jv-orb.wake{border-color:#39f29a;box-shadow:0 0 22px rgba(57,242,154,.5),inset 0 0 12px rgba(57,242,154,.35)}
+.jv-orb.listening span{animation-duration:.9s;background:radial-gradient(circle,#fff 0%,#39f29a 40%,rgba(57,242,154,0) 72%)}
+.jv-orb.speaking span{animation-duration:.6s}
+.jv-orb.thinking span{animation:jv-spin 1s linear infinite;background:conic-gradient(#5fd3f3,transparent 60%,#5fd3f3)}
+@keyframes jv-breathe{0%,100%{transform:scale(.82);opacity:.75}50%{transform:scale(1.05);opacity:1}}
+@keyframes jv-spin{to{transform:rotate(360deg)}}
+@keyframes jv-rot{to{transform:rotate(360deg)}}
+@keyframes jv-rot-r{to{transform:rotate(-360deg)}}
+@keyframes jv-bar{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+
+.jv-panel{position:fixed;right:18px;bottom:164px;z-index:61;width:min(420px,calc(100vw - 24px));max-height:min(78vh,720px);display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid rgba(95,211,243,.55);border-radius:14px;background:linear-gradient(180deg,rgba(6,18,24,.97),rgba(4,10,13,.98));box-shadow:0 0 40px rgba(95,211,243,.18),inset 0 0 30px rgba(95,211,243,.06);font:11px var(--font-mono);color:#cfeff8;backdrop-filter:blur(6px)}
+.jv-panel::before{content:"";position:absolute;inset:0;border-radius:14px;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(95,211,243,.035) 0 1px,transparent 1px 3px)}
+.jv-head{display:flex;align-items:center;gap:10px}
+.jv-head b{font-size:13px;letter-spacing:4px;color:#5fd3f3;text-shadow:0 0 8px rgba(95,211,243,.7)}
+.jv-head em{flex:1;font-style:normal;font-size:9px;letter-spacing:1.5px;color:#7fb9c8}
+.jv-head button{background:none;border:0;color:#7fb9c8;font-size:14px;cursor:pointer}
+.jv-hud{position:relative;height:150px;display:grid;place-items:center}
+.jv-hud svg{position:absolute;height:150px;width:150px}
+.jv-hud circle{fill:none;stroke:#5fd3f3;transform-origin:100px 100px}
+.jv-hud .r1{stroke-width:1;stroke-dasharray:4 10;opacity:.55;animation:jv-rot 26s linear infinite}
+.jv-hud .r2{stroke-width:3;stroke-dasharray:60 30 10 30;opacity:.7;animation:jv-rot-r 14s linear infinite}
+.jv-hud .r3{stroke-width:1;stroke-dasharray:2 4;opacity:.5;animation:jv-rot 9s linear infinite}
+.jv-hud .r4{stroke-width:2;stroke-dasharray:90 40;opacity:.8;animation:jv-rot-r 6s linear infinite}
+.jv-hud .core{fill:rgba(95,211,243,.15);stroke-width:2;filter:drop-shadow(0 0 8px #5fd3f3)}
+.jv-hud.listening circle{stroke:#39f29a}.jv-hud.listening .core{fill:rgba(57,242,154,.18);filter:drop-shadow(0 0 10px #39f29a)}
+.jv-hud.thinking .r2,.jv-hud.thinking .r4{animation-duration:1.4s}
+.jv-wave{position:relative;display:flex;gap:3px;align-items:center;height:26px}
+.jv-wave i{width:3px;height:26px;border-radius:2px;background:#5fd3f3;transform:scaleY(.15);opacity:.35}
+.jv-hud.speaking .jv-wave i,.jv-hud.listening .jv-wave i{opacity:1;animation:jv-bar .7s ease-in-out infinite}
+.jv-hud.listening .jv-wave i{background:#39f29a}
+.jv-log{flex:1;min-height:90px;overflow-y:auto;display:grid;align-content:start;gap:6px;padding-right:4px}
+.jv-log p{margin:0;padding:6px 9px;border-radius:8px;font:11.5px/1.5 system-ui,sans-serif}
+.jv-log p b{display:block;font:8.5px var(--font-mono);letter-spacing:1.5px;margin-bottom:2px}
+.jv-log .jarvis{background:rgba(95,211,243,.08);border-left:2px solid #5fd3f3}.jv-log .jarvis b{color:#5fd3f3}
+.jv-log .yo{background:rgba(57,242,154,.07);border-left:2px solid #39f29a;justify-self:end;max-width:88%}.jv-log .yo b{color:#39f29a}
+.jv-log .interim{opacity:.6;font-style:italic}
+.jv-chips{display:flex;gap:5px;overflow-x:auto;padding-bottom:2px}
+.jv-chips button{flex:none;padding:5px 9px;font:9.5px var(--font-mono);color:#cfeff8;background:rgba(95,211,243,.06);border:1px solid rgba(95,211,243,.35);border-radius:999px;cursor:pointer}
+.jv-chips button:hover{background:rgba(95,211,243,.16)}
+.jv-input{display:flex;gap:6px}
+.jv-input input{flex:1;min-width:0;padding:9px 10px;font:12px system-ui,sans-serif;color:#e8f9fd;background:#06141a;border:1px solid rgba(95,211,243,.35);border-radius:8px}
+.jv-input button{padding:0 11px;font:9.5px var(--font-mono);letter-spacing:1px;color:#05181e;background:#5fd3f3;border:0;border-radius:8px;cursor:pointer}
+.jv-input .mic{font-size:15px;background:#0b2a33;color:#5fd3f3;border:1px solid rgba(95,211,243,.5)}
+.jv-input .mic.on{background:#39f29a;color:#05181e;box-shadow:0 0 12px rgba(57,242,154,.6)}
+.jv-opts{display:flex;flex-wrap:wrap;gap:12px;font-size:10px;color:#9cc9d4}
+.jv-opts input{accent-color:#5fd3f3;vertical-align:-2px}
+.jv-foot{font-size:8.5px;color:#5f8a95}
+@media (min-width:900px){.jv-orb{bottom:24px}.jv-panel{bottom:92px}}
+@media (prefers-reduced-motion:reduce){.jv-orb span,.jv-hud circle,.jv-wave i{animation:none!important}}
