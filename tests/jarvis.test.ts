@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { briefingText, findCoins, findTimeframe, greeting, normalize, parseCommand, priceLine } from "../lib/jarvis.ts";
+import { briefingText, findCoins, findTimeframe, greeting, normalize, parseCommand, priceLine, spokenLevel } from "../lib/jarvis.ts";
 
 const KNOWN = new Set(["BTC", "ETH", "SOL", "PEPE", "WIF", "ORDI"]);
 
@@ -68,4 +68,38 @@ test("price line and briefing read like speech", () => {
   assert.match(text, /A punto de romper: NEAR hacia arriba/);
   assert.match(text, /uno por ciento por operación/);
   assert.match(briefingText({ hour: 9, name: "señor", tickers: [], breakouts: [] }), /Ninguna de las principales/);
+});
+
+test("JARVIS TRADING: the questions of the desk reach the desk", () => {
+  assert.deepEqual(parseCommand("Analizame BTC"), { kind: "DESK", symbol: "BTC" });
+  assert.deepEqual(parseCommand("Jarvis, análisis completo"), { kind: "DESK", symbol: null });
+  assert.deepEqual(parseCommand("¿Dónde entrarías?"), { kind: "ENTRY", symbol: null });
+  assert.deepEqual(parseCommand("dame un plan de trading en sol"), { kind: "ENTRY", symbol: "SOL" });
+  assert.deepEqual(parseCommand("¿Qué pasa si pierde 110.000?"), { kind: "WHATIF", symbol: null, level: 110_000 });
+  assert.deepEqual(parseCommand("y si BTC rompe los 125 mil"), { kind: "WHATIF", symbol: "BTC", level: 125_000 });
+  assert.deepEqual(parseCommand("¿Está más fuerte ETH que BTC?"), { kind: "COMPARE", a: "ETH", b: "BTC" });
+  assert.deepEqual(parseCommand("Comparame BTC vs ETH"), { kind: "COMPARE", a: "BTC", b: "ETH" });
+  assert.deepEqual(parseCommand("¿Qué opinan los indicadores?"), { kind: "INDICATORS", symbol: null });
+  assert.deepEqual(parseCommand("¿Hay riesgo de liquidaciones?"), { kind: "LIQ_RISK", symbol: null });
+  assert.deepEqual(parseCommand("¿Qué pasa si sale un CPI peor de lo esperado?"), { kind: "MACRO", question: "¿Qué pasa si sale un CPI peor de lo esperado?" });
+  assert.deepEqual(parseCommand("abrí jarvis trading"), { kind: "SECTION", section: "jarvis-trading", label: "JARVIS TRADING" });
+  // A conversation about an asset still goes to the AI, with the desk's numbers as context.
+  assert.deepEqual(parseCommand("¿cómo ves SOL?"), { kind: "AI", question: "¿cómo ves SOL?" });
+  // "What if" without a price is not a scenario.
+  assert.equal(parseCommand("y si compro ahora").kind, "AI");
+});
+
+test("prices said the Argentine way; timeframes and percentages are not prices", () => {
+  assert.equal(spokenLevel("si pierde 110.000"), 110_000);
+  assert.equal(spokenLevel("si rompe 110 mil"), 110_000);
+  assert.equal(spokenLevel("los 110k"), 110_000);
+  assert.equal(spokenLevel("2.462,5"), 2462.5);
+  assert.equal(spokenLevel("si pierde 0,85"), 0.85);
+  assert.equal(spokenLevel("si pierde 0.85"), 0.85);
+  assert.equal(spokenLevel("si cae 1.5k"), 1500);
+  assert.equal(spokenLevel("si cae 35%"), null);
+  assert.equal(spokenLevel("si cae 3 por ciento"), null);
+  assert.equal(spokenLevel("en 4h"), null);
+  assert.equal(spokenLevel("si en 4 horas pierde 98.500"), 98_500);
+  assert.equal(spokenLevel("si pierde el soporte"), null);
 });

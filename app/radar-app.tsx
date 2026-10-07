@@ -40,6 +40,7 @@ import DecouplingDesk from "./decoupling-desk";
 import { everyVisible } from "@/lib/visible-interval";
 import RobotSignalsDesk from "./robot-signals-desk";
 import PreBreakDesk from "./prebreak-desk";
+import JarvisTrading from "./jarvis-trading";
 import Jarvis from "./jarvis";
 import FuturesDesk from "./futures-desk";
 import FuturesRecorder from "./futures-recorder";
@@ -77,6 +78,7 @@ const STABLE_BASES = new Set([
 
 const NAV_ITEMS = [
   { label: "RESUMEN", mobile: "INICIO", icon: "⌂", id: "resumen" },
+  { label: "JARVIS TRADING", mobile: "TRADING", icon: "◬", id: "jarvis-trading" },
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
   { label: "PUMPEO", mobile: "PUMP", icon: "▲", id: "pumpeo" },
   { label: "LIQUIDACIONES", mobile: "MAPA", icon: "▨", id: "liquidaciones" },
@@ -1068,6 +1070,10 @@ export default function RadarApp() {
               </small>
             </article>
           </section>
+        </Collapsible>
+
+        <Collapsible id="jarvis-trading" label="JARVIS TRADING" open={workspace.open["jarvis-trading"]} onToggle={workspace.toggle}>
+          <JarvisTrading getContext={getAssistantContext} />
         </Collapsible>
 
         <Collapsible id="inteligencia" label="SEÑALES · ROBOT MM" open={workspace.open["inteligencia"]} onToggle={workspace.toggle}>

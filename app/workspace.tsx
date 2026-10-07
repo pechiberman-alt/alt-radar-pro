@@ -43,6 +43,7 @@ export type WorkspaceGroup = (typeof WORKSPACE_GROUPS)[number];
 export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   // EMPEZÁ ACÁ — orientation. Open by default; everything else is not.
   { id: "resumen", label: "RESUMEN", primary: true, group: "EMPEZÁ ACÁ" },
+  { id: "jarvis-trading", label: "JARVIS TRADING", primary: true, group: "EMPEZÁ ACÁ" },
   { id: "alertas", label: "ALERTAS", primary: true, group: "EMPEZÁ ACÁ" },
   { id: "noticias", label: "NOTICIAS", primary: false, group: "EMPEZÁ ACÁ" },
   { id: "inteligencia", label: "SEÑALES · ROBOT MM", primary: true, group: "EMPEZÁ ACÁ" },
@@ -93,7 +94,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
  * They live under AVANZADO, one tap away, and opening any of them from
  * elsewhere in the app turns AVANZADO on by itself.
  */
-export const ESSENTIAL_IDS = new Set(["resumen", "inteligencia", "liquidaciones", "rompe", "desacople", "alertas", "diario", "configuracion"]);
+export const ESSENTIAL_IDS = new Set(["resumen", "jarvis-trading", "inteligencia", "liquidaciones", "rompe", "desacople", "alertas", "diario", "configuracion"]);
 const ADVANCED_KEY = "alt-radar-pro:workspace:advanced:v1";
 const ADVANCED_EVENT = "alt-radar:advanced";
 

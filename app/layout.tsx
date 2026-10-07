@@ -46,6 +46,7 @@ import "./jarvis.css";
 import "./spot-desk.css";
 import "./sentiment-desk.css";
 import "./settings-desk.css";
+import "./jarvis-trading.css";
 import "./responsive-fixes.css";
 import "./laptop.css";
 import PwaRegister from "./pwa-register";
