@@ -86,3 +86,10 @@
 .jv-row input[type=checkbox]{accent-color:#5fd3f3}
 .jv-row select{flex:1;min-width:0;background:#06171d;color:#e6fbff;border:1px solid #1d4a57;border-radius:8px;font:inherit;font-size:10px;padding:6px}
 .jv-test{background:linear-gradient(90deg,#0c3a47,#0f4d5e);border:1px solid #5fd3f3;color:#e6fbff;font:inherit;font-size:10px;letter-spacing:.1em;padding:8px;border-radius:8px;cursor:pointer}
+.jv-head .jv-core{display:inline-flex;align-items:center;gap:5px;margin-left:auto;margin-right:6px;background:transparent;border:1px solid #1d4a57;border-radius:999px;color:#9cc9d4;font:inherit;font-size:8.5px;letter-spacing:.14em;padding:3px 8px;cursor:pointer}
+.jv-head .jv-core i{width:7px;height:7px;border-radius:50%;background:#e05a5a;box-shadow:0 0 6px #e05a5a}
+.jv-head .jv-core.on i{background:#29e39b;box-shadow:0 0 8px #29e39b;animation:jvbeat 1.6s ease-in-out infinite}
+.jv-head .jv-core.on{border-color:#1f6b55;color:#bff5df}
+@keyframes jvbeat{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.8)}}
+.jv-ledger .jv-ltabs{min-height:30px;overflow:visible;margin-bottom:2px}
+.jv-head em{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
