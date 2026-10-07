@@ -38,6 +38,7 @@ import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSour
 import type { SwingCandle } from "@/lib/swing-entries";
 import { findInducements, idmStats } from "@/lib/inducement";
 import { readPreBreak, replayPreBreakout } from "@/lib/pre-breakout";
+import { magnetEvents, magnetEventText, replayMagnets, strongestMagnets } from "@/lib/magnet-watch";
 import { mmEvents, runMm, studyMm, studyMmPooled, type MmTrade } from "@/lib/mm-robot";
 import { eligible } from "@/lib/decoupling";
 import { MM_WIDE_KEY, MM_WIDE_TTL, type WideSummary, type WideVariant } from "@/lib/robot-signals";
@@ -282,6 +283,8 @@ export default function LiquidationHeatmapDesk() {
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [timeframe, setTimeframe] = useState("1h");
   const [rawData, setData] = useState<ApiResponse | null>(null);
+  /** Every candle the map was built from (the chart keeps only the last 220). */
+  const [history, setHistory] = useState<{ key: string; candles: SwingCandle[] }>({ key: "", candles: [] });
   // Which leverage tiers the liquidation map shows. All by default; a 100x
   // position dies to a ~1% move and a 10x to ~10%, so isolating tiers answers
   // "how much is at stake on a small move" — which the blended map can't.
@@ -661,6 +664,8 @@ export default function LiquidationHeatmapDesk() {
   // and reset the refresh counter so that load is allowed to report errors.
   const selectSymbol = (next: string) => {
     setSymbolQuery("");
+    // The coin already on screen: nothing to reload (blanking it would stick).
+    if (next === symbol) return;
     setLoading(true);
     setError("");
     setData(null);
@@ -668,11 +673,19 @@ export default function LiquidationHeatmapDesk() {
     setVisibleCandles(70);
     setSymbol(next);
   };
-  // Another panel (SUBEN SOLAS) can ask the map to show a coin.
+  // Another panel (SUBEN SOLAS, JARVIS) can ask the map to show a coin. Asking
+  // for what is already on screen changes nothing: blanking it would leave
+  // "CONSTRUYENDO…" forever, since the load effect would not run again.
+  const shownRef = useRef({ symbol, timeframe });
+  useEffect(() => {
+    shownRef.current = { symbol, timeframe };
+  }, [symbol, timeframe]);
   useEffect(
     () =>
       onMapSymbol((next, tf) => {
-        if (tf && TIMEFRAME_ORDER.includes(tf)) setTimeframe(tf);
+        const wantTf = tf && TIMEFRAME_ORDER.includes(tf) ? tf : shownRef.current.timeframe;
+        if (next === shownRef.current.symbol && wantTf === shownRef.current.timeframe) return;
+        if (wantTf !== shownRef.current.timeframe) setTimeframe(wantTf);
         setSymbolQuery("");
         setLoading(true);
         setError("");
@@ -684,6 +697,9 @@ export default function LiquidationHeatmapDesk() {
     [],
   );
   const selectTimeframe = (next: string) => {
+    // Re-selecting the frame on screen must not blank the map: nothing in the
+    // load effect's dependencies would change, so it would never reload.
+    if (next === timeframe) return;
     setLoading(true);
     setError("");
     setData(null);
@@ -853,6 +869,8 @@ export default function LiquidationHeatmapDesk() {
           const v = Number(row[9]);
           if (Number.isFinite(v)) takerBuyByTime.set(Number(row[0]), v);
         }
+        // Closed candles only, for measurements that need the whole lookback.
+        setHistory({ key: `${symbol}:${timeframe}`, candles: candles.filter((c) => c.openTime + config.frameMs <= Date.now()) });
         setData({
           heatmap,
           candles: candles.slice(-MAX_DISPLAY_CANDLES).map((candle) => ({
@@ -1444,6 +1462,65 @@ export default function LiquidationHeatmapDesk() {
   // A PUNTO DE ROMPER for this coin, and how often it was followed by a big move here.
   const pre = useMemo(() => (scalpSeries.length >= 80 ? readPreBreak(scalpSeries) : null), [scalpSeries]);
   const preReplay = useMemo(() => (scalpSeries.length >= 200 ? replayPreBreakout(scalpSeries) : null), [scalpSeries]);
+  // Liquidation magnets: the heaviest zone each side, alerts and the measurement.
+  const [magnetAlerts, setMagnetAlerts] = useState(false);
+  useEffect(() => {
+    void (async () => {
+      await Promise.resolve();
+      try {
+        setMagnetAlerts(window.localStorage.getItem("alt-radar-pro:magnet-alerts:v1") === "1");
+      } catch {
+        // stays off
+      }
+    })();
+  }, []);
+  const magnets = useMemo(() => (data?.heatmap ? strongestMagnets(data.heatmap, data.heatmap.currentPrice) : null), [data]);
+  const magnetReplay = useMemo(() => {
+    if (history.key !== `${symbol}:${timeframe}` || history.candles.length < 250) return null;
+    const cfg = timeframeConfig(timeframe);
+    return replayMagnets(symbol, history.candles, { priceRangePct: cfg.priceRange, halfLifeCandles: cfg.halfLife });
+  }, [history, symbol, timeframe]);
+  // In-app alert on the coin on screen, once per zone per day (and once per swept candle).
+  useEffect(() => {
+    if (!magnetAlerts || scalpSeries.length < 60 || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const cfg = timeframeConfig(timeframe);
+    const opts = { halfLifeCandles: cfg.halfLife, priceRangePct: cfg.priceRange };
+    const prev = scalpSeries.slice(0, -1);
+    const before = buildLiquidationHeatmap(symbol, prev, prev[prev.length - 1].close, opts);
+    const now = buildLiquidationHeatmap(symbol, scalpSeries, scalpSeries[scalpSeries.length - 1].close, opts);
+    const day = new Date().toISOString().slice(0, 10);
+    let sent: string[] = [];
+    try {
+      sent = JSON.parse(window.localStorage.getItem("alt-radar-pro:magnet-sent:v1") ?? "[]");
+    } catch {
+      sent = [];
+    }
+    for (const e of magnetEvents(scalpSeries, before, now, { minIntensity: 70 })) {
+      const key = e.kind === "CERCA" ? `n:${symbol}:${timeframe}:${e.magnet.price}:${day}` : `s:${symbol}:${timeframe}:${e.candleOpenTime}:${e.magnet.side}`;
+      if (sent.includes(key)) continue;
+      sent.push(key);
+      const t = magnetEventText(symbol, timeframe, e);
+      new Notification(t.title, { body: t.body, tag: key });
+      navigator.vibrate?.([180, 90, 180]);
+    }
+    try {
+      window.localStorage.setItem("alt-radar-pro:magnet-sent:v1", JSON.stringify(sent.slice(-200)));
+    } catch {
+      // the next refresh may repeat once
+    }
+  }, [magnetAlerts, scalpSeries, symbol, timeframe]);
+  const toggleMagnetAlerts = async () => {
+    const next = !magnetAlerts;
+    if (next && typeof Notification !== "undefined" && Notification.permission === "default") await Notification.requestPermission();
+    const ok = !next || (typeof Notification !== "undefined" && Notification.permission === "granted");
+    setMagnetAlerts(next && ok);
+    try {
+      window.localStorage.setItem("alt-radar-pro:magnet-alerts:v1", next && ok ? "1" : "0");
+    } catch {
+      // remembered for this page only
+    }
+  };
+
   const liveLv: LvTrade | null = lv && lv.trades.length && lv.trades[lv.trades.length - 1].result === "ABIERTA" ? lv.trades[lv.trades.length - 1] : null;
 
   // Who is winning, over the candles in view: from the aggressive-buy volume
@@ -3493,6 +3570,37 @@ export default function LiquidationHeatmapDesk() {
                   ? "FOOTPRINT: cargando operaciones…"
                   : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
             </p>
+          )}
+
+          {magnets && (magnets.above || magnets.below) && (
+            <div className="div-list sc-list mg-list">
+              <h4>
+                IMANES DE LIQUIDACIÓN · {timeframe.toUpperCase()}
+                <button className={`mg-bell ${magnetAlerts ? "on" : ""}`} onClick={() => void toggleMagnetAlerts()} aria-pressed={magnetAlerts}>
+                  {magnetAlerts ? "🔔 AVISOS ACTIVOS" : "🔕 ACTIVAR AVISOS"}
+                </button>
+              </h4>
+              {[magnets.above, magnets.below].map((m) =>
+                m ? (
+                  <div key={m.side} className={`mg-row ${m.side === "CORTOS" ? "down" : "up"}`}>
+                    <span className="mg-side">{m.side === "CORTOS" ? "▲ ARRIBA · liquida cortos" : "▼ ABAJO · liquida largos"}</span>
+                    <b className="mg-price">{priceLabel(m.price)}</b>
+                    <span className="mg-dist">{m.distancePct >= 0 ? "+" : ""}{m.distancePct.toFixed(2).replace(".", ",")}%</span>
+                    <span className="mg-bar" aria-label={`intensidad ${Math.round(m.intensity)} de 100`}><i style={{ width: `${Math.max(4, m.intensity)}%` }} /></span>
+                    <em>{Math.round(m.intensity)}/100{m.notionalUsd !== null ? ` · ~US$${m.notionalUsd >= 1e9 ? `${(m.notionalUsd / 1e9).toFixed(1).replace(".", ",")}B` : `${Math.round(m.notionalUsd / 1e6)}M`}` : ""}</em>
+                  </div>
+                ) : null,
+              )}
+              <small>
+                {magnetReplay && magnetReplay.cases > 0 && magnetReplay.resolved === 0
+                  ? `Medido en esta moneda y temporalidad: en ${magnetReplay.cases} momentos con un imán de cada lado, el precio no llegó a ninguno dentro de 48 velas. Con lo cargado, los imanes de este marco quedan lejos para operar.`
+                  : magnetReplay && magnetReplay.resolved > 0
+                  ? `Medido en esta moneda y temporalidad, rearmando el mapa en el pasado sin mirar el futuro: con un imán de cada lado, el precio llegó primero al más fuerte ${magnetReplay.strongerFirst} de ${magnetReplay.resolved} veces (${Math.round((magnetReplay.strongerFirst / magnetReplay.resolved) * 100)}%) y al más cercano ${magnetReplay.nearerFirst} de ${magnetReplay.resolved} (${Math.round((magnetReplay.nearerFirst / magnetReplay.resolved) * 100)}%); después de tocarlo rebotó una ATR ${magnetReplay.reversed} veces · ${magnetReplay.confidence.toLowerCase()}. Si «el más fuerte» no le gana a «el más cercano», acá la fuerza del imán no predice adónde va.`
+                  : "Todavía no hay historia suficiente cargada para medir si el precio va al imán más fuerte."}{" "}
+                Los avisos de la app son para la moneda en pantalla; por Telegram llegan los de BTC, ETH y SOL en 1h aunque la app esté cerrada (CONFIGURACIÓN →
+                Telegram → IMANES). Zonas estimadas por modelo, no posiciones reales. No es asesoramiento financiero.
+              </small>
+            </div>
           )}
 
           {layers.robot && (
