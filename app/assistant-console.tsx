@@ -84,18 +84,18 @@ export default function AssistantConsole({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: text, snapshot: compactSnapshot(getContext()), history: turns }),
       });
-      const d = (await r.json().catch(() => ({}))) as { text?: string; error?: string; remaining?: number };
+      const d = (await r.json().catch(() => ({}))) as { text?: string; error?: string; remaining?: number; brain?: string; label?: string };
       if (typeof d.remaining === "number") setAiRemaining(d.remaining);
       const message =
         d.error === "SESIÓN REQUERIDA"
           ? "La IA necesita una cuenta porque cada respuesta tiene un costo y se limita por usuario. El modo REGLAS funciona sin cuenta."
           : d.error === "IA NO CONFIGURADA"
             ? "La IA todavía no está configurada: cargá la clave de Anthropic en CONFIGURACIÓN. El modo REGLAS sigue disponible."
-            : d.error === "LÍMITE DIARIO ALCANZADO"
-              ? `Llegaste al límite de ${AI_DAILY_LIMIT} preguntas con IA por hoy. Se renueva mañana; el modo REGLAS no tiene límite.`
+            : d.error === "LÍMITE DIARIO ALCANZADO" || d.error === "SIN IA POR HOY"
+              ? `Por hoy se terminaron las respuestas de IA (Claude, ${AI_DAILY_LIMIT} por día, y las gratuitas). Se renuevan mañana; el modo REGLAS no tiene límite.`
               : d.error ?? "";
       entry = r.ok && d.text
-        ? { id: nextId.current++, kind: "ai", question: text, text: d.text, error: false, at: new Date().toLocaleTimeString() }
+        ? { id: nextId.current++, kind: "ai", question: text, text: d.brain && d.brain !== "claude" ? `${d.text}\n\n(Respondió: ${d.label ?? "IA gratis"}.)` : d.text, error: false, at: new Date().toLocaleTimeString() }
         : { id: nextId.current++, kind: "ai", question: text, text: message || "La IA no respondió.", error: true, needsAccount: d.error === "SESIÓN REQUERIDA", at: new Date().toLocaleTimeString() };
     } catch {
       entry = { id: nextId.current++, kind: "ai", question: text, text: "Sin conexión con la IA.", error: true, at: new Date().toLocaleTimeString() };

@@ -1,5 +1,6 @@
 import { buildSystemPrompt, buildUserMessage, type ChatTurn } from "./ai-analyst.ts";
-import { askClaude, consumeQuota, quotaFor } from "./ai-analyst-server.ts";
+import { BRAIN_LABEL, type AiLike } from "./ai-brains.ts";
+import { answerWithBrains } from "./ai-cascade.ts";
 import { getSecret, type SettingsEnv } from "./app-settings.ts";
 import { KNOWLEDGE } from "./assistant/knowledge.ts";
 import { loadCryptoNews, type CryptoNewsResult } from "./crypto-news.ts";
@@ -10,6 +11,7 @@ import { cached } from "./upstream-cache.ts";
 import { coreContext } from "./jarvis-core.ts";
 import { coreSnapshot } from "./jarvis-core-db.ts";
 import { sharedJson } from "./shared-cache.ts";
+import { listMemory, memoryBlock } from "./jarvis-memory.ts";
 
 const SYSTEM =
   buildSystemPrompt(KNOWLEDGE) +
@@ -88,20 +90,15 @@ export async function clearChat(db: D1Database, chatId: string) {
  * background (the webhook has already answered Telegram), so every failure
  * ends in a message to the user rather than a silent drop.
  */
-export async function answerInTelegram(db: D1Database, env: SettingsEnv, token: string, chatId: string, userId: number, question: string) {
+export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?: AiLike }, token: string, chatId: string, userId: number, question: string) {
   try {
     await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => undefined);
 
-    const quota = await quotaFor(db, userId);
-    if (!quota.allowed) {
-      await sendMessage(token, chatId, `Llegaste al límite de ${quota.limit} preguntas con IA por hoy (se comparte con la app). Se renueva mañana.`);
-      return;
-    }
-    const key = (await getSecret(db, env, "anthropic_api_key")).value;
-    if (!key) {
-      await sendMessage(token, chatId, "La IA todavía no está activada: falta cargar la clave de Anthropic en la app → CONFIGURACIÓN.");
-      return;
-    }
+    const [claudeKey, groqKey, notes] = await Promise.all([
+      getSecret(db, env, "anthropic_api_key"),
+      getSecret(db, env, "groq_api_key"),
+      listMemory(db, userId).catch(() => []),
+    ]);
 
     await db.prepare(CHAT_SCHEMA).run();
     const history = (
@@ -117,23 +114,24 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv, token: 
       sharedJson("jarvis-core-v1", 60, () => coreSnapshot(db, Date.now())).catch(() => null),
     ]);
     const snapshot = core ? { ...base, jarvis: coreContext(core, Date.now()).nucleo } : base;
-    const messages: ChatTurn[] = [...history, { role: "user", content: buildUserMessage(question, snapshot) }];
-    const answer = await askClaude(key, SYSTEM, messages);
+    const messages: ChatTurn[] = [...history, { role: "user", content: buildUserMessage(question, snapshot, memoryBlock(notes)) }];
+    // Claude first, then the free brains (lib/ai-brains.ts); only the one that answered is counted.
+    const answer = await answerWithBrains(db, userId, { claude: claudeKey.value, groq: groqKey.value }, env.AI ?? null, SYSTEM, messages);
     if (!answer.ok) {
       await sendMessage(
         token,
         chatId,
-        answer.error === "CLAVE DE IA INVÁLIDA"
-          ? "La clave de IA fue rechazada por Anthropic. Revisala en la app → CONFIGURACIÓN."
+        answer.error === "SIN IA POR HOY"
+          ? "Por hoy se terminaron las respuestas de IA (Claude y las gratuitas); mañana vuelven. Mientras tanto /jarvis y los demás comandos siguen andando, y en la app JARVIS responde con su motor local sin límite."
           : "La IA no pudo responder ahora. Probá de nuevo en un rato.",
       );
       return;
     }
 
-    for (const part of splitForTelegram(markdownToTelegramHtml(answer.text))) {
+    const html = markdownToTelegramHtml(answer.text) + (answer.brain === "claude" ? "" : `\n<i>Respondió: ${BRAIN_LABEL[answer.brain]}.</i>`);
+    for (const part of splitForTelegram(html)) {
       await sendMessage(token, chatId, part);
     }
-    await consumeQuota(db, userId, quota.day);
     const now = Date.now();
     // Only the plain question and answer are kept — never the data snapshot —
     // so follow-ups work without re-sending old market data.

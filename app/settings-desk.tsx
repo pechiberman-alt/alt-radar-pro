@@ -10,6 +10,8 @@ type Status = {
   canClaim: boolean;
   telegram: { configured: boolean; source: "cloudflare" | "app" | null };
   ai: { configured: boolean; source: "cloudflare" | "app" | null };
+  groq?: { configured: boolean; source: "cloudflare" | "app" | null };
+  freeAi?: { ok: boolean; at: number; ms: number; model: string; error: string | null } | null;
   encryption: "fuerte" | "local";
 };
 
@@ -27,6 +29,7 @@ export default function SettingsDesk() {
   const [code, setCode] = useState("");
   const [telegramToken, setTelegramToken] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
+  const [groqKey, setGroqKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
@@ -66,24 +69,25 @@ export default function SettingsDesk() {
   };
 
   const save = async () => {
-    if (!telegramToken.trim() && !anthropicKey.trim()) return;
+    if (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim()) return;
     setBusy(true);
     setResults({});
     const r = await fetch("/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telegramToken, anthropicKey }),
+      body: JSON.stringify({ telegramToken, anthropicKey, groqKey }),
     }).catch(() => null);
     const d = (await r?.json().catch(() => ({}))) as { results?: Record<string, string>; error?: string } | undefined;
     setResults(d?.results ?? { error: d?.error ?? "No se pudo guardar." });
     // Cleared either way: the field must not keep a secret on screen.
     setTelegramToken("");
     setAnthropicKey("");
+    setGroqKey("");
     setBusy(false);
     await load();
   };
 
-  const remove = async (which: "telegram" | "ai") => {
+  const remove = async (which: "telegram" | "ai" | "groq") => {
     await fetch(`/api/admin/settings?which=${which}`, { method: "DELETE" }).catch(() => undefined);
     await load();
   };
@@ -134,6 +138,23 @@ export default function SettingsDesk() {
               <b>{sourceLabel(status.ai)}</b>
               {status.ai.source === "app" && <button onClick={() => remove("ai")}>BORRAR</button>}
             </div>
+            {status.groq && (
+              <div className={status.groq.configured ? "on" : ""}>
+                <span>IA GRATIS · GROQ</span>
+                <b>{sourceLabel(status.groq)}</b>
+                {status.groq.source === "app" && <button onClick={() => remove("groq")}>BORRAR</button>}
+              </div>
+            )}
+            <div className={status.freeAi?.ok ? "on" : ""}>
+              <span>IA GRATIS · CLOUDFLARE</span>
+              <b>
+                {!status.freeAi
+                  ? "SIN PROBAR TODAVÍA"
+                  : status.freeAi.ok
+                    ? `ACTIVA · respondió en ${(status.freeAi.ms / 1000).toFixed(1).replace(".", ",")} s`
+                    : `FALLÓ LA PRUEBA · ${status.freeAi.error ?? "sin detalle"}`}
+              </b>
+            </div>
           </div>
 
           <label className="set-field">
@@ -144,13 +165,17 @@ export default function SettingsDesk() {
             <span>Clave de Anthropic (console.anthropic.com)</span>
             <input type="password" value={anthropicKey} onChange={(e) => setAnthropicKey(e.target.value)} placeholder="sk-ant-…" autoComplete="off" />
           </label>
-          <button className="set-save" onClick={save} disabled={busy || (!telegramToken.trim() && !anthropicKey.trim())}>
+          <label className="set-field">
+            <span>Clave gratis de Groq, opcional (console.groq.com → API Keys): más respuestas de IA por día cuando se termina el cupo de Claude</span>
+            <input type="password" value={groqKey} onChange={(e) => setGroqKey(e.target.value)} placeholder="gsk_…" autoComplete="off" />
+          </label>
+          <button className="set-save" onClick={save} disabled={busy || (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim())}>
             {busy ? "VERIFICANDO…" : "VERIFICAR Y GUARDAR"}
           </button>
 
           {Object.entries(results).map(([k, v]) => (
             <p key={k} className={`set-result ${v.startsWith("OK") ? "ok" : "bad"}`}>
-              {k === "telegram" ? "Telegram" : k === "ai" ? "IA" : "Error"}: {v}
+              {k === "telegram" ? "Telegram" : k === "ai" ? "IA" : k === "groq" ? "Groq" : "Error"}: {v}
             </p>
           ))}
 

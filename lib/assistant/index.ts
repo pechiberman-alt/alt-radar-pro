@@ -179,7 +179,7 @@ function summarize(context: AssistantContext): Omit<AssistantAnswer, "concepts" 
   const structure = context.structure;
 
   const lines = [
-    `Régimen: altseason ${context.altseason.final ?? UNAVAILABLE}/100 (${context.altseason.state}), riesgo macro ${context.risk.score ?? UNAVAILABLE}/100 (${context.risk.level}).`,
+    `Régimen: altseason ${context.altseason.final === null ? UNAVAILABLE : `${context.altseason.final}/100`} (${context.altseason.state}), riesgo macro ${context.risk.score === null ? UNAVAILABLE : `${context.risk.score}/100`} (${context.risk.level}).`,
     `Universo: ${context.market.length} pares. Señales activas: ${active.length} (${triggers} trigger, ${setups} setup).`,
   ];
 

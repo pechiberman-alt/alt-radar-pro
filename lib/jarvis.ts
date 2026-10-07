@@ -18,6 +18,9 @@ export type JarvisIntent =
   | { kind: "CORE" }
   | { kind: "LEARN" }
   | { kind: "NAME"; name: string }
+  | { kind: "REMEMBER"; text: string }
+  | { kind: "FORGET"; text: string }
+  | { kind: "MEMORY" }
   | { kind: "STOP" }
   | { kind: "HELP" }
   | { kind: "AI"; question: string };
@@ -45,6 +48,9 @@ const COIN_ALIASES: Record<string, string> = {
 };
 /** Spanish words that are also tickers; only taken as coins with an explicit cue ("de", "la moneda"). */
 const AMBIGUOUS = new Set(["sol", "link", "near", "ada", "hype", "ton", "dot", "one", "op", "arb", "uni", "aave", "sand", "mana", "gala", "pol", "jup", "ar", "me", "a", "s"]);
+/** Names of the app's own sections that are also tickers: alone they mean the section (the PUMP tab), not the coin. */
+const SECTION_WORDS = new Set(["pump", "pumps"]);
+const COIN_CUE = ["de", "del", "moneda", "token", "mapa", "precio", "grafico", "chart"];
 
 export function findCoins(text: string, known: Set<string> = new Set()): string[] {
   const words = normalize(text).split(" ");
@@ -53,6 +59,7 @@ export function findCoins(text: string, known: Set<string> = new Set()): string[
     const prev = words[i - 1] ?? "";
     let sym: string | null = COIN_ALIASES[w] ?? (known.has(w.toUpperCase()) ? w.toUpperCase() : null);
     if (!sym) return;
+    if (SECTION_WORDS.has(w) && !COIN_CUE.includes(prev)) return;
     if (AMBIGUOUS.has(w) && !["de", "del", "a", "el", "la", "moneda", "en", "abri", "abrime", "mostrame", "muestra", "mapa", "precio", "esta"].includes(prev) && words.length > 2) {
       // "sol" in "el sol" … only "de sol", "precio sol", or a phrase that is basically the coin.
       sym = null;
@@ -100,6 +107,15 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   if (!text) return { kind: "HELP" };
   if (/^(silencio|callate|basta|para|stop|cancelar)\b/.test(text)) return { kind: "STOP" };
   if (/\b(ayuda|que podes hacer|que puedes hacer|comandos)\b/.test(text)) return { kind: "HELP" };
+  // Memory: "recordá que…", "olvidá lo de…", "¿qué recordás?" (lib/jarvis-memory.ts).
+  if (/\b(que (te )?(recordas|acordas)( de mi)?|que sabes de mi|(que hay|que tenes|mostrame|abri) (en )?tu memoria|que tenes (anotado|guardado)|que te pedi que (recuerdes|anotes))\b/.test(text)) return { kind: "MEMORY" };
+  const forget = text.match(/^(?:olvida(?:te)?|borra (?:de tu memoria|el recuerdo|lo que te dije|todo lo que sabes))\b\s*(?:de |que |lo de |el recuerdo de |sobre )?(.*)$/);
+  if (forget) return { kind: "FORGET", text: /^(todo|toda tu memoria|todo lo que sabes( de mi)?|lo que sabes de mi)?$/.test(forget[1].trim()) ? "todo" : forget[1].trim() };
+  const remember = raw
+    .trim()
+    .replace(/^(?:(?:oye|hey|ok)\s+)?jarvis[,:]?\s*/i, "")
+    .match(/^(?:record[aá](?:me)?|acord[aá]te|anot[aá]|memoriz[aá]|guard[aá] en (?:tu )?memoria|aprend[eé])\s*(?:que|esto|lo siguiente)?\s*:?\s+(.{3,})$/i);
+  if (remember) return { kind: "REMEMBER", text: remember[1].trim() };
   if (/\b(que aprendiste|que (has )?aprendido|aprendizaje|que descubriste|lecciones|que estudiaste|que sabes del mercado)\b/.test(text)) return { kind: "LEARN" };
   if (/\b(nucleo|estado del nucleo|que hiciste|mientras no estaba|que paso mientras|que estuviste haciendo|estas activo|estas despierto)\b/.test(text)) return { kind: "CORE" };
   if (/\b(rendimiento|estadisticas|tus senales|tu registro|registro de senales|win ?rate|profit factor|como (te )?(va|fue|vienen?)( con)? (las|tus) senales|cuanto acertaste|aciertos)\b/.test(text)) return { kind: "STATS" };
@@ -175,4 +191,5 @@ export function briefingText(input: {
 
 export const HELP_TEXT =
   "Podés decirme: informe del mercado. Precio de Bitcoin. Abrí el mapa de Solana en 15 minutos. ¿Qué está por romper? ¿Qué está subiendo? " +
-  "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. O preguntame lo que quieras sobre el mercado.";
+  "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. " +
+  "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizalo, para lo que tenés en pantalla. O preguntame lo que quieras sobre el mercado.";
