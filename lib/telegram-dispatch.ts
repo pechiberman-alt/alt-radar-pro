@@ -15,6 +15,7 @@ import {
 import { familyOf, kindKey } from "./signal-plan.ts";
 import { ensureSignalPlanColumns, getPlanStatsCached } from "./signal-plan-db.ts";
 import { collectVolumeEvents } from "./telegram-volume.ts";
+import { collectMagnetEvents } from "./telegram-magnets.ts";
 import { runPriceAlerts } from "./price-alerts-server.ts";
 import { cached } from "./upstream-cache.ts";
 
@@ -107,6 +108,13 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
   // Unusual volume on the majors (public candles, no database).
   try {
     shared.push(...(await collectVolumeEvents(now)));
+  } catch {
+    // Exchange data down: the other categories still go out.
+  }
+
+  // Liquidation magnets on the majors (public candles + OI, no database).
+  try {
+    shared.push(...(await collectMagnetEvents(now)));
   } catch {
     // Exchange data down: the other categories still go out.
   }
