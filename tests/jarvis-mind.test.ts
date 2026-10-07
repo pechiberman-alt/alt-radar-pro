@@ -28,6 +28,10 @@ test("a thesis is kept only as a real plan from the current price", () => {
   assert.match((checkThesis({ sesgo: "ALCISTA", objetivo: 101, invalidacion: 97 }, 100) as { motivo: string }).motivo, /objetivo\/riesgo 0.3/);
   assert.equal(checkThesis({ sesgo: "NEUTRAL", objetivo: 110, invalidacion: 95 }, 100).ok, false);
   assert.equal((checkThesis({ sesgo: "ALCISTA", objetivo: 110, invalidacion: 96, confianza: "ENORME" }, 100) as { confianza: string }).confianza, "BAJA", "unknown confidence counts as low");
+  // Levels come back as text copied from DATOS; a slip into English notation is still read right.
+  const txt = checkThesis({ sesgo: "ALCISTA", objetivo: "11,5", invalidacion: "10.78" }, 11.07);
+  assert.deepEqual([txt.ok, (txt as { objetivo: number }).objetivo, (txt as { invalidacion: number }).invalidacion], [true, 11.5, 10.78]);
+  assert.equal((checkThesis({ sesgo: "BAJISTA", objetivo: "nivel", invalidacion: "nivel" }, 11.07) as { motivo: string }).motivo, "niveles inválidos");
 });
 
 const read = (precio: number, at: number) => ({
@@ -61,7 +65,7 @@ const answer = JSON.stringify({
   riesgos: ["Dato de inflación de EE.UU."],
   vigilar: ["Cierre de 4h de BTC arriba de 94.500"],
   tesis: [
-    { moneda: "SOL", sesgo: "ALCISTA", objetivo: 189, invalidacion: 174.6, confianza: "MEDIA", porque: "1h y 4h alcistas sobre soporte de 3 toques" },
+    { moneda: "SOL", sesgo: "ALCISTA", objetivo: "189", invalidacion: "174,6", confianza: "MEDIA", porque: "1h y 4h alcistas sobre soporte de 3 toques" },
     { moneda: "BTC", sesgo: "ALCISTA", objetivo: 85_000, invalidacion: 80_000, confianza: "ALTA", porque: "x" },
     { moneda: "PEPE", sesgo: "ALCISTA", objetivo: 1, invalidacion: 0.5, confianza: "BAJA", porque: "y" },
   ],
@@ -89,6 +93,8 @@ test("the hourly mind: once an hour from hh:17, with fresh reads only, theses ch
   assert.match(r.descartadas[1].motivo, /fuera de las 20 monedas/);
   assert.match(seen, /\\"m\\":\\"SOL\\"/, "the prompt carries the coins' reads");
   assert.doesNotMatch(seen, /\\"m\\":\\"ETH\\"/, "a read older than 3 hours is left out");
+  assert.match(seen, /\\"precio\\":\\"90\.000\\"/, "prices go written the Argentine way");
+  assert.match(seen, /\\"sop\\":\[\\"174,6\\"\]/);
   const open = await openCoreSignals(db);
   assert.deepEqual(open.map((s) => [s.id, s.source, s.taken, s.note]), [[`IA:SOLUSDT:1h:${at}:LONG`, "IA", true, "tesis de la IA · confianza media · precios de Kraken (USD)"]]);
   assert.equal((await readCoreStats(db)).bySource.IA.open, 1);

@@ -1,4 +1,5 @@
 import type { Brain } from "./ai-brains.ts";
+import { arNumber, parseLevel } from "./ai-numbers.ts";
 import type { CoreSignal, Mind } from "./jarvis-core.ts";
 import type { LvStats } from "./liq-vol-signals.ts";
 import type { LearnSummary } from "./jarvis-learn.ts";
@@ -50,17 +51,17 @@ export const MIND_MAX_OUTPUT = 1800;
 export const MIND_SYSTEM = `Sos JARVIS, la inteligencia artificial de ALT RADAR PRO (marca url.fx). Vivís en el servidor y cada hora escribís tu lectura del mercado con los datos del software que te paso en DATOS.
 
 Respondé SOLO con un objeto JSON válido, sin texto antes ni después, con esta forma exacta:
-{"sesgo":"ALCISTA|BAJISTA|NEUTRAL","resumen":"...","activos":[{"moneda":"BTC","lectura":"..."}],"riesgos":["..."],"vigilar":["..."],"tesis":[{"moneda":"SOL","sesgo":"ALCISTA|BAJISTA","objetivo":0,"invalidacion":0,"confianza":"BAJA|MEDIA|ALTA","porque":"..."}]}
+{"sesgo":"ALCISTA|BAJISTA|NEUTRAL","resumen":"...","activos":[{"moneda":"BTC","lectura":"..."}],"riesgos":["..."],"vigilar":["..."],"tesis":[{"moneda":"SOL","sesgo":"ALCISTA|BAJISTA","objetivo":"nivel","invalidacion":"nivel","confianza":"BAJA|MEDIA|ALTA","porque":"..."}]}
 
 REGLAS
 1. Todo número sale de DATOS (precios, niveles, imanes, porcentajes). Nada de memoria: tu memoria del mercado está desactualizada.
 2. "resumen": 2 a 4 frases profesionales. Régimen (BTC y altcoins), sentimiento, qué manda ahora y qué cambió desde tu lectura anterior.
 3. "activos": hasta 6 monedas, las más relevantes ahora (a punto de romper, tendencias alineadas, cerca de un imán o de un nivel). Una o dos frases técnicas cada una, con niveles concretos.
-4. "tesis": de 0 a 3, solo con evidencia clara que coincida en varias temporalidades. "objetivo" e "invalidacion" son niveles de DATOS (soportes, resistencias, imanes). Horizonte: 48 horas. Objetivo/riesgo entre 1,5 y 4. Si no hay nada claro, la lista va vacía: nunca inventes oportunidades.
+4. "tesis": de 0 a 3, solo con evidencia clara que coincida en varias temporalidades. "objetivo" e "invalidacion" son niveles de DATOS (soportes, resistencias, imanes), copiados como texto tal cual aparecen. Horizonte: 48 horas. Objetivo/riesgo entre 1,5 y 4. Si no hay nada claro, la lista va vacía: nunca inventes oportunidades.
 5. Calibrá la confianza con TU HISTORIAL (en DATOS): si tus tesis vienen perdiendo, sé más exigente y bajá la confianza. Con menos de 15 tesis cerradas la muestra es mínima: decilo si opinás sobre tu rendimiento.
 6. Distinguí lo medido (precios, volumen) de lo estimado (imanes de liquidación = modelo). No prometas resultados; no es asesoramiento financiero.
 7. Español rioplatense, claro y directo.
-8. Números en el texto con formato argentino: punto de miles solo desde 1.000 y coma decimal, sin cambiar el valor de DATOS. Ejemplos: 82920 → 82.920; 2462.5 → 2.462,5; 11.0664 → 11,07; 0.7042 → 0,7042; 2.99% → 2,99%. En "tesis", "objetivo" e "invalidacion" van como números JSON (con punto decimal, ej. 11.07).`;
+8. Los números de DATOS ya vienen en formato argentino, con punto de miles y coma decimal: "82.920" son ochenta y dos mil, "11,066" es once, "0,7042" es menos de uno. Copialos así: nunca cambies puntos por comas ni comas por puntos. Los cambios ("c24", "c7d") y las distancias ya son porcentajes: "-2,99" se escribe -2,99%.`;
 
 const coin = (s: string) => s.replace(/USDT$/, "");
 const r2 = (v: number | null | undefined) => (v === null || v === undefined ? null : Number(v.toFixed(2)));
@@ -175,15 +176,15 @@ export function rawTheses(raw: RawMind): RawThesis[] {
 export function checkThesis(t: RawThesis, entry: number): { ok: true; lado: "LONG" | "SHORT"; objetivo: number; invalidacion: number; confianza: MindThesis["confianza"]; porque: string } | { ok: false; motivo: string } {
   const lado = t.sesgo === "ALCISTA" ? "LONG" : t.sesgo === "BAJISTA" ? "SHORT" : null;
   if (!lado) return { ok: false, motivo: "sin dirección" };
-  const objetivo = Number(t.objetivo);
-  const invalidacion = Number(t.invalidacion);
-  if (!(entry > 0) || !(objetivo > 0) || !(invalidacion > 0)) return { ok: false, motivo: "niveles inválidos" };
+  const objetivo = parseLevel(t.objetivo, entry);
+  const invalidacion = parseLevel(t.invalidacion, entry);
+  if (!(entry > 0) || objetivo === null || invalidacion === null) return { ok: false, motivo: "niveles inválidos" };
   const long = lado === "LONG";
   if (long ? !(invalidacion < entry && entry < objetivo) : !(objetivo < entry && entry < invalidacion)) return { ok: false, motivo: "objetivo o invalidación del lado equivocado del precio" };
   const risk = Math.abs(entry - invalidacion) / entry;
   const rr = Math.abs(objetivo - entry) / Math.abs(entry - invalidacion);
-  if (risk < 0.004 || risk > 0.12) return { ok: false, motivo: `riesgo de ${(risk * 100).toFixed(1)}% fuera de 0,4–12%` };
-  if (rr < 1 || rr > 6) return { ok: false, motivo: `objetivo/riesgo ${rr.toFixed(1)} fuera de 1–6` };
+  if (risk < 0.004 || risk > 0.12) return { ok: false, motivo: `riesgo de ${(risk * 100).toFixed(1).replace(".", ",")}% fuera de 0,4–12%` };
+  if (rr < 1 || rr > 6) return { ok: false, motivo: `objetivo/riesgo ${rr.toFixed(1).replace(".", ",")} fuera de 1–6` };
   const confianza = t.confianza === "ALTA" || t.confianza === "MEDIA" ? t.confianza : "BAJA";
   return { ok: true, lado, objetivo, invalidacion, confianza, porque: str(t.porque, 280) };
 }
@@ -217,7 +218,7 @@ export function thesisSignal(symbol: string, candleOpenTime: number, entry: numb
 export function readingSpeech(r: MindReading, now: number): string {
   const ago = Math.max(1, Math.round((now - r.at) / 60_000));
   const parts = [`Mi lectura de hace ${ago} ${ago === 1 ? "minuto" : "minutos"}: mercado ${r.sesgo === "NEUTRAL" ? "sin dirección clara" : r.sesgo.toLowerCase()}. ${r.resumen}`];
-  if (r.tesis.length) parts.push(`Tesis nuevas: ${r.tesis.map((t) => `${t.moneda} ${t.lado === "LONG" ? "alcista" : "bajista"}, objetivo ${t.objetivo}, invalidación ${t.invalidacion}`).join("; ")}.`);
+  if (r.tesis.length) parts.push(`Tesis nuevas: ${r.tesis.map((t) => `${t.moneda} ${t.lado === "LONG" ? "alcista" : "bajista"}, objetivo ${arNumber(t.objetivo)}, invalidación ${arNumber(t.invalidacion)}`).join("; ")}.`);
   if (r.vigilar.length) parts.push(`A vigilar: ${r.vigilar.slice(0, 2).join("; ")}.`);
   parts.push("No es asesoramiento financiero.");
   return parts.join(" ");

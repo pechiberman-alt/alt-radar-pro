@@ -1,3 +1,4 @@
+import { forAi } from "./ai-numbers.ts";
 import type { AssistantContext } from "./assistant/index.ts";
 import type { KnowledgeEntry } from "./assistant/knowledge.ts";
 
@@ -102,7 +103,7 @@ REGLAS QUE NO SE ROMPEN
 5. Riesgo primero: si alguien pregunta por entrar, mencioná tamaño de posición e invalidación. En spot no hay liquidación; con apalancamiento sí.
 6. Si la pregunta no es de mercado o de la app, respondé breve y volvé al tema.
 7. Sin tablas; listas cortas sólo si ayudan. Si un dato no está en el SNAPSHOT, decí que no lo tenés en vez de estimarlo.
-8. Números con formato argentino, sin cambiar su valor: punto de miles solo desde 1.000 y coma decimal (82920 → 82.920; 2462.5 → 2.462,5; 11.0664 → 11,07; 0.7042 → 0,7042; 2.99% → 2,99%).
+8. Los números del SNAPSHOT ya vienen en formato argentino, con punto de miles y coma decimal: "82.920" son ochenta y dos mil, "11,066" es once, "0,7042" es menos de uno. Copialos así: nunca cambies puntos por comas ni comas por puntos. Los cambios y distancias ya son porcentajes: "-2,99" se escribe -2,99%.
 
 CÓMO LEE EL MERCADO ESTA APP
 - Liquidez de máximos/mínimos iguales: se considera tomada con que el precio la toque (una mecha alcanza).
@@ -118,9 +119,13 @@ GLOSARIO REVISADO DE LA APP
 ${glossary}`;
 }
 
-/** `extra`: other context for this person (their memory), placed before the question. */
+/**
+ * `extra`: other context for this person (their memory), placed before the
+ * question. The snapshot's numbers go already written the Argentine way, so
+ * the model copies them instead of converting them (ai-numbers.ts).
+ */
 export function buildUserMessage(question: string, snapshot: unknown, extra = ""): string {
-  return `SNAPSHOT DEL RADAR (JSON, datos en vivo de la app):\n${JSON.stringify(snapshot)}\n\n${extra ? `${extra}\n\n` : ""}PREGUNTA:\n${question.slice(0, 600)}`;
+  return `SNAPSHOT DEL RADAR (JSON, datos en vivo de la app):\n${JSON.stringify(forAi(snapshot))}\n\n${extra ? `${extra}\n\n` : ""}PREGUNTA:\n${question.slice(0, 600)}`;
 }
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };

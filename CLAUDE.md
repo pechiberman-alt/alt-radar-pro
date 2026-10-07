@@ -36,6 +36,8 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
 - Analista propio (`lib/jarvis-analyst.ts`): todos los motores sobre un activo en 1h/4h/1d; corre en el navegador (CPU del Worker).
 - MENTE (`lib/jarvis-mind.ts`): lectura horaria en el servidor (hh:17 UTC) con IA gratis; sus tesis son señales fuente "IA",
   se resuelven como cualquier señal y su historial vuelve al prompt. Nunca se usa Claude en tareas programadas (se paga).
+- Los datos llegan a las IAs con los números ya en formato argentino (`forAi` de `lib/ai-numbers.ts`): el modelo los copia, no
+  los convierte (convirtiendo escribió "11.066,4" por 11,07). Niveles que vuelven como texto: `parseLevel`.
 
 ## Honestidad (marca url.fx)
 - Ninguna probabilidad inventada. Todo porcentaje va con su tamaño de muestra (menos de 15 = "muestra mínima").

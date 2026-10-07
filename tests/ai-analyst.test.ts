@@ -45,6 +45,9 @@ test("the question is bounded and travels with the snapshot", () => {
   const m = buildUserMessage("x".repeat(2000), { a: 1 });
   assert.match(m, /^SNAPSHOT DEL RADAR/);
   assert.ok(m.length < 800);
+  // Its numbers go written the Argentine way, times untouched.
+  const at = Date.UTC(2026, 9, 7, 18);
+  assert.match(buildUserMessage("¿AVAX?", { at, foco: { precio: 11.0664, soportes: [{ precio: 10.782 }] }, majors: [{ s: "BTCUSDT", price: 82920.4 }] }), new RegExp(`\\{"at":${at},"foco":\\{"precio":"11,066","soportes":\\[\\{"precio":"10,782"\\}\\]\\},"majors":\\[\\{"s":"BTCUSDT","price":"82.920"\\}\\]\\}`));
 });
 
 test("history is trimmed, alternating and starts with the user", () => {
