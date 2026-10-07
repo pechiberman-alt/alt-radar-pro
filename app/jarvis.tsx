@@ -6,6 +6,9 @@ import { eligible } from "@/lib/decoupling";
 import { briefingText, greeting, HELP_TEXT, parseCommand, priceLine, type JarvisIntent, type Ticker } from "@/lib/jarvis";
 import { FUTURES_BASES, loadRows, loadTopSymbols, timeframeConfig } from "@/lib/market-fetch";
 import { readPreBreak } from "@/lib/pre-breakout";
+import { addSignals, breakoutSignal, ledgerCsv, ledgerStats, magnetSignal, resolveSignal, statsSpeech, type JarvisSignal } from "@/lib/jarvis-ledger";
+import { buildLiquidationHeatmap } from "@/lib/liquidation-heatmap";
+import { magnetEvents, strongestMagnets } from "@/lib/magnet-watch";
 import { parseSwingKlines } from "@/lib/swing-entries";
 import { everyVisible } from "@/lib/visible-interval";
 
@@ -19,7 +22,51 @@ import { everyVisible } from "@/lib/visible-interval";
 
 type Line = { who: "yo" | "jarvis"; text: string };
 type Mode = "idle" | "listening" | "thinking" | "speaking";
-type Breakout = { symbol: string; side: string; score: number };
+type Breakout = { symbol: string; side: string; score: number; signal: JarvisSignal | null };
+
+const LEDGER_KEY = "alt-radar-pro:jarvis-ledger:v1";
+function loadLedger(): JarvisSignal[] {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(LEDGER_KEY) ?? "[]");
+    return Array.isArray(raw) ? (raw as JarvisSignal[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function closedCandles(symbol: string, tf: string, limit: number) {
+  const frameMs = timeframeConfig(tf).frameMs;
+  const now = Date.now();
+  return parseSwingKlines(await loadRows(symbol, tf, limit, new AbortController().signal)).filter((c) => c.openTime + frameMs <= now);
+}
+
+/** Liquidation-magnet sweeps that closed back, on BTC/ETH/SOL 1h: reversal signals. */
+async function scanMagnetSignals(): Promise<JarvisSignal[]> {
+  const cfg = timeframeConfig("1h");
+  const out: JarvisSignal[] = [];
+  for (const symbol of ["BTCUSDT", "ETHUSDT", "SOLUSDT"]) {
+    try {
+      const candles = await closedCandles(symbol, "1h", 500);
+      if (candles.length < 200) continue;
+      const opts = { halfLifeCandles: cfg.halfLife, priceRangePct: cfg.priceRange };
+      const prev = candles.slice(0, -1);
+      const before = buildLiquidationHeatmap(symbol, prev, prev[prev.length - 1].close, opts);
+      const now = buildLiquidationHeatmap(symbol, candles, candles[candles.length - 1].close, opts);
+      const pair = now ? strongestMagnets(now, candles[candles.length - 1].close) : null;
+      for (const e of magnetEvents(candles, before, now, { minIntensity: 70 })) {
+        const sig = magnetSignal(symbol, "1h", candles, e, pair);
+        if (sig) out.push(sig);
+      }
+    } catch {
+      // skip this coin this round
+    }
+  }
+  return out;
+}
+
+const fmtPx = (v: number) => v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : v >= 1 ? 3 : 6 });
+const signalSpeech = (s: JarvisSignal) =>
+  `Señal registrada: ${s.symbol.replace(/USDT$/, "")} ${s.side === "LONG" ? "largo" : "corto"} en ${s.timeframe}, entrada ${fmtPx(s.entry)}, stop ${fmtPx(s.stop)}, objetivo ${fmtPx(s.target)}.`;
 
 const PREFS_KEY = "alt-radar-pro:jarvis:v1";
 type Prefs = { name: string; voice: boolean; wake: boolean; watch: boolean; lastBriefing: string };
@@ -73,7 +120,7 @@ async function scanBreakouts(tf: string, count: number): Promise<Breakout[]> {
       const now = Date.now();
       const candles = parseSwingKlines(await loadRows(symbol, tf, 200, new AbortController().signal)).filter((c) => c.openTime + frameMs <= now);
       const r = readPreBreak(candles, symbol);
-      if (r && r.state === "A PUNTO") out.push({ symbol, side: r.side, score: r.score });
+      if (r && r.state === "A PUNTO") out.push({ symbol, side: r.side, score: r.score, signal: breakoutSignal(symbol, tf, candles, r) });
     } catch {
       // skip this coin
     }
@@ -96,6 +143,9 @@ function JarvisInner() {
   const [draft, setDraft] = useState("");
   const [interim, setInterim] = useState("");
   const [prefs, setPrefsState] = useState<Prefs>(loadPrefs);
+  const [ledger, setLedgerState] = useState<JarvisSignal[]>(loadLedger);
+  const [showLedger, setShowLedger] = useState(false);
+  const ledgerRef = useRef(ledger);
   const recRef = useRef<SpeechRec | null>(null);
   const wakeRef = useRef(false);
   const known = useRef<Set<string>>(new Set());
@@ -113,6 +163,46 @@ function JarvisInner() {
       return next;
     });
   }, []);
+
+  const saveLedger = useCallback((next: JarvisSignal[]) => {
+    ledgerRef.current = next;
+    setLedgerState(next);
+    try {
+      window.localStorage.setItem(LEDGER_KEY, JSON.stringify(next));
+    } catch {
+      // kept for this page
+    }
+  }, []);
+
+  /** Records new directional signals; returns the ones that were not there before. */
+  const record = useCallback(
+    (fresh: (JarvisSignal | null)[]) => {
+      const have = new Set(ledgerRef.current.map((x) => x.id));
+      const added = fresh.filter((x): x is JarvisSignal => Boolean(x) && !have.has((x as JarvisSignal).id));
+      if (added.length) saveLedger(addSignals(ledgerRef.current, added));
+      return added;
+    },
+    [saveLedger],
+  );
+
+  /** Resolves open signals with the candles that came after them. */
+  const resolveOpen = useCallback(async () => {
+    const open = ledgerRef.current.filter((x) => x.result === "ABIERTA");
+    if (!open.length) return;
+    const groups = new Map<string, JarvisSignal[]>();
+    for (const x of open) groups.set(`${x.symbol}|${x.timeframe}`, [...(groups.get(`${x.symbol}|${x.timeframe}`) ?? []), x]);
+    const updated = new Map<string, JarvisSignal>();
+    for (const [key, list] of groups) {
+      const [symbol, tf] = key.split("|");
+      try {
+        const candles = await closedCandles(symbol, tf, 200);
+        for (const x of list) updated.set(x.id, resolveSignal(x, candles, timeframeConfig(tf).frameMs));
+      } catch {
+        // try again next time
+      }
+    }
+    if (updated.size) saveLedger(ledgerRef.current.map((x) => updated.get(x.id) ?? x));
+  }, [saveLedger]);
 
   useEffect(() => {
     void loadTopSymbols(new AbortController().signal)
@@ -189,14 +279,21 @@ function JarvisInner() {
           case "BREAKOUTS": {
             setLines((l) => [...l, { who: "jarvis" as const, text: `Escaneando 20 monedas en ${intent.timeframe}…` }]);
             const hot = await scanBreakouts(intent.timeframe, 20);
+            const added = record(hot.map((b) => b.signal));
             return speak(
               hot.length
-                ? `En ${intent.timeframe}, a punto de romper: ${hot.slice(0, 4).map((b) => `${b.symbol.replace(/USDT$/, "")} ${b.side === "ALCISTA" ? "hacia arriba" : b.side === "BAJISTA" ? "hacia abajo" : "sin dirección clara"}, presión ${b.score}`).join("; ")}. La dirección es probable, no segura.`
+                ? `En ${intent.timeframe}, a punto de romper: ${hot.slice(0, 4).map((b) => `${b.symbol.replace(/USDT$/, "")} ${b.side === "ALCISTA" ? "hacia arriba" : b.side === "BAJISTA" ? "hacia abajo" : "sin dirección clara"}, presión ${b.score}`).join("; ")}. La dirección es probable, no segura.${added.length ? ` ${added.slice(0, 2).map(signalSpeech).join(" ")}` : ""}`
                 : `En ${intent.timeframe} no veo ninguna de las principales comprimida contra un nivel.`,
             );
           }
+          case "STATS": {
+            await resolveOpen();
+            setShowLedger(true);
+            return speak(statsSpeech(ledgerStats(ledgerRef.current)));
+          }
           case "BRIEFING": {
             const [tickers, hot] = await Promise.all([tickers24h(), scanBreakouts("1h", 12).catch(() => undefined)]);
+            if (hot) record(hot.map((b) => b.signal));
             setPrefs({ lastBriefing: new Date().toISOString().slice(0, 10) });
             return speak(briefingText({ hour: new Date().getHours(), name: prefs.name, tickers, breakouts: hot }));
           }
@@ -221,7 +318,7 @@ function JarvisInner() {
         speak("No pude completar eso: Binance no respondió. Probá de nuevo en un momento.");
       }
     },
-    [lines, prefs.name, setPrefs, speak],
+    [lines, prefs.name, record, resolveOpen, setPrefs, speak],
   );
 
   const handle = useCallback(
@@ -312,17 +409,22 @@ function JarvisInner() {
     if (!prefs.watch) return;
     const seen = new Set<string>();
     const check = async () => {
-      const hot = await scanBreakouts("1h", 20).catch(() => []);
+      await resolveOpen();
+      const [hot, sweeps] = await Promise.all([scanBreakouts("1h", 20).catch(() => []), scanMagnetSignals().catch(() => [])]);
+      const added = record([...hot.map((b) => b.signal), ...sweeps]);
       const fresh = hot.filter((b) => !seen.has(b.symbol));
       fresh.forEach((b) => seen.add(b.symbol));
-      if (fresh.length) {
+      const parts: string[] = [];
+      if (fresh.length) parts.push(`${fresh.slice(0, 3).map((b) => `${b.symbol.replace(/USDT$/, "")} está a punto de romper ${b.side === "ALCISTA" ? "hacia arriba" : b.side === "BAJISTA" ? "hacia abajo" : "sin dirección clara"}`).join("; ")}.`);
+      if (added.length) parts.push(added.slice(0, 3).map(signalSpeech).join(" "));
+      if (parts.length) {
         setOpen(true);
-        speak(`Atención, ${prefs.name}: ${fresh.slice(0, 3).map((b) => `${b.symbol.replace(/USDT$/, "")} está a punto de romper ${b.side === "ALCISTA" ? "hacia arriba" : b.side === "BAJISTA" ? "hacia abajo" : ""}`).join("; ")}.`);
+        speak(`Atención, ${prefs.name}: ${parts.join(" ")}`);
       }
     };
     void check();
     return everyVisible(() => void check(), 300_000);
-  }, [prefs.watch, prefs.name, speak]);
+  }, [prefs.watch, prefs.name, record, resolveOpen, speak]);
 
   // Keyboard: Alt+J opens and listens; Escape closes.
   useEffect(() => {
@@ -340,6 +442,7 @@ function JarvisInner() {
 
   const openPanel = () => {
     setOpen(true);
+    void resolveOpen();
     if (!lines.length) {
       const today = new Date().toISOString().slice(0, 10);
       if (prefs.lastBriefing !== today) void run({ kind: "BRIEFING" });
@@ -359,6 +462,7 @@ function JarvisInner() {
           <div className="jv-head">
             <b>J.A.R.V.I.S.</b>
             <em>{label}</em>
+            <button className={showLedger ? "jv-tab on" : "jv-tab"} onClick={() => setShowLedger((v) => !v)} aria-pressed={showLedger} title="Registro de señales">📊</button>
             <button onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
           </div>
           <div className={`jv-hud ${mode}`} aria-hidden="true">
@@ -383,8 +487,62 @@ function JarvisInner() {
             ))}
             {interim && <p className="yo interim">{interim}…</p>}
           </div>
+          {showLedger && (() => {
+            const st = ledgerStats(ledger);
+            const pfTxt = st.profitFactor === null ? "—" : st.profitFactor === Infinity ? "∞" : st.profitFactor.toFixed(2).replace(".", ",");
+            return (
+              <div className="jv-ledger">
+                <div className="jv-kpis">
+                  <span><b>{st.winRate === null ? "—" : `${Math.round(st.winRate * 100)}%`}</b>win rate</span>
+                  <span><b>{pfTxt}</b>profit factor</span>
+                  <span className={st.totalR >= 0 ? "up" : "down"}><b>{st.totalR >= 0 ? "+" : ""}{st.totalR.toFixed(1).replace(".", ",")}R</b>total</span>
+                  <span><b>{st.expectancyR === null ? "—" : `${st.expectancyR >= 0 ? "+" : ""}${st.expectancyR.toFixed(2).replace(".", ",")}R`}</b>por señal</span>
+                </div>
+                <p className="jv-sample">
+                  {st.resolved} cerradas ({st.wins} ganadoras · {st.losses} perdedoras) · {st.open} abiertas · {st.confidence.toLowerCase()}
+                  {(["ROMPE", "IMÁN"] as const).map((src) =>
+                    st.bySource[src].resolved ? ` · ${src === "ROMPE" ? "rupturas" : "imanes"}: PF ${st.bySource[src].profitFactor === Infinity ? "∞" : (st.bySource[src].profitFactor ?? 0).toFixed(2).replace(".", ",")} en ${st.bySource[src].resolved}` : "",
+                  )}
+                </p>
+                <div className="jv-sigs">
+                  {ledger.length ? (
+                    [...ledger].reverse().slice(0, 12).map((x) => (
+                      <p key={x.id} className={x.r === null ? "" : x.r > 0 ? "up" : "down"}>
+                        <b>{x.symbol.replace(/USDT$/, "")} {x.side === "LONG" ? "▲" : "▼"} {x.timeframe}</b>
+                        <span>{fmtPx(x.entry)} → stop {fmtPx(x.stop)} · obj {fmtPx(x.target)}</span>
+                        <em>{x.result === "ABIERTA" ? "abierta" : `${x.result.toLowerCase()} ${x.r !== null ? `${x.r >= 0 ? "+" : ""}${x.r.toFixed(2).replace(".", ",")}R` : ""}`}</em>
+                      </p>
+                    ))
+                  ) : (
+                    <p className="jv-empty">Todavía no di señales con dirección. Activá la vigilancia o preguntame qué está por romper.</p>
+                  )}
+                </div>
+                <div className="jv-ledger-actions">
+                  <button onClick={() => void resolveOpen()}>ACTUALIZAR</button>
+                  {ledger.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const url = URL.createObjectURL(new Blob([ledgerCsv(ledger)], { type: "text/csv;charset=utf-8" }));
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = "jarvis-senales.csv";
+                        a.click();
+                        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                      }}
+                    >
+                      CSV
+                    </button>
+                  )}
+                </div>
+                <small>
+                  Cada señal queda con su plan desde que la doy y se resuelve con las velas siguientes: si una vela toca stop y objetivo, cuenta el stop; a las 48 velas
+                  se cierra a mercado; comisiones descontadas. Nada se borra ni se corrige después. Guardado en este dispositivo. No es asesoramiento financiero.
+                </small>
+              </div>
+            );
+          })()}
           <div className="jv-chips">
-            {["Informe del mercado", "¿Qué está por romper?", "¿Qué está subiendo?", "Precio de Bitcoin", "Abrí las señales"].map((c) => (
+            {["Informe del mercado", "¿Qué está por romper?", "¿Cómo vienen tus señales?", "¿Qué está subiendo?", "Precio de Bitcoin"].map((c) => (
               <button key={c} onClick={() => handle(c)}>{c}</button>
             ))}
           </div>
@@ -407,7 +565,7 @@ function JarvisInner() {
             {supportsListen && (
               <label title="Queda escuchando: decí «Jarvis» y tu pedido"><input type="checkbox" checked={prefs.wake} onChange={(e) => setPrefs({ wake: e.target.checked })} /> Manos libres</label>
             )}
-            <label title="Cada 5 minutos revisa 20 monedas y te avisa en voz si alguna está a punto de romper"><input type="checkbox" checked={prefs.watch} onChange={(e) => setPrefs({ watch: e.target.checked })} /> Vigilancia</label>
+            <label title="Cada 5 minutos revisa 20 monedas y las barridas de imanes de BTC, ETH y SOL; te avisa en voz y registra cada señal con su resultado"><input type="checkbox" checked={prefs.watch} onChange={(e) => setPrefs({ watch: e.target.checked })} /> Vigilancia</label>
           </div>
           <small className="jv-foot">La voz se procesa en tu navegador. Análisis, no órdenes: no es asesoramiento financiero.</small>
         </div>
