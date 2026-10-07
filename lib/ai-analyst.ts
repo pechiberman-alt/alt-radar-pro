@@ -102,8 +102,9 @@ GLOSARIO REVISADO DE LA APP
 ${glossary}`;
 }
 
-export function buildUserMessage(question: string, snapshot: unknown): string {
-  return `SNAPSHOT DEL RADAR (JSON, datos en vivo de la app):\n${JSON.stringify(snapshot)}\n\nPREGUNTA:\n${question.slice(0, 600)}`;
+/** `extra`: other context for this person (their memory), placed before the question. */
+export function buildUserMessage(question: string, snapshot: unknown, extra = ""): string {
+  return `SNAPSHOT DEL RADAR (JSON, datos en vivo de la app):\n${JSON.stringify(snapshot)}\n\n${extra ? `${extra}\n\n` : ""}PREGUNTA:\n${question.slice(0, 600)}`;
 }
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };

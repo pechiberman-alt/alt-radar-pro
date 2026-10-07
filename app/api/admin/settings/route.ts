@@ -10,6 +10,8 @@ import {
   setSecret,
   type SecretName,
 } from "@/lib/app-settings";
+import { GROQ_BASE, isGroqKey } from "@/lib/ai-brains";
+import { readProbe } from "@/lib/ai-probe";
 import { getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 import { tg } from "@/lib/telegram";
 import { ensureTelegramSchema, ensureWebhook } from "@/lib/telegram-server";
@@ -27,9 +29,11 @@ export async function GET(request: NextRequest) {
   const user = await who(request);
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   const admin = await adminUserId(env.DB);
-  const [telegram, ai] = await Promise.all([
+  const [telegram, ai, groq, probe] = await Promise.all([
     getSecret(env.DB, env, "telegram_bot_token"),
     getSecret(env.DB, env, "anthropic_api_key"),
+    getSecret(env.DB, env, "groq_api_key"),
+    readProbe(env.DB).catch(() => null),
   ]);
   return NextResponse.json(
     {
@@ -38,6 +42,8 @@ export async function GET(request: NextRequest) {
       canClaim: admin === null && (await hasClaimCode(env.DB)),
       telegram: { configured: Boolean(telegram.value), source: telegram.source },
       ai: { configured: Boolean(ai.value), source: ai.source },
+      groq: { configured: Boolean(groq.value), source: groq.source },
+      freeAi: probe ? { ok: probe.ok, at: probe.at, ms: probe.ms, model: probe.model, error: probe.error ?? null } : null,
       encryption: encryptionStrength(env),
     },
     { headers: { "Cache-Control": "no-store" } },
@@ -59,7 +65,7 @@ export async function PUT(request: NextRequest) {
   const user = await who(request);
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   if ((await adminUserId(env.DB)) !== user.id) return NextResponse.json({ error: "SÓLO ADMINISTRADOR" }, { status: 403 });
-  const body = ((await request.json().catch(() => ({}))) ?? {}) as { telegramToken?: string; anthropicKey?: string };
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { telegramToken?: string; anthropicKey?: string; groqKey?: string };
   const results: Record<string, string> = {};
 
   const telegramToken = body.telegramToken?.trim();
@@ -91,6 +97,22 @@ export async function PUT(request: NextRequest) {
       results.ai = "OK · clave verificada";
     }
   }
+
+  // Groq's free key: more free AI answers a day after Claude's quota (lib/ai-brains.ts).
+  const groqKey = body.groqKey?.trim();
+  if (groqKey) {
+    if (!isGroqKey(groqKey)) results.groq = "NO PARECE UNA CLAVE DE GROQ (empieza con gsk_)";
+    else {
+      const r = await fetch(`${GROQ_BASE}/models`, { headers: { Authorization: `Bearer ${groqKey}` }, signal: AbortSignal.timeout(10_000) }).catch(() => null);
+      if (!r) results.groq = "NO SE PUDO VERIFICAR: sin respuesta de Groq";
+      else if (r.status === 401 || r.status === 403) results.groq = "CLAVE INVÁLIDA: Groq la rechazó";
+      else if (!r.ok) results.groq = `NO SE PUDO VERIFICAR (HTTP ${r.status})`;
+      else {
+        await setSecret(env.DB, env, "groq_api_key", groqKey);
+        results.groq = "OK · clave verificada";
+      }
+    }
+  }
   return NextResponse.json({ results });
 }
 
@@ -100,7 +122,7 @@ export async function DELETE(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   if ((await adminUserId(env.DB)) !== user.id) return NextResponse.json({ error: "SÓLO ADMINISTRADOR" }, { status: 403 });
   const which = request.nextUrl.searchParams.get("which");
-  const name: SecretName | null = which === "telegram" ? "telegram_bot_token" : which === "ai" ? "anthropic_api_key" : null;
+  const name: SecretName | null = which === "telegram" ? "telegram_bot_token" : which === "ai" ? "anthropic_api_key" : which === "groq" ? "groq_api_key" : null;
   if (!name) return NextResponse.json({ error: "¿CUÁL?" }, { status: 400 });
   await deleteSecret(env.DB, name);
   return NextResponse.json({ ok: true });

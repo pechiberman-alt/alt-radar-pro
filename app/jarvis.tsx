@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { openInMap, showSection } from "@/lib/account-events";
 import { eligible } from "@/lib/decoupling";
-import { briefingText, greeting, HELP_TEXT, parseCommand, priceLine, type JarvisIntent, type Ticker } from "@/lib/jarvis";
+import { briefingText, findCoins, findTimeframe, greeting, HELP_TEXT, parseCommand, priceLine, type JarvisIntent, type Ticker } from "@/lib/jarvis";
+import { compactSnapshot } from "@/lib/ai-analyst";
+import type { AssistantContext } from "@/lib/assistant/index";
+import { briefForAi, coinBrief, localAnswer, pointsAtScreen, SECTION_SCREEN, withFocus, type Focus } from "@/lib/jarvis-local";
 import { FUTURES_BASES, loadRows, loadTopSymbols, timeframeConfig } from "@/lib/market-fetch";
 import { readPreBreak } from "@/lib/pre-breakout";
 import { addSignals, breakoutSignal, ledgerCsv, ledgerStats, magnetSignal, resolveSignal, statsSpeech, type JarvisSignal } from "@/lib/jarvis-ledger";
@@ -36,7 +39,9 @@ import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
  * the phone's own voice without cutting off.
  */
 
-type Line = { who: "yo" | "jarvis"; text: string };
+/** `tag`: which brain answered (Claude, a free AI, the local analyst), shown next to the name. */
+type Line = { who: "yo" | "jarvis"; text: string; tag?: string };
+type JarvisProps = { getContext?: () => AssistantContext; screen?: string };
 type Mode = "idle" | "listening" | "thinking" | "speaking";
 type Breakout = { symbol: string; side: string; score: number; signal: JarvisSignal | null };
 
@@ -216,11 +221,11 @@ function useMounted() {
   return useSyncExternalStore(() => () => undefined, () => true, () => false);
 }
 
-export default function Jarvis() {
-  return useMounted() ? <JarvisInner /> : null;
+export default function Jarvis(props: JarvisProps) {
+  return useMounted() ? <JarvisInner {...props} /> : null;
 }
 
-function JarvisInner() {
+function JarvisInner({ getContext, screen }: JarvisProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("idle");
   const [lines, setLines] = useState<Line[]>([]);
@@ -246,6 +251,13 @@ function JarvisInner() {
   const neural = useSyncExternalStore(onNeural, neuralSnapshot, neuralServer);
   const wakeRef = useRef(false);
   const known = useRef<Set<string>>(new Set());
+  /** The coin JARVIS last opened or talked about, so "analizalo" knows what "lo" is. */
+  const focusRef = useRef<{ symbol: string | null; timeframe: string | null }>({ symbol: null, timeframe: null });
+  /** The section on screen and the radar's live data, from the app (radar-app.tsx). */
+  const screenRef = useRef<string | null>(screen ?? null);
+  const ctxRef = useRef<(() => AssistantContext) | null>(getContext ?? null);
+  /** Which brain answered last, to say once when it changes (Claude's quota used, no session…). */
+  const brainRef = useRef<string | null>(null);
   const logRef = useRef<HTMLDivElement | null>(null);
   const supportsListen = typeof window !== "undefined" && Boolean((window as unknown as { webkitSpeechRecognition?: unknown; SpeechRecognition?: unknown }).webkitSpeechRecognition ?? (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition);
 
@@ -319,6 +331,14 @@ function JarvisInner() {
       .catch(() => undefined);
   }, []);
 
+  // The section on screen changes when the person scrolls or taps the menu; JARVIS also sets it when it opens one.
+  useEffect(() => {
+    screenRef.current = screen ?? null;
+  }, [screen]);
+  useEffect(() => {
+    ctxRef.current = getContext ?? null;
+  }, [getContext]);
+
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
   }, [lines, interim]);
@@ -365,8 +385,8 @@ function JarvisInner() {
   }, []);
 
   const speak = useCallback(
-    (text: string) => {
-      setLines((l) => [...l, { who: "jarvis" as const, text }].slice(-40));
+    (text: string, tag?: string) => {
+      setLines((l) => [...l, { who: "jarvis" as const, text, ...(tag ? { tag } : {}) }].slice(-40));
       if (!prefs.voice) {
         setMode("idle");
         return;
@@ -423,12 +443,16 @@ function JarvisInner() {
             setPrefs({ name: intent.name });
             return speak(`Entendido. De ahora en más te llamo ${intent.name}.`);
           case "SECTION":
+            screenRef.current = SECTION_SCREEN[intent.section] ?? intent.label;
             showSection(intent.section);
             return speak(`Abriendo ${intent.label.toLowerCase()}.`);
           case "MAP":
+            focusRef.current = { symbol: `${intent.symbol}USDT`, timeframe: intent.timeframe ?? "1h" };
+            screenRef.current = "LIQUIDACIONES";
             openInMap(`${intent.symbol}USDT`, intent.timeframe);
             return speak(`Mapa de ${intent.symbol}${intent.timeframe ? ` en ${intent.timeframe.replace("m", " minutos").replace("h", intent.timeframe === "1h" ? " hora" : " horas").replace("1d", "diario")}` : ""}, en pantalla.`);
           case "PRICE": {
+            focusRef.current = { symbol: `${intent.symbols[0]}USDT`, timeframe: focusRef.current.timeframe };
             const all = await tickers24h();
             const found = intent.symbols.map((s) => all.find((t) => t.symbol === `${s}USDT`)).filter((t): t is Ticker => Boolean(t));
             return speak(found.length ? found.map(priceLine).join(" ") : "No encontré esa moneda en Binance futuros.");
@@ -493,25 +517,92 @@ function JarvisInner() {
             awayRef.current = null;
             return speak(`${briefingText({ hour: new Date().getHours(), name: prefs.name, tickers, breakouts: hot })}${away ? ` ${away}` : ""}`);
           }
-          case "AI": {
-            const r = await fetch("/api/analyst/ai", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                question: intent.question,
-                // JARVIS answers knowing what its own 24/7 core is doing and how it has done.
-                snapshot: coreRef.current ? coreContext(coreRef.current, Date.now()) : { asistente: "JARVIS" },
-                history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
-              }),
-            });
-            const d = (await r.json().catch(() => ({}))) as { text?: string; error?: string };
+          case "REMEMBER": {
+            const r = await fetch("/api/jarvis/memory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: intent.text }) });
+            if (r.status === 401) return speak("Para recordar cosas necesito que inicies sesión: la memoria es tuya y se guarda en tu cuenta.");
+            const d = (await r.json().catch(() => ({}))) as { saved?: boolean; text?: string; total?: number };
+            if (d.saved) return speak(`Anotado: ${d.text}. Lo voy a tener en cuenta en cada respuesta.`);
+            return speak(d.text && d.text.length >= 3 ? "Eso ya lo tenía anotado." : "No entendí qué querés que recuerde. Decime, por ejemplo: recordá que opero solo BTC con uno por ciento de riesgo.");
+          }
+          case "FORGET": {
+            const r = await fetch("/api/jarvis/memory", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: intent.text }) });
+            if (r.status === 401) return speak("Para tocar mi memoria necesito que inicies sesión.");
+            const d = (await r.json().catch(() => ({}))) as { removed?: string[] };
+            const gone = d.removed ?? [];
+            return speak(gone.length ? `Listo, olvidé ${gone.length === 1 ? `esto: ${gone[0]}` : `${gone.length} cosas`}.` : "No encontré nada así en mi memoria. Preguntame qué recuerdo y te digo cómo está anotado.");
+          }
+          case "MEMORY": {
+            const r = await fetch("/api/jarvis/memory", { cache: "no-store" });
+            if (r.status === 401) return speak("Mi memoria se guarda en tu cuenta: iniciá sesión y decime, por ejemplo, recordá que opero solo BTC.");
+            const d = (await r.json().catch(() => ({}))) as { notes?: { text: string }[] };
+            const notes = d.notes ?? [];
             return speak(
-              d.text ??
-                (d.error === "SESIÓN REQUERIDA"
-                  ? "Para consultas libres necesito que inicies sesión. Los comandos de mercado funcionan igual."
-                  : d.error === "LÍMITE DIARIO ALCANZADO"
-                    ? "Llegamos al límite diario de consultas a la inteligencia artificial."
-                    : "No pude consultar a la inteligencia artificial ahora."),
+              notes.length
+                ? `${notes.length === 1 ? "Tengo una cosa anotada" : `Tengo ${notes.length} cosas anotadas`}: ${notes.map((n) => n.text).join("; ")}. Las uso en cada respuesta; decime olvidá lo de… para borrar una.`
+                : "Todavía no me pediste que recuerde nada. Decime, por ejemplo: recordá que opero solo BTC con uno por ciento de riesgo.",
+            );
+          }
+          case "AI": {
+            // What the question is about: a coin it names, or what is on screen ("analizalo").
+            const named = findCoins(intent.question, known.current);
+            if (named.length) focusRef.current = { symbol: `${named[0]}USDT`, timeframe: findTimeframe(intent.question) ?? focusRef.current.timeframe };
+            const onScreen = !named.length && pointsAtScreen(intent.question);
+            const focus: Focus = { screen: screenRef.current, symbol: focusRef.current.symbol, timeframe: focusRef.current.timeframe };
+            const briefSymbol = named.length ? focus.symbol : onScreen && (focus.screen === "LIQUIDACIONES" || !focus.screen) ? focus.symbol : null;
+            const brief = briefSymbol ? await closedCandles(briefSymbol, "1h", 500).then((c) => coinBrief(briefSymbol, c, Date.now())).catch(() => null) : null;
+            const ctx = (() => {
+              try {
+                return ctxRef.current?.() ?? null;
+              } catch {
+                return null;
+              }
+            })();
+            const asked = named.length ? { question: intent.question } : withFocus(intent.question, focus);
+            const local = (why: string | null) => {
+              const tag = "motor local";
+              const text = localAnswer(intent.question, focus, ctx, brief);
+              if (why && brainRef.current !== "local") {
+                brainRef.current = "local";
+                return speak(`${why} ${text}`, tag);
+              }
+              brainRef.current = "local";
+              return speak(text, tag);
+            };
+            let r: Response;
+            try {
+              r = await fetch("/api/analyst/ai", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  question: asked.question,
+                  // Every brain gets the same live data: the radar, JARVIS's 24/7 core, the screen and the coin in focus.
+                  snapshot: {
+                    asistente: "JARVIS",
+                    ...(ctx ? compactSnapshot(ctx) : {}),
+                    jarvis: coreRef.current ? coreContext(coreRef.current, Date.now()).nucleo : null,
+                    pantalla: { seccion: focus.screen, moneda: focus.symbol, temporalidad: focus.timeframe },
+                    foco: brief ? briefForAi(brief) : null,
+                  },
+                  history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
+                }),
+              });
+            } catch {
+              return local("No llego a la inteligencia artificial ahora; te respondo con mi motor local.");
+            }
+            const d = (await r.json().catch(() => ({}))) as { text?: string; error?: string; brain?: string; label?: string };
+            if (r.ok && d.text) {
+              // Said once each time the brain changes, so it is clear even by voice which one is answering.
+              const changed = brainRef.current !== d.brain;
+              brainRef.current = d.brain ?? null;
+              const note = changed && d.brain && d.brain !== "claude" ? "Te respondo con la inteligencia artificial gratuita. " : "";
+              return speak(`${note}${d.text}`, d.label);
+            }
+            return local(
+              d.error === "SESIÓN REQUERIDA"
+                ? "Sin sesión iniciada no uso la inteligencia artificial; te respondo con mi motor local, sin límite."
+                : d.error === "SIN IA POR HOY"
+                  ? "Por hoy se terminaron las respuestas de inteligencia artificial; sigo con mi motor local, sin límite."
+                  : "La inteligencia artificial no respondió; te respondo con mi motor local.",
             );
           }
         }
@@ -756,7 +847,11 @@ function JarvisInner() {
           <div className="jv-log" ref={logRef}>
             {lines.map((l, i) => (
               <p key={i} className={l.who}>
-                <b>{l.who === "yo" ? prefs.name.toUpperCase() : "JARVIS"}</b> {l.text}
+                <b>
+                  {l.who === "yo" ? prefs.name.toUpperCase() : "JARVIS"}
+                  {l.tag && <small> · {l.tag}</small>}
+                </b>{" "}
+                {l.text}
               </p>
             ))}
             {interim && <p className="yo interim">{interim}…</p>}

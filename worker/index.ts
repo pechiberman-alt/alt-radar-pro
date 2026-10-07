@@ -6,6 +6,8 @@ import handler from "vinext/server/app-router-entry";
 import { windDownSignals } from "../lib/automation";
 import { archiveCoreLiquidity } from "../lib/liquidity-archive";
 import { runCoreTick } from "../lib/jarvis-core-db";
+import { probeFreeBrain } from "../lib/ai-probe";
+import type { AiLike } from "../lib/ai-brains";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
 
@@ -100,6 +102,12 @@ const worker = {
       ctx.waitUntil(
         archiveCoreLiquidity(env.DB).catch((error) => {
           console.error("[ALT_RADAR_LIQUIDITY_SCHEDULED]", error);
+        }),
+      );
+      // Once per deploy: does the free AI brain answer in production? (lib/ai-probe.ts)
+      ctx.waitUntil(
+        probeFreeBrain(env.DB, (env as unknown as { AI?: AiLike }).AI ?? null).catch((error) => {
+          console.error("[ALT_RADAR_AI_PROBE]", error);
         }),
       );
       // JARVIS CORE: one small job per minute, 24/7 (lib/jarvis-core.ts).

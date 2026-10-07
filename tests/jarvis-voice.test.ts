@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_NEURAL, NEURAL_VOICES, neuralVoice, PREMIUM_DAILY_CHARS, USER_DAILY_CHARS } from "../lib/jarvis-voice.ts";
+import { FREE_DAILY_NEURONS } from "../lib/ai-brains.ts";
 import { addUsage, allowance, audioBytes, AURA, cacheKey, MELO, synthesize, usageToday, type AiLike } from "../lib/jarvis-voice-server.ts";
 
 const sqlite = await import("node:sqlite").catch(() => null);
@@ -21,7 +22,7 @@ test("voices: Cloudflare's Aura-2 Spanish catalog, Latin American defaults, unkn
   assert.equal(neuralVoice(DEFAULT_NEURAL.male).accent, "México");
   assert.equal(neuralVoice(DEFAULT_NEURAL.female).accent, "Latinoamérica");
   assert.equal(neuralVoice("no-existe").id, "sirio");
-  assert.ok(PREMIUM_DAILY_CHARS * 2.727 < 10_000, "premium stays inside the 10.000 free neurons a day");
+  assert.ok(PREMIUM_DAILY_CHARS * 2.727 + FREE_DAILY_NEURONS < 10_000, "premium voice and the free AI brain fit together in the 10.000 free neurons a day");
 });
 
 test("synthesis: premium voice first; the simpler one if premium fails or is not allowed; null if neither", async () => {
@@ -50,13 +51,13 @@ test("allowance: per person and premium for everyone, per UTC day", { skip: !sql
   const db = makeDb();
   const day = "2026-10-07";
   assert.deepEqual(await usageToday(db, day, 1), { user: 0, premiumAll: 0 });
-  await addUsage(db, day, 1, 1000, true);
-  await addUsage(db, day, 2, 2000, true);
+  await addUsage(db, day, 1, 600, true);
+  await addUsage(db, day, 2, 1200, true);
   await addUsage(db, day, 1, 500, false);
   const u1 = await usageToday(db, day, 1);
-  assert.deepEqual(u1, { user: 1500, premiumAll: 3000 });
-  assert.deepEqual(allowance(u1, 200), { allowed: true, premium: true, reason: "OK" });
-  assert.deepEqual(allowance(u1, 400), { allowed: true, premium: false, reason: "OK" }, "premium budget for the day would be passed: simpler voice");
+  assert.deepEqual(u1, { user: 1100, premiumAll: 1800 });
+  assert.deepEqual(allowance(u1, PREMIUM_DAILY_CHARS - 1800), { allowed: true, premium: true, reason: "OK" });
+  assert.deepEqual(allowance(u1, PREMIUM_DAILY_CHARS - 1800 + 1), { allowed: true, premium: false, reason: "OK" }, "premium budget for the day would be passed: simpler voice");
   assert.deepEqual(allowance({ user: USER_DAILY_CHARS - 10, premiumAll: 0 }, 50), { allowed: false, premium: false, reason: "CUPO PERSONAL" });
   assert.deepEqual(await usageToday(db, "2026-10-08", 1), { user: 0, premiumAll: 0 }, "a new day starts clean");
   await addUsage(db, "2026-10-12", 1, 1, false);

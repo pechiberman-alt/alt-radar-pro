@@ -1330,7 +1330,7 @@ export default function RadarApp() {
         />
       )}
 
-      <Jarvis />
+      <Jarvis getContext={getAssistantContext} screen={tab} />
 
       <nav className="mobile-nav" aria-label="Navegación móvil">
         {NAV_ITEMS.filter(({ id }) => isVisibleSection(id, advanced)).map(({ label, mobile, icon, id }) => (
