@@ -24,6 +24,9 @@
       "migrations_dir": "drizzle"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
   "triggers": {
     "crons": ["* * * * *", "*/5 * * * *", "*/15 * * * *"]
   },

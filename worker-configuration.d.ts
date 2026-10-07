@@ -9,6 +9,8 @@ interface __BaseEnv_Env {
 	TELEGRAM_BOT_TOKEN?: string;
 	/** Anthropic API key for the ANALISTA AI mode (Cloudflare secret). Off while missing. */
 	ANTHROPIC_API_KEY?: string;
+	/** Workers AI: JARVIS's neural voice (Deepgram Aura-2 Spanish, MeloTTS as fallback). Off while missing. */
+	AI?: Ai;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

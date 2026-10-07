@@ -12,7 +12,10 @@ import { magnetEvents, strongestMagnets } from "@/lib/magnet-watch";
 import { parseSwingKlines } from "@/lib/swing-entries";
 import { everyVisible } from "@/lib/visible-interval";
 import { pickVoice } from "@/lib/browser-voice";
-import { awaySpeech, coreContext, coreOnline, coreStatusSpeech, reviveSnapshot, type CoreSnapshot } from "@/lib/jarvis-core";
+import { awaySpeech, breakoutsFromMind, coreContext, coreOnline, coreStatusSpeech, GRADE_LABEL, reviveSnapshot, type CoreSignal, type CoreSnapshot } from "@/lib/jarvis-core";
+import { fmtExpect, learnSpeech } from "@/lib/jarvis-learn";
+import { DEFAULT_NEURAL, NEURAL_VOICES, neuralVoice } from "@/lib/jarvis-voice";
+import { earcon, neuralModel, neuralState, onNeural, probeNeural, speakNeural, stopNeural, unlockAudio } from "./jarvis-voice-player";
 import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
 
 /**
@@ -22,9 +25,15 @@ import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
  * AI analyst. Voice and listening run in the browser.
  *
  * Its CORE runs on the server 24/7 (lib/jarvis-core.ts): it scans, records and
- * resolves its own signals with the app closed and sends them by Telegram. The
- * panel reads the core's status and record, tells what it did while you were
+ * resolves its own signals with the app closed, studies the market's history
+ * candle by candle to learn which signals work in which context
+ * (lib/jarvis-learn.ts), and sends what it takes by Telegram. The panel reads
+ * the core's status, record and lessons, tells what it did while you were
  * away, and gives the AI that context so it answers knowing its own track record.
+ *
+ * It speaks with a neural voice served by Cloudflare (app/jarvis-voice-player.ts),
+ * sentence by sentence so it never waits between sentences, and falls back to
+ * the phone's own voice without cutting off.
  */
 
 type Line = { who: "yo" | "jarvis"; text: string };
@@ -120,12 +129,31 @@ type Prefs = {
   wake: boolean;
   watch: boolean;
   lastBriefing: string;
+  /** "neural": the server's neural voice (falls back to the phone's); "device": the phone's own. */
+  engine: "neural" | "device";
+  neuralVoice: string;
+  /** After answering something asked by voice, listen once more for a follow-up. */
+  followUp: boolean;
   /** Device voice by name; "" = the best Spanish one available. */
   voiceName: string;
   gender: "male" | "female";
   rate: number;
 };
-const DEFAULT_PREFS: Prefs = { name: "señor", voice: true, wake: false, watch: false, lastBriefing: "", voiceName: "", gender: "male", rate: 1 };
+const DEFAULT_PREFS: Prefs = {
+  name: "señor",
+  voice: true,
+  wake: false,
+  watch: false,
+  lastBriefing: "",
+  engine: "neural",
+  neuralVoice: DEFAULT_NEURAL.male,
+  followUp: true,
+  voiceName: "",
+  gender: "male",
+  rate: 1,
+};
+const neuralSnapshot = () => `${neuralState()}|${neuralModel() ?? ""}`;
+const neuralServer = () => "unknown|";
 const VOICE_TEST = "Hola. Soy JARVIS, tu asistente de ALT RADAR PRO. Leo la liquidez del mercado, te aviso antes de que el precio rompa y anoto cada señal con su resultado.";
 
 function loadPrefs(): Prefs {
@@ -205,11 +233,17 @@ function JarvisInner() {
   const [showLedger, setShowLedger] = useState(false);
   const [core, setCore] = useState<CoreSnapshot | null>(null);
   const [coreUp, setCoreUp] = useState(false);
-  const [ledgerTab, setLedgerTab] = useState<"core" | "local">("core");
+  const [ledgerTab, setLedgerTab] = useState<"core" | "learn" | "local">("core");
   const coreRef = useRef<CoreSnapshot | null>(null);
   const awayRef = useRef<string | null>(null);
   const ledgerRef = useRef(ledger);
   const recRef = useRef<SpeechRec | null>(null);
+  const speakGen = useRef(0);
+  const speakingRef = useRef(false);
+  /** The last thing JARVIS was asked came by voice (for the follow-up turn). */
+  const lastVoiceRef = useRef(false);
+  const listenRef = useRef<((wake: boolean) => void) | null>(null);
+  const neural = useSyncExternalStore(onNeural, neuralSnapshot, neuralServer);
   const wakeRef = useRef(false);
   const known = useRef<Set<string>>(new Set());
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -289,18 +323,15 @@ function JarvisInner() {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
   }, [lines, interim]);
 
-  const speak = useCallback(
-    (text: string) => {
-      setLines((l) => [...l, { who: "jarvis" as const, text }].slice(-40));
-      if (!prefs.voice || typeof speechSynthesis === "undefined") {
-        setMode("idle");
-        return;
-      }
+  /** The phone's own voice. Said as words, in pieces: Chrome cuts long utterances off after ~15 s. */
+  const sayDevice = useCallback(
+    (text: string, onStart: () => void, onEnd: () => void) => {
+      if (typeof speechSynthesis === "undefined") return onEnd();
       speechSynthesis.cancel();
       const all = speechSynthesis.getVoices();
       const voice = all.find((v) => v.name === prefs.voiceName) ?? pickVoice(all, prefs.gender);
-      // Said as words ("uno coma setenta y seis", "uin réit"), in pieces: Chrome cuts long utterances off after ~15 s.
       const parts = splitForSpeech(normalizeSpanish(text), 180);
+      if (!parts.length) return onEnd();
       let started = false;
       parts.forEach((part, i) => {
         const u = new SpeechSynthesisUtterance(part);
@@ -311,18 +342,69 @@ function JarvisInner() {
         if (i === 0)
           u.onstart = () => {
             started = true;
-            setMode("speaking");
+            onStart();
           };
-        if (i === parts.length - 1) u.onend = () => setMode(wakeRef.current ? "listening" : "idle");
-        u.onerror = () => setMode(wakeRef.current ? "listening" : "idle");
+        if (i === parts.length - 1) u.onend = onEnd;
+        u.onerror = onEnd;
         speechSynthesis.speak(u);
       });
       // Browsers without a usable voice never start: the text is already on screen, so don't hang.
       window.setTimeout(() => {
-        if (!started) setMode(wakeRef.current ? "listening" : "idle");
+        if (!started) onEnd();
       }, 2500);
     },
-    [prefs.voice, prefs.voiceName, prefs.gender, prefs.rate],
+    [prefs.voiceName, prefs.gender, prefs.rate],
+  );
+
+  /** Stops whatever JARVIS is saying, neural or device. */
+  const hush = useCallback(() => {
+    speakGen.current += 1;
+    speakingRef.current = false;
+    stopNeural();
+    if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+  }, []);
+
+  const speak = useCallback(
+    (text: string) => {
+      setLines((l) => [...l, { who: "jarvis" as const, text }].slice(-40));
+      if (!prefs.voice) {
+        setMode("idle");
+        return;
+      }
+      // Only the latest reply may change the state when it ends: an interrupted one ends quietly.
+      const mine = ++speakGen.current;
+      let ended = false;
+      const onStart = () => {
+        if (speakGen.current !== mine) return;
+        speakingRef.current = true;
+        setMode("speaking");
+      };
+      const onEnd = () => {
+        if (ended || speakGen.current !== mine) return;
+        ended = true;
+        speakingRef.current = false;
+        setMode(wakeRef.current ? "listening" : "idle");
+        // Something asked by voice gets one more turn of listening, like a conversation.
+        if (prefs.followUp && lastVoiceRef.current && !wakeRef.current) {
+          lastVoiceRef.current = false;
+          window.setTimeout(() => listenRef.current?.(false), 350);
+        }
+      };
+      const ns = neuralState();
+      if (prefs.engine === "neural" && ns !== "login" && ns !== "quota" && ns !== "off") {
+        if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+        speakingRef.current = true;
+        void speakNeural(normalizeSpanish(text), { voice: prefs.neuralVoice, rate: prefs.rate, onStart }).then((r) => {
+          if (speakGen.current !== mine) return;
+          if (r.done) onEnd();
+          else sayDevice(r.rest, onStart, onEnd);
+        });
+        return;
+      }
+      stopNeural();
+      sayDevice(text, onStart, onEnd);
+    },
+    [prefs.voice, prefs.engine, prefs.neuralVoice, prefs.rate, prefs.followUp, sayDevice],
   );
 
   const run = useCallback(
@@ -331,7 +413,8 @@ function JarvisInner() {
       try {
         switch (intent.kind) {
           case "STOP":
-            speechSynthesis?.cancel();
+            lastVoiceRef.current = false;
+            hush();
             setMode("idle");
             return;
           case "HELP":
@@ -356,6 +439,12 @@ function JarvisInner() {
             return speak(`Las que más suben en 24 horas, con volumen: ${top.map((t) => `${t.symbol.replace(/USDT$/, "")} ${t.change.toFixed(1).replace(".", ",")} por ciento`).join(", ")}.`);
           }
           case "BREAKOUTS": {
+            // The core reads 20 coins in 1h every 15 minutes: answer from it at once when it is fresh.
+            if (intent.timeframe === "1h") {
+              const snap = coreRef.current ?? (await loadCore());
+              const fromCore = breakoutsFromMind(snap?.mind ?? null, Date.now());
+              if (fromCore) return speak(fromCore.text);
+            }
             setLines((l) => [...l, { who: "jarvis" as const, text: `Escaneando 20 monedas en ${intent.timeframe}…` }]);
             const hot = await scanBreakouts(intent.timeframe, 20);
             const added = record(hot.map((b) => b.signal));
@@ -371,12 +460,24 @@ function JarvisInner() {
             const local = ledgerStats(ledgerRef.current);
             if (snap && (snap.stats.resolved || snap.open.length)) {
               setLedgerTab("core");
+              const sh = snap.shadow;
               return speak(
-                `Núcleo veinticuatro siete. ${statsSpeech(snap.stats)}${local.resolved ? ` En este dispositivo, aparte: ${local.resolved} cerradas, profit factor ${local.profitFactor === null ? "sin dato" : local.profitFactor === Infinity ? "infinito" : local.profitFactor.toFixed(2).replace(".", ",")}.` : ""}`,
+                `Núcleo veinticuatro siete. ${statsSpeech(snap.stats)}${
+                  sh.resolved
+                    ? ` Además dejé en sombra ${sh.resolved} ${sh.resolved === 1 ? "señal" : "señales"} que el aprendizaje desaconsejó: ${sh.totalR >= 0 ? "sumaron más" : "sumaron menos"} ${Math.abs(sh.totalR).toFixed(1).replace(".", ",")} R.`
+                    : ""
+                }${local.resolved ? ` En este dispositivo, aparte: ${local.resolved} cerradas, profit factor ${local.profitFactor === null ? "sin dato" : local.profitFactor === Infinity ? "infinito" : local.profitFactor.toFixed(2).replace(".", ",")}.` : ""}`,
               );
             }
             setLedgerTab("local");
             return speak(statsSpeech(local));
+          }
+          case "LEARN": {
+            const snap = await loadCore();
+            setShowLedger(true);
+            setLedgerTab("learn");
+            if (!snap?.learning) return speak("Mi núcleo todavía no empezó a estudiar la historia. En unos minutos tengo los primeros casos.");
+            return speak(learnSpeech(snap.learning));
           }
           case "CORE": {
             const snap = await loadCore();
@@ -418,13 +519,14 @@ function JarvisInner() {
         speak("No pude completar eso: Binance no respondió. Probá de nuevo en un momento.");
       }
     },
-    [lines, prefs.name, record, resolveOpen, setPrefs, speak, loadCore],
+    [lines, prefs.name, record, resolveOpen, setPrefs, speak, loadCore, hush],
   );
 
   const handle = useCallback(
-    (text: string) => {
+    (text: string, byVoice = false) => {
       const clean = text.trim();
       if (!clean) return;
+      lastVoiceRef.current = byVoice;
       setLines((l) => [...l, { who: "yo" as const, text: clean }].slice(-40));
       void run(parseCommand(clean, known.current));
     },
@@ -442,6 +544,8 @@ function JarvisInner() {
       rec.interimResults = true;
       wakeRef.current = wake;
       rec.onresult = (e) => {
+        // While JARVIS talks the microphone hears it too: never answer itself.
+        if (speakingRef.current) return;
         let finalText = "";
         let partial = "";
         for (let i = e.resultIndex; i < e.results.length; i += 1) {
@@ -456,9 +560,16 @@ function JarvisInner() {
           const m = finalText.match(/jarvis[,:]?\s*(.*)$/i);
           if (!m) return;
           setOpen(true);
-          if (m[1].trim()) handle(m[1]);
-          else speak(`Te escucho, ${prefs.name}.`);
-        } else handle(finalText);
+          earcon("stop");
+          if (m[1].trim()) handle(m[1], true);
+          else {
+            lastVoiceRef.current = true;
+            speak(`Te escucho, ${prefs.name}.`);
+          }
+        } else {
+          earcon("stop");
+          handle(finalText, true);
+        }
       };
       rec.onerror = (e) => {
         if (e.error === "not-allowed") {
@@ -480,12 +591,16 @@ function JarvisInner() {
       try {
         rec.start();
         setMode("listening");
+        if (!wake) earcon("listen");
       } catch {
         // already started
       }
     },
     [handle, prefs.name, setPrefs, speak],
   );
+  useEffect(() => {
+    listenRef.current = startListening;
+  }, [startListening]);
 
   useEffect(() => {
     if (prefs.wake && supportsListen) {
@@ -577,6 +692,8 @@ function JarvisInner() {
 
   const openPanel = () => {
     setOpen(true);
+    unlockAudio();
+    void probeNeural();
     void resolveOpen();
     void (async () => {
       const snap = await loadCore();
@@ -610,7 +727,10 @@ function JarvisInner() {
             >
               <i />NÚCLEO
             </button>
-            <button className={showLedger ? "jv-tab on" : "jv-tab"} onClick={() => setShowLedger((v) => !v)} aria-pressed={showLedger} title="Registro de señales">📊</button>
+            <button className={showLedger ? "jv-tab on" : "jv-tab"} onClick={() => {
+                setShowLedger((v) => !v);
+                setShowVoice(false);
+              }} aria-pressed={showLedger} title="Registro de señales y aprendizaje">📊</button>
             <button onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
           </div>
           <div className={`jv-hud ${mode}`} aria-hidden="true">
@@ -636,20 +756,88 @@ function JarvisInner() {
             {interim && <p className="yo interim">{interim}…</p>}
           </div>
           {showLedger && (() => {
+            const fmtR = (r: number) => `${r >= 0 ? "+" : ""}${r.toFixed(2).replace(".", ",")}R`;
+            const tabs = (
+              <div className="jv-seg jv-ltabs three" role="tablist">
+                {(
+                  [
+                    ["core", "NÚCLEO 24/7"],
+                    ["learn", "APRENDIZAJE"],
+                    ["local", "ESTE EQUIPO"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button key={id} role="tab" aria-selected={ledgerTab === id} className={ledgerTab === id ? "on" : ""} onClick={() => setLedgerTab(id)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            );
+            if (ledgerTab === "learn") {
+              const l = core?.learning ?? null;
+              const taken = core?.stats;
+              const sh = core?.shadow;
+              let verdict = "Todavía hay pocas señales cerradas para juzgar si el filtro ayuda.";
+              if (taken && sh && taken.resolved >= 15 && sh.resolved >= 15 && taken.expectancyR !== null && sh.expectancyR !== null) {
+                const d = taken.expectancyR - sh.expectancyR;
+                verdict = d > 0 ? `Por ahora el filtro ayuda: las tomadas rinden ${fmtR(d)} más por señal que las descartadas.` : "Por ahora el filtro no ayuda: las descartadas no rinden peor que las tomadas.";
+              }
+              return (
+                <div className="jv-ledger">
+                  {tabs}
+                  {!core ? (
+                    <p className="jv-empty">Conectando con el núcleo…</p>
+                  ) : !l ? (
+                    <p className="jv-empty">El núcleo todavía no empezó a estudiar la historia: arranca en los próximos minutos.</p>
+                  ) : (
+                    <>
+                      <div className="jv-kpis">
+                        <span><b>{l.historyCases.toLocaleString("es-AR")}</b>situaciones estudiadas</span>
+                        <span><b>{l.coins}</b>monedas</span>
+                        <span><b>{l.backlog.toLocaleString("es-AR")}</b>velas por estudiar</span>
+                        <span><b>{l.liveCases}</b>en vivo</span>
+                      </div>
+                      {(["ROMPE", "IMÁN"] as const).map((src) => {
+                        const x = l.sources[src];
+                        return (
+                          <div key={src} className="jv-learn">
+                            <p>
+                              <b>{src === "ROMPE" ? "Rupturas" : "Barridas de imán"}</b>{" "}
+                              {x.base ? `· esperado por señal ${fmtExpect(x.base)} con ${x.n.toLocaleString("es-AR")} casos` : `· ${x.n} casos, todavía pocos para opinar`}
+                            </p>
+                            {x.base && (
+                              <ul>
+                                {x.lessons.slice(1).map((t) => (
+                                  <li key={t}>{t}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {taken && sh && (
+                        <p className="jv-sample">
+                          Filtro aprendido: tomadas {taken.resolved} cerradas ({fmtR(taken.totalR)}) · en sombra {sh.resolved} ({fmtR(sh.totalR)}). {verdict}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  <small>
+                    Cómo aprende: recorre la historia de 20 monedas vela por vela con la misma regla que usa en vivo y solo las velas de ese momento, y anota el resultado de
+                    las 48 siguientes. Con eso estima cuánto rinde cada tipo de señal según el contexto (BTC a favor o en contra, volatilidad, horario, fuerza) y cuán seguro
+                    está. Una señal desfavorable queda en sombra: se mide igual pero no se anuncia. Sin pocos casos no opina. No es asesoramiento financiero.
+                  </small>
+                </div>
+              );
+            }
             const onCore = ledgerTab === "core" && core !== null;
-            const list = onCore ? [...core.open, ...core.recent].sort((a, b) => (b.closedAt ?? b.time) - (a.closedAt ?? a.time)) : [...ledger].reverse();
+            const list: (JarvisSignal & Partial<Pick<CoreSignal, "taken" | "grade" | "expectR">>)[] = onCore
+              ? [...core.open, ...core.recent].sort((a, b) => (b.closedAt ?? b.time) - (a.closedAt ?? a.time))
+              : [...ledger].reverse();
             const st = onCore ? core.stats : ledgerStats(ledger);
             const pfTxt = st.profitFactor === null ? "—" : st.profitFactor === Infinity ? "∞" : st.profitFactor.toFixed(2).replace(".", ",");
             return (
               <div className="jv-ledger">
-                <div className="jv-seg jv-ltabs" role="tablist">
-                  <button role="tab" aria-selected={ledgerTab === "core"} className={ledgerTab === "core" ? "on" : ""} onClick={() => setLedgerTab("core")}>
-                    NÚCLEO 24/7
-                  </button>
-                  <button role="tab" aria-selected={ledgerTab === "local"} className={ledgerTab === "local" ? "on" : ""} onClick={() => setLedgerTab("local")}>
-                    ESTE DISPOSITIVO
-                  </button>
-                </div>
+                {tabs}
                 {ledgerTab === "core" && !core && <p className="jv-empty">Conectando con el núcleo…</p>}
                 <div className="jv-kpis">
                   <span><b>{st.winRate === null ? "—" : `${Math.round(st.winRate * 100)}%`}</b>win rate</span>
@@ -662,21 +850,28 @@ function JarvisInner() {
                   {(["ROMPE", "IMÁN"] as const).map((src) =>
                     st.bySource[src].resolved ? ` · ${src === "ROMPE" ? "rupturas" : "imanes"}: PF ${st.bySource[src].profitFactor === Infinity ? "∞" : (st.bySource[src].profitFactor ?? 0).toFixed(2).replace(".", ",")} en ${st.bySource[src].resolved}` : "",
                   )}
+                  {onCore && core.shadow.resolved ? ` · en sombra (no cuentan): ${core.shadow.resolved}, ${fmtR(core.shadow.totalR)}` : ""}
                 </p>
                 <div className="jv-sigs">
                   {list.length ? (
                     list.slice(0, 12).map((x) => (
-                      <p key={x.id} className={x.r === null ? "" : x.r > 0 ? "up" : "down"}>
+                      <p key={x.id} className={`${x.r === null ? "" : x.r > 0 ? "up" : "down"}${x.taken === false ? " shadow" : ""}`}>
                         <b>{x.symbol.replace(/USDT$/, "")} {x.side === "LONG" ? "▲" : "▼"} {x.timeframe}</b>
                         <span>{fmtPx(x.entry)} → stop {fmtPx(x.stop)} · obj {fmtPx(x.target)}</span>
                         <em>{x.result === "ABIERTA" ? "abierta" : `${x.result.toLowerCase()} ${x.r !== null ? `${x.r >= 0 ? "+" : ""}${x.r.toFixed(2).replace(".", ",")}R` : ""}`}</em>
+                        {x.grade && (
+                          <i className={`jv-grade g-${x.taken === false ? "sombra" : x.grade.toLowerCase()}`}>
+                            {x.taken === false ? "en sombra" : GRADE_LABEL[x.grade]}
+                            {x.expectR !== null && x.expectR !== undefined && x.grade !== "APRENDIENDO" ? ` ${fmtR(x.expectR)}` : ""}
+                          </i>
+                        )}
                       </p>
                     ))
                   ) : (
                     <p className="jv-empty">
                       {onCore
                         ? "El núcleo todavía no abrió señales: solo lo hace cuando una moneda está a punto de romper con dirección o un imán se barre y rechaza."
-                        : "Todavía no di señales con dirección en este dispositivo. Activá la vigilancia o preguntame qué está por romper."}
+                        : "Todavía no di señales con dirección en este equipo. Activá la vigilancia o preguntame qué está por romper."}
                     </p>
                   )}
                 </div>
@@ -701,15 +896,15 @@ function JarvisInner() {
                   Cada señal queda con su plan desde que la doy y se resuelve con las velas siguientes: si una vela toca stop y objetivo, cuenta el stop; a las 48 velas
                   se cierra a mercado; comisiones descontadas. Nada se borra ni se corrige después.{" "}
                   {onCore
-                    ? `El núcleo corre en el servidor las 24 horas: ${core.heartbeat ? `último latido ${new Date(core.heartbeat.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} (${core.heartbeat.note})` : "todavía sin latido"}. Se ven las últimas 20 cerradas; el registro cuenta todas.`
-                    : "Guardado en este dispositivo."}{" "}
+                    ? `El núcleo corre en el servidor las 24 horas: ${core.heartbeat ? `último latido ${new Date(core.heartbeat.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} (${core.heartbeat.note})` : "todavía sin latido"}. Las señales en sombra se miden aparte y no cuentan en el registro.`
+                    : "Guardado en este equipo."}{" "}
                   No es asesoramiento financiero.
                 </small>
               </div>
             );
           })()}
           <div className="jv-chips">
-            {["Informe del mercado", "¿Qué está por romper?", "¿Cómo vienen tus señales?", "¿Qué está subiendo?", "Precio de Bitcoin"].map((c) => (
+            {["Informe del mercado", "¿Qué está por romper?", "¿Cómo vienen tus señales?", "¿Qué aprendiste?", "Estado del núcleo", "Precio de Bitcoin"].map((c) => (
               <button key={c} onClick={() => handle(c)}>{c}</button>
             ))}
           </div>
@@ -721,7 +916,18 @@ function JarvisInner() {
               setDraft("");
             }}
           >
-            <button type="button" className={mode === "listening" ? "mic on" : "mic"} onClick={() => (mode === "listening" && !prefs.wake ? recRef.current?.stop() : startListening(false))} aria-label="Hablar">
+            <button
+              type="button"
+              className={mode === "listening" ? "mic on" : "mic"}
+              onClick={() => {
+                unlockAudio();
+                // Tapping while JARVIS talks interrupts it and listens, like any assistant.
+                if (mode === "speaking") hush();
+                if (mode === "listening" && !prefs.wake) recRef.current?.stop();
+                else startListening(false);
+              }}
+              aria-label="Hablar"
+            >
               🎙
             </button>
             <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Escribí o tocá el micrófono…" />
@@ -733,16 +939,52 @@ function JarvisInner() {
               <label title="Queda escuchando: decí «Jarvis» y tu pedido"><input type="checkbox" checked={prefs.wake} onChange={(e) => setPrefs({ wake: e.target.checked })} /> Manos libres</label>
             )}
             <label title="Cada 5 minutos revisa 20 monedas y las barridas de imanes de BTC, ETH y SOL; te avisa en voz y registra cada señal con su resultado"><input type="checkbox" checked={prefs.watch} onChange={(e) => setPrefs({ watch: e.target.checked })} /> Vigilancia</label>
-            <button type="button" className={`jv-voicebtn${showVoice ? " on" : ""}`} onClick={() => setShowVoice((v) => !v)} aria-expanded={showVoice}>
+            <button type="button" className={`jv-voicebtn${showVoice ? " on" : ""}`} onClick={() => {
+                setShowVoice((v) => !v);
+                setShowLedger(false);
+              }} aria-expanded={showVoice}>
               🔊 VOZ
             </button>
           </div>
           {showVoice && (
             <div className="jv-voice">
+              <div className="jv-seg" role="radiogroup" aria-label="Motor de voz">
+                <button type="button" role="radio" aria-checked={prefs.engine === "neural"} className={prefs.engine === "neural" ? "on" : ""} onClick={() => setPrefs({ engine: "neural" })}>
+                  NEURONAL PRO
+                </button>
+                <button type="button" role="radio" aria-checked={prefs.engine === "device"} className={prefs.engine === "device" ? "on" : ""} onClick={() => setPrefs({ engine: "device" })}>
+                  DEL TELÉFONO
+                </button>
+              </div>
+              {prefs.engine === "neural" && (
+                <>
+                  <label className="jv-row">
+                    <span>Voz</span>
+                    <select value={neuralVoice(prefs.neuralVoice).id} onChange={(e) => setPrefs({ neuralVoice: e.target.value })} aria-label="Voz neuronal">
+                      {NEURAL_VOICES.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label} · {v.accent} · {v.style}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <small className={/login|quota|off/.test(neural) ? "err" : ""}>
+                    {(() => {
+                      const [st, model] = neural.split("|");
+                      if (st === "login") return "Iniciá sesión para usar la voz neuronal; mientras tanto hablo con la del teléfono.";
+                      if (st === "quota") return "Se usó el cupo diario de voz neuronal: hasta mañana hablo con la del teléfono.";
+                      if (st === "off") return "La voz neuronal todavía no está activa en el servidor: hablo con la del teléfono.";
+                      if (model === "melo") return "Voz neuronal simple: el cupo premium de hoy ya se usó (vuelve mañana).";
+                      if (model === "aura") return "Voz neuronal premium (Deepgram Aura-2) servida por Cloudflare. Las frases repetidas salen de la caché, sin gastar cupo.";
+                      return "Voz neuronal premium (Deepgram Aura-2). Si falla o se acaba el cupo diario, sigo con la del teléfono sin cortarme.";
+                    })()}
+                  </small>
+                </>
+              )}
               <label className="jv-row">
-                <span>Voz</span>
+                <span>{prefs.engine === "neural" ? "Respaldo" : "Voz"}</span>
                 <select value={prefs.voiceName} onChange={(e) => setPrefs({ voiceName: e.target.value })} aria-label="Voz del teléfono">
-                  <option value="">Automática · la mejor disponible</option>
+                  <option value="">Automática · la mejor del teléfono</option>
                   {voices.map((v) => (
                     <option key={v.name} value={v.name}>
                       {v.name.replace(/^(Microsoft|Google)\s+/, "")} · {v.lang}
@@ -751,31 +993,47 @@ function JarvisInner() {
                   ))}
                 </select>
               </label>
-              <div className="jv-row">
-                <span>Tono</span>
-                <div className="jv-seg small">
-                  <button type="button" className={prefs.gender === "male" ? "on" : ""} onClick={() => setPrefs({ gender: "male", voiceName: "" })}>MASCULINA</button>
-                  <button type="button" className={prefs.gender === "female" ? "on" : ""} onClick={() => setPrefs({ gender: "female", voiceName: "" })}>FEMENINA</button>
+              {prefs.engine === "device" && (
+                <div className="jv-row">
+                  <span>Tono</span>
+                  <div className="jv-seg small">
+                    <button type="button" className={prefs.gender === "male" ? "on" : ""} onClick={() => setPrefs({ gender: "male", voiceName: "" })}>MASCULINA</button>
+                    <button type="button" className={prefs.gender === "female" ? "on" : ""} onClick={() => setPrefs({ gender: "female", voiceName: "" })}>FEMENINA</button>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="jv-row">
                 <span>Velocidad</span>
                 <input type="range" min={0.8} max={1.25} step={0.05} value={prefs.rate} onChange={(e) => setPrefs({ rate: Number(e.target.value) })} aria-label="Velocidad de la voz" />
                 <b>{prefs.rate.toFixed(2).replace(".", ",")}×</b>
               </div>
-              <button type="button" className="jv-test" onClick={() => speak(VOICE_TEST)}>▶ PROBAR VOZ</button>
-              <small>
-                {(() => {
-                  const all = voices;
-                  const v = all.find((x) => x.name === prefs.voiceName) ?? pickVoice(all, prefs.gender);
-                  if (!v) return "Tu navegador no tiene voces en español: JARVIS te responde por escrito.";
-                  const good = /natural|neural|online|premium|enhanced|google/i.test(v.name);
-                  return `Usando: ${v.name} (${v.lang}).${good ? "" : " ★ = voces de mejor calidad. En la PC, Microsoft Edge trae «Tomás» y «Elena» de Argentina (naturales); en Android, Ajustes › Texto a voz › Servicios de Google › instalá las voces de español."}`;
-                })()}
-              </small>
+              <label className="jv-row">
+                <input type="checkbox" checked={prefs.followUp} onChange={(e) => setPrefs({ followUp: e.target.checked })} /> Conversación continua: después de responder algo que pediste por voz, sigo escuchando
+              </label>
+              <button
+                type="button"
+                className="jv-test"
+                onClick={() => {
+                  unlockAudio();
+                  speak(VOICE_TEST);
+                }}
+              >
+                ▶ PROBAR VOZ
+              </button>
+              {prefs.engine === "device" && (
+                <small>
+                  {(() => {
+                    const all = voices;
+                    const v = all.find((x) => x.name === prefs.voiceName) ?? pickVoice(all, prefs.gender);
+                    if (!v) return "Tu navegador no tiene voces en español: JARVIS te responde por escrito.";
+                    const good = /natural|neural|online|premium|enhanced|google/i.test(v.name);
+                    return `Usando: ${v.name} (${v.lang}).${good ? "" : " ★ = voces de mejor calidad. En la PC, Microsoft Edge trae «Tomás» y «Elena» de Argentina (naturales); en Android, Ajustes › Texto a voz › Servicios de Google › instalá las voces de español."}`;
+                  })()}
+                </small>
+              )}
             </div>
           )}
-          <small className="jv-foot">La voz se procesa en tu navegador. Análisis, no órdenes: no es asesoramiento financiero.</small>
+          <small className="jv-foot">El dictado se procesa en tu navegador; la voz neuronal, en Cloudflare. Análisis, no órdenes: no es asesoramiento financiero.</small>
         </div>
       )}
     </>

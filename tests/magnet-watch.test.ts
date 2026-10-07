@@ -72,35 +72,38 @@ test("replay on a real-looking series: counts are consistent and labelled", () =
   assert.ok(cut.cases <= r.cases);
 });
 
-import { collectMagnetEvents, MAGNET_WATCH } from "../lib/telegram-magnets.ts";
+import { MAGNET_WATCH, magnetEventsFromMind } from "../lib/telegram-magnets.ts";
 
-test("server collector: at most four requests per coin (OI down: all mirrors tried), only IMANES events with stable keys", async () => {
-  const urls: string[] = [];
+test("server alerts come from the core's stored map: no candles fetched, no map built, stale maps silent", () => {
   const real = globalThis.fetch;
-  const now = Date.UTC(2026, 9, 6, 12, 30);
-  globalThis.fetch = (async (url: string) => {
-    urls.push(url);
-    const u = new URL(url);
-    if (u.pathname.includes("openInterestHist")) return new Response("[]");
-    let p = 100;
-    let s = 9;
-    const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
-    const rows = Array.from({ length: 500 }, (_, i) => {
-      const t = Math.floor(now / 3_600_000) * 3_600_000 - (499 - i) * 3_600_000;
-      const o = p;
-      p *= 1 + (rnd() - 0.5) * 0.02;
-      return [t, o, Math.max(o, p) * 1.003, Math.min(o, p) * 0.997, p, 100 + rnd() * 100, t + 3_599_999, 1, 1, 1, 1, "0"].map(String);
-    });
-    return new Response(JSON.stringify(rows));
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return new Response("[]");
   }) as typeof fetch;
   try {
-    const events = await collectMagnetEvents(now);
-    assert.ok(urls.length <= MAGNET_WATCH.length * 4, `${urls.length} requests`);
+    const now = Date.UTC(2026, 9, 6, 12, 30);
+    const lastTime = Date.UTC(2026, 9, 6, 11);
+    const above = { side: "CORTOS" as const, price: 85000, intensity: 90, distancePct: 0.3, notionalUsd: null, density: 1 };
+    const below = { side: "LARGOS" as const, price: 80000, intensity: 95, distancePct: -5.6, notionalUsd: null, density: 1 };
+    const swept = { kind: "BARRIDA" as const, magnet: { ...below, price: 84500 }, candleOpenTime: lastTime, closedBack: true };
+    const mind = {
+      readings: {},
+      btc: null,
+      magnets: {
+        BTCUSDT: { lastTime, at: now, price: 84745, above, below, nearPct: 0.4, sweeps: [swept] },
+        ETHUSDT: { lastTime: lastTime - 5 * 3_600_000, at: now, price: 1, above, below, nearPct: 0.4, sweeps: [swept] },
+      },
+    };
+    const events = magnetEventsFromMind(mind, now);
+    assert.equal(calls, 0, "nothing fetched");
+    assert.deepEqual(events.map((e) => e.key).sort(), [`magnet:near:BTCUSDT:1h:85000:2026-10-06`, `magnet:swept:BTCUSDT:1h:${lastTime}:LARGOS`]);
     for (const e of events) {
       assert.equal(e.category, "IMANES");
-      assert.match(e.key, /^magnet:(near|swept):(BTC|ETH|SOL)USDT:1h:/);
       assert.match(e.text, /No es asesoramiento financiero/);
     }
+    assert.deepEqual(magnetEventsFromMind(mind, now, 99), [magnetEventsFromMind(mind, now)[0]].filter((e) => e.key.startsWith("magnet:swept")), "weak zones are not 'near' alerts");
+    assert.equal(MAGNET_WATCH.length, 3);
   } finally {
     globalThis.fetch = real;
   }

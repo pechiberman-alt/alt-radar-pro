@@ -7,6 +7,10 @@ import { parseCommand, sendMessage, webhookSecret } from "@/lib/telegram";
 import { answerInTelegram, clearChat } from "@/lib/telegram-ai-server";
 import { ensureTelegramSchema } from "@/lib/telegram-server";
 import { handleAlertCommand } from "@/lib/price-alerts-server";
+import { coreStatusSpeech, GRADE_LABEL } from "@/lib/jarvis-core";
+import { coreSnapshot } from "@/lib/jarvis-core-db";
+import { learnSpeech } from "@/lib/jarvis-learn";
+import { sharedJson } from "@/lib/shared-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +19,8 @@ const HELP =
   "Escribime cualquier pregunta sobre el mercado y te respondo con los datos del radar (ej: <i>¿cómo ves BTC?</i>, <i>¿qué señales hay abiertas?</i>).\n\n" +
   "/estado — resumen del momento\n" +
   "/resultados — cuántas señales llegaron a TP1, TP2, TP3 o al SL, por tipo\n" +
+  "/jarvis — estado del núcleo 24/7, señales abiertas y registro\n" +
+  "/aprendizaje — qué aprendió JARVIS estudiando el mercado\n" +
   "/alerta BTC 90000 — te aviso cuando llegue a ese precio · /alertas · /borrar N\n" +
   "/nuevo — empezar una conversación nueva\n" +
   "/stop — dejar de recibir alertas\n\n" +
@@ -120,6 +126,32 @@ export async function POST(request: NextRequest) {
       chat,
       `<b>Estado</b>\n${fg}Señales abiertas: <b>${open?.n ?? "—"}</b>\nAlertas: ${linked ? "activas ✅" : "no vinculado — hacelo desde la app"}`,
     );
+  } else if (cmd === "jarvis" || cmd === "aprendizaje") {
+    const now = Date.now();
+    const snap = await sharedJson("jarvis-core-v1", 60, () => coreSnapshot(env.DB, now)).catch(() => null);
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    if (!snap) {
+      await sendMessage(token, chat, "No pude leer el núcleo de JARVIS ahora. Probá en un minuto.");
+    } else if (cmd === "aprendizaje") {
+      await sendMessage(
+        token,
+        chat,
+        snap.learning
+          ? `🧠 <b>JARVIS · aprendizaje</b>\n${esc(learnSpeech(snap.learning)).replace(/\. (?=[A-ZÁÉÍÓÚ])/g, ".\n")}\n<i>Promedios con comisiones; si una vela toca stop y objetivo, cuenta el stop. No es asesoramiento financiero.</i>`
+          : "🧠 JARVIS todavía no empezó a estudiar la historia. En unos minutos tiene los primeros casos.",
+      );
+    } else {
+      const open = snap.open.filter((s) => s.taken !== false);
+      const px = (v: number) => v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : v >= 1 ? 3 : 6 });
+      const lines = open
+        .slice(0, 6)
+        .map((s) => `• <b>${esc(s.symbol.replace(/USDT$/, ""))} ${s.side === "LONG" ? "▲" : "▼"}</b> entrada ${px(s.entry)} · stop ${px(s.stop)} · obj ${px(s.target)}${s.grade ? ` · ${GRADE_LABEL[s.grade]}` : ""}`);
+      await sendMessage(
+        token,
+        chat,
+        `🤖 <b>JARVIS · núcleo 24/7</b>\n${esc(coreStatusSpeech(snap, now))}${lines.length ? `\n\n<b>Abiertas</b>\n${lines.join("\n")}` : ""}\n<i>No es asesoramiento financiero.</i>`,
+      );
+    }
   } else if (cmd === "resultados") {
     const stats = await getPlanStatsCached(env.DB, Date.now()).catch(() => []);
     await sendMessage(token, chat, resultsMessage(stats, STATS_DAYS));

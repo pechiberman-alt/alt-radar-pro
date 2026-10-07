@@ -38,6 +38,10 @@ test("commands", () => {
   assert.deepEqual(parseCommand("silencio"), { kind: "STOP" });
   assert.deepEqual(parseCommand("Jarvis, ¿cómo vienen tus señales?"), { kind: "STATS" });
   assert.deepEqual(parseCommand("decime tu win rate y profit factor"), { kind: "STATS" });
+  assert.deepEqual(parseCommand("Jarvis, ¿qué aprendiste?"), { kind: "LEARN" });
+  assert.deepEqual(parseCommand("mostrame el aprendizaje"), { kind: "LEARN" });
+  assert.deepEqual(parseCommand("estado del núcleo"), { kind: "CORE" });
+  assert.deepEqual(parseCommand("¿qué hiciste mientras no estaba?"), { kind: "CORE" });
   assert.deepEqual(parseCommand("¿qué podés hacer?"), { kind: "HELP" });
   assert.deepEqual(parseCommand("Jarvis, ¿conviene entrar en largo si el funding está alto?"), { kind: "AI", question: "¿conviene entrar en largo si el funding está alto?" });
 });

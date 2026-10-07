@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeSpanish, numberToWords, readNumber, splitForSpeech } from "../lib/speech-text.ts";
+import { normalizeSpanish, numberToWords, parseEsNumber, readNumber, roundSpoken, splitForSpeech } from "../lib/speech-text.ts";
 import { pickVoice, scoreVoice } from "../lib/browser-voice.ts";
 
 test("numbers in Spanish words, with apocope and the 100/1000 forms", () => {
@@ -60,4 +60,18 @@ test("browser voice: natural/neural from Argentina first, then the closest regio
   assert.equal(pickVoice([{ name: "Monica", lang: "es-ES" }, { name: "Google español de Estados Unidos", lang: "es-US" }])?.name, "Google español de Estados Unidos");
   assert.equal(pickVoice([{ name: "Samantha", lang: "en-US" }]), null, "no Spanish voice: none rather than English");
   assert.equal(scoreVoice({ name: "x", lang: "fr-FR" }), -1);
+});
+
+test("prices said like a person: rounded by size; timeframes and symbols in words", () => {
+  assert.equal(parseEsNumber("84.523,7"), 84523.7);
+  assert.equal(parseEsNumber("115.000"), 115000);
+  assert.equal(parseEsNumber("0.5"), 0.5);
+  assert.equal(roundSpoken("84.523,7"), "84524");
+  assert.equal(roundSpoken("181,236"), "181,2");
+  assert.equal(roundSpoken("1,76"), "1,76");
+  assert.equal(roundSpoken("1,50"), "1,5", "trailing zeros are not said");
+  assert.equal(roundSpoken("0,000123456"), "0,0001235");
+  const t = normalizeSpanish("TRI largo en 1h, stop 108,121 · objetivo 111,807 → en 15m, ± 2,45%");
+  assert.match(t, /en una hora, estóp ciento ocho coma uno, objetivo ciento once coma ocho a en quince minutos, más o menos dos coma cuarenta y cinco por ciento/);
+  assert.equal(normalizeSpanish("1d, 3d, 1w, 4h"), "un día, tres días, una semana, cuatro horas");
 });

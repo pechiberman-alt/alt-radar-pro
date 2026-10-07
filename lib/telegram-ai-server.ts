@@ -7,6 +7,9 @@ import { parseFearGreed, type FearGreed } from "./fear-greed.ts";
 import { sendMessage, tg } from "./telegram.ts";
 import { buildServerSnapshot, markdownToTelegramHtml, splitForTelegram, type ServerSnapshot } from "./telegram-ai.ts";
 import { cached } from "./upstream-cache.ts";
+import { coreContext } from "./jarvis-core.ts";
+import { coreSnapshot } from "./jarvis-core-db.ts";
+import { sharedJson } from "./shared-cache.ts";
 
 const SYSTEM =
   buildSystemPrompt(KNOWLEDGE) +
@@ -108,7 +111,12 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv, token: 
         .all<{ role: "user" | "assistant"; content: string }>()
     ).results.reverse();
 
-    const snapshot = await loadServerSnapshot(db);
+    // JARVIS's 24/7 core goes along: its record, what it learned and what it sees now.
+    const [base, core] = await Promise.all([
+      loadServerSnapshot(db),
+      sharedJson("jarvis-core-v1", 60, () => coreSnapshot(db, Date.now())).catch(() => null),
+    ]);
+    const snapshot = core ? { ...base, jarvis: coreContext(core, Date.now()).nucleo } : base;
     const messages: ChatTurn[] = [...history, { role: "user", content: buildUserMessage(question, snapshot) }];
     const answer = await askClaude(key, SYSTEM, messages);
     if (!answer.ok) {
