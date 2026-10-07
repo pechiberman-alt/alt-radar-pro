@@ -23,7 +23,7 @@ import { fmtExpect, learnSpeech, venuesSpeech } from "@/lib/jarvis-learn";
 import { DEFAULT_NEURAL, NEURAL_VOICES, neuralVoice } from "@/lib/jarvis-voice";
 import { earcon, neuralModel, neuralState, onNeural, probeNeural, speakNeural, stopNeural, unlockAudio } from "./jarvis-voice-player";
 import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
-import { ECHO_MS, HandsFree } from "@/lib/hands-free";
+import { ECHO_MS, HandsFree, MAX_SPEECH_MS } from "@/lib/hands-free";
 
 /**
  * JARVIS: a voice assistant over the whole app. It listens (Web Speech API,
@@ -182,6 +182,7 @@ type SpeechRec = {
   onerror: ((e: { error: string }) => void) | null;
   start: () => void;
   stop: () => void;
+  abort?: () => void;
 };
 /** The thread lives on the server for signed-in people. If the server says they are not signed in, it stops asking. */
 let threadOpen = true;
@@ -224,15 +225,58 @@ function handsOf(ref: { current: HandsFree | null }): HandsFree {
 
 type WakeLockRef = { current: { release: () => Promise<void> } | null };
 
-/** Keeps the screen on while the engine listens. Not every browser has it: then the screen may sleep. */
+type Sentinel = { release: () => Promise<void>; addEventListener?: (type: "release", fn: () => void) => void };
+
+/**
+ * Keeps the screen on while the engine listens. Not every browser has it: then
+ * the screen may sleep. Android lets go of the lock by itself (battery saver,
+ * another app on top): the ref forgets it then, so the next start asks again.
+ */
 function keepAwake(ref: WakeLockRef): void {
-  const nav = navigator as unknown as { wakeLock?: { request: (kind: "screen") => Promise<{ release: () => Promise<void> }> } };
+  const nav = navigator as unknown as { wakeLock?: { request: (kind: "screen") => Promise<Sentinel> } };
   if (!nav.wakeLock || ref.current) return;
   nav.wakeLock.request("screen").then((lock) => {
     ref.current = lock;
+    lock.addEventListener?.("release", () => {
+      if (ref.current === lock) ref.current = null;
+    });
   }).catch(() => {
     // Refused: the engine still listens while the screen is on.
   });
+}
+
+/**
+ * Closes the hands-free microphone while JARVIS speaks, without switching
+ * hands-free off. On Android an open recognizer takes the audio from the page:
+ * JARVIS's voice is muted or cut, and the microphone hears it back.
+ */
+function closeMic(ref: { current: SpeechRec | null }): void {
+  const rec = ref.current;
+  ref.current = null;
+  if (!rec) return;
+  rec.onend = null;
+  rec.onerror = null;
+  rec.onresult = null;
+  try {
+    if (rec.abort) rec.abort();
+    else rec.stop();
+  } catch {
+    // not running
+  }
+}
+
+/** Longest a reply may keep the microphone closed: about 9 characters a second of speech, plus the first clip's wait. */
+function speechBudgetMs(text: string, rate: number): number {
+  return Math.min(MAX_SPEECH_MS, 8000 + (text.length * 110) / Math.max(0.5, rate));
+}
+
+/** A short buzz on Android when JARVIS hears its name: the phone may be across the table. */
+function buzz(): void {
+  try {
+    (navigator as Navigator & { vibrate?: (ms: number) => boolean }).vibrate?.(35);
+  } catch {
+    // No vibration motor or not allowed.
+  }
 }
 
 function letGoAwake(ref: WakeLockRef): void {
@@ -316,6 +360,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   const [handsText, setHandsText] = useState("");
   const speakGen = useRef(0);
   const speakingRef = useRef(false);
+  /** JARVIS has the floor: from the moment a reply is given until its voice ends. The hands-free microphone stays closed. */
+  const floorRef = useRef(false);
   /** The last thing JARVIS was asked came by voice (for the follow-up turn). */
   const lastVoiceRef = useRef(false);
   const listenRef = useRef<(() => void) | null>(null);
@@ -446,13 +492,15 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
     [prefs.voiceName, prefs.gender, prefs.rate],
   );
 
-  /** Stops whatever JARVIS is saying, neural or device. */
+  /** Stops whatever JARVIS is saying, neural or device. With hands-free on, the microphone opens again. */
   const hush = useCallback(() => {
     speakGen.current += 1;
     speakingRef.current = false;
+    floorRef.current = false;
     handsRef.current?.busy(false, Date.now());
     stopNeural();
     if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+    if (handsRef.current?.active) window.setTimeout(() => engineFnsRef.current?.startEngine(), 400);
   }, []);
 
   const speak = useCallback(
@@ -466,6 +514,12 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       // Only the latest reply may change the state when it ends: an interrupted one ends quietly.
       const mine = ++speakGen.current;
       let ended = false;
+      let watchdog = 0;
+      // The microphone closes before the voice starts and opens again after the echo (closeMic).
+      floorRef.current = true;
+      closeMic(engineRef);
+      handsOf(handsRef).busy(true, Date.now(), text);
+      setInterim("");
       const onStart = () => {
         if (speakGen.current !== mine) return;
         speakingRef.current = true;
@@ -475,16 +529,21 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       const onEnd = () => {
         if (ended || speakGen.current !== mine) return;
         ended = true;
+        window.clearTimeout(watchdog);
         speakingRef.current = false;
+        floorRef.current = false;
         handsOf(handsRef).busy(false, Date.now());
         const listening = handsOf(handsRef).active;
         setMode(listening ? "listening" : "idle");
+        if (listening) window.setTimeout(() => engineFnsRef.current?.startEngine(), ECHO_MS);
         // Something asked by voice gets one more turn of listening, like a conversation. It waits out the echo first.
         if (prefs.followUp && lastVoiceRef.current && !listening) {
           lastVoiceRef.current = false;
           window.setTimeout(() => listenRef.current?.(), ECHO_MS);
         }
       };
+      // A voice that never reports its end (it happens on Android) must not leave the microphone closed.
+      watchdog = window.setTimeout(onEnd, speechBudgetMs(text, prefs.rate));
       const ns = neuralState();
       if (prefs.engine === "neural" && ns !== "login" && ns !== "quota" && ns !== "off") {
         if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
@@ -728,18 +787,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
 
   /** Stops the hands-free engine for good: nothing restarts it until it is switched on again. */
   const stopEngine = useCallback(() => {
-    const rec = engineRef.current;
-    engineRef.current = null;
-    if (rec) {
-      rec.onend = null;
-      rec.onerror = null;
-      rec.onresult = null;
-      try {
-        rec.stop();
-      } catch {
-        // not running
-      }
-    }
+    closeMic(engineRef);
     letGoAwake(wakeLockRef);
   }, []);
 
@@ -759,7 +807,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   /** The hands-free engine: one continuous recognition. The browser ends it now and then; the rules decide the next one. */
   const startEngine = useCallback(() => {
     const hands = handsOf(handsRef);
-    if (!hands.active || oneShotRef.current || engineRef.current) return;
+    if (!hands.active || oneShotRef.current || engineRef.current || floorRef.current) return;
     const rec = recognizer();
     if (!rec) return;
     rec.lang = "es-AR";
@@ -781,9 +829,15 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
         const heard = hands.final(i, r[0].transcript, Date.now());
         if (heard.type === "none") continue;
         setOpen(true);
-        earcon("stop");
-        if (heard.type === "awake") latest.speak(`Te escucho, ${latest.name}.`);
-        else latest.handle(heard.text, true);
+        buzz();
+        if (heard.type === "awake") {
+          // A tone and a buzz, not a sentence: people go on talking right after "Jarvis", and a
+          // spoken "te escucho" would close the microphone over their words (closeMic).
+          earcon("listen");
+        } else {
+          earcon("stop");
+          latest.handle(heard.text, true);
+        }
       }
       setInterim(partial);
       setHandsText(hands.status(Date.now()));
@@ -817,6 +871,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   /** One phrase, for the mic button and Alt+J. It takes the microphone from the engine, which comes back after it. */
   const listenOnce = useCallback(() => {
     if (oneShotRef.current) return;
+    const hadEngine = engineRef.current !== null;
     stopEngine();
     const rec = recognizer();
     if (!rec) return latestRef.current.speak("Tu navegador no permite dictado por voz. Probá con Chrome, o escribime.");
@@ -849,15 +904,21 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
       engineFnsRef.current?.startEngine();
     };
     recRef.current = rec;
-    try {
-      rec.start();
-      setMode("listening");
-      earcon("listen");
-    } catch {
-      oneShotRef.current = false;
-      recRef.current = null;
-      engineFnsRef.current?.startEngine();
-    }
+    const begin = () => {
+      try {
+        rec.start();
+        setMode("listening");
+        earcon("listen");
+      } catch {
+        oneShotRef.current = false;
+        recRef.current = null;
+        engineFnsRef.current?.startEngine();
+      }
+    };
+    // Android needs a moment to hand the microphone from the hands-free engine to this phrase:
+    // started at once, it fails and the tap seems to do nothing.
+    if (hadEngine) window.setTimeout(begin, 350);
+    else begin();
   }, [stopEngine]);
 
   useEffect(() => {
@@ -1123,6 +1184,11 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                       )}
                       {rd.vigilar.length > 0 && <p className="jv-sample">A vigilar: {rd.vigilar.join(" · ")}</p>}
                       {rd.riesgos.length > 0 && <p className="jv-sample">Riesgos: {rd.riesgos.join(" · ")}</p>}
+                      {(rd.quitadas?.length ?? 0) > 0 && (
+                        <p className="jv-sample">
+                          Verificación: quité {rd.quitadas?.length} {rd.quitadas?.length === 1 ? "frase" : "frases"} con números o niveles que no están en los datos.
+                        </p>
+                      )}
                     </div>
                   )}
                   {core && (

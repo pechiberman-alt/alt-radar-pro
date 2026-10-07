@@ -26,6 +26,8 @@ export const REPEAT_MS = 2_500;
 export const SPOKEN_MEMORY_MS = 15_000;
 /** Safety net: a speech that never reports its end must not keep the engine deaf for longer. */
 export const MAX_SPEECH_MS = 120_000;
+/** After the browser takes the microphone back, how long to wait before asking for it again. */
+export const ABORTED_WAIT_MS = 1_000;
 
 const WAKE = /\b(?:jarvis|jarbis|yarvis|jarvi)\b[\s,.:;!?]*/i;
 
@@ -72,7 +74,12 @@ export class HandsFree {
   private lastText = "";
   private lastAt = Number.NEGATIVE_INFINITY;
   private lastGreetAt = Number.NEGATIVE_INFINITY;
+  /** Failures in a row that can stop the engine (network, microphone…), for the back-off and the verdict. */
   private failures = 0;
+  /** The microphone could not be opened, in a row. */
+  private micFailures = 0;
+  /** The last session was taken back by the browser ("aborted"): wait a second for it to let the microphone go. */
+  private aborted = false;
   private spoken: { words: Set<string>; at: number } | null = null;
 
   /** The engine should run now: switched on, page visible, nothing stopped it. */
@@ -83,7 +90,7 @@ export class HandsFree {
   enable(): void {
     this.enabled = true;
     this.stopped = null;
-    this.failures = 0;
+    this.resetFailures();
   }
 
   /** Switching off keeps a stop reason, so the panel can still say why it stopped. */
@@ -99,15 +106,20 @@ export class HandsFree {
     this.visible = visible;
     if (!visible) return this.enabled ? "abort" : "none";
     if (this.active) {
-      this.failures = 0;
+      this.resetFailures();
       return "start";
     }
     return "none";
   }
 
-  /** A new engine session: its results start again from 0. */
+  /**
+   * A new engine session: its results start again from 0, and it cannot
+   * deliver again what the last one heard — the same words now are said anew
+   * ("ayuda", answered, and "ayuda" again).
+   */
   started(): void {
     this.lastIndex = -1;
+    this.lastText = "";
   }
 
   /** JARVIS starts or stops speaking. `said` is what it says, so its echo is recognised. */
@@ -135,7 +147,7 @@ export class HandsFree {
     if (clean.toLowerCase() === this.lastText && now - this.lastAt < REPEAT_MS) return NONE;
     this.lastText = clean.toLowerCase();
     this.lastAt = now;
-    this.failures = 0;
+    this.resetFailures();
 
     const { woke, rest } = afterWake(clean);
     if (woke && rest) return this.accept(rest, now);
@@ -151,19 +163,39 @@ export class HandsFree {
   /** The engine ended on its own (it does, after silence): restart it, backing off after failures. */
   ended(): Engine {
     if (!this.active) return IDLE;
-    const inMs = this.failures === 0 ? 250 : Math.min(30_000, 500 * 2 ** (this.failures - 1));
+    const inMs = this.aborted ? ABORTED_WAIT_MS : this.failures === 0 ? 250 : Math.min(30_000, 500 * 2 ** (this.failures - 1));
+    this.aborted = false;
     return { type: "restart", inMs };
   }
 
-  /** The engine reported an error. Silence is not an error; the rest back off, and some stop it for good. */
+  /**
+   * The engine reported an error. Silence is not an error. "aborted" is the
+   * browser taking the microphone back — on Android, a sound of the system or
+   * another app — so it only waits a second and never stops hands-free. The
+   * rest back off, and some stop it for good: the permission at once, the
+   * microphone after three tries, the network after six.
+   */
   error(code: string): Engine {
     if (!this.active) return IDLE;
     if (code === "not-allowed" || code === "service-not-allowed") return this.halt("permiso");
     if (code === "no-speech") return IDLE;
+    if (code === "aborted") {
+      this.aborted = true;
+      return IDLE;
+    }
     this.failures += 1;
-    if (code === "audio-capture" && this.failures >= 2) return this.halt("micrófono");
+    if (code === "audio-capture") {
+      this.micFailures += 1;
+      if (this.micFailures >= 3) return this.halt("micrófono");
+    }
     if (this.failures >= 6) return this.halt("red");
     return IDLE;
+  }
+
+  private resetFailures(): void {
+    this.failures = 0;
+    this.micFailures = 0;
+    this.aborted = false;
   }
 
   /** What the panel says, now. */
