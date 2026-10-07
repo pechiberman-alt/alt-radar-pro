@@ -6,7 +6,10 @@ import { eligible } from "@/lib/decoupling";
 import { briefingText, findCoins, findTimeframe, greeting, HELP_TEXT, parseCommand, priceLine, type JarvisIntent, type Ticker } from "@/lib/jarvis";
 import { compactSnapshot } from "@/lib/ai-analyst";
 import type { AssistantContext } from "@/lib/assistant/index";
-import { briefForAi, coinBrief, localAnswer, pointsAtScreen, SECTION_SCREEN, withFocus, type Focus } from "@/lib/jarvis-local";
+import { localAnswer, pointsAtScreen, SECTION_SCREEN, withFocus, type Focus } from "@/lib/jarvis-local";
+import { analysisForAi, analysisText, analyzeAsset, type Analysis } from "@/lib/jarvis-analyst";
+import { readingSpeech } from "@/lib/jarvis-mind";
+import { BRAIN_LABEL } from "@/lib/ai-brains";
 import { FUTURES_BASES, loadRows, loadTopSymbols, timeframeConfig } from "@/lib/market-fetch";
 import { readPreBreak } from "@/lib/pre-breakout";
 import { addSignals, breakoutSignal, ledgerCsv, ledgerStats, magnetSignal, resolveSignal, statsSpeech, type JarvisSignal } from "@/lib/jarvis-ledger";
@@ -238,7 +241,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   const [showLedger, setShowLedger] = useState(false);
   const [core, setCore] = useState<CoreSnapshot | null>(null);
   const [coreUp, setCoreUp] = useState(false);
-  const [ledgerTab, setLedgerTab] = useState<"core" | "learn" | "local">("core");
+  const [ledgerTab, setLedgerTab] = useState<"core" | "mind" | "learn" | "local">("core");
   const coreRef = useRef<CoreSnapshot | null>(null);
   const awayRef = useRef<string | null>(null);
   const ledgerRef = useRef(ledger);
@@ -515,7 +518,18 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             setPrefs({ lastBriefing: new Date().toISOString().slice(0, 10) });
             const away = awayRef.current;
             awayRef.current = null;
-            return speak(`${briefingText({ hour: new Date().getHours(), name: prefs.name, tickers, breakouts: hot })}${away ? ` ${away}` : ""}`);
+            // What its 24/7 mind concluded in the last hour, when there is a fresh reading.
+            const rd = (coreRef.current ?? (await loadCore()))?.reading ?? null;
+            const mindLine = rd && Date.now() - rd.at < 2 * 3_600_000 ? ` Mi lectura de la última hora: ${rd.resumen}` : "";
+            return speak(`${briefingText({ hour: new Date().getHours(), name: prefs.name, tickers, breakouts: hot })}${mindLine}${away ? ` ${away}` : ""}`);
+          }
+          case "MIND": {
+            const snap = await loadCore();
+            setShowLedger(true);
+            setShowVoice(false);
+            setLedgerTab("mind");
+            if (!snap?.reading) return speak("Todavía no escribí mi primera lectura del mercado: la escribo cada hora, a los diecisiete minutos, con todos los datos del software.");
+            return speak(readingSpeech(snap.reading, Date.now()));
           }
           case "REMEMBER": {
             const r = await fetch("/api/jarvis/memory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: intent.text }) });
@@ -548,8 +562,16 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             if (named.length) focusRef.current = { symbol: `${named[0]}USDT`, timeframe: findTimeframe(intent.question) ?? focusRef.current.timeframe };
             const onScreen = !named.length && pointsAtScreen(intent.question);
             const focus: Focus = { screen: screenRef.current, symbol: focusRef.current.symbol, timeframe: focusRef.current.timeframe };
-            const briefSymbol = named.length ? focus.symbol : onScreen && (focus.screen === "LIQUIDACIONES" || !focus.screen) ? focus.symbol : null;
-            const brief = briefSymbol ? await closedCandles(briefSymbol, "1h", 500).then((c) => coinBrief(briefSymbol, c, Date.now())).catch(() => null) : null;
+            const subject = named.length ? focus.symbol : onScreen && (focus.screen === "LIQUIDACIONES" || !focus.screen) ? focus.symbol : null;
+            // The asset through every engine of the software, on 1h, 4h and daily (jarvis-analyst.ts).
+            let analysis: Analysis | null = null;
+            if (subject) {
+              if (named.length) setLines((l) => [...l, { who: "jarvis" as const, text: `Analizando ${subject.replace(/USDT$/, "")} con todos los motores: 1h, 4h y diario…` }].slice(-40));
+              analysis = await Promise.all([closedCandles(subject, "1h", 1000), closedCandles(subject, "4h", 300).catch(() => null), closedCandles(subject, "1d", 200).catch(() => null)])
+                .then(([h1, h4, d1]) => analyzeAsset(subject, { h1, h4, d1 }, Date.now()))
+                .catch(() => null);
+            }
+            const report = analysis ? analysisText(analysis) : null;
             const ctx = (() => {
               try {
                 return ctxRef.current?.() ?? null;
@@ -560,7 +582,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             const asked = named.length ? { question: intent.question } : withFocus(intent.question, focus);
             const local = (why: string | null) => {
               const tag = "motor local";
-              const text = localAnswer(intent.question, focus, ctx, brief);
+              // A coin named in the question wins over the screen ("analizá BTC" while PUMP is open).
+              const text = localAnswer(intent.question, named.length ? null : focus, ctx, report);
               if (why && brainRef.current !== "local") {
                 brainRef.current = "local";
                 return speak(`${why} ${text}`, tag);
@@ -581,7 +604,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                     ...(ctx ? compactSnapshot(ctx) : {}),
                     jarvis: coreRef.current ? coreContext(coreRef.current, Date.now()).nucleo : null,
                     pantalla: { seccion: focus.screen, moneda: focus.symbol, temporalidad: focus.timeframe },
-                    foco: brief ? briefForAi(brief) : null,
+                    foco: analysis ? analysisForAi(analysis) : null,
                   },
                   history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
                 }),
@@ -777,8 +800,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   }, [startListening]);
 
   const refreshLedger = useCallback(() => {
-    if (ledgerTab === "core") void loadCore();
-    else void resolveOpen();
+    if (ledgerTab === "local") void resolveOpen();
+    else void loadCore();
   }, [ledgerTab, loadCore, resolveOpen]);
 
   const openPanel = () => {
@@ -859,10 +882,11 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
           {showLedger && (() => {
             const fmtR = (r: number) => `${r >= 0 ? "+" : ""}${r.toFixed(2).replace(".", ",")}R`;
             const tabs = (
-              <div className="jv-seg jv-ltabs three" role="tablist">
+              <div className="jv-seg jv-ltabs four" role="tablist">
                 {(
                   [
                     ["core", "NÚCLEO 24/7"],
+                    ["mind", "MENTE"],
                     ["learn", "APRENDIZAJE"],
                     ["local", "ESTE EQUIPO"],
                   ] as const
@@ -873,6 +897,75 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                 ))}
               </div>
             );
+            if (ledgerTab === "mind") {
+              const rd = core?.reading ?? null;
+              const ia = core?.stats.bySource.IA ?? null;
+              const iaOpen = (core?.open ?? []).filter((s) => s.source === "IA");
+              const iaClosed = (core?.recent ?? []).filter((s) => s.source === "IA" && s.r !== null);
+              const px = (v: number) => v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : v >= 1 ? 3 : 6 });
+              const coin = (s: string) => s.replace(/USDT$/, "");
+              return (
+                <div className="jv-ledger">
+                  {tabs}
+                  {!core ? (
+                    <p className="jv-empty">Conectando con el núcleo…</p>
+                  ) : !rd ? (
+                    <p className="jv-empty">JARVIS escribe su primera lectura del mercado en la próxima hora, a los 17 minutos.</p>
+                  ) : (
+                    <div className="jv-mind">
+                      <p className="jv-mind-head">
+                        <b className={`jv-bias ${rd.sesgo.toLowerCase()}`}>{rd.sesgo === "NEUTRAL" ? "SIN DIRECCIÓN" : rd.sesgo}</b>
+                        <span>
+                          {new Date(rd.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} · {BRAIN_LABEL[rd.brain]}
+                        </span>
+                      </p>
+                      <p>{rd.resumen}</p>
+                      {rd.activos.length > 0 && (
+                        <ul>
+                          {rd.activos.map((a) => (
+                            <li key={a.moneda}>
+                              <b>{a.moneda}</b> {a.lectura}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {rd.vigilar.length > 0 && <p className="jv-sample">A vigilar: {rd.vigilar.join(" · ")}</p>}
+                      {rd.riesgos.length > 0 && <p className="jv-sample">Riesgos: {rd.riesgos.join(" · ")}</p>}
+                    </div>
+                  )}
+                  {core && (
+                    <div className="jv-learn">
+                      <p>
+                        <b>Tesis de la IA</b> ·{" "}
+                        {ia && ia.resolved
+                          ? `${ia.resolved} cerradas, win rate ${Math.round((ia.winRate ?? 0) * 100)}%, ${fmtR(ia.totalR)}${ia.resolved < 15 ? " · muestra mínima" : ""}`
+                          : "todavía sin tesis cerradas para medir"}
+                      </p>
+                      {(iaOpen.length > 0 || iaClosed.length > 0) && (
+                        <ul>
+                          {iaOpen.map((s) => (
+                            <li key={s.id}>
+                              {coin(s.symbol)} {s.side === "LONG" ? "▲" : "▼"} abierta · entrada {px(s.entry)} · objetivo {px(s.target)} · invalidación {px(s.stop)}
+                              {s.why ? ` · ${s.why}` : ""}
+                            </li>
+                          ))}
+                          {iaClosed.slice(0, 5).map((s) => (
+                            <li key={s.id}>
+                              {coin(s.symbol)} {s.side === "LONG" ? "▲" : "▼"} {s.result === "OBJETIVO" ? "objetivo" : s.result === "STOP" ? "invalidada" : "cerrada por tiempo"} · {fmtR(s.r as number)}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                  <small>
+                    Cada hora JARVIS lee todo el software en el servidor: 20 monedas en 1h, 4h y diario, imanes de liquidación, estructura del mercado, miedo y avaricia,
+                    noticias, lo que aprendió su núcleo y su propio historial. Escribe esta lectura y, cuando la evidencia es clara, una tesis con objetivo e invalidación
+                    que se mide sola contra el precio: así aprende de sus aciertos y errores, con el tamaño de muestra a la vista. No es asesoramiento financiero.
+                  </small>
+                </div>
+              );
+            }
             if (ledgerTab === "learn") {
               const l = core?.learning ?? null;
               const taken = core?.stats;
@@ -1008,7 +1101,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             );
           })()}
           <div className="jv-chips">
-            {["Informe del mercado", "¿Qué está por romper?", "¿Cómo vienen tus señales?", "¿Qué aprendiste?", "Estado del núcleo", "Precio de Bitcoin"].map((c) => (
+            {["Tu lectura del mercado", "Analizá Bitcoin", "Informe del mercado", "¿Qué está por romper?", "¿Cómo vienen tus señales?", "¿Qué aprendiste?", "Estado del núcleo"].map((c) => (
               <button key={c} onClick={() => handle(c)}>{c}</button>
             ))}
           </div>

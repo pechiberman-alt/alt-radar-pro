@@ -1,4 +1,6 @@
-import { coreActivitySince, ensureCoreSchema, loadModel, readCoreStats } from "./jarvis-core-db.ts";
+import { BRAIN_LABEL } from "./ai-brains.ts";
+import { coreActivitySince, ensureCoreSchema, latestReading, loadModel, readCoreStats } from "./jarvis-core-db.ts";
+import type { MindReading } from "./jarvis-mind.ts";
 import type { CoreSignal } from "./jarvis-core.ts";
 import type { LedgerStats } from "./jarvis-ledger.ts";
 import { summarizeModel, venuesSpeech, type LearnSummary } from "./jarvis-learn.ts";
@@ -39,7 +41,7 @@ export function jarvisEvents(activity: CoreSignal[], since: number, st: LedgerSt
   for (const s of activity) {
     if (s.taken === false) continue;
     const side = s.side === "LONG" ? "LARGO ▲" : "CORTO ▼";
-    const kind = s.source === "ROMPE" ? "ruptura" : "barrida de imán";
+    const kind = s.source === "ROMPE" ? "ruptura" : s.source === "IA" ? "tesis de la IA" : "barrida de imán";
     if (s.closedAt !== null && s.closedAt > since && s.r !== null) {
       const icon = s.r > 0 ? "✅" : s.r < 0 ? "❌" : "➖";
       const how = s.result === "OBJETIVO" ? "llegó al objetivo" : s.result === "STOP" ? "tocó el stop" : "cerró por tiempo";
@@ -50,7 +52,7 @@ export function jarvisEvents(activity: CoreSignal[], since: number, st: LedgerSt
         text: `${icon} <b>JARVIS · ${esc(coin(s.symbol))} ${side} · ${esc(s.timeframe)}</b>\n${how}: <b>${rr(s.r)}</b> (comisiones incluidas)\nEntrada ${px(s.entry)} · stop ${px(s.stop)} · objetivo ${px(s.target)}${foot}`,
       });
     } else if (s.result === "ABIERTA") {
-      const n = learn ? learn.sources[s.source].n : null;
+      const n = learn && s.source !== "IA" ? learn.sources[s.source].n : null;
       out.push({
         key: `jarvis:new:${s.id}`,
         category: "JARVIS",
@@ -62,9 +64,29 @@ export function jarvisEvents(activity: CoreSignal[], since: number, st: LedgerSt
   return out;
 }
 
+/** When the hourly mind's reading of the market changes bias: what it sees now and why. */
+export function readingEvent(r: MindReading): TelegramEvent | null {
+  if (!r.sesgoAnterior || r.sesgoAnterior === r.sesgo) return null;
+  const word = (b: MindReading["sesgo"]) => (b === "NEUTRAL" ? "sin dirección" : b.toLowerCase());
+  return {
+    key: `jarvis:mind:${r.at}`,
+    category: "JARVIS",
+    priority: 55,
+    text: `🧠 <b>JARVIS cambió su lectura del mercado: ${word(r.sesgoAnterior)} → ${word(r.sesgo)}</b>\n${esc(r.resumen)}${
+      r.vigilar.length ? `\n<b>A vigilar:</b> ${esc(r.vigilar.slice(0, 2).join("; "))}` : ""
+    }\n<i>Lectura de la IA con los datos del software (${esc(BRAIN_LABEL[r.brain])}). No es asesoramiento financiero.</i>`,
+  };
+}
+
 /** Once a day: the record, the shadow, how much it has studied and what it has learned. */
 export function dailyEvent(day: string, st: LedgerStats, learn: LearnSummary | null): TelegramEvent {
   const lines = [`🧠 <b>JARVIS · bitácora del ${esc(day.split("-").reverse().join("/"))}</b>`, esc(recordLine(st))];
+  const ia = st.bySource.IA;
+  if (ia && (ia.resolved || ia.open)) {
+    lines.push(
+      `Tesis de la IA: ${ia.open} abiertas, ${ia.resolved} cerradas${ia.resolved ? ` · win rate ${Math.round((ia.winRate ?? 0) * 100)}% · ${rr(ia.totalR)}${ia.confidence === "MUESTRA RAZONABLE" ? "" : " · muestra mínima"}` : ""}`,
+    );
+  }
   if (learn) {
     lines.push(
       `Estudié ${learn.historyCases.toLocaleString("es-AR")} situaciones de la historia de ${learn.coins} monedas${learn.liveCases ? ` y ${learn.liveCases} señales en vivo` : ""}${learn.backlog ? `; quedan ${learn.backlog.toLocaleString("es-AR")} velas por estudiar` : ""}.`,
@@ -84,13 +106,15 @@ export async function collectJarvisEvents(db: D1Database, now: number): Promise<
   await db.prepare("INSERT OR REPLACE INTO telegram_state (key, value) VALUES ('jarvis_since', ?1)").bind(String(now)).run();
   if (!row) return [];
   const since = Number(row.value) || now;
-  const activity = await coreActivitySince(db, since, 20);
+  const [activity, reading] = await Promise.all([coreActivitySince(db, since, 20), latestReading(db).catch(() => null)]);
   const day = new Date(now).toISOString().slice(0, 10);
   const wantDaily = new Date(now).getUTCHours() >= 12;
-  if (!activity.length && !wantDaily) return [];
+  const changed = reading && reading.at > since ? readingEvent(reading) : null;
+  if (!activity.length && !wantDaily && !changed) return [];
   const [st, loaded] = await Promise.all([readCoreStats(db), loadModel(db)]);
   const learn = loaded.exists ? summarizeModel(loaded.model) : null;
   const out = jarvisEvents(activity, since, st, learn);
+  if (changed) out.push(changed);
   // The dispatch skips keys already sent, so this goes out once per day.
   if (wantDaily && (st.resolved > 0 || (learn?.historyCases ?? 0) > 0)) out.push(dailyEvent(day, st, learn));
   return out;

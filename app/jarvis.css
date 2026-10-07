@@ -32,7 +32,7 @@
 .jv-hud.speaking .jv-wave i,.jv-hud.listening .jv-wave i{opacity:1;animation:jv-bar .7s ease-in-out infinite}
 .jv-hud.listening .jv-wave i{background:#39f29a}
 .jv-log{flex:1;min-height:90px;overflow-y:auto;display:grid;align-content:start;gap:6px;padding-right:4px}
-.jv-log p{margin:0;padding:6px 9px;border-radius:8px;font:11.5px/1.5 system-ui,sans-serif}
+.jv-log p{margin:0;padding:6px 9px;border-radius:8px;font:11.5px/1.5 system-ui,sans-serif;white-space:pre-line}
 .jv-log p b{display:block;font:8.5px var(--font-mono);letter-spacing:1.5px;margin-bottom:2px}
 .jv-log .jarvis{background:rgba(95,211,243,.08);border-left:2px solid #5fd3f3}.jv-log .jarvis b{color:#5fd3f3}
 .jv-log .yo{background:rgba(57,242,154,.07);border-left:2px solid #39f29a;justify-self:end;max-width:88%}.jv-log .yo b{color:#39f29a}
@@ -94,6 +94,17 @@
 .jv-ledger .jv-ltabs{min-height:30px;overflow:visible;margin-bottom:2px}
 .jv-head em{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jv-ltabs.three{grid-template-columns:1fr 1fr 1fr}
+.jv-ltabs.four{grid-template-columns:repeat(4,1fr)}
+.jv-ltabs.four button{font-size:8px;letter-spacing:.06em;padding-left:2px;padding-right:2px}
+.jv-mind{display:grid;gap:5px;font-size:10.5px;color:#d9f3fa;line-height:1.4}
+.jv-mind p{margin:0}
+.jv-mind ul{margin:0;padding-left:14px;display:grid;gap:3px;color:#b5dbe5}
+.jv-mind li b{color:#5fd3f3;margin-right:3px}
+.jv-mind-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.jv-mind-head span{font-size:9px;color:#7fb9c8;letter-spacing:.06em}
+.jv-bias{font-size:10px;letter-spacing:.14em;padding:2px 8px;border-radius:999px;border:1px solid #2a6d80;color:#bfefff}
+.jv-bias.alcista{border-color:#1f8a5f;color:#39f29a;background:rgba(57,242,154,.08)}
+.jv-bias.bajista{border-color:#8a2a35;color:#ff6b78;background:rgba(255,89,100,.08)}
 .jv-learn{display:grid;gap:3px;font-size:10px;color:#cfeff8;line-height:1.35}
 .jv-learn p{margin:0}
 .jv-learn b{color:#5fd3f3;letter-spacing:.06em}

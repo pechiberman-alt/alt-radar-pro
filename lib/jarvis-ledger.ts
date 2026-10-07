@@ -26,7 +26,13 @@ import type { SwingCandle } from "./swing-entries.ts";
 export const HORIZON = 48;
 export const FEE_PCT = 0.05;
 
-export type JarvisSource = "ROMPE" | "IMÁN";
+/** Sources with a learned model (jarvis-learn.ts). */
+export type LearnedSource = "ROMPE" | "IMÁN";
+/**
+ * IA: a thesis JARVIS's 24/7 mind wrote itself (jarvis-mind.ts) — direction,
+ * target and invalidation — measured with the same rules as every signal.
+ */
+export type JarvisSource = LearnedSource | "IA";
 export type JarvisSignal = {
   id: string;
   source: JarvisSource;
@@ -131,7 +137,11 @@ export type LedgerStats = LvStats & { bySource: Record<JarvisSource, LvStats> };
 export function ledgerStats(ledger: JarvisSignal[]): LedgerStats {
   return {
     ...lvStats(ledger),
-    bySource: { ROMPE: lvStats(ledger.filter((s) => s.source === "ROMPE")), "IMÁN": lvStats(ledger.filter((s) => s.source === "IMÁN")) },
+    bySource: {
+      ROMPE: lvStats(ledger.filter((s) => s.source === "ROMPE")),
+      "IMÁN": lvStats(ledger.filter((s) => s.source === "IMÁN")),
+      IA: lvStats(ledger.filter((s) => s.source === "IA")),
+    },
   };
 }
 

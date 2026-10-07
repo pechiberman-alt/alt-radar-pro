@@ -1,4 +1,4 @@
-import { loadCryptoNews, type CryptoNewsResult } from "./crypto-news.ts";
+import { loadCryptoNews, type CryptoNewsItem, type CryptoNewsResult } from "./crypto-news.ts";
 import { isDueToday, type DcaSchedule } from "./dca-tracker.ts";
 import { parseFearGreed, type FearGreed } from "./fear-greed.ts";
 import {
@@ -18,6 +18,7 @@ import { collectVolumeEvents } from "./telegram-volume.ts";
 import { collectMagnetEvents } from "./telegram-magnets.ts";
 import { collectJarvisEvents } from "./telegram-jarvis.ts";
 import { runPriceAlerts } from "./price-alerts-server.ts";
+import { saveWorld, worldDigest } from "./jarvis-world.ts";
 import { cached } from "./upstream-cache.ts";
 
 /**
@@ -93,12 +94,17 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
     }
   }
 
+  // What JARVIS's 24/7 mind reads about the world (lib/jarvis-world.ts), filled below.
+  let worldNews: CryptoNewsItem[] = [];
+  let worldFg: FearGreed | null = null;
+
   // High-impact news from the last 3 hours (shared cache with the panel).
   try {
     const news = await cached<CryptoNewsResult>("crypto-news", 10 * 60_000, async () => {
       const r = await loadCryptoNews(now);
       return r.items.length ? r : null;
     }, 6 * 3_600_000);
+    worldNews = news.value?.items ?? [];
     for (const n of news.value?.items ?? []) {
       if (n.impact === "ALTO" && now - n.publishedAt < 3 * 3_600_000) shared.push(newsEvent(n));
     }
@@ -133,11 +139,13 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
       const r = await fetch("https://api.alternative.me/fng/?limit=31&format=json", { signal: AbortSignal.timeout(6000) });
       return r.ok ? parseFearGreed(await r.json()) : null;
     }, 24 * 3_600_000);
+    worldFg = fg.value ?? null;
     const e = fg.value ? fearGreedEvent(fg.value.value, fg.value.zone, nowIso.slice(0, 10)) : null;
     if (e) shared.push(e);
   } catch {
     // Index down: skip it this run.
   }
+  if (worldNews.length || worldFg) await saveWorld(db, worldDigest(worldNews, worldFg, now)).catch(() => undefined);
 
   let sent = 0;
   for (const link of links) {
