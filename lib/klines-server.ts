@@ -23,25 +23,61 @@ export const marketOf = (symbol: string): "spot" | "futures" => (FUTURES_ONLY.ha
 
 export type ServerKlines = { candles: SwingCandle[]; base: string; thin: boolean };
 
+/**
+ * Binance answers 403/451 to its spot hosts from some data centres (the US
+ * one where the Worker's cron runs, for instance) while the futures hosts
+ * work. After such an answer, spot is skipped for 10 minutes in this isolate
+ * and the same pair is read from USDT-M futures: one request instead of five
+ * failing ones, which matters with 50 per run on the free plan.
+ */
+let spotBlockedUntil = 0;
+export function resetKlinesServerState() {
+  spotBlockedUntil = 0;
+}
+
 export async function fetchKlinesServer(
   symbol: string,
   interval: string,
   opts: { limit?: number; startTime?: number; minCandles?: number; allowThin?: boolean; market?: "spot" | "futures" } = {},
 ): Promise<ServerKlines> {
   const futures = (opts.market ?? marketOf(symbol)) === "futures";
-  const bases = futures ? FUTURES_BASES_SERVER : opts.allowThin ? [...GLOBAL_BASES, ...THIN_BASES] : GLOBAL_BASES;
-  const path = futures ? "/fapi/v1/klines" : "/api/v3/klines";
   const query = `symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${opts.limit ?? 30}${opts.startTime ? `&startTime=${Math.floor(opts.startTime)}` : ""}`;
   let lastError: unknown;
-  for (const base of bases) {
-    try {
-      const response = await globalThis.fetch(`${base}${path}?${query}`, { signal: AbortSignal.timeout(6_000), headers: { Accept: "application/json" } });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const candles = parseSwingKlines(await response.json());
-      if (candles.length >= (opts.minCandles ?? 1)) return { candles, base, thin: THIN_BASES.includes(base) };
-    } catch (error) {
-      lastError = error;
+  const attempt = async (bases: string[], path: string, stopOnBlock: boolean): Promise<ServerKlines | null> => {
+    for (const base of bases) {
+      try {
+        const response = await globalThis.fetch(`${base}${path}?${query}`, { signal: AbortSignal.timeout(6_000), headers: { Accept: "application/json" } });
+        if (!response.ok) {
+          if (stopOnBlock && (response.status === 403 || response.status === 451)) {
+            spotBlockedUntil = Date.now() + 10 * 60_000;
+            lastError = new Error(`HTTP ${response.status}`);
+            return null;
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const candles = parseSwingKlines(await response.json());
+        if (candles.length >= (opts.minCandles ?? 1)) return { candles, base, thin: THIN_BASES.includes(base) };
+      } catch (error) {
+        lastError = error;
+      }
     }
+    return null;
+  };
+  if (futures) {
+    const r = await attempt(FUTURES_BASES_SERVER, "/fapi/v1/klines", false);
+    if (r) return r;
+    throw lastError ?? new Error("SIN DATOS");
+  }
+  if (Date.now() >= spotBlockedUntil) {
+    const r = await attempt(GLOBAL_BASES, "/api/v3/klines", true);
+    if (r) return r;
+  }
+  // Spot blocked or down: the same pair on USDT-M futures, the deepest market.
+  const f = await attempt(FUTURES_BASES_SERVER, "/fapi/v1/klines", false);
+  if (f) return f;
+  if (opts.allowThin) {
+    const t = await attempt(THIN_BASES, "/api/v3/klines", false);
+    if (t) return t;
   }
   throw lastError ?? new Error("SIN DATOS");
 }

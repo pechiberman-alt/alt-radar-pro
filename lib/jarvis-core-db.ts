@@ -174,6 +174,19 @@ export async function coreSnapshot(db: D1Database, now: number): Promise<CoreSna
 }
 
 /**
+ * Candles for the core: USDT-M futures first (the same market the app's map
+ * reads, and reachable from the Worker), spot as fallback. From the cron's
+ * data centre the spot hosts answered 403.
+ */
+async function coreCandles(symbol: string, limit: number, minCandles = Math.min(limit, 120)) {
+  try {
+    return (await fetchKlinesServer(symbol, CORE_TF, { limit, minCandles, market: "futures" })).candles;
+  } catch {
+    return (await fetchKlinesServer(symbol, CORE_TF, { limit, minCandles })).candles;
+  }
+}
+
+/**
  * One minute of the core. Never throws: a failed job is noted in the
  * heartbeat and the next minute's job runs anyway.
  */
@@ -186,20 +199,23 @@ export async function runCoreTick(db: D1Database, now = Date.now()): Promise<Cor
   try {
     if (task.kind === "SCAN") {
       const found: JarvisSignal[] = [];
+      const failed: string[] = [];
       for (const symbol of task.symbols) {
         try {
-          const closed = closedOnly((await fetchKlinesServer(symbol, CORE_TF, { limit: 200, minCandles: 120 })).candles, frameMs, now);
+          const closed = closedOnly(await coreCandles(symbol, 200), frameMs, now);
           const s = scanSignal(symbol, closed);
           if (s) found.push(s);
-        } catch {
+        } catch (error) {
           // This coin's data is down this minute; it comes round again in 15.
+          failed.push(`${symbol.replace(/USDT$/, "")} sin datos (${error instanceof Error ? error.message : "error"})`);
         }
       }
       const added = await recordCoreSignals(db, found, now);
-      note = `${task.symbols.map((s) => s.replace(/USDT$/, "")).join("+")}: ${added.length ? `${added.length} señal nueva` : "sin ruptura"}`;
+      ok = failed.length < task.symbols.length;
+      note = `${task.symbols.map((s) => s.replace(/USDT$/, "")).join("+")}: ${added.length ? `${added.length} señal nueva` : "sin ruptura"}${failed.length ? ` · ${failed.join(", ")}` : ""}`;
     } else if (task.kind === "MAGNET") {
       const cfg = timeframeConfig(CORE_TF);
-      const closed = closedOnly((await fetchKlinesServer(task.symbol, CORE_TF, { limit: 500, minCandles: 200 })).candles, frameMs, now);
+      const closed = closedOnly(await coreCandles(task.symbol, 500), frameMs, now);
       if (closed.length >= 200) {
         const oi = await loadOiDelta(task.symbol, CORE_TF, closed.map((c) => c.openTime), AbortSignal.timeout(6000)).catch(() => null);
         const opts = { halfLifeCandles: cfg.halfLife, priceRangePct: cfg.priceRange };
@@ -217,7 +233,7 @@ export async function runCoreTick(db: D1Database, now = Date.now()): Promise<Cor
       // At most 12 coins per minute: the free plan allows 50 outside requests per run.
       for (const [symbol, list] of [...bySymbol].slice(0, 12)) {
         try {
-          const closed = closedOnly((await fetchKlinesServer(symbol, CORE_TF, { limit: 200 })).candles, frameMs, now);
+          const closed = closedOnly(await coreCandles(symbol, 200, 1), frameMs, now);
           for (const s of list) updated.push(resolveSignal(s, closed, frameMs));
         } catch {
           // Try again next cycle.
