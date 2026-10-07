@@ -87,6 +87,14 @@ test("JARVIS TRADING: the questions of the desk reach the desk", () => {
   assert.deepEqual(parseCommand("¿cómo ves SOL?"), { kind: "AI", question: "¿cómo ves SOL?" });
   // "What if" without a price is not a scenario.
   assert.equal(parseCommand("y si compro ahora").kind, "AI");
+  // Paper trading: follow the plan without real money, and the measured record.
+  assert.deepEqual(parseCommand("Jarvis, simulá la operación"), { kind: "PAPER_OPEN", symbol: null });
+  assert.deepEqual(parseCommand("ponela en papel a sol"), { kind: "PAPER_OPEN", symbol: "SOL" });
+  assert.deepEqual(parseCommand("¿cómo va mi paper trading?"), { kind: "PAPER" });
+  assert.deepEqual(parseCommand("¿cómo van las operaciones de papel?"), { kind: "PAPER" });
+  assert.deepEqual(parseCommand("resultados de las simulaciones"), { kind: "PAPER" });
+  assert.notEqual(parseCommand("¿qué papel juega la Fed?").kind, "PAPER", "a role is not paper trading");
+  assert.deepEqual(parseCommand("decime tu win rate y profit factor"), { kind: "STATS" }, "JARVIS's own signals stay where they were");
 });
 
 test("prices said the Argentine way; timeframes and percentages are not prices", () => {

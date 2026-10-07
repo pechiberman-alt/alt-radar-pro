@@ -6,6 +6,9 @@ import { eligible } from "@/lib/decoupling";
 import { briefingText, findCoins, findTimeframe, greeting, HELP_TEXT, parseCommand, priceLine, type JarvisIntent, type Ticker } from "@/lib/jarvis";
 import { compareDesks, deskForAi, deskSpeech, entrySpeech, indicatorsSpeech, liquidationRisk, macroBrief, macroKindOf, macroSpeech, whatIf, type DeskDecision } from "@/lib/jarvis-desk";
 import { cachedDesk, deskFor, showInDesk } from "@/lib/jarvis-desk-run";
+import { canPaper, paperForAi, paperSpeech } from "@/lib/jarvis-paper";
+import { loadPaper, openFromDesk, paperTrades, refreshPaper } from "@/lib/jarvis-paper-run";
+import { arNumber } from "@/lib/ai-numbers";
 import { loadCalendar } from "@/lib/econ-calendar";
 import { compactSnapshot } from "@/lib/ai-analyst";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -757,6 +760,32 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             const top = c.filas.filter((r) => r.gana === "A" || r.gana === "B").slice(0, 4).map((r) => `${r.criterio}: ${r.gana === "A" ? c.a : c.b}`).join("; ");
             return speak(`${c.resumen.replace(/ No es asesoramiento financiero\.$/, "")}${top ? ` Por criterio: ${top}.` : ""} No es asesoramiento financiero.`, "mesa");
           }
+          case "PAPER": {
+            const st = await loadPaper();
+            screenRef.current = "JARVIS TRADING";
+            showSection("jarvis-trading");
+            if (st.mode === "error") return speak(`${st.error ?? "No pude leer tu registro de papel."} Este dato no está disponible actualmente.`);
+            await refreshPaper().catch(() => null);
+            return speak(paperSpeech(paperTrades()), "papel");
+          }
+          case "PAPER_OPEN": {
+            const sym = intent.symbol ? `${intent.symbol}USDT` : (focusRef.current.symbol ?? "BTCUSDT");
+            const coin = sym.replace(/USDT$/, "");
+            const d = (await deskFor(sym, { structure: deskContext()?.structure ?? null })).decision;
+            if (!d) return speak(`No tengo velas suficientes de ${coin} para que la mesa arme un plan. Este dato no está disponible actualmente.`);
+            // Paper follows the desk: never a plan the risk manager did not approve.
+            if (!canPaper(d)) return speak(`No hay un plan aprobado para ${coin}: la mesa dice ${d.direccion === "NO TRADE" ? "no operar" : d.direccion.toLowerCase()}. ${d.resolucion} No abro operaciones de papel contra el gestor de riesgo.`, "mesa");
+            const r = await openFromDesk(d);
+            if (!r.ok) return speak(r.error);
+            screenRef.current = "JARVIS TRADING";
+            showSection("jarvis-trading");
+            showInDesk(sym);
+            const t = r.trade;
+            return speak(
+              `Listo, en papel: ${t.lado === "LONG" ? "largo" : "corto"} en ${coin} ${t.tipoEntrada === "LÍMITE" ? `con orden límite en ${arNumber(t.entrada)}` : `desde ${arNumber(t.entrada)}`}, stop ${arNumber(t.stop)}, objetivos ${t.tp.map((x) => arNumber(x)).join(", ")}. La sigo con velas de una hora y mido el resultado. Simulado, sin plata real.`,
+              "papel",
+            );
+          }
           case "MACRO": {
             const cal = await loadCalendar().catch(() => null);
             return speak(macroSpeech(macroBrief(cal?.events ?? null, Date.now(), macroKindOf(intent.question))), "mesa");
@@ -812,6 +841,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                     foco: analysis ? analysisForAi(analysis) : null,
                     // The desk's last decision on that coin, so the conversation uses the same plan and numbers.
                     mesa: subject && cachedDesk(subject) ? deskForAi(cachedDesk(subject)!) : null,
+                    // Its own paper record (simulated), so it can discuss how its plans actually went.
+                    papel: paperForAi(paperTrades()),
                   },
                   history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
                 }),

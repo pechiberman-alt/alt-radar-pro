@@ -1,5 +1,7 @@
 import { loadDeskSnapshot, type DeskSnapshot } from "./jarvis-desk-data.ts";
 import { DEFAULT_DESK_SETTINGS, runDesk, type DeskDecision, type DeskRecord, type DeskSettings } from "./jarvis-desk.ts";
+import { withRecord } from "./jarvis-paper.ts";
+import { loadPaper, paperTrades } from "./jarvis-paper-run.ts";
 import type { MarketStructure } from "./market-structure.ts";
 
 /**
@@ -52,7 +54,13 @@ export function saveDeskSettings(s: DeskSettings) {
     // Private mode: the settings live only in this visit.
   }
   // The same data decided again with the new risk: no new request, and the answer changes at once.
-  for (const [sym, e] of cache) cache.set(sym, { ...e, decision: runDesk(e.snapshot, s, e.record) });
+  for (const [sym, e] of cache) cache.set(sym, { ...e, decision: decide(e.snapshot, s, e.record) });
+}
+
+/** The desk's decision, with the measured record of similar paper trades next to the score (the plan does not change). */
+function decide(snapshot: DeskSnapshot, settings: DeskSettings, record: DeskRecord | null): DeskDecision | null {
+  const d = runDesk(snapshot, settings, record);
+  return d && !record ? withRecord(d, paperTrades()) : d;
 }
 
 /** La decisión de la mesa para un activo; la reutiliza si tiene menos de 90 s. */
@@ -63,9 +71,9 @@ export async function deskFor(symbol: string, opts: { structure?: MarketStructur
   const running = inflight.get(sym);
   if (running) return running;
   const job = (async () => {
-    const snapshot = await loadDeskSnapshot(sym, { structure: opts.structure });
+    const [snapshot] = await Promise.all([loadDeskSnapshot(sym, { structure: opts.structure }), loadPaper().catch(() => null)]);
     const record = opts.record ?? null;
-    const decision = runDesk(snapshot, loadDeskSettings(), record);
+    const decision = decide(snapshot, loadDeskSettings(), record);
     const entry: Entry = { at: Date.now(), decision, snapshot, record };
     cache.set(sym, entry);
     return entry;

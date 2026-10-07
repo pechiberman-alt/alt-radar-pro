@@ -31,6 +31,8 @@ export type JarvisIntent =
   | { kind: "LIQ_RISK"; symbol: string | null }
   | { kind: "INDICATORS"; symbol: string | null }
   | { kind: "MACRO"; question: string }
+  | { kind: "PAPER" }
+  | { kind: "PAPER_OPEN"; symbol: string | null }
   | { kind: "AI"; question: string };
 
 /** Lowercase, no accents, no punctuation, single spaces. */
@@ -144,6 +146,10 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   if (remember) return { kind: "REMEMBER", text: remember[1].trim() };
   if (/\b(tu lectura|lectura del mercado|que ves en el mercado|como ves el mercado|que pensas del mercado|tu (vision|opinion) del mercado|tus tesis|tu mente)\b/.test(text)) return { kind: "MIND" };
   if (/\b(que aprendiste|que (has )?aprendido|aprendizaje|que descubriste|lecciones|que estudiaste|que sabes del mercado)\b/.test(text)) return { kind: "LEARN" };
+  // Paper trading (lib/jarvis-paper.ts): follow the desk's plan without real money; its measured record.
+  if (/\b(simula(la|lo|me)?|abri(la|lo)? en papel|segui(la|lo)? en papel|opera(la|lo)? en papel|pone(la|lo) en papel)\b/.test(text) && !/\b(como (va|van|vienen?|fue)|resultados?|historial|estadisticas)\b/.test(text))
+    return { kind: "PAPER_OPEN", symbol: findCoins(text, known)[0] ?? null };
+  if (/\b(paper( trading)?|de papel|en papel|simulad[ao]s|simulaciones)\b/.test(text)) return { kind: "PAPER" };
   if (/\b(nucleo|estado del nucleo|que hiciste|mientras no estaba|que paso mientras|que estuviste haciendo|estas activo|estas despierto)\b/.test(text)) return { kind: "CORE" };
   if (/\b(rendimiento|estadisticas|tus senales|tu registro|registro de senales|win ?rate|profit factor|como (te )?(va|fue|vienen?)( con)? (las|tus) senales|cuanto acertaste|aciertos)\b/.test(text)) return { kind: "STATS" };
   const name = text.match(/\b(?:llamame|decime|dime|mi nombre es|me llamo)\s+([a-zñ]{2,20})\b/);
@@ -238,4 +244,5 @@ export const HELP_TEXT =
   "Podés decirme: informe del mercado. Precio de Bitcoin. Abrí el mapa de Solana en 15 minutos. ¿Qué está por romper? ¿Qué está subiendo? " +
   "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. " +
   "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizá Solana, o analizalo para lo que tenés en pantalla. Tu lectura del mercado. " +
-  "Trading: analizame Bitcoin, ¿dónde entrarías?, ¿qué pasa si pierde 110.000?, comparame Bitcoin contra Ethereum, ¿hay riesgo de liquidaciones?, ¿qué pasa si sale un CPI peor de lo esperado? O preguntame lo que quieras sobre el mercado.";
+  "Trading: analizame Bitcoin, ¿dónde entrarías?, ¿qué pasa si pierde 110.000?, comparame Bitcoin contra Ethereum, ¿hay riesgo de liquidaciones?, ¿qué pasa si sale un CPI peor de lo esperado? " +
+  "Papel, sin plata real: simulá la operación, ¿cómo va mi paper trading? O preguntame lo que quieras sobre el mercado.";

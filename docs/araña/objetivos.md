@@ -61,6 +61,8 @@ Reglas:
 - La mesa lee solo velas cerradas (test de no mirar el futuro). Un especialista sin datos pesa cero y lo dice: «Este dato no está disponible actualmente.».
 - El puntaje de confluencia no es una probabilidad. El gestor de riesgo veta (R:R menor a 1,5, stop absurdo, contra la mesa) y espera (evento de alto impacto en menos de 2 h); el veto gana a cualquier confianza.
 - Análisis, papel y ejecución real están separados: la mesa nunca opera sola.
+- Paper trading (lib/jarvis-paper*.ts, tablas jarvis_paper y jarvis_paper_counts): solo sigue planes que el gestor de riesgo aprobó; reglas fijas al abrir (un tercio por TP, stop fijo, peor caso primero, comisiones, 7 días). Se resuelve en el navegador con velas de Binance; el servidor no acepta cambios de plan ni retrocesos y recalcula el resultado.
+- El aprendizaje es una observación medida con su muestra: nunca cambia las reglas de la mesa.
 Pendiente:
 - Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI).
 - Mesa: faltan clientes de Bybit y OKX, la clave CMC_API_KEY y el historial real de liquidaciones; TradingView no tiene API pública.

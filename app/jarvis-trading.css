@@ -81,6 +81,26 @@
 .jt-bad{color:var(--red);font:11px var(--font-mono)}
 .jt-brief{border:1px solid #3d3420;background:#14110a;border-radius:6px;padding:4px 10px;margin-top:8px}
 .jt-hint{font-size:12px;color:#9fb3a8;line-height:1.5;margin:0}
+.jt-follow{display:grid;gap:6px}
+.jt-follow button{min-height:46px;border:1px solid #3f4f7a;background:#111a33;color:#b9c8ff;border-radius:6px;font:12px var(--font-mono);letter-spacing:1px;font-weight:700;cursor:pointer}
+.jt-follow button:disabled{opacity:.6}
+.jt-follow small{font-size:11px;color:var(--muted)}
+.jt-ok{color:var(--green);font-size:13px;line-height:1.5;margin:0}
+.jt-tag-paper{color:#b9c8ff;border-color:#3f4f7a}
+.jt-warn{color:var(--amber)}
+.jt-paper{display:grid;gap:8px}
+.jt-trades{display:grid;gap:8px}
+.jt-trade{border:1px solid var(--line);border-left:3px solid #3a4a42;border-radius:6px;padding:10px;background:#0c130f;display:grid;gap:4px}
+.jt-trade.long{border-left-color:var(--green)}
+.jt-trade.short{border-left-color:var(--red)}
+.jt-trade p{margin:0;font-size:12.5px;line-height:1.45}
+.jt-trade-top{display:flex;justify-content:space-between;align-items:center;gap:8px;font:13px var(--font-mono)}
+.jt-trade-top i{font-style:normal;font-size:12px;color:#c9d5ce}
+.jt-mini{min-height:40px;padding:0 12px;border:1px solid var(--line);background:#0b120e;color:#c9d5ce;border-radius:6px;font:11px var(--font-mono);letter-spacing:.8px;cursor:pointer;justify-self:start}
+.jt-mini:disabled{opacity:.6}
+.jt-row{display:flex;gap:8px;flex-wrap:wrap}
+.jt-audit{margin:6px 0;padding-left:20px;display:grid;gap:6px}
+.jt-audit li{font-size:12.5px;line-height:1.5;color:#c9d5ce}
 @media(min-width:760px){
   .jt-desk{padding:20px 22px}
   .jt-levels{grid-template-columns:repeat(5,1fr)}
