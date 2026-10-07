@@ -104,6 +104,9 @@ test("server alerts come from the core's stored map: no candles fetched, no map 
     }
     assert.deepEqual(magnetEventsFromMind(mind, now, 99), [magnetEventsFromMind(mind, now)[0]].filter((e) => e.key.startsWith("magnet:swept")), "weak zones are not 'near' alerts");
     assert.equal(MAGNET_WATCH.length, 3);
+    assert.ok(events.every((e) => !/Kraken/.test(e.text)), "a map from Binance's candles needs no note");
+    const fromKraken = magnetEventsFromMind({ ...mind, magnets: { BTCUSDT: { ...mind.magnets.BTCUSDT, venue: "KRAKEN" as const } } }, now);
+    assert.ok(fromKraken.length > 0 && fromKraken.every((e) => /Mapa hecho con velas de Kraken en dólares: Binance no deja leer al servidor\./.test(e.text)));
   } finally {
     globalThis.fetch = real;
   }

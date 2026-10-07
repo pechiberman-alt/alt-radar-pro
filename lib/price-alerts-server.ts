@@ -1,4 +1,4 @@
-import { fetchKlinesServer, FUTURES_BASES_SERVER, GLOBAL_BASES, marketOf } from "./klines-server.ts";
+import { fetchKlinesServer, FUTURES_BASES_SERVER, GLOBAL_BASES, isOutside, marketOf, VENUE_LABEL, type Venue } from "./klines-server.ts";
 import {
   ALERT_USAGE, createdMessage, directionFor, firstTouch, listMessage, LOOKBACK_MINUTES, MAX_ALERTS_PER_USER, parseAlertArgs, parseTarget,
   triggeredMessage, type AlertDirection, type PriceAlert,
@@ -168,9 +168,13 @@ export async function runPriceAlerts(db: D1Database, token: string, now = Date.n
     const oldest = Math.min(...list.map((r) => r.created_at));
     const start = Math.floor(Math.max(oldest, now - LOOKBACK_MINUTES * 60_000) / 60_000) * 60_000;
     let candles;
+    let venue: Venue;
     try {
-      // Main market only: a thin exchange's wicks are not the market's.
-      candles = (await fetchKlinesServer(symbol, "1m", { limit: LOOKBACK_MINUTES + 5, startTime: start, allowThin: false })).candles;
+      // Never a thin exchange (its wicks are not the market's). When Binance's
+      // firewall refuses the cron, Kraken or Coinbase in dollars — deep markets
+      // whose price differs from Binance's by hundredths of a percent — and
+      // the message says so; otherwise the alert would never fire.
+      ({ candles, venue } = await fetchKlinesServer(symbol, "1m", { limit: LOOKBACK_MINUTES + 5, startTime: start, allowThin: false, outside: true }));
     } catch {
       continue; // retried on the next run
     }
@@ -185,7 +189,7 @@ export async function runPriceAlerts(db: D1Database, token: string, now = Date.n
       } catch {
         // default: Argentina
       }
-      const sent = await sendMessage(token, r.chat_id, triggeredMessage(alert, touched, last, tz));
+      const sent = await sendMessage(token, r.chat_id, triggeredMessage(alert, touched, last, tz, isOutside(venue) ? VENUE_LABEL[venue] : null));
       // Deleted only once the person was told; a failed send is retried next run.
       if (sent.ok) {
         await db.prepare("DELETE FROM telegram_price_alerts WHERE id = ?1").bind(alert.id).run();

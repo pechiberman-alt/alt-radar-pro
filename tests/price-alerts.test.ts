@@ -85,6 +85,9 @@ test("messages say what was set, how far it is, and when it was reached in the p
   assert.match(fired, /BTC llegó a 90\.000<\/b> subiendo/);
   assert.match(fired, /a las 14:32 · ahora 90\.120/, "UTC-3");
   assert.match(fired, /ya se borró/);
+  assert.doesNotMatch(fired, /Kraken|dólares/, "Binance's own price: nothing to explain");
+  const elsewhere = triggeredMessage(alert, Date.UTC(2026, 8, 30, 17, 32), 90_120, 180, "Kraken");
+  assert.match(elsewhere, /Medido con el precio de Kraken en dólares: Binance no deja leer al servidor ahora\. Puede diferir levemente del de Binance\./);
   const list = listMessage([alert, { ...alert, id: 2, symbol: "SOLUSDT", target: 110, direction: "ABAJO" }], { BTCUSDT: 85_000 });
   assert.match(list, /1\. <b>BTC ↑ 90\.000<\/b> · ahora 85\.000/);
   assert.match(list, /2\. <b>SOL ↓ 110<\/b>$/m, "no price known: no distance invented");

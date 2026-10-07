@@ -380,11 +380,13 @@ export type LearnModel = {
   /** Cases learned from the history walk and from live signals that closed. */
   historyCases: number;
   liveCases: number;
+  /** History cases by the exchange whose candles they came from (klines-server.ts Venue). */
+  venues: Record<string, number>;
   updatedAt: number;
 };
 
 export function emptyModel(): LearnModel {
-  return { v: 1, rev: 0, ridge: { ROMPE: emptyRidge(), "IMÁN": emptyRidge() }, cursors: {}, backlog: {}, btc: null, historyCases: 0, liveCases: 0, updatedAt: 0 };
+  return { v: 1, rev: 0, ridge: { ROMPE: emptyRidge(), "IMÁN": emptyRidge() }, cursors: {}, backlog: {}, btc: null, historyCases: 0, liveCases: 0, venues: {}, updatedAt: 0 };
 }
 
 /** Rounds the sums so the stored model stays small; 1e-6 R is far below anything that matters. */
@@ -399,7 +401,7 @@ export function parseModel(raw: string | null | undefined): LearnModel {
   try {
     const m = JSON.parse(raw) as LearnModel;
     if (m.v !== 1 || !m.ridge?.ROMPE || m.ridge.ROMPE.xx.length !== (D * (D + 1)) / 2) return emptyModel();
-    return { ...emptyModel(), ...m, ridge: { ROMPE: m.ridge.ROMPE, "IMÁN": m.ridge["IMÁN"] ?? emptyRidge() } };
+    return { ...emptyModel(), ...m, venues: m.venues ?? {}, ridge: { ROMPE: m.ridge.ROMPE, "IMÁN": m.ridge["IMÁN"] ?? emptyRidge() } };
   } catch {
     return emptyModel();
   }
@@ -412,6 +414,8 @@ export type LearnSummary = {
   coins: number;
   updatedAt: number;
   sources: Record<JarvisSource, { n: number; base: Prediction | null; lessons: string[] }>;
+  /** History cases by exchange: Binance when it answers the server, Kraken or Coinbase (in dollars) when it refuses it. */
+  venues?: Record<string, number>;
 };
 
 /** What the app and the AI need to know about the learning, without the matrices. */
@@ -436,7 +440,28 @@ export function summarizeModel(m: LearnModel): LearnSummary {
     coins: Object.keys(m.cursors).length,
     updatedAt: m.updatedAt,
     sources: { ROMPE: src("ROMPE"), "IMÁN": src("IMÁN") },
+    venues: Object.fromEntries(Object.entries(m.venues ?? {}).filter(([, n]) => n > 0)),
   };
+}
+
+const VENUE_WORDS: Record<string, string> = { BINANCE: "Binance", BINANCE_FUTURES: "Binance", BINANCE_US: "Binance.US", KRAKEN: "Kraken en dólares", COINBASE: "Coinbase en dólares" };
+
+/**
+ * Which exchange's candles the cases came from, when not all are Binance's
+ * (null otherwise): Binance refuses the server's scheduled jobs, so the core
+ * may study Kraken's or Coinbase's instead.
+ */
+export function venuesSpeech(venues: Record<string, number> | undefined): string | null {
+  const byName = new Map<string, number>();
+  for (const [v, n] of Object.entries(venues ?? {})) {
+    const name = VENUE_WORDS[v] ?? v;
+    if (n > 0) byName.set(name, (byName.get(name) ?? 0) + n);
+  }
+  const list = [...byName].sort((a, b) => b[1] - a[1]);
+  if (!list.length || (list.length === 1 && list[0][0] === "Binance")) return null;
+  if (list.length === 1) return `Las estudié con velas de ${list[0][0]}, porque Binance no deja leer al servidor.`;
+  const items = list.map(([name, n], i) => `${fmtN(n)} ${i === 0 ? "salen de velas de" : "de"} ${name}`);
+  return `De esas, ${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}: cuando Binance no deja leer al servidor, uso otra fuente.`;
 }
 
 /** What JARVIS says when asked what it has learned. */
@@ -444,6 +469,8 @@ export function learnSpeech(s: LearnSummary): string {
   const parts = [
     `Estudié ${fmtN(s.historyCases)} ${s.historyCases === 1 ? "situación" : "situaciones"} de la historia de ${s.coins} ${s.coins === 1 ? "moneda" : "monedas"}${s.liveCases ? ` y ${fmtN(s.liveCases)} señales en vivo` : ""}.`,
   ];
+  const venues = venuesSpeech(s.venues);
+  if (venues) parts.push(venues);
   if (s.backlog > 0) parts.push(`Me quedan ${fmtN(s.backlog)} velas por estudiar; sigo aprendiendo cada minuto.`);
   for (const k of ["ROMPE", "IMÁN"] as const) {
     const ls = s.sources[k].lessons;

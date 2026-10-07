@@ -1,7 +1,7 @@
 import { coreActivitySince, ensureCoreSchema, loadModel, readCoreStats } from "./jarvis-core-db.ts";
 import type { CoreSignal } from "./jarvis-core.ts";
 import type { LedgerStats } from "./jarvis-ledger.ts";
-import { summarizeModel, type LearnSummary } from "./jarvis-learn.ts";
+import { summarizeModel, venuesSpeech, type LearnSummary } from "./jarvis-learn.ts";
 import type { TelegramEvent } from "./telegram.ts";
 
 /**
@@ -69,6 +69,8 @@ export function dailyEvent(day: string, st: LedgerStats, learn: LearnSummary | n
     lines.push(
       `Estudié ${learn.historyCases.toLocaleString("es-AR")} situaciones de la historia de ${learn.coins} monedas${learn.liveCases ? ` y ${learn.liveCases} señales en vivo` : ""}${learn.backlog ? `; quedan ${learn.backlog.toLocaleString("es-AR")} velas por estudiar` : ""}.`,
     );
+    const from = venuesSpeech(learn.venues);
+    if (from) lines.push(esc(from));
     for (const l of [...learn.sources.ROMPE.lessons.slice(0, 3), ...(learn.sources["IMÁN"].n ? learn.sources["IMÁN"].lessons.slice(0, 2) : [])]) lines.push(`• ${esc(l)}`);
   }
   lines.push("<i>Promedios con comisiones; si una vela toca stop y objetivo, cuenta el stop. No es asesoramiento financiero.</i>");

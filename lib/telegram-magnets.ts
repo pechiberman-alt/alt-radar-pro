@@ -1,5 +1,6 @@
 import { CORE_MAGNETS, type Mind } from "./jarvis-core.ts";
 import { ensureCoreSchema, readMind } from "./jarvis-core-db.ts";
+import { isOutside, VENUE_LABEL, type Venue } from "./klines-server.ts";
 import { magnetEventText, type MagnetEvent } from "./magnet-watch.ts";
 import type { TelegramEvent } from "./telegram.ts";
 
@@ -16,14 +17,16 @@ const H = 3_600_000;
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-function event(symbol: string, e: MagnetEvent, day: string): TelegramEvent {
+function event(symbol: string, e: MagnetEvent, day: string, venue?: Venue): TelegramEvent {
   const t = magnetEventText(symbol, TF, e);
+  // The map was built from another exchange's candles when Binance refused the server: its volume, its dollar prices.
+  const from = isOutside(venue) ? ` Mapa hecho con velas de ${VENUE_LABEL[venue as Venue]} en dólares: Binance no deja leer al servidor.` : "";
   return {
     // Near: once per zone per day. Swept: once per candle.
     key: e.kind === "CERCA" ? `magnet:near:${symbol}:${TF}:${e.magnet.price}:${day}` : `magnet:swept:${symbol}:${TF}:${e.candleOpenTime}:${e.magnet.side}`,
     category: "IMANES",
     priority: e.kind === "BARRIDA" ? 72 : 66,
-    text: `<b>${esc(t.title)}</b>\n${esc(t.body)}\n<i>Zonas estimadas por modelo, no posiciones reales. No es asesoramiento financiero.</i>`,
+    text: `<b>${esc(t.title)}</b>\n${esc(t.body)}\n<i>Zonas estimadas por modelo, no posiciones reales.${esc(from)} No es asesoramiento financiero.</i>`,
   };
 }
 
@@ -34,10 +37,10 @@ export function magnetEventsFromMind(mind: Mind, now: number, minIntensity = 70)
   for (const symbol of MAGNET_WATCH) {
     const m = mind.magnets[symbol];
     if (!m || now - (m.lastTime + H) > 2 * H) continue;
-    for (const e of m.sweeps ?? []) if (e.kind === "BARRIDA") out.push(event(symbol, e, day));
+    for (const e of m.sweeps ?? []) if (e.kind === "BARRIDA") out.push(event(symbol, e, day, m.venue));
     const near = m.nearPct ?? 0.4;
     for (const g of [m.above, m.below]) {
-      if (g && g.intensity >= minIntensity && Math.abs(g.distancePct) <= near) out.push(event(symbol, { kind: "CERCA", magnet: g, price: m.price, nearPct: near }, day));
+      if (g && g.intensity >= minIntensity && Math.abs(g.distancePct) <= near) out.push(event(symbol, { kind: "CERCA", magnet: g, price: m.price, nearPct: near }, day, m.venue));
     }
   }
   return out;

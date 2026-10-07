@@ -144,10 +144,12 @@ export function createdMessage(alert: Pick<PriceAlert, "symbol" | "target" | "di
   );
 }
 
-export function triggeredMessage(alert: PriceAlert, touchedAt: number, price: number | null, tzOffsetMin: number): string {
+/** `elsewhere`: the exchange whose dollar price was read because Binance refused the server (Kraken, Coinbase). */
+export function triggeredMessage(alert: PriceAlert, touchedAt: number, price: number | null, tzOffsetMin: number, elsewhere: string | null = null): string {
   return (
     `🔔 <b>${coin(alert.symbol)} llegó a ${px(alert.target)}</b> ${alert.direction === "ARRIBA" ? "subiendo" : "bajando"}\n` +
     `Lo tocó a las ${hhmm(touchedAt, tzOffsetMin)}${price ? ` · ahora ${px(price)}` : ""}.\n` +
+    (elsewhere ? `Medido con el precio de ${elsewhere} en dólares: Binance no deja leer al servidor ahora. Puede diferir levemente del de Binance.\n` : "") +
     `<i>La pusiste cuando estaba en ${px(alert.createdPrice)}. Esta alerta ya se borró.</i>`
   );
 }
