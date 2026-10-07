@@ -13,6 +13,7 @@ import {
   type AiLike,
   type BrainCall,
 } from "./ai-brains.ts";
+import { forAi } from "./ai-numbers.ts";
 import { getSecret, type SettingsEnv } from "./app-settings.ts";
 import { CORE_COINS, type CoreSignal } from "./jarvis-core.ts";
 import { coreCandles, ensureCoreSchema, isBusy, latestReading, loadModel, MIND_SCHEMA, openCoreSignals, readCoreStats, readMind, recentClosed, recordCoreSignals } from "./jarvis-core-db.ts";
@@ -114,7 +115,8 @@ export async function runMindHour(db: D1Database, env: SettingsEnv & { AI?: AiLi
     await setStatus(db, { at: now, ok: false, error: "SIN LECTURAS FRESCAS DEL NÚCLEO" });
     return null;
   }
-  const messages = [{ role: "user" as const, content: `DATOS:\n${JSON.stringify(dossier)}` }];
+  // Numbers go already written the Argentine way: the model copies them instead of converting them (ai-numbers.ts).
+  const messages = [{ role: "user" as const, content: `DATOS:\n${JSON.stringify(forAi(dossier))}` }];
   const calls: BrainCall[] = [];
   if (groq.value) {
     const key = groq.value;
