@@ -9,6 +9,14 @@
  * what JARVIS does. The panel only wires events to it, so every rule is tested
  * without a microphone.
  *
+ * Android's Chrome has two traps of its own, read in its source
+ * (content/.../speech/SpeechRecognition.java): it reports "not-allowed" both
+ * for a missing permission and for a recognizer still busy with the last
+ * session (ERROR_RECOGNIZER_BUSY), and in continuous mode it hands every
+ * partial guess over as final ("jarvis analizame" before "… SOL"). So a
+ * "not-allowed" after the microphone has worked is a busy recognizer — it
+ * retries — and on Android the panel listens one phrase per session.
+ *
  * What it cannot do is listen with the page in the background: the browser
  * takes the microphone away together with the page. The panel says so: for
  * that, JARVIS is reached on Telegram, where it answers with the page closed.
@@ -48,7 +56,9 @@ export function words(text: string): string[] {
     .filter(Boolean);
 }
 
-export type Stop = "permiso" | "micrófono" | "red";
+export type Stop = "permiso" | "micrófono" | "red" | "ocupado";
+/** What the browser says about the microphone permission (navigator.permissions), when it says it. */
+export type MicPermission = "granted" | "denied" | "prompt" | "unknown";
 export type Heard = { type: "none" } | { type: "awake" } | { type: "command"; text: string };
 export type Engine = { type: "none" } | { type: "restart"; inMs: number } | { type: "stop"; reason: Stop };
 export type Visibility = "none" | "start" | "abort";
@@ -59,6 +69,7 @@ const STOP_TEXT: Record<Stop, string> = {
   permiso: "SIN PERMISO DEL MICRÓFONO · permitilo en el navegador y reactivá Manos libres",
   "micrófono": "NO ENCUENTRO EL MICRÓFONO · revisá el dispositivo y reactivá Manos libres",
   red: "EL DICTADO NO RESPONDE · reactivá Manos libres cuando tengas conexión",
+  ocupado: "EL MICRÓFONO ESTÁ OCUPADO · cerrá la app que lo usa y reactivá Manos libres",
 };
 
 export class HandsFree {
@@ -80,6 +91,13 @@ export class HandsFree {
   private micFailures = 0;
   /** The last session was taken back by the browser ("aborted"): wait a second for it to let the microphone go. */
   private aborted = false;
+  /** "not-allowed" in a row while the microphone is known to work: Android's recognizer still busy. */
+  private busyFailures = 0;
+  /** The microphone worked since hands-free was switched on (a phrase, a silence, a clean session). */
+  private worked = false;
+  /** The session now running reported a failure (so its end does not prove the microphone works). */
+  private sessionFailed = false;
+  private permission: MicPermission = "unknown";
   private spoken: { words: Set<string>; at: number } | null = null;
 
   /** The engine should run now: switched on, page visible, nothing stopped it. */
@@ -90,7 +108,13 @@ export class HandsFree {
   enable(): void {
     this.enabled = true;
     this.stopped = null;
+    this.worked = false;
     this.resetFailures();
+  }
+
+  /** The browser's word on the microphone permission: "granted" makes a "not-allowed" a busy recognizer. */
+  setPermission(permission: MicPermission): void {
+    this.permission = permission;
   }
 
   /** Switching off keeps a stop reason, so the panel can still say why it stopped. */
@@ -120,6 +144,7 @@ export class HandsFree {
   started(): void {
     this.lastIndex = -1;
     this.lastText = "";
+    this.sessionFailed = false;
   }
 
   /** JARVIS starts or stops speaking. `said` is what it says, so its echo is recognised. */
@@ -142,6 +167,7 @@ export class HandsFree {
   final(index: number, text: string, now: number): Heard {
     if (!this.active || index <= this.lastIndex) return NONE;
     this.lastIndex = index;
+    this.worked = true;
     const clean = text.replace(/\s+/g, " ").trim();
     if (!clean || now < this.speakingUntil || now < this.echoUntil || this.isEcho(clean, now)) return NONE;
     if (clean.toLowerCase() === this.lastText && now - this.lastAt < REPEAT_MS) return NONE;
@@ -163,25 +189,48 @@ export class HandsFree {
   /** The engine ended on its own (it does, after silence): restart it, backing off after failures. */
   ended(): Engine {
     if (!this.active) return IDLE;
-    const inMs = this.aborted ? ABORTED_WAIT_MS : this.failures === 0 ? 250 : Math.min(30_000, 500 * 2 ** (this.failures - 1));
+    const aborted = this.aborted;
+    if (!this.sessionFailed) {
+      // A session that ended cleanly (silence counts): the microphone works and the recognizer is free again.
+      this.worked = true;
+      this.failures = 0;
+      this.micFailures = 0;
+      this.busyFailures = 0;
+    }
+    this.sessionFailed = false;
     this.aborted = false;
+    const inMs = aborted ? ABORTED_WAIT_MS : this.failures === 0 ? 250 : Math.min(30_000, 500 * 2 ** (this.failures - 1));
     return { type: "restart", inMs };
   }
 
   /**
-   * The engine reported an error. Silence is not an error. "aborted" is the
+   * The engine reported an error. Silence ("no-speech", or "no-match" on
+   * Android, a noise it could not read) is not an error. "aborted" is the
    * browser taking the microphone back — on Android, a sound of the system or
-   * another app — so it only waits a second and never stops hands-free. The
-   * rest back off, and some stop it for good: the permission at once, the
-   * microphone after three tries, the network after six.
+   * another app — so it only waits a second and never stops hands-free.
+   * "not-allowed" stops it at once only when the permission is really missing;
+   * after the microphone worked, or with the permission granted, it is
+   * Android's busy recognizer: it backs off and stops after four in a row,
+   * saying the microphone is busy. The rest back off and stop it for good:
+   * the microphone after three tries, the network after six.
    */
   error(code: string): Engine {
     if (!this.active) return IDLE;
-    if (code === "not-allowed" || code === "service-not-allowed") return this.halt("permiso");
-    if (code === "no-speech") return IDLE;
+    if (code === "no-speech" || code === "no-match") {
+      this.worked = true;
+      return IDLE;
+    }
     if (code === "aborted") {
       this.aborted = true;
       return IDLE;
+    }
+    this.sessionFailed = true;
+    if (code === "not-allowed" || code === "service-not-allowed") {
+      const realDenial = this.permission === "denied" || (!this.worked && this.permission !== "granted");
+      if (realDenial) return this.halt("permiso");
+      this.failures += 1;
+      this.busyFailures += 1;
+      return this.busyFailures >= 4 ? this.halt("ocupado") : IDLE;
     }
     this.failures += 1;
     if (code === "audio-capture") {
@@ -195,6 +244,7 @@ export class HandsFree {
   private resetFailures(): void {
     this.failures = 0;
     this.micFailures = 0;
+    this.busyFailures = 0;
     this.aborted = false;
   }
 

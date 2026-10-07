@@ -223,3 +223,59 @@ test("the same words in a new engine session are a new request, not a delivery o
   m.started();
   assert.deepEqual(m.final(0, "ayuda", T0 + 2_000), { type: "command", text: "ayuda" }, "asked again right after a short answer");
 });
+
+test("on Android 'not-allowed' after the microphone worked is a busy recognizer: it retries, and says 'busy' after four", () => {
+  const m = new HandsFree();
+  m.enable();
+  m.started();
+  m.final(0, "Jarvis precio de BTC", T0);
+  for (let i = 0; i < 3; i += 1) {
+    assert.deepEqual(m.error("not-allowed"), { type: "none" }, `try ${i + 1} is not a verdict`);
+    assert.equal(m.ended().type, "restart");
+  }
+  assert.deepEqual(m.error("not-allowed"), { type: "stop", reason: "ocupado" });
+  assert.match(m.status(T0), /OCUPADO/);
+});
+
+test("a clean session in between frees the recognizer: busy errors are counted again from zero", () => {
+  const m = new HandsFree();
+  m.enable();
+  m.started();
+  m.final(0, "Jarvis ayuda", T0);
+  for (let round = 0; round < 3; round += 1) {
+    m.error("not-allowed");
+    assert.deepEqual(m.ended(), { type: "restart", inMs: 500 });
+    m.error("not-allowed");
+    assert.deepEqual(m.ended(), { type: "restart", inMs: 1_000 });
+    m.error("not-allowed");
+    assert.deepEqual(m.ended(), { type: "restart", inMs: 2_000 });
+    m.started();
+    assert.deepEqual(m.ended(), { type: "restart", inMs: 250 }, "a clean session ends the back-off");
+  }
+  assert.equal(m.error("not-allowed").type, "none", "three clean rounds never add up to four in a row");
+});
+
+test("a real denial still stops it at once: the browser says 'denied', or the microphone never worked", () => {
+  const denied = new HandsFree();
+  denied.enable();
+  denied.setPermission("denied");
+  denied.started();
+  denied.final(0, "Jarvis ayuda", T0);
+  assert.deepEqual(denied.error("not-allowed"), { type: "stop", reason: "permiso" });
+
+  const fresh = new HandsFree();
+  fresh.enable();
+  assert.deepEqual(fresh.error("service-not-allowed"), { type: "stop", reason: "permiso" });
+
+  const granted = new HandsFree();
+  granted.enable();
+  granted.setPermission("granted");
+  assert.deepEqual(granted.error("not-allowed"), { type: "none" }, "granted but busy at the first start");
+});
+
+test("Android's 'no-match' (a noise it could not read) is silence, not a failure", () => {
+  const m = new HandsFree();
+  m.enable();
+  for (let i = 0; i < 10; i += 1) assert.deepEqual(m.error("no-match"), { type: "none" });
+  assert.deepEqual(m.ended(), { type: "restart", inMs: 250 });
+});

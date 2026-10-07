@@ -106,7 +106,7 @@ def492abf855	146	app/install-panel.tsx
 58e9409bb2ba	192	app/institutional-desk.tsx
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
 39c4819ab1a5	121	app/jarvis.css
-551dfe35c6df	1499	app/jarvis.tsx
+fdc3e80d704a	1533	app/jarvis.tsx
 aa4d7c876c20	51	app/laptop.css
 d6020ed94c96	129	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -223,7 +223,7 @@ da42f6c9e464	311	lib/fair-value-gaps.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
 dfc52ea472c0	115	lib/futures-risk.ts
-415055cca73b	238	lib/hands-free.ts
+86351172d0c2	288	lib/hands-free.ts
 619425206c2d	149	lib/inducement.ts
 cd4af39e8ba8	322	lib/institutional-flows.ts
 f83a7c4a72ca	222	lib/jarvis-analyst.ts
@@ -363,7 +363,7 @@ d6031202b073	89	tests/footprint-sweeps.test.ts
 79b36d34e65f	119	tests/footprint-verdict.test.ts
 6ef376781704	137	tests/futures-log.test.ts
 4ea64afcb20f	108	tests/futures-risk.test.ts
-e092c0680fc5	226	tests/hands-free.test.ts
+a3b08c3b70ce	282	tests/hands-free.test.ts
 42f4e5fce8fd	17	tests/helpers/fake-d1.ts
 27b5bf9632d2	26	tests/helpers/setups.ts
 adcae854588e	101	tests/inducement.test.ts
