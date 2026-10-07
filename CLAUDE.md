@@ -33,6 +33,9 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
   3.500 neuronas/día) → motor local del navegador (`lib/jarvis-local.ts`, sin límite). La respuesta dice qué cerebro habló.
 - Las 10.000 neuronas gratis por día se reparten con la voz premium (2.200 caracteres ≈ 6.000). Subir una obliga a bajar la otra.
 - Memoria por usuario (`lib/jarvis-memory.ts`): solo lo que la persona pidió recordar; va en cada pregunta.
+- Analista propio (`lib/jarvis-analyst.ts`): todos los motores sobre un activo en 1h/4h/1d; corre en el navegador (CPU del Worker).
+- MENTE (`lib/jarvis-mind.ts`): lectura horaria en el servidor (hh:17 UTC) con IA gratis; sus tesis son señales fuente "IA",
+  se resuelven como cualquier señal y su historial vuelve al prompt. Nunca se usa Claude en tareas programadas (se paga).
 
 ## Honestidad (marca url.fx)
 - Ninguna probabilidad inventada. Todo porcentaje va con su tamaño de muestra (menos de 15 = "muestra mínima").

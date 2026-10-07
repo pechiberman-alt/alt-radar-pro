@@ -7,6 +7,7 @@ import { windDownSignals } from "../lib/automation";
 import { archiveCoreLiquidity } from "../lib/liquidity-archive";
 import { runCoreTick } from "../lib/jarvis-core-db";
 import { probeFreeBrain } from "../lib/ai-probe";
+import { runMindHour } from "../lib/jarvis-mind-db";
 import type { AiLike } from "../lib/ai-brains";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
@@ -108,6 +109,12 @@ const worker = {
       ctx.waitUntil(
         probeFreeBrain(env.DB, (env as unknown as { AI?: AiLike }).AI ?? null).catch((error) => {
           console.error("[ALT_RADAR_AI_PROBE]", error);
+        }),
+      );
+      // JARVIS MENTE: once an hour (hh:17 UTC), its own reading of the market and theses (lib/jarvis-mind.ts).
+      ctx.waitUntil(
+        runMindHour(env.DB, env as unknown as { AI?: AiLike }, controller.scheduledTime).catch((error) => {
+          console.error("[ALT_RADAR_JARVIS_MIND]", error);
         }),
       );
       // JARVIS CORE: one small job per minute, 24/7 (lib/jarvis-core.ts).

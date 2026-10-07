@@ -21,6 +21,7 @@ export type JarvisIntent =
   | { kind: "REMEMBER"; text: string }
   | { kind: "FORGET"; text: string }
   | { kind: "MEMORY" }
+  | { kind: "MIND" }
   | { kind: "STOP" }
   | { kind: "HELP" }
   | { kind: "AI"; question: string };
@@ -116,6 +117,7 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
     .replace(/^(?:(?:oye|hey|ok)\s+)?jarvis[,:]?\s*/i, "")
     .match(/^(?:record[aá](?:me)?|acord[aá]te|anot[aá]|memoriz[aá]|guard[aá] en (?:tu )?memoria|aprend[eé])\s*(?:que|esto|lo siguiente)?\s*:?\s+(.{3,})$/i);
   if (remember) return { kind: "REMEMBER", text: remember[1].trim() };
+  if (/\b(tu lectura|lectura del mercado|que ves en el mercado|como ves el mercado|que pensas del mercado|tu (vision|opinion) del mercado|tus tesis|tu mente)\b/.test(text)) return { kind: "MIND" };
   if (/\b(que aprendiste|que (has )?aprendido|aprendizaje|que descubriste|lecciones|que estudiaste|que sabes del mercado)\b/.test(text)) return { kind: "LEARN" };
   if (/\b(nucleo|estado del nucleo|que hiciste|mientras no estaba|que paso mientras|que estuviste haciendo|estas activo|estas despierto)\b/.test(text)) return { kind: "CORE" };
   if (/\b(rendimiento|estadisticas|tus senales|tu registro|registro de senales|win ?rate|profit factor|como (te )?(va|fue|vienen?)( con)? (las|tus) senales|cuanto acertaste|aciertos)\b/.test(text)) return { kind: "STATS" };
@@ -128,6 +130,10 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   if (/\b(que (sube|suben|esta subiendo|esta pumpeando)|mayores subas|ganadoras|lo que mas sube|top)\b/.test(text)) return { kind: "MOVERS" };
 
   const coins = findCoins(text, known);
+  // "Analizá BTC", "¿cómo ves SOL?": the full analysis of the asset, not its map.
+  if (coins.length && /\b(analiza(me|lo|la)?|analisis|analizar|que opinas de|como ves|que ves en|evalua|estudia)\b/.test(text)) {
+    return { kind: "AI", question: raw.trim().replace(/^(oye |hey |ok )?jarvis[,:]?\s*/i, "") };
+  }
   if (coins.length && /\b(precio|cuanto (esta|vale|cotiza)|a cuanto|cotizacion|como esta|como va)\b/.test(text)) return { kind: "PRICE", symbols: coins.slice(0, 4) };
   if (coins.length && (OPEN_VERB.test(text) || /\b(mapa|grafico|chart)\b/.test(text) || text.split(" ").length <= 2))
     return { kind: "MAP", symbol: coins[0], timeframe: findTimeframe(text) };
@@ -192,4 +198,4 @@ export function briefingText(input: {
 export const HELP_TEXT =
   "Podés decirme: informe del mercado. Precio de Bitcoin. Abrí el mapa de Solana en 15 minutos. ¿Qué está por romper? ¿Qué está subiendo? " +
   "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. " +
-  "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizalo, para lo que tenés en pantalla. O preguntame lo que quieras sobre el mercado.";
+  "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizá Solana, o analizalo para lo que tenés en pantalla. Tu lectura del mercado. O preguntame lo que quieras sobre el mercado.";

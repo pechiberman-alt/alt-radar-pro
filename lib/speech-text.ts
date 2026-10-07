@@ -170,7 +170,7 @@ export function normalizeSpanish(text: string): string {
   });
   // Unpronounceable acronyms ("PF", "RSI") are spelled; words in caps ("ALT", "PRO", "IMANES") are read.
   t = t.replace(/\b[A-ZÑ]{2,5}\b/g, (w) => (pronounceable(w) ? w.toLowerCase() : w.toLowerCase().split("").map((c) => LETTER_NAMES[c] ?? c).join(" ")));
-  t = t.replace(/[“”«»"]/g, "").replace(/[¡¿]/g, "").replace(/\s*[\n\r]+\s*/g, ". ");
+  t = t.replace(/[“”«»"]/g, "").replace(/[¡¿]/g, "").replace(/([.!?…:;])\s*[\n\r]+\s*/g, "$1 ").replace(/\s*[\n\r]+\s*/g, ". ");
   // Emoji, arrows, bullets and anything else the voice can't say.
   t = t.replace(/[^\p{L}\s.,;:!?…—'()-]/gu, " ").replace(/\s+/g, " ").trim();
   return t;

@@ -29,6 +29,8 @@ import { fetchKlinesServer, isOutside, VENUE_LABEL, type Venue } from "./klines-
 import { buildLiquidationHeatmap } from "./liquidation-heatmap.ts";
 import { atrPct, strongestMagnets } from "./magnet-watch.ts";
 import type { SwingCandle } from "./swing-entries.ts";
+import { compactRead, readAsset } from "./asset-read.ts";
+import type { MindReading } from "./jarvis-mind.ts";
 import { loadOiDelta, timeframeConfig } from "./market-fetch.ts";
 
 /**
@@ -231,7 +233,7 @@ export async function saveModel(db: D1Database, model: LearnModel, loaded: { rev
   return res.meta.changes > 0;
 }
 
-const MIND_EMPTY = '{"readings":{},"btc":null,"magnets":{}}';
+const MIND_EMPTY = '{"readings":{},"btc":null,"magnets":{},"reads":{}}';
 /** Sets fields of the mind row one by one (json_set), so jobs touching different coins never overwrite each other. */
 async function setMind(db: D1Database, fields: [string, unknown][]) {
   if (!fields.length) return;
@@ -258,15 +260,36 @@ export async function coreActivitySince(db: D1Database, since: number, limit = 3
   return [...map.values()].map(rowToSignal);
 }
 
+/** JARVIS MENTE's hourly readings (jarvis-mind.ts), one row each; the last 72 are kept. */
+export const MIND_SCHEMA = "CREATE TABLE IF NOT EXISTS jarvis_mind (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, body TEXT NOT NULL)";
+
+export async function latestReading(db: D1Database): Promise<MindReading | null> {
+  await db.prepare(MIND_SCHEMA).run();
+  const row = await db.prepare("SELECT body FROM jarvis_mind ORDER BY id DESC LIMIT 1").first<{ body: string }>();
+  try {
+    return row ? (JSON.parse(row.body) as MindReading) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The last closed signals of one source, newest first (the IA theses for the hourly mind). */
+export async function recentClosed(db: D1Database, source: JarvisSource, limit = 8): Promise<CoreSignal[]> {
+  await ensureCoreSchema(db);
+  const rows = (await db.prepare(`SELECT ${COLS} FROM jarvis_core_signals WHERE closed_at IS NOT NULL AND source = ?1 ORDER BY closed_at DESC LIMIT ?2`).bind(source, limit).all<Row>()).results;
+  return rows.map(rowToSignal);
+}
+
 export async function coreSnapshot(db: D1Database, now: number): Promise<CoreSnapshot> {
   await ensureCoreSchema(db);
-  const [heartbeat, counters, open, recentRows, loaded, mind] = await Promise.all([
+  const [heartbeat, counters, open, recentRows, loaded, mind, reading] = await Promise.all([
     readHeartbeat(db),
     readCounters(db),
     openCoreSignals(db, 20),
     db.prepare(`SELECT ${COLS} FROM jarvis_core_signals WHERE closed_at IS NOT NULL ORDER BY closed_at DESC LIMIT 20`).all<Row>(),
     loadModel(db),
     readMind(db),
+    latestReading(db).catch(() => null),
   ]);
   return {
     heartbeat,
@@ -276,6 +299,7 @@ export async function coreSnapshot(db: D1Database, now: number): Promise<CoreSna
     recent: recentRows.results.map(rowToSignal),
     learning: loaded.exists ? summarizeModel(loaded.model) : null,
     mind,
+    reading,
     generatedAt: now,
   };
 }
@@ -290,7 +314,7 @@ const coin = (s: string) => s.replace(/USDT$/, "");
  * data centres — Kraken and Coinbase in dollars (klines-server.ts). `feed`
  * says which one answered, so every reading, signal and lesson can say it.
  */
-async function coreCandles(symbol: string, limit: number, minCandles: number, now: number): Promise<{ candles: SwingCandle[]; feed: Feed }> {
+export async function coreCandles(symbol: string, limit: number, minCandles: number, now: number): Promise<{ candles: SwingCandle[]; feed: Feed }> {
   const r = await fetchKlinesServer(symbol, CORE_TF, { limit, minCandles, market: "futures", outside: true });
   return { candles: closedOnly(r.candles, CORE_FRAME, now), feed: { venue: r.venue, binance: r.binance, at: now } };
 }
@@ -342,6 +366,9 @@ async function scanJob(db: D1Database, symbols: string[], now: number): Promise<
     }
     const { reading, signal } = liveRompe(symbol, closed, model, now);
     if (reading) mindFields.push([`$.readings.${symbol}`, reading]);
+    // The full technical read (trend by timeframe, levels, volume) for JARVIS's hourly mind and its answers.
+    const read = readAsset(symbol, closed, now);
+    if (read) mindFields.push([`$.reads.${symbol}`, { ...compactRead(read), at: read.at }]);
     let line = `${coin(symbol)}: ${reading ? reading.state.toLowerCase() : "sin lectura"}`;
     if (signal && !(await isBusy(db, symbol, "ROMPE"))) {
       fresh.push(withVenue(signal, venue));

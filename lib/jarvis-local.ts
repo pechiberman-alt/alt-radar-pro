@@ -1,9 +1,4 @@
 import { ask, type AssistantContext } from "./assistant/index.ts";
-import { buildLiquidationHeatmap } from "./liquidation-heatmap.ts";
-import { atrPct, strongestMagnets } from "./magnet-watch.ts";
-import { timeframeConfig } from "./market-fetch.ts";
-import { readPreBreak, type PreBreak } from "./pre-breakout.ts";
-import type { SwingCandle } from "./swing-entries.ts";
 
 /**
  * JARVIS's own analyst: what it says when no AI is available (no session, or
@@ -87,129 +82,16 @@ export function withFocus(question: string, focus: Focus | null): { question: st
   return about ? { question: `${question.trim()} — se refiere a ${about}.`, about } : { question, about: null };
 }
 
-// ── A coin, read from its candles (only closed ones) ─────────────────────────
-
-export type CoinBrief = {
-  symbol: string;
-  timeframe: string;
-  /** Open time of the last closed candle read. */
-  at: number;
-  price: number;
-  change24h: number | null;
-  change7d: number | null;
-  trend: "ALCISTA" | "BAJISTA" | "LATERAL";
-  atrPct: number;
-  high48: number;
-  low48: number;
-  /** Volume of the last closed candle against the average of the 20 before it. */
-  relVolume: number | null;
-  preBreak: Pick<PreBreak, "state" | "side" | "score" | "level"> | null;
-  magnets: { above: { price: number; distancePct: number; intensity: number } | null; below: { price: number; distancePct: number; intensity: number } | null };
-};
-
-function ema(values: number[], n: number): number[] {
-  const k = 2 / (n + 1);
-  const out: number[] = [];
-  values.forEach((v, i) => out.push(i === 0 ? v : v * k + out[i - 1] * (1 - k)));
-  return out;
-}
-
 /**
- * The brief of a coin on 1h candles. `now` drops the candle still forming:
- * the reading never uses a candle that has not closed.
+ * The local analyst's answer: the asset's full analysis (jarvis-analyst.ts,
+ * already written as a report) when the question is about a coin — named, or
+ * on the map — and the app's rules-based analyst for the rest.
  */
-export function coinBrief(symbol: string, candles: SwingCandle[], now: number, frameMs = 3_600_000, timeframe = "1h"): CoinBrief | null {
-  const c = candles.filter((x) => x.openTime + frameMs <= now);
-  if (c.length < 60) return null;
-  const last = c[c.length - 1];
-  const closes = c.map((x) => x.close);
-  const e50 = ema(closes, 50);
-  const slope = e50[e50.length - 1] / e50[e50.length - 11] - 1;
-  const trend = last.close > e50[e50.length - 1] && slope > 0.002 ? "ALCISTA" : last.close < e50[e50.length - 1] && slope < -0.002 ? "BAJISTA" : "LATERAL";
-  const back = (n: number) => (c.length > n ? last.close / c[c.length - 1 - n].close - 1 : null);
-  const recent = c.slice(-48);
-  const prev20 = c.slice(-21, -1);
-  const avgVol = prev20.reduce((a, x) => a + x.volume, 0) / (prev20.length || 1);
-  const pre = c.length >= 80 ? readPreBreak(c.slice(-200), symbol) : null;
-  const cfg = timeframeConfig(timeframe);
-  const map = c.length >= 120 ? buildLiquidationHeatmap(symbol, c.slice(-500), last.close, { halfLifeCandles: cfg.halfLife, priceRangePct: cfg.priceRange }) : null;
-  const pair = map ? strongestMagnets(map, last.close) : null;
-  const mag = (m: { price: number; distancePct: number; intensity: number } | null | undefined) => (m ? { price: m.price, distancePct: m.distancePct, intensity: m.intensity } : null);
-  return {
-    symbol,
-    timeframe,
-    at: last.openTime,
-    price: last.close,
-    change24h: back(24),
-    change7d: back(168),
-    trend,
-    atrPct: atrPct(c),
-    high48: Math.max(...recent.map((x) => x.high)),
-    low48: Math.min(...recent.map((x) => x.low)),
-    relVolume: avgVol > 0 ? last.volume / avgVol : null,
-    preBreak: pre ? { state: pre.state, side: pre.side, score: pre.score, level: pre.level } : null,
-    magnets: { above: mag(pair?.above), below: mag(pair?.below) },
-  };
-}
-
-const px = (v: number) => v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : v >= 1 ? 3 : 6 });
-const pc = (v: number, d = 1) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(d).replace(".", ",")}%`;
-
-/** The brief in a few plain sentences: what it is doing, where the levels are, what would change the read. */
-export function briefText(b: CoinBrief): string {
-  const coin = b.symbol.replace(/USDT$/, "");
-  const parts = [
-    `${coin} en ${px(b.price)}${b.change24h !== null ? `, ${pc(b.change24h)} en 24 horas` : ""}${b.change7d !== null ? ` y ${pc(b.change7d)} en 7 días` : ""}.`,
-    b.trend === "LATERAL"
-      ? `En ${b.timeframe} está de costado: el precio va y viene alrededor de su media de 50 velas.`
-      : `En ${b.timeframe} la tendencia es ${b.trend === "ALCISTA" ? "alcista: precio arriba de su media de 50 velas y la media subiendo" : "bajista: precio abajo de su media de 50 velas y la media bajando"}.`,
-    `Rango de las últimas 48 velas: ${px(b.low48)} a ${px(b.high48)}; se mueve ${b.atrPct.toFixed(2).replace(".", ",")}% por vela en promedio.`,
-  ];
-  if (b.preBreak && b.preBreak.state !== "QUIETO") {
-    const dir = b.preBreak.side === "ALCISTA" ? "hacia arriba" : b.preBreak.side === "BAJISTA" ? "hacia abajo" : "sin dirección clara";
-    parts.push(`${b.preBreak.state === "A PUNTO" ? "Está a punto de romper" : "Se está armando una ruptura"} ${dir} (presión ${b.preBreak.score}/100${b.preBreak.level ? `, contra ${px(b.preBreak.level)}` : ""}): es probable, no seguro.`);
-  }
-  const { above, below } = b.magnets;
-  if (above || below) {
-    const z = (m: NonNullable<CoinBrief["magnets"]["above"]>) => `${px(m.price)} (${pc(m.distancePct / 100)}, intensidad ${Math.round(m.intensity)})`;
-    parts.push(`Imanes de liquidación estimados: ${above ? `arriba ${z(above)}` : ""}${above && below ? "; " : ""}${below ? `abajo ${z(below)}` : ""}. Son zonas de un modelo, no posiciones reales.`);
-  }
-  if (b.relVolume !== null && (b.relVolume >= 2 || b.relVolume <= 0.4)) {
-    parts.push(b.relVolume >= 2 ? `La última vela tuvo ${b.relVolume.toFixed(1).replace(".", ",")} veces el volumen normal: hay interés.` : "La última vela tuvo muy poco volumen: el movimiento no tiene respaldo.");
-  }
-  const invalid = b.trend === "ALCISTA" ? `perder ${px(b.low48)}` : b.trend === "BAJISTA" ? `recuperar ${px(b.high48)}` : `salir del rango ${px(b.low48)}–${px(b.high48)}`;
-  parts.push(`Lo que cambiaría la lectura: ${invalid}. No es asesoramiento financiero.`);
-  return parts.join(" ");
-}
-
-/** For the AIs: the brief as compact numbers. */
-export function briefForAi(b: CoinBrief) {
-  const r = (v: number | null, d = 4) => (v === null ? null : Number(v.toFixed(d)));
-  return {
-    moneda: b.symbol,
-    temporalidad: b.timeframe,
-    ultimaVelaCerrada: new Date(b.at).toISOString(),
-    precio: b.price,
-    cambio24h: r(b.change24h),
-    cambio7d: r(b.change7d),
-    tendencia: b.trend,
-    atrPct: r(b.atrPct, 3),
-    rango48: [b.low48, b.high48],
-    volumenRelativo: r(b.relVolume, 2),
-    aPuntoDeRomper: b.preBreak,
-    imanesEstimados: b.magnets,
-  };
-}
-
-/**
- * The local analyst's answer: the coin's brief when the question is about a
- * coin (named or on screen), and the app's rules-based analyst for the rest.
- */
-export function localAnswer(question: string, focus: Focus | null, ctx: AssistantContext | null, brief: CoinBrief | null): string {
+export function localAnswer(question: string, focus: Focus | null, ctx: AssistantContext | null, report: string | null): string {
   const onScreen = pointsAtScreen(question);
   const topic = focus?.screen ? SCREEN_TOPIC[focus.screen] : undefined;
-  if (brief && (!onScreen || focus?.screen === "LIQUIDACIONES" || !topic)) return briefText(brief);
-  if (!ctx) return brief ? briefText(brief) : "Todavía no tengo los datos del radar cargados. Abrí el resumen un momento y preguntame de nuevo.";
+  if (report && (!onScreen || focus?.screen === "LIQUIDACIONES" || !topic)) return report;
+  if (!ctx) return report ?? "Todavía no tengo los datos del radar cargados. Abrí el resumen un momento y preguntame de nuevo.";
   const q = onScreen && topic ? topic.local : question;
   return ask(q, ctx).text;
 }

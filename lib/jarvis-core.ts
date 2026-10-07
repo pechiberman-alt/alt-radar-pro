@@ -1,4 +1,4 @@
-import { breakoutSignal, magnetSignal, type JarvisSignal, type JarvisSource, type LedgerStats } from "./jarvis-ledger.ts";
+import { breakoutSignal, magnetSignal, type JarvisSignal, type JarvisSource, type LearnedSource, type LedgerStats } from "./jarvis-ledger.ts";
 import {
   explain,
   featuresAt,
@@ -14,6 +14,8 @@ import {
   type Ridge,
 } from "./jarvis-learn.ts";
 import { isOutside, VENUE_LABEL, type BinanceStatus, type Venue } from "./klines-server.ts";
+import type { CompactRead } from "./asset-read.ts";
+import type { MindReading } from "./jarvis-mind.ts";
 import type { LvStats } from "./liq-vol-signals.ts";
 import type { Magnet, MagnetEvent } from "./magnet-watch.ts";
 import { readPreBreak, type PreBreak } from "./pre-breakout.ts";
@@ -78,7 +80,7 @@ export type CoreSignal = JarvisSignal & {
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 const fmtR = (r: number) => `${r >= 0 ? "+" : "−"}${Math.abs(r).toFixed(2).replace(".", ",")}R`;
 
-export function gradeSignal(sig: JarvisSignal, f: Features, ridge: Ridge, src: JarvisSource): CoreSignal {
+export function gradeSignal(sig: JarvisSignal, f: Features, ridge: Ridge, src: LearnedSource): CoreSignal {
   const p = predict(ridge, f);
   const g = gradeOf(p);
   const why = explain(ridge, f, src)
@@ -193,7 +195,8 @@ const sum = (a: CoreCounters, b: CoreCounters): CoreCounters => ({
 export function coreStats(byKey: Record<string, CoreCounters>): LedgerStats {
   const r = byKey.ROMPE ?? ZERO;
   const m = byKey["IMÁN"] ?? ZERO;
-  return { ...countersToStats(sum(r, m)), bySource: { ROMPE: countersToStats(r), "IMÁN": countersToStats(m) } };
+  const ia = byKey.IA ?? ZERO;
+  return { ...countersToStats(sum(sum(r, m), ia)), bySource: { ROMPE: countersToStats(r), "IMÁN": countersToStats(m), IA: countersToStats(ia) } };
 }
 
 /** The same for the ones it kept in shadow: if these do worse, the learning is helping. */
@@ -226,14 +229,23 @@ export type MindMagnet = { lastTime: number; at: number; price: number; above: M
  */
 export type Feed = { venue: Venue; binance: BinanceStatus; at: number };
 /** What the core knows about the market right now. */
-export type Mind = { readings: Record<string, Reading>; btc: { regime: Regime; change24: number | null; at: number } | null; magnets: Record<string, MindMagnet>; feed?: Feed | null };
-export const emptyMind = (): Mind => ({ readings: {}, btc: null, magnets: {}, feed: null });
+/** The technical read of a coin (asset-read.ts) as the core stored it, with the open time of its last closed candle. */
+export type MindRead = CompactRead & { at: number };
+export type Mind = {
+  readings: Record<string, Reading>;
+  btc: { regime: Regime; change24: number | null; at: number } | null;
+  magnets: Record<string, MindMagnet>;
+  feed?: Feed | null;
+  /** Trend by timeframe, levels, volume and pressure of each coin, refreshed every 15 minutes. */
+  reads?: Record<string, MindRead>;
+};
+export const emptyMind = (): Mind => ({ readings: {}, btc: null, magnets: {}, feed: null, reads: {} });
 
 export function parseMind(raw: string | null | undefined): Mind {
   if (!raw) return emptyMind();
   try {
     const m = JSON.parse(raw) as Mind;
-    return { readings: m.readings ?? {}, btc: m.btc ?? null, magnets: m.magnets ?? {}, feed: m.feed ?? null };
+    return { readings: m.readings ?? {}, btc: m.btc ?? null, magnets: m.magnets ?? {}, feed: m.feed ?? null, reads: m.reads ?? {} };
   } catch {
     return emptyMind();
   }
@@ -247,6 +259,8 @@ export type CoreSnapshot = {
   recent: CoreSignal[];
   learning: LearnSummary | null;
   mind: Mind | null;
+  /** JARVIS MENTE's latest hourly reading of the market (jarvis-mind.ts). */
+  reading?: MindReading | null;
   generatedAt: number;
 };
 
@@ -304,7 +318,7 @@ export function awaySpeech(signals: CoreSignal[], since: number): string | null 
 }
 
 /** A short status line: alive or not, what it watches, its health, record and learning. */
-export function coreStatusSpeech(snap: Pick<CoreSnapshot, "heartbeat" | "stats" | "open" | "learning"> & { mind?: Mind | null }, now: number): string {
+export function coreStatusSpeech(snap: Pick<CoreSnapshot, "heartbeat" | "stats" | "open" | "learning"> & { mind?: Mind | null; reading?: MindReading | null }, now: number): string {
   if (!coreOnline(snap.heartbeat, now)) {
     return snap.heartbeat
       ? `El núcleo no da señales de vida desde hace ${Math.round((now - snap.heartbeat.at) / 60_000)} minutos. Sigo funcionando desde tu navegador.`
@@ -332,6 +346,13 @@ export function coreStatusSpeech(snap: Pick<CoreSnapshot, "heartbeat" | "stats" 
     const l = snap.learning;
     parts.push(`Aprendí de ${l.historyCases.toLocaleString("es-AR")} situaciones de la historia${l.backlog ? ` y me quedan ${l.backlog.toLocaleString("es-AR")} velas por estudiar` : ""}.`);
   }
+  const r = snap.reading;
+  if (r && now - r.at < 3 * 3_600_000) {
+    const min = Math.max(1, Math.round((now - r.at) / 60_000));
+    parts.push(`Mi última lectura del mercado es de hace ${min} ${min === 1 ? "minuto" : "minutos"}: ${r.sesgo === "NEUTRAL" ? "sin dirección clara" : r.sesgo.toLowerCase()}.`);
+  }
+  const ia = st.bySource.IA;
+  if (ia && (ia.resolved || ia.open)) parts.push(`Mis tesis de inteligencia artificial: ${ia.open} abiertas y ${ia.resolved} cerradas${ia.resolved ? `, ${fmtRWords(ia.totalR)}${ia.resolved < 15 ? ", muestra mínima" : ""}` : ""}.`);
   return parts.join(" ");
 }
 
@@ -403,6 +424,27 @@ export function coreContext(snap: CoreSnapshot, now: number) {
         .filter((s) => s.taken !== false)
         .slice(0, 8)
         .map((s) => ({ moneda: coin(s.symbol), lado: s.side, resultado: s.result, r: s.r })),
+      // What its 24/7 mind concluded last hour, so every answer is coherent with it.
+      mente: snap.reading
+        ? {
+            haceMin: Math.round((now - snap.reading.at) / 60_000),
+            sesgo: snap.reading.sesgo,
+            resumen: snap.reading.resumen,
+            activos: snap.reading.activos.slice(0, 6),
+            vigilar: snap.reading.vigilar,
+            riesgos: snap.reading.riesgos,
+          }
+        : null,
+      historialDeTesis: st.bySource.IA
+        ? { cerradas: st.bySource.IA.resolved, abiertas: st.bySource.IA.open, winRate: st.bySource.IA.winRate, totalR: Number(st.bySource.IA.totalR.toFixed(2)), muestra: st.bySource.IA.confidence }
+        : null,
+      lecturasTecnicas: mind?.reads
+        ? Object.fromEntries(
+            Object.entries(mind.reads)
+              .filter(([, r]) => now - r.at < 3 * 3_600_000)
+              .map(([s, r]) => [coin(s), { precio: r.precio, tendencias: r.tendencias, soportes: r.soportes.map((l) => l.precio), resistencias: r.resistencias.map((l) => l.precio) }]),
+          )
+        : null,
     },
   };
 }
@@ -416,7 +458,8 @@ export function reviveSnapshot(raw: CoreSnapshot): CoreSnapshot {
     shadow: raw.shadow ? fix(raw.shadow) : countersToStats(ZERO),
     learning: raw.learning ?? null,
     mind: raw.mind ?? null,
-    stats: { ...fix(st), bySource: { ROMPE: fix(st.bySource.ROMPE), "IMÁN": fix(st.bySource["IMÁN"]) } },
+    reading: raw.reading ?? null,
+    stats: { ...fix(st), bySource: { ROMPE: fix(st.bySource.ROMPE), "IMÁN": fix(st.bySource["IMÁN"]), IA: st.bySource.IA ? fix(st.bySource.IA) : countersToStats(ZERO) } },
   };
 }
 

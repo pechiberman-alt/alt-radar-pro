@@ -1,4 +1,4 @@
-import { breakoutSignal, HORIZON, resolveSignal, type JarvisSource } from "./jarvis-ledger.ts";
+import { breakoutSignal, HORIZON, resolveSignal, type LearnedSource as JarvisSource } from "./jarvis-ledger.ts";
 import { readPreBreak } from "./pre-breakout.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
