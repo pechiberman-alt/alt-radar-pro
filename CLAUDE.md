@@ -3,6 +3,12 @@
 Terminal de inteligencia de mercado cripto (marca url.fx). App React sobre un Cloudflare Worker (vinext),
 base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-radar-pro.pechiberman.workers.dev/
 
+## La araña: mapa del proyecto (ahorra tokens)
+- Antes de leer archivos enteros: `npm run arana -- --buscar <tema>` (en español o inglés), `--archivo <ruta>` (ficha), `--ruta <archivo>` (qué se revisa si lo cambiás), `--objetivo <nombre>`, `--tablas`, `--secretos`. Todo: `npm run arana -- --ayuda`.
+- docs/araña/objetivos.md dice a qué objetivo pertenece cada archivo, con sus reglas y pendientes. Un archivo sin objetivo hace fallar `npm run test:unit`: agregalo ahí.
+- Después de agregar, mover o borrar archivos, o cambiar código y objetivos: `npm run arana` y commiteá docs/araña/ junto con el cambio. `npm run arana -- --cambios` dice qué cambió desde el último mapa.
+- No leas docs/araña/MAPA.md entero: es el mapa completo; usá las consultas.
+
 ## Antes de proponer un cambio
 - `npm ci --no-audit --no-fund`, después `npm run lint`, `npm run test:unit` y `npm run build`. Los tres tienen que pasar.
 - Todo cambio de lógica lleva tests en `tests/` (node:test). Los de datos de mercado incluyen un test de que no se mira el futuro.
