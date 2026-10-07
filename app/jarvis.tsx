@@ -11,6 +11,8 @@ import { buildLiquidationHeatmap } from "@/lib/liquidation-heatmap";
 import { magnetEvents, strongestMagnets } from "@/lib/magnet-watch";
 import { parseSwingKlines } from "@/lib/swing-entries";
 import { everyVisible } from "@/lib/visible-interval";
+import { pickVoice } from "@/lib/browser-voice";
+import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
 
 /**
  * JARVIS: a voice assistant over the whole app. It listens (Web Speech API,
@@ -69,8 +71,34 @@ const signalSpeech = (s: JarvisSignal) =>
   `Señal registrada: ${s.symbol.replace(/USDT$/, "")} ${s.side === "LONG" ? "largo" : "corto"} en ${s.timeframe}, entrada ${fmtPx(s.entry)}, stop ${fmtPx(s.stop)}, objetivo ${fmtPx(s.target)}.`;
 
 const PREFS_KEY = "alt-radar-pro:jarvis:v1";
-type Prefs = { name: string; voice: boolean; wake: boolean; watch: boolean; lastBriefing: string };
-const DEFAULT_PREFS: Prefs = { name: "señor", voice: true, wake: false, watch: false, lastBriefing: "" };
+// Device voices load asynchronously ("voiceschanged"); keep one list for the picker.
+let voiceList: SpeechSynthesisVoice[] = [];
+const NO_VOICES: SpeechSynthesisVoice[] = [];
+function subscribeVoices(cb: () => void): () => void {
+  if (typeof speechSynthesis === "undefined") return () => undefined;
+  const update = () => {
+    voiceList = speechSynthesis.getVoices().filter((v) => /^es/i.test(v.lang));
+    cb();
+  };
+  update();
+  speechSynthesis.addEventListener("voiceschanged", update);
+  return () => speechSynthesis.removeEventListener("voiceschanged", update);
+}
+const getVoices = () => voiceList;
+const getNoVoices = () => NO_VOICES;
+type Prefs = {
+  name: string;
+  voice: boolean;
+  wake: boolean;
+  watch: boolean;
+  lastBriefing: string;
+  /** Device voice by name; "" = the best Spanish one available. */
+  voiceName: string;
+  gender: "male" | "female";
+  rate: number;
+};
+const DEFAULT_PREFS: Prefs = { name: "señor", voice: true, wake: false, watch: false, lastBriefing: "", voiceName: "", gender: "male", rate: 1 };
+const VOICE_TEST = "Hola. Soy JARVIS, tu asistente de ALT RADAR PRO. Leo la liquidez del mercado, te aviso antes de que el precio rompa y anoto cada señal con su resultado.";
 
 function loadPrefs(): Prefs {
   try {
@@ -143,6 +171,8 @@ function JarvisInner() {
   const [draft, setDraft] = useState("");
   const [interim, setInterim] = useState("");
   const [prefs, setPrefsState] = useState<Prefs>(loadPrefs);
+  const voices = useSyncExternalStore(subscribeVoices, getVoices, getNoVoices);
+  const [showVoice, setShowVoice] = useState(false);
   const [ledger, setLedgerState] = useState<JarvisSignal[]>(loadLedger);
   const [showLedger, setShowLedger] = useState(false);
   const ledgerRef = useRef(ledger);
@@ -224,26 +254,32 @@ function JarvisInner() {
         return;
       }
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      const voices = speechSynthesis.getVoices();
-      u.voice = voices.find((v) => v.lang === "es-AR") ?? voices.find((v) => v.lang.startsWith("es") && /male|jorge|diego|pablo|google/i.test(v.name)) ?? voices.find((v) => v.lang.startsWith("es")) ?? null;
-      u.lang = u.voice?.lang ?? "es-AR";
-      u.rate = 1.03;
-      u.pitch = 0.85;
+      const all = speechSynthesis.getVoices();
+      const voice = all.find((v) => v.name === prefs.voiceName) ?? pickVoice(all, prefs.gender);
+      // Said as words ("uno coma setenta y seis", "uin réit"), in pieces: Chrome cuts long utterances off after ~15 s.
+      const parts = splitForSpeech(normalizeSpanish(text), 180);
       let started = false;
-      u.onstart = () => {
-        started = true;
-        setMode("speaking");
-      };
-      u.onend = () => setMode(wakeRef.current ? "listening" : "idle");
-      u.onerror = () => setMode(wakeRef.current ? "listening" : "idle");
-      speechSynthesis.speak(u);
+      parts.forEach((part, i) => {
+        const u = new SpeechSynthesisUtterance(part);
+        u.voice = voice;
+        u.lang = voice?.lang ?? "es-AR";
+        u.rate = prefs.rate;
+        u.pitch = prefs.gender === "male" ? 0.92 : 1;
+        if (i === 0)
+          u.onstart = () => {
+            started = true;
+            setMode("speaking");
+          };
+        if (i === parts.length - 1) u.onend = () => setMode(wakeRef.current ? "listening" : "idle");
+        u.onerror = () => setMode(wakeRef.current ? "listening" : "idle");
+        speechSynthesis.speak(u);
+      });
       // Browsers without a usable voice never start: the text is already on screen, so don't hang.
       window.setTimeout(() => {
         if (!started) setMode(wakeRef.current ? "listening" : "idle");
       }, 2500);
     },
-    [prefs.voice],
+    [prefs.voice, prefs.voiceName, prefs.gender, prefs.rate],
   );
 
   const run = useCallback(
@@ -566,7 +602,48 @@ function JarvisInner() {
               <label title="Queda escuchando: decí «Jarvis» y tu pedido"><input type="checkbox" checked={prefs.wake} onChange={(e) => setPrefs({ wake: e.target.checked })} /> Manos libres</label>
             )}
             <label title="Cada 5 minutos revisa 20 monedas y las barridas de imanes de BTC, ETH y SOL; te avisa en voz y registra cada señal con su resultado"><input type="checkbox" checked={prefs.watch} onChange={(e) => setPrefs({ watch: e.target.checked })} /> Vigilancia</label>
+            <button type="button" className={`jv-voicebtn${showVoice ? " on" : ""}`} onClick={() => setShowVoice((v) => !v)} aria-expanded={showVoice}>
+              🔊 VOZ
+            </button>
           </div>
+          {showVoice && (
+            <div className="jv-voice">
+              <label className="jv-row">
+                <span>Voz</span>
+                <select value={prefs.voiceName} onChange={(e) => setPrefs({ voiceName: e.target.value })} aria-label="Voz del teléfono">
+                  <option value="">Automática · la mejor disponible</option>
+                  {voices.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {v.name.replace(/^(Microsoft|Google)\s+/, "")} · {v.lang}
+                      {/natural|neural|online|premium|enhanced|google/i.test(v.name) ? " ★" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="jv-row">
+                <span>Tono</span>
+                <div className="jv-seg small">
+                  <button type="button" className={prefs.gender === "male" ? "on" : ""} onClick={() => setPrefs({ gender: "male", voiceName: "" })}>MASCULINA</button>
+                  <button type="button" className={prefs.gender === "female" ? "on" : ""} onClick={() => setPrefs({ gender: "female", voiceName: "" })}>FEMENINA</button>
+                </div>
+              </div>
+              <div className="jv-row">
+                <span>Velocidad</span>
+                <input type="range" min={0.8} max={1.25} step={0.05} value={prefs.rate} onChange={(e) => setPrefs({ rate: Number(e.target.value) })} aria-label="Velocidad de la voz" />
+                <b>{prefs.rate.toFixed(2).replace(".", ",")}×</b>
+              </div>
+              <button type="button" className="jv-test" onClick={() => speak(VOICE_TEST)}>▶ PROBAR VOZ</button>
+              <small>
+                {(() => {
+                  const all = voices;
+                  const v = all.find((x) => x.name === prefs.voiceName) ?? pickVoice(all, prefs.gender);
+                  if (!v) return "Tu navegador no tiene voces en español: JARVIS te responde por escrito.";
+                  const good = /natural|neural|online|premium|enhanced|google/i.test(v.name);
+                  return `Usando: ${v.name} (${v.lang}).${good ? "" : " ★ = voces de mejor calidad. En la PC, Microsoft Edge trae «Tomás» y «Elena» de Argentina (naturales); en Android, Ajustes › Texto a voz › Servicios de Google › instalá las voces de español."}`;
+                })()}
+              </small>
+            </div>
+          )}
           <small className="jv-foot">La voz se procesa en tu navegador. Análisis, no órdenes: no es asesoramiento financiero.</small>
         </div>
       )}
