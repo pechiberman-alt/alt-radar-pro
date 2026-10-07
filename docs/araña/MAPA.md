@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 433 · objetivos: 15 · sin objetivo: 0
+- Archivos: 435 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 40 · secretos: 3 · variables de entorno: 8 · rutas /api: 45 · hosts: 50
-- Código de navegador: 52 archivos con "use client" que alcanzan 137 · problemas: 0
-- Lib sin prueba directa: 21 de 130
+- Código de navegador: 52 archivos con "use client" que alcanzan 138 · problemas: 0
+- Lib sin prueba directa: 21 de 131
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (32)
+### jarvis — JARVIS, la IA propia del software (33)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: la usan MENTE y las notas de voz de Telegram.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -32,6 +32,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: la usan MENTE y las
 - `lib/assistant/index.ts` — exporta: AssistantContext, AssistantAnswer, extractSymbol, ask
 - `lib/assistant/knowledge.ts` — Curated explanations for the concepts the terminal actually uses.
 - `lib/browser-voice.ts` — Picks the best Spanish voice the browser has.
+- `lib/hands-free.ts` — Manos libres: the rules behind JARVIS's listening mode in the browser.
 - `lib/jarvis-analyst.ts` — exporta: Frames, Scenario, Analysis, analyzeAsset, analysisText, analysisForAi
 - `lib/jarvis-core-db.ts` — exporta: ensureCoreSchema, rowToSignal, readCoreStats, recordCoreSignals, openCoreSignals, isBusy (+12)
 - `lib/jarvis-core.ts` — exporta: CORE_TF, CORE_FRAME, CORE_COINS, CORE_MAGNETS, CYCLE_MIN, CoreTask (+36)
@@ -288,7 +289,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+38)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (104)
+### calidad — Pruebas (105)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
@@ -325,6 +326,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/footprint-verdict.test.ts` — pruebas: fewer than 3 candles with taker data → no verdict, rather than one built on noth, candles without taker data or without volume are ignored, not counted as balance, aggressive buyers winning is reported as such, with the share and the delta (+1)
 - `tests/futures-log.test.ts` — pruebas: an execution becomes a fill with everything the report needs, new orders, cancels, expiries and amendments are not operations, liquidations are recorded and flagged, whether Binance marks them by execution t (+1)
 - `tests/futures-risk.test.ts` — pruebas: a positive positionAmt is LONG, negative is SHORT, qty is always positive, matches Binance, liquidationPrice of 0 is read as null, never as a real price of $0 (+1)
+- `tests/hands-free.test.ts` — pruebas: the wake word is found in any spelling the engine tends to produce, and the rest, a result the engine delivers again is heard once, however often it comes back, the same words coming back under a new index within a few seconds are not said t (+1)
 - `tests/helpers/fake-d1.ts` — A D1 stand-in over node:sqlite (in memory), with the calls the app uses: prepare/bind/run/first/all and batch.
 - `tests/helpers/setups.ts` — exporta: setupAt
 - `tests/inducement.test.ts` — pruebas: bullish: BOS on the close above the swing high, the first real pullback is the I, swept and then structure failed: a close below the leg origin, not swept yet: pending, no outcome (+1)

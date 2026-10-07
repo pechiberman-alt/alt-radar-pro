@@ -48,6 +48,7 @@
 .jv-opts{display:flex;flex-wrap:wrap;gap:12px;font-size:10px;color:#9cc9d4}
 .jv-opts input{accent-color:#5fd3f3;vertical-align:-2px}
 .jv-foot{font-size:8.5px;color:#5f8a95}
+.jv-hf{flex-basis:100%;margin:0;font-size:9px;color:#9cc9d4;letter-spacing:.02em}
 @media (min-width:900px){.jv-orb{bottom:24px}.jv-panel{bottom:92px}}
 @media (prefers-reduced-motion:reduce){.jv-orb span,.jv-hud circle,.jv-wave i{animation:none!important}}
 
