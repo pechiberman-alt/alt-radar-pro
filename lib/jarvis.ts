@@ -14,6 +14,7 @@ export type JarvisIntent =
   | { kind: "BRIEFING" }
   | { kind: "BREAKOUTS"; timeframe: string }
   | { kind: "MOVERS" }
+  | { kind: "STATS" }
   | { kind: "NAME"; name: string }
   | { kind: "STOP" }
   | { kind: "HELP" }
@@ -97,6 +98,7 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   if (!text) return { kind: "HELP" };
   if (/^(silencio|callate|basta|para|stop|cancelar)\b/.test(text)) return { kind: "STOP" };
   if (/\b(ayuda|que podes hacer|que puedes hacer|comandos)\b/.test(text)) return { kind: "HELP" };
+  if (/\b(rendimiento|estadisticas|tus senales|tu registro|registro de senales|win ?rate|profit factor|como (te )?(va|fue|vienen?)( con)? (las|tus) senales|cuanto acertaste|aciertos)\b/.test(text)) return { kind: "STATS" };
   const name = text.match(/\b(?:llamame|decime|dime|mi nombre es|me llamo)\s+([a-zñ]{2,20})\b/);
   if (name) return { kind: "NAME", name: name[1][0].toUpperCase() + name[1].slice(1) };
   if (/\b(informe|briefing|reporte|como esta el mercado|como viene el mercado|estado del mercado|buen dia|buenos dias|buenas tardes|buenas noches|ponme al dia|poneme al dia)\b/.test(text))
@@ -169,4 +171,4 @@ export function briefingText(input: {
 
 export const HELP_TEXT =
   "Podés decirme: informe del mercado. Precio de Bitcoin. Abrí el mapa de Solana en 15 minutos. ¿Qué está por romper? ¿Qué está subiendo? " +
-  "Abrí señales, diario o alertas. Llamame por tu nombre. O preguntame lo que quieras sobre el mercado.";
+  "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? Llamame por tu nombre. O preguntame lo que quieras sobre el mercado.";
