@@ -140,7 +140,12 @@ function pick(candles: SwingCandle[], limit: number, startTime?: number): SwingC
   return startTime ? candles.filter((c) => c.openTime >= startTime).slice(0, limit) : candles.slice(-limit);
 }
 
-type Opts = { limit?: number; startTime?: number; minCandles?: number; allowThin?: boolean; market?: "spot" | "futures"; outside?: boolean };
+/**
+ * `maxAgeMs`: a source whose newest candle opened longer ago than this is
+ * skipped as stale — a market that stopped trading on one exchange (Kraken
+ * returns only the hours that had trades) must not pass for today's price.
+ */
+type Opts = { limit?: number; startTime?: number; minCandles?: number; allowThin?: boolean; market?: "spot" | "futures"; outside?: boolean; maxAgeMs?: number; now?: number };
 /** What every source answered on the way, for the error and for `binance`. */
 type Trail = { errors: string[]; blocked: boolean; failed: boolean };
 const statusOf = (t: Trail): BinanceStatus => (t.blocked ? "BLOQUEADO" : t.failed ? "FALLA" : "OK");
@@ -252,6 +257,10 @@ export async function fetchKlinesServer(symbol: string, interval: string, opts: 
   if (opts.allowThin && !futuresOnly) steps.push(() => fromBinance(THIN_BASES, "/api/v3/klines", query, minCandles, t));
   for (const step of steps) {
     const r = await step();
+    if (r && opts.maxAgeMs && !opts.startTime && (opts.now ?? Date.now()) - r.candles[r.candles.length - 1].openTime > opts.maxAgeMs) {
+      t.errors.push(`${VENUE_LABEL[r.venue]}: velas viejas`);
+      continue;
+    }
     if (r) return r;
   }
   const errors = [...new Set(t.errors)];
