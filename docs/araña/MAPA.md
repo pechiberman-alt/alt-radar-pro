@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 438 · objetivos: 15 · sin objetivo: 0
+- Archivos: 440 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 41 · secretos: 3 · variables de entorno: 8 · rutas /api: 46 · hosts: 50
 - Código de navegador: 52 archivos con "use client" que alcanzan 138 · problemas: 0
-- Lib sin prueba directa: 21 de 132
+- Lib sin prueba directa: 21 de 133
 
 ## Objetivos
 
@@ -169,7 +169,7 @@ Texto: lectura de la cuenta y operaciones con claves del usuario, siempre desde 
 - `lib/futures-log-db.ts` — exporta: MAX_FUTURES_LOG_ROWS, ensureFuturesLogSchema, listFuturesLog, countFuturesLog, saveFuturesLog
 - `lib/futures-log.ts` — The record of the person's REAL Binance USDⓈ-M futures activity.
 
-### telegram — Bot: alertas 24/7, comandos y chat con JARVIS (13)
+### telegram — Bot: alertas 24/7, comandos y chat con JARVIS (14)
 Texto: el canal que trabaja con la app cerrada: manda alertas, responde preguntas y comandos, y recibe notas de voz.
 Pendiente: Notas de voz: transcripción con Groq (necesita la clave gratis) y respuesta en audio.
 - `app/api/telegram/link/route.ts` — exporta: dynamic, GET, POST, PUT, DELETE
@@ -177,12 +177,13 @@ Pendiente: Notas de voz: transcripción con Groq (necesita la clave gratis) y re
 - `app/telegram-card.tsx` — exporta: TelegramCard, default
 - `lib/price-alerts-server.ts` — exporta: PRICE_ALERTS_SCHEMA, ensurePriceAlertsSchema, listUserAlerts, fetchSpotPrice, handleAlertCommand, runPriceAlerts
 - `lib/price-alerts.ts` — exporta: AlertDirection, PriceAlert, MAX_ALERTS_PER_USER, LOOKBACK_MINUTES, MIN_DISTANCE, normalizeSymbol (+9)
-- `lib/telegram-ai-server.ts` — exporta: loadServerSnapshot, clearChat, answerInTelegram
+- `lib/telegram-ai-server.ts` — exporta: loadServerSnapshot, clearChat, answerInTelegram, answerVoiceInTelegram
 - `lib/telegram-ai.ts` — Telegram answers from the ALT RADAR analyst: the pure parts.
 - `lib/telegram-dispatch.ts` — exporta: runTelegramDispatch
 - `lib/telegram-jarvis.ts` — exporta: recordLine, gradeLine, jarvisEvents, readingEvent, dailyEvent, collectJarvisEvents
 - `lib/telegram-magnets.ts` — exporta: MAGNET_WATCH, magnetEventsFromMind, collectMagnetEvents
 - `lib/telegram-server.ts` — exporta: ensureTelegramSchema, botUsername, ensureWebhook
+- `lib/telegram-voice.ts` — JARVIS on Telegram by voice.
 - `lib/telegram-volume.ts` — exporta: VOLUME_WATCH, VOLUME_FRAMES, framesFor, volumeEventsFrom, collectVolumeEvents
 - `lib/telegram.ts` — Telegram alerts: the pure parts.
 
@@ -291,7 +292,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+38)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (106)
+### calidad — Pruebas (107)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
@@ -387,6 +388,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/swing-liquidity-filter.test.ts` — pruebas: a stop sitting inside a dense zone is moved beyond it, a stop already clear of the liquidity is left exactly where it was, faint zones do not justify widening risk (+1)
 - `tests/telegram-ai.test.ts` — pruebas: markdown becomes Telegram HTML, and raw HTML from the model is escaped, long answers are split under Telegram, the server snapshot is bounded and says what it does not contain
 - `tests/telegram-signals.test.ts` — pruebas: the message with a plan: entry, stop with its distance, three targets with their, a big enough sample drops the caveat; no stats means no history line; no plan ke, /resultados and its aliases are commands; other text is still a question for the (+1)
+- `tests/telegram-voice.test.ts` — pruebas: a note too long or too heavy is refused in words; a short one goes through, what Whisper heard is cleaned; silence and stray dots are nothing heard, the answer is spoken without markdown, in whole sentences; the rest stays in the (+1)
 - `tests/telegram-volume.test.ts` — pruebas: the Telegram message: one key per candle, its own category, escaped text, and th, preferences saved before this category existed read it as on; an explicit off st, selection: sent when on, skipped when off, never twice, and folded into the summ (+1)
 - `tests/telegram.test.ts` — pruebas: signals below the user, disabled categories are never sent, an event already sent is never sent twice (+1)
 - `tests/timeframes.test.ts` — pruebas: the selector order and the config table describe exactly the same timeframes, 3m, 2h and 8h are present, every frameMs matches what its id says, so a typo can (+1)
@@ -622,10 +624,10 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `api.coingecko.com` — app/api/market-structure/route.ts, app/api/radar/route.ts, app/radar-app.tsx, app/unlock-desk.tsx, lib/spot-plan-client.ts, lib/token-unlocks.ts (+1)
 - `api.coinlore.net` — app/api/market-structure/route.ts, app/api/radar/route.ts, app/radar-app.tsx, lib/automation.ts, worker/index.ts
 - `api.exchange.coinbase.com` — lib/klines-server.ts
-- `api.groq.com` — lib/ai-brains.ts, tests/arana.test.ts
+- `api.groq.com` — lib/ai-brains.ts, lib/telegram-voice.ts, tests/arana.test.ts
 - `api.kraken.com` — app/api/orderbook/route.ts, lib/klines-server.ts
 - `api.llama.fi` — lib/exchange-reserves.ts
-- `api.telegram.org` — lib/telegram.ts
+- `api.telegram.org` — lib/telegram-voice.ts, lib/telegram.ts
 - `api1.binance.com` — app/api/klines/route.ts, app/api/rolling/route.ts, app/api/tickers/route.ts, app/binance-klines.ts, lib/automation.ts, lib/binance-account.ts (+3)
 - `api2.binance.com` — app/api/klines/route.ts, app/api/rolling/route.ts, app/api/tickers/route.ts, lib/automation.ts, lib/binance-account.ts, lib/klines-history.ts (+1)
 - `api3.binance.com` — lib/automation.ts, lib/binance-account.ts, lib/klines-server.ts

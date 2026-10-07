@@ -1325,7 +1325,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
           <div className="jv-opts">
             <label><input type="checkbox" checked={prefs.voice} onChange={(e) => setPrefs({ voice: e.target.checked })} /> Voz</label>
             {supportsListen && (
-              <label title="Escucha con la pantalla encendida: decí «Jarvis» y tu pedido. Con la app en segundo plano no escucha: escribile por Telegram"><input type="checkbox" checked={prefs.wake} onChange={(e) => setPrefs({ wake: e.target.checked })} /> Manos libres</label>
+              <label title="Escucha con la pantalla encendida: decí «Jarvis» y tu pedido. Con la app en segundo plano no escucha: mandale una nota de voz por Telegram"><input type="checkbox" checked={prefs.wake} onChange={(e) => setPrefs({ wake: e.target.checked })} /> Manos libres</label>
             )}
             {handsText && <p className="jv-hf" role="status">{handsText}</p>}
             <label title="Cada 5 minutos revisa 20 monedas y las barridas de imanes de BTC, ETH y SOL; te avisa en voz y registra cada señal con su resultado"><input type="checkbox" checked={prefs.watch} onChange={(e) => setPrefs({ watch: e.target.checked })} /> Vigilancia</label>

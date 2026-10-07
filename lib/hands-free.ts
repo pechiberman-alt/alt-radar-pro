@@ -170,7 +170,7 @@ export class HandsFree {
   status(now: number): string {
     if (this.stopped) return STOP_TEXT[this.stopped];
     if (!this.enabled) return "";
-    if (!this.visible) return "EN PAUSA · la app quedó en segundo plano: con la pantalla apagada escribime por Telegram";
+    if (!this.visible) return "EN PAUSA · la app quedó en segundo plano: con la pantalla apagada mandame una nota de voz por Telegram";
     if (now < this.speakingUntil) return "HABLANDO · no te escucho mientras hablo";
     if (now < this.windowUntil) return "TE ESCUCHO · decí tu pedido";
     return "ESCUCHANDO · decí «Jarvis» y tu pedido";
