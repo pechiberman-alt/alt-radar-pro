@@ -57,8 +57,13 @@ Reglas:
 - Cascada: Claude (25 por persona y día, pago) → Groq (gratis con clave) → Workers AI (Qwen3, 3.500 neuronas/día) → motor local del navegador (sin límite).
 - Claude nunca en tareas programadas: cuesta por respuesta.
 - Los números van a las IAs ya en formato argentino (lib/ai-numbers.ts): copian, no convierten.
+- JARVIS TRADING (lib/jarvis-desk*.ts): la mesa de especialistas es determinista y corre en el navegador; ninguna IA decide la dirección, solo la conversa con los números de la mesa.
+- La mesa lee solo velas cerradas (test de no mirar el futuro). Un especialista sin datos pesa cero y lo dice: «Este dato no está disponible actualmente.».
+- El puntaje de confluencia no es una probabilidad. El gestor de riesgo veta (R:R menor a 1,5, stop absurdo, contra la mesa) y espera (evento de alto impacto en menos de 2 h); el veto gana a cualquier confianza.
+- Análisis, papel y ejecución real están separados: la mesa nunca opera sola.
 Pendiente:
-- Cargar la clave gratis de Groq en CONFIGURACIÓN: la usan MENTE y las notas de voz de Telegram.
+- Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI).
+- Mesa: faltan clientes de Bybit y OKX, la clave CMC_API_KEY y el historial real de liquidaciones; TradingView no tiene API pública.
 
 ## honestidad — Nunca inventar: probabilidades, precios, noticias
 Texto: transversal a todo el producto. Lo que no se sabe se dice, no se estima a escondidas.
@@ -105,7 +110,7 @@ Reglas:
 - El webhook exige el secreto de Telegram y siempre responde 200 para que Telegram no reintente.
 - Una pregunta por Telegram usa la misma memoria y la misma cascada que la app.
 Pendiente:
-- Notas de voz: transcripción con Groq (necesita la clave gratis) y respuesta en audio.
+- Notas de voz: con Groq si está la clave; si no, Whisper de Workers AI dentro del cupo gratis diario.
 
 ## alertas — Avisos de la app: push del navegador y centro de alertas
 Texto: lo que llega al navegador o al celular cuando algo pasa.

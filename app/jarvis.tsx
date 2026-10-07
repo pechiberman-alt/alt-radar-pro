@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { openInMap, showSection } from "@/lib/account-events";
 import { eligible } from "@/lib/decoupling";
 import { briefingText, findCoins, findTimeframe, greeting, HELP_TEXT, parseCommand, priceLine, type JarvisIntent, type Ticker } from "@/lib/jarvis";
+import { compareDesks, deskForAi, deskSpeech, entrySpeech, indicatorsSpeech, liquidationRisk, macroBrief, macroKindOf, macroSpeech, whatIf, type DeskDecision } from "@/lib/jarvis-desk";
+import { cachedDesk, deskFor, showInDesk } from "@/lib/jarvis-desk-run";
+import { loadCalendar } from "@/lib/econ-calendar";
 import { compactSnapshot } from "@/lib/ai-analyst";
 import type { AssistantContext } from "@/lib/assistant/index";
 import { localAnswer, pointsAtScreen, SECTION_SCREEN, withFocus, type Focus } from "@/lib/jarvis-local";
@@ -589,6 +592,15 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
     [prefs.voice, prefs.engine, prefs.neuralVoice, prefs.rate, prefs.followUp, sayDevice],
   );
 
+  // The radar's live context (market structure for the desk); a failing panel never breaks an answer.
+  const deskContext = useCallback((): AssistantContext | null => {
+    try {
+      return ctxRef.current?.() ?? null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const run = useCallback(
     async (intent: JarvisIntent) => {
       setMode("thinking");
@@ -715,6 +727,40 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                 : "Todavía no me pediste que recuerde nada. Decime, por ejemplo: recordá que opero solo BTC con uno por ciento de riesgo.",
             );
           }
+          // JARVIS TRADING: the desk of specialists (lib/jarvis-desk.ts) answers with its own numbers.
+          case "DESK":
+          case "ENTRY":
+          case "INDICATORS":
+          case "LIQ_RISK":
+          case "WHATIF": {
+            const sym = intent.symbol ? `${intent.symbol}USDT` : (focusRef.current.symbol ?? "BTCUSDT");
+            focusRef.current = { symbol: sym, timeframe: focusRef.current.timeframe ?? "4h" };
+            const d: DeskDecision | null = (intent.kind === "WHATIF" ? cachedDesk(sym) : null) ?? (await deskFor(sym, { structure: deskContext()?.structure ?? null })).decision;
+            if (!d) return speak(`No tengo velas suficientes de ${sym.replace(/USDT$/, "")} para que la mesa lo analice. Este dato no está disponible actualmente.`);
+            if (intent.kind === "DESK" || intent.kind === "ENTRY") {
+              screenRef.current = "JARVIS TRADING";
+              showSection("jarvis-trading");
+              showInDesk(sym);
+            }
+            const said =
+              intent.kind === "DESK" ? deskSpeech(d) : intent.kind === "ENTRY" ? entrySpeech(d) : intent.kind === "INDICATORS" ? indicatorsSpeech(d) : intent.kind === "LIQ_RISK" ? liquidationRisk(d) : whatIf(d, intent.level);
+            return speak(said, "mesa");
+          }
+          case "COMPARE": {
+            const ctxNow = deskContext();
+            const [x, y] = await Promise.all([deskFor(`${intent.a}USDT`, { structure: ctxNow?.structure ?? null }), deskFor(`${intent.b}USDT`, { structure: ctxNow?.structure ?? null })]);
+            if (!x.decision || !y.decision) return speak("No pude leer los dos activos para compararlos. Este dato no está disponible actualmente.");
+            const c = compareDesks(x.decision, y.decision);
+            screenRef.current = "JARVIS TRADING";
+            showSection("jarvis-trading");
+            showInDesk(`${intent.a}USDT`, `${intent.b}USDT`);
+            const top = c.filas.filter((r) => r.gana === "A" || r.gana === "B").slice(0, 4).map((r) => `${r.criterio}: ${r.gana === "A" ? c.a : c.b}`).join("; ");
+            return speak(`${c.resumen.replace(/ No es asesoramiento financiero\.$/, "")}${top ? ` Por criterio: ${top}.` : ""} No es asesoramiento financiero.`, "mesa");
+          }
+          case "MACRO": {
+            const cal = await loadCalendar().catch(() => null);
+            return speak(macroSpeech(macroBrief(cal?.events ?? null, Date.now(), macroKindOf(intent.question))), "mesa");
+          }
           case "AI": {
             // What the question is about: a coin it names, or what is on screen ("analizalo").
             const named = findCoins(intent.question, known.current);
@@ -764,6 +810,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                     jarvis: coreRef.current ? coreContext(coreRef.current, Date.now()).nucleo : null,
                     pantalla: { seccion: focus.screen, moneda: focus.symbol, temporalidad: focus.timeframe },
                     foco: analysis ? analysisForAi(analysis) : null,
+                    // The desk's last decision on that coin, so the conversation uses the same plan and numbers.
+                    mesa: subject && cachedDesk(subject) ? deskForAi(cachedDesk(subject)!) : null,
                   },
                   history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
                 }),
@@ -792,7 +840,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
         speak("No pude completar eso: Binance no respondió. Probá de nuevo en un momento.");
       }
     },
-    [lines, prefs.name, record, resolveOpen, setPrefs, speak, loadCore, hush],
+    [lines, prefs.name, record, resolveOpen, setPrefs, speak, loadCore, hush, deskContext],
   );
 
   const handle = useCallback(

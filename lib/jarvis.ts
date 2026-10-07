@@ -24,6 +24,13 @@ export type JarvisIntent =
   | { kind: "MIND" }
   | { kind: "STOP" }
   | { kind: "HELP" }
+  | { kind: "DESK"; symbol: string | null }
+  | { kind: "ENTRY"; symbol: string | null }
+  | { kind: "WHATIF"; symbol: string | null; level: number }
+  | { kind: "COMPARE"; a: string; b: string }
+  | { kind: "LIQ_RISK"; symbol: string | null }
+  | { kind: "INDICATORS"; symbol: string | null }
+  | { kind: "MACRO"; question: string }
   | { kind: "AI"; question: string };
 
 /** Lowercase, no accents, no punctuation, single spaces. */
@@ -83,6 +90,7 @@ export function findTimeframe(text: string): string | null {
 }
 
 const SECTIONS: [RegExp, string, string][] = [
+  [/\b(jarvis trading|trading|mesa de trading|la mesa)\b/, "jarvis-trading", "JARVIS TRADING"],
   [/\b(por romper|a punto de romper|por explotar|rupturas?|rompe)\b/, "rompe", "A PUNTO DE ROMPER"],
   [/\b(suben solas|desacople|por su cuenta)\b/, "desacople", "SUBEN SOLAS"],
   [/\b(senales|robot|robot mm)\b/, "inteligencia", "SEÑALES · ROBOT MM"],
@@ -99,6 +107,23 @@ const SECTIONS: [RegExp, string, string][] = [
   [/\b(configuracion|ajustes)\b/, "configuracion", "CONFIGURACIÓN"],
   [/\b(resumen|inicio)\b/, "resumen", "RESUMEN"],
 ];
+
+/**
+ * A price said or typed the Argentine way: "110.000", "110 mil", "110k",
+ * "0,85", "2.462,5". Null when the phrase has no price.
+ */
+export function spokenLevel(raw: string): number | null {
+  // Whole numbers only (never the "3" of "35%"), and never a timeframe or a percentage.
+  const m = raw.toLowerCase().match(/(?<![\d.,])(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+\.\d+|\d+(?:,\d+)?)(?![.,]?\d)\s*(k\b|mil\b|lucas\b)?(?!\s*(?:(?:h|hs|horas?|m|min|minutos?|d|dias?|por ?ciento)\b|%))/);
+  if (!m) return null;
+  const n = m[1];
+  let v: number;
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(n)) v = Number(n.replace(/\./g, "").replace(",", "."));
+  else if (n.includes(",")) v = Number(n.replace(",", "."));
+  else v = Number(n);
+  if (m[2]) v *= 1000;
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
 
 const OPEN_VERB = /\b(abri|abrime|abre|abrir|mostrame|muestrame|muestra|mostra|anda a|ir a|llevame|pone|pasa a|quiero ver|ver)\b/;
 
@@ -130,9 +155,23 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   if (/\b(que (sube|suben|esta subiendo|esta pumpeando)|mayores subas|ganadoras|lo que mas sube|top)\b/.test(text)) return { kind: "MOVERS" };
 
   const coins = findCoins(text, known);
-  // "Analizá BTC", "¿cómo ves SOL?": the full analysis of the asset, not its map.
-  if (coins.length && /\b(analiza(me|lo|la)?|analisis|analizar|que opinas de|como ves|que ves en|evalua|estudia)\b/.test(text)) {
-    return { kind: "AI", question: raw.trim().replace(/^(oye |hey |ok )?jarvis[,:]?\s*/i, "") };
+  const question = raw.trim().replace(/^(oye |hey |ok )?jarvis[,:]?\s*/i, "");
+  // JARVIS TRADING (lib/jarvis-desk.ts): the desk of specialists, its plan, its scenarios.
+  if (/\b(cpi|ppi|nfp|fomc|inflacion|nominas|dato macro|datos macro|agenda macro|calendario (economico|macro)|eventos? macro|la fed|tasa de (la fed|interes)|tasas de interes|desempleo|pbi|gdp)\b/.test(text))
+    return { kind: "MACRO", question };
+  if (coins.length >= 2 && /\b(compara(me|las|los)?|comparacion|versus|vs|contra|mas fuerte|mas debil|mejor|conviene mas)\b/.test(text)) return { kind: "COMPARE", a: coins[0], b: coins[1] };
+  if (/\b(que pasa si|y si|si (pierde|rompe|cae|baja|sube|supera|perfora|pasa))\b/.test(text)) {
+    const level = spokenLevel(raw);
+    if (level !== null) return { kind: "WHATIF", symbol: coins[0] ?? null, level };
+  }
+  if (/\b(riesgo de (liquidacion|liquidaciones|barrida)|hay (riesgo|peligro) de (liquidacion|liquidaciones|barrida)|liquidaciones cerca|(van|pueden) a liquidar)\b/.test(text)) return { kind: "LIQ_RISK", symbol: coins[0] ?? null };
+  if (/\b(que (opinan|dicen|marcan|muestran) (los )?indicadores|como (estan|vienen) los indicadores|indicadores de|que dice el (rsi|macd))\b/.test(text)) return { kind: "INDICATORS", symbol: coins[0] ?? null };
+  if (/\b(donde (entrarias|entraria|entro|entrar|conviene entrar)|punto de entrada|plan de (trading|operacion)|dame (una |un )?(operacion|entrada|trade|plan)|que operacion|long o short|largo o corto|compro o vendo)\b/.test(text)) return { kind: "ENTRY", symbol: coins[0] ?? null };
+  if (/\b(analisis completo|analizame|analizalo|analizala|analiza|analizar|evalua|estudia|operacion en|trade en)\b/.test(text) && (coins.length || /\b(analisis completo)\b/.test(text)))
+    return { kind: "DESK", symbol: coins[0] ?? null };
+  // "¿Cómo ves SOL?", "¿qué opinás de ETH?": a conversation about the asset, with the desk's reading as context.
+  if (coins.length && /\b(analisis|que opinas de|como ves|que ves en)\b/.test(text)) {
+    return { kind: "AI", question };
   }
   if (coins.length && /\b(precio|cuanto (esta|vale|cotiza)|a cuanto|cotizacion|como esta|como va)\b/.test(text)) return { kind: "PRICE", symbols: coins.slice(0, 4) };
   if (coins.length && (OPEN_VERB.test(text) || /\b(mapa|grafico|chart)\b/.test(text) || text.split(" ").length <= 2))
@@ -198,4 +237,5 @@ export function briefingText(input: {
 export const HELP_TEXT =
   "Podés decirme: informe del mercado. Precio de Bitcoin. Abrí el mapa de Solana en 15 minutos. ¿Qué está por romper? ¿Qué está subiendo? " +
   "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. " +
-  "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizá Solana, o analizalo para lo que tenés en pantalla. Tu lectura del mercado. O preguntame lo que quieras sobre el mercado.";
+  "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizá Solana, o analizalo para lo que tenés en pantalla. Tu lectura del mercado. " +
+  "Trading: analizame Bitcoin, ¿dónde entrarías?, ¿qué pasa si pierde 110.000?, comparame Bitcoin contra Ethereum, ¿hay riesgo de liquidaciones?, ¿qué pasa si sale un CPI peor de lo esperado? O preguntame lo que quieras sobre el mercado.";

@@ -115,7 +115,8 @@ export const OI_PERIOD: Record<string, string | null> = Object.fromEntries(
   Object.entries(TIMEFRAMES).map(([key, value]) => [key, value.oiPeriod]),
 );
 
-export async function loadRows(symbol: string, interval: string, limit: number, signal: AbortSignal) {
+/** `meta.venue` says which source answered, so a caller can name it (futures, spot or the Worker's copy). */
+export async function loadRows(symbol: string, interval: string, limit: number, signal: AbortSignal, meta?: { venue?: string }) {
   const query = `symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`;
 
   // Futures first, for two reasons. This map is entirely about futures
@@ -128,7 +129,10 @@ export async function loadRows(symbol: string, interval: string, limit: number, 
       const response = await fetch(`${base}/fapi/v1/klines?${query}`, { signal });
       if (!response.ok) continue;
       const rows = await response.json();
-      if (Array.isArray(rows) && rows.length) return rows;
+      if (Array.isArray(rows) && rows.length) {
+        if (meta) meta.venue = "Binance Futures";
+        return rows;
+      }
     } catch {
       // Next mirror.
     }
@@ -147,6 +151,7 @@ export async function loadRows(symbol: string, interval: string, limit: number, 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(rows.slice(-500)),
         }).catch(() => undefined);
+        if (meta) meta.venue = "Binance Spot";
         return rows;
       }
     } catch {
@@ -162,7 +167,9 @@ export async function loadRows(symbol: string, interval: string, limit: number, 
   );
   if (!proxied.ok) return null;
   const rows = await proxied.json();
-  return Array.isArray(rows) && rows.length ? rows : null;
+  if (!Array.isArray(rows) || !rows.length) return null;
+  if (meta) meta.venue = "copia del servidor (Binance)";
+  return rows;
 }
 
 /**

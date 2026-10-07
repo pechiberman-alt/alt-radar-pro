@@ -46,6 +46,7 @@ export const SCREEN_TOPIC: Record<string, { about: string; local: string }> = {
   DIARIO: { about: "el diario de operaciones del usuario", local: "cuanto arriesgo" },
   RIESGO: { about: "la calculadora de riesgo", local: "cuanto arriesgo" },
   DCA: { about: "la calculadora de compras escalonadas (DCA)", local: "cuanto arriesgo" },
+  "JARVIS TRADING": { about: "la mesa de especialistas de JARVIS (plan de trading del activo en pantalla)", local: "cual es la mejor señal" },
 };
 
 /** JARVIS's section ids (lib/jarvis.ts) as the app's screen names, for when JARVIS itself opens one. */
@@ -64,6 +65,7 @@ export const SECTION_SCREEN: Record<string, string> = {
   diario: "DIARIO",
   riesgo: "RIESGO",
   dca: "DCA",
+  "jarvis-trading": "JARVIS TRADING",
 };
 
 /**

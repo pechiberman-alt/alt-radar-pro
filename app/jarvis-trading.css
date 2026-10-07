@@ -1,0 +1,91 @@
+/* JARVIS TRADING — la mesa de especialistas. Primero el celular: una columna, botones de 44 px. */
+.jt-desk{padding:16px;display:grid;gap:12px}
+.jt-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.jt-head h2{font-size:18px;letter-spacing:-.2px}
+.jt-tag{font:9px var(--font-mono);letter-spacing:1px;color:var(--amber);border:1px solid #5c4a24;border-radius:3px;padding:5px 7px;white-space:nowrap}
+.jt-search{display:grid;grid-template-columns:1fr auto;gap:8px}
+.jt-search input{min-height:44px;background:#0a110d;border:1px solid var(--line);border-radius:6px;color:var(--text);padding:0 12px;font:14px var(--font-mono);text-transform:uppercase}
+.jt-search button{min-height:44px;padding:0 14px;border:1px solid var(--green2);background:#0c2d20;color:var(--green);border-radius:6px;font:11px var(--font-mono);letter-spacing:1px;font-weight:700;cursor:pointer}
+.jt-search button:disabled{opacity:.6}
+.jt-quick{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.jt-quick::-webkit-scrollbar{display:none}
+.jt-quick button{min-height:36px;min-width:52px;border:1px solid var(--line);background:#0b120e;color:#a9b7af;border-radius:18px;font:11px var(--font-mono);cursor:pointer}
+.jt-quick button.on{border-color:var(--green2);color:var(--green);background:#0c2219}
+.jt-muted,.jt-note{color:var(--muted);font-size:12px;line-height:1.5;margin:6px 0}
+.jt-error{color:var(--red);font-size:13px;line-height:1.5}
+.jt-card{border:1px solid var(--line);border-left:4px solid #3a4a42;border-radius:8px;padding:14px;background:linear-gradient(150deg,#0f1813,#0a0f0c);display:grid;gap:10px}
+.jt-card.long{border-left-color:var(--green)}
+.jt-card.short{border-left-color:var(--red)}
+.jt-card.wait{border-left-color:var(--amber)}
+.jt-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.jt-pair{display:block;font:13px var(--font-mono);letter-spacing:1px;color:#a9b7af}
+.jt-price{display:block;font:26px var(--font-mono);letter-spacing:-1px;margin-top:2px}
+.jt-dir{text-align:right}
+.jt-dir strong{display:block;font:18px var(--font-mono);letter-spacing:.5px}
+.jt-card.long .jt-dir strong{color:var(--green)}
+.jt-card.short .jt-dir strong{color:var(--red)}
+.jt-card.wait .jt-dir strong{color:var(--amber)}
+.jt-dir small{display:block;font:11px var(--font-mono);color:var(--muted);margin-top:4px}
+.jt-record{margin:0;font-size:11px;color:var(--muted);line-height:1.4}
+.jt-levels{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:0}
+.jt-levels>div{background:#0c130f;padding:10px}
+.jt-levels>div:first-child{grid-column:1/-1}
+.jt-levels dt{font:10px var(--font-mono);letter-spacing:1px;color:var(--muted)}
+.jt-levels dd{margin:4px 0 0;font:15px var(--font-mono)}
+.jt-levels dd em{display:block;font:9px var(--font-mono);font-style:normal;color:var(--muted);margin-top:2px}
+.jt-levels .bad dd{color:var(--red)}
+.jt-levels .good dd{color:var(--green)}
+.jt-facts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.jt-facts span{background:#101713;border:1px solid var(--line);border-radius:5px;padding:8px;font:11px var(--font-mono);color:var(--muted)}
+.jt-facts b{display:block;margin-top:3px;font-size:14px;color:var(--text)}
+.jt-facts b.bajo{color:var(--green)}
+.jt-facts b.medio{color:var(--amber)}
+.jt-facts b.alto{color:var(--red)}
+.jt-verdict{margin:0;font-size:13px;line-height:1.5;color:#d7e0da}
+.jt-block{border:1px solid var(--line);border-radius:8px;background:#0a100d;padding:0 14px}
+.jt-block>summary{min-height:46px;display:flex;align-items:center;font:12px var(--font-mono);letter-spacing:1px;font-weight:700;cursor:pointer;color:#cfe0d6;list-style:none}
+.jt-block>summary::-webkit-details-marker{display:none}
+.jt-block>summary:before{content:"▸";margin-right:8px;color:var(--green)}
+.jt-block[open]>summary:before{content:"▾"}
+.jt-block[open]{padding-bottom:12px}
+.jt-block p{font-size:13px;line-height:1.55;margin:8px 0}
+.jt-lead{color:#e3ebe6}
+.jt-list{margin:6px 0;padding-left:18px;display:grid;gap:5px}
+.jt-list li{font-size:12.5px;line-height:1.5;color:#c9d5ce}
+.jt-list.off li,.jt-list li.warn{color:var(--amber)}
+.jt-list li.bad{color:var(--red)}
+.jt-sub{font:11px var(--font-mono);letter-spacing:1.2px;color:var(--green2);margin:14px 0 6px}
+.jt-debate{display:grid;gap:8px}
+.jt-side{border:1px solid var(--line);border-radius:6px;padding:10px;background:#0c130f}
+.jt-side.up{border-top:2px solid var(--green)}
+.jt-side.down{border-top:2px solid var(--red)}
+.jt-side>b{font:11px var(--font-mono);letter-spacing:1px}
+.jt-agents{display:grid;gap:6px}
+.jt-agent{border:1px solid var(--line);border-radius:6px;padding:0 10px;background:#0c130f}
+.jt-agent>summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none;font-size:13px}
+.jt-agent>summary::-webkit-details-marker{display:none}
+.jt-agent>summary i{font:10px var(--font-mono);font-style:normal;letter-spacing:1px;padding:4px 6px;border-radius:3px;border:1px solid var(--line)}
+.jt-agent i.up{color:var(--green);border-color:#1f5a40}
+.jt-agent i.down{color:var(--red);border-color:#673238}
+.jt-agent i.flat{color:#c9d5ce}
+.jt-agent i.off{color:var(--muted)}
+.jt-agent[open]{padding-bottom:8px}
+.jt-compare{overflow-x:auto}
+.jt-compare table{min-width:100%}
+.jt-compare td,.jt-compare th{white-space:normal;font-size:11px;padding:8px}
+.jt-compare td.win{color:var(--green);font-weight:700}
+.jt-settings{display:grid;gap:10px}
+.jt-settings label{display:grid;gap:6px;font:11px var(--font-mono);color:var(--muted)}
+.jt-settings input{min-height:44px;background:#0a110d;border:1px solid var(--line);border-radius:6px;color:var(--text);padding:0 12px;font:14px var(--font-mono)}
+.jt-settings input[aria-invalid="true"]{border-color:var(--red)}
+.jt-bad{color:var(--red);font:11px var(--font-mono)}
+.jt-brief{border:1px solid #3d3420;background:#14110a;border-radius:6px;padding:4px 10px;margin-top:8px}
+.jt-hint{font-size:12px;color:#9fb3a8;line-height:1.5;margin:0}
+@media(min-width:760px){
+  .jt-desk{padding:20px 22px}
+  .jt-levels{grid-template-columns:repeat(5,1fr)}
+  .jt-levels>div:first-child{grid-column:auto}
+  .jt-facts{grid-template-columns:repeat(4,1fr)}
+  .jt-debate{grid-template-columns:1fr 1fr}
+  .jt-settings{grid-template-columns:repeat(3,1fr)}
+}
