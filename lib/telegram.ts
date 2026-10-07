@@ -11,7 +11,7 @@
 import { MIN_SAMPLE, planLines, ratesText, type KindStats } from "./signal-plan.ts";
 import { dec, SPIKE_DISCLAIMER, spikeSentence, type VolumeSpike } from "./volume-spike.ts";
 
-export type TelegramCategory = "SEÑAL" | "DCA" | "NOTICIAS" | "SENTIMIENTO" | "VOLUMEN" | "ROMPE" | "IMANES";
+export type TelegramCategory = "SEÑAL" | "DCA" | "NOTICIAS" | "SENTIMIENTO" | "VOLUMEN" | "ROMPE" | "IMANES" | "JARVIS";
 
 export type TelegramPrefs = {
   categories: Record<TelegramCategory, boolean>;
@@ -24,8 +24,8 @@ export type TelegramPrefs = {
 
 export const DEFAULT_TELEGRAM_PREFS: TelegramPrefs = {
   // A saved preference without VOLUMEN (everyone saved before it existed) reads it as on.
-  // Same for ROMPE (A PUNTO DE ROMPER) and IMANES (liquidation magnets).
-  categories: { "SEÑAL": true, DCA: true, NOTICIAS: true, SENTIMIENTO: true, VOLUMEN: true, ROMPE: true, IMANES: true },
+  // Same for ROMPE (A PUNTO DE ROMPER), IMANES (liquidation magnets) and JARVIS (its 24/7 core).
+  categories: { "SEÑAL": true, DCA: true, NOTICIAS: true, SENTIMIENTO: true, VOLUMEN: true, ROMPE: true, IMANES: true, JARVIS: true },
   // Only the stronger signals by default: a phone that buzzes for every
   // setup gets muted within a day.
   signalMinScore: 75,

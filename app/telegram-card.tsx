@@ -19,6 +19,7 @@ const CATS: [TelegramCategory, string, string][] = [
   ["VOLUMEN", "VOLUMEN", "Vela con 3× el volumen normal en BTC, ETH, SOL (15m, 1h, 4h) y XAU (1h, 4h)"],
   ["ROMPE", "A PUNTO DE ROMPER", "Monedas comprimidas presionando un nivel (se calcula con la app abierta)"],
   ["IMANES", "IMANES DE LIQUIDACIÓN", "BTC, ETH y SOL en 1h: precio cerca de una zona fuerte o vela que la barre (llega con la app cerrada)"],
+  ["JARVIS", "JARVIS · NÚCLEO 24/7", "Cada señal que abre el núcleo, con entrada, stop y objetivo, y cuando cierra, con su resultado y el acumulado"],
 ];
 
 /** Links the signed-in account to a Telegram chat and sets what gets sent. */

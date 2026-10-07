@@ -5,6 +5,7 @@ import { runTelegramDispatch } from "../lib/telegram-dispatch";
 import handler from "vinext/server/app-router-entry";
 import { windDownSignals } from "../lib/automation";
 import { archiveCoreLiquidity } from "../lib/liquidity-archive";
+import { runCoreTick } from "../lib/jarvis-core-db";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
 
@@ -99,6 +100,12 @@ const worker = {
       ctx.waitUntil(
         archiveCoreLiquidity(env.DB).catch((error) => {
           console.error("[ALT_RADAR_LIQUIDITY_SCHEDULED]", error);
+        }),
+      );
+      // JARVIS CORE: one small job per minute, 24/7 (lib/jarvis-core.ts).
+      ctx.waitUntil(
+        runCoreTick(env.DB, controller.scheduledTime).catch((error) => {
+          console.error("[ALT_RADAR_JARVIS_CORE]", error);
         }),
       );
     }

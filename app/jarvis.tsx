@@ -12,14 +12,19 @@ import { magnetEvents, strongestMagnets } from "@/lib/magnet-watch";
 import { parseSwingKlines } from "@/lib/swing-entries";
 import { everyVisible } from "@/lib/visible-interval";
 import { pickVoice } from "@/lib/browser-voice";
+import { awaySpeech, coreContext, coreOnline, coreStatusSpeech, reviveSnapshot, type CoreSnapshot } from "@/lib/jarvis-core";
 import { normalizeSpanish, splitForSpeech } from "@/lib/speech-text";
 
 /**
  * JARVIS: a voice assistant over the whole app. It listens (Web Speech API,
  * es-AR), speaks back, opens sections and coins, reads prices, briefs the
  * market, watches for coins about to break and, for anything else, asks the
- * AI analyst. Everything runs in the browser; nothing is recorded or sent
- * anywhere except the AI question itself.
+ * AI analyst. Voice and listening run in the browser.
+ *
+ * Its CORE runs on the server 24/7 (lib/jarvis-core.ts): it scans, records and
+ * resolves its own signals with the app closed and sends them by Telegram. The
+ * panel reads the core's status and record, tells what it did while you were
+ * away, and gives the AI that context so it answers knowing its own track record.
  */
 
 type Line = { who: "yo" | "jarvis"; text: string };
@@ -27,6 +32,29 @@ type Mode = "idle" | "listening" | "thinking" | "speaking";
 type Breakout = { symbol: string; side: string; score: number; signal: JarvisSignal | null };
 
 const LEDGER_KEY = "alt-radar-pro:jarvis-ledger:v1";
+/** When this device last heard from the core, for "what happened while you were away". */
+const CORE_SEEN_KEY = "alt-radar-pro:jarvis-core-seen:v1";
+
+async function fetchCore(): Promise<CoreSnapshot | null> {
+  try {
+    const r = await fetch("/api/jarvis/core", { cache: "no-store", signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    return reviveSnapshot((await r.json()) as CoreSnapshot);
+  } catch {
+    return null;
+  }
+}
+
+function takeAway(snap: CoreSnapshot): string | null {
+  let seen = 0;
+  try {
+    seen = Number(window.localStorage.getItem(CORE_SEEN_KEY) ?? 0);
+    window.localStorage.setItem(CORE_SEEN_KEY, String(Date.now()));
+  } catch {
+    return null;
+  }
+  return seen ? awaySpeech([...snap.open, ...snap.recent], seen) : null;
+}
 function loadLedger(): JarvisSignal[] {
   try {
     const raw = JSON.parse(window.localStorage.getItem(LEDGER_KEY) ?? "[]");
@@ -175,6 +203,11 @@ function JarvisInner() {
   const [showVoice, setShowVoice] = useState(false);
   const [ledger, setLedgerState] = useState<JarvisSignal[]>(loadLedger);
   const [showLedger, setShowLedger] = useState(false);
+  const [core, setCore] = useState<CoreSnapshot | null>(null);
+  const [coreUp, setCoreUp] = useState(false);
+  const [ledgerTab, setLedgerTab] = useState<"core" | "local">("core");
+  const coreRef = useRef<CoreSnapshot | null>(null);
+  const awayRef = useRef<string | null>(null);
   const ledgerRef = useRef(ledger);
   const recRef = useRef<SpeechRec | null>(null);
   const wakeRef = useRef(false);
@@ -202,6 +235,16 @@ function JarvisInner() {
     } catch {
       // kept for this page
     }
+  }, []);
+
+  const loadCore = useCallback(async () => {
+    const snap = await fetchCore();
+    if (snap) {
+      coreRef.current = snap;
+      setCore(snap);
+    }
+    setCoreUp(snap !== null && coreOnline(snap.heartbeat, Date.now()));
+    return snap;
   }, []);
 
   /** Records new directional signals; returns the ones that were not there before. */
@@ -323,21 +366,42 @@ function JarvisInner() {
             );
           }
           case "STATS": {
-            await resolveOpen();
+            const [snap] = await Promise.all([loadCore(), resolveOpen()]);
             setShowLedger(true);
-            return speak(statsSpeech(ledgerStats(ledgerRef.current)));
+            const local = ledgerStats(ledgerRef.current);
+            if (snap && (snap.stats.resolved || snap.open.length)) {
+              setLedgerTab("core");
+              return speak(
+                `Núcleo veinticuatro siete. ${statsSpeech(snap.stats)}${local.resolved ? ` En este dispositivo, aparte: ${local.resolved} cerradas, profit factor ${local.profitFactor === null ? "sin dato" : local.profitFactor === Infinity ? "infinito" : local.profitFactor.toFixed(2).replace(".", ",")}.` : ""}`,
+              );
+            }
+            setLedgerTab("local");
+            return speak(statsSpeech(local));
+          }
+          case "CORE": {
+            const snap = await loadCore();
+            if (!snap) return speak("No pude conectar con el núcleo. Sigo funcionando desde tu navegador.");
+            const away = takeAway(snap);
+            return speak(`${coreStatusSpeech(snap, Date.now())}${away ? ` ${away}` : ""}`);
           }
           case "BRIEFING": {
             const [tickers, hot] = await Promise.all([tickers24h(), scanBreakouts("1h", 12).catch(() => undefined)]);
             if (hot) record(hot.map((b) => b.signal));
             setPrefs({ lastBriefing: new Date().toISOString().slice(0, 10) });
-            return speak(briefingText({ hour: new Date().getHours(), name: prefs.name, tickers, breakouts: hot }));
+            const away = awayRef.current;
+            awayRef.current = null;
+            return speak(`${briefingText({ hour: new Date().getHours(), name: prefs.name, tickers, breakouts: hot })}${away ? ` ${away}` : ""}`);
           }
           case "AI": {
             const r = await fetch("/api/analyst/ai", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ question: intent.question, history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })) }),
+              body: JSON.stringify({
+                question: intent.question,
+                // JARVIS answers knowing what its own 24/7 core is doing and how it has done.
+                snapshot: coreRef.current ? coreContext(coreRef.current, Date.now()) : { asistente: "JARVIS" },
+                history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
+              }),
             });
             const d = (await r.json().catch(() => ({}))) as { text?: string; error?: string };
             return speak(
@@ -354,7 +418,7 @@ function JarvisInner() {
         speak("No pude completar eso: Binance no respondió. Probá de nuevo en un momento.");
       }
     },
-    [lines, prefs.name, record, resolveOpen, setPrefs, speak],
+    [lines, prefs.name, record, resolveOpen, setPrefs, speak, loadCore],
   );
 
   const handle = useCallback(
@@ -440,18 +504,42 @@ function JarvisInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the wake setting changes
   }, [prefs.wake]);
 
-  // Watch mode: every 5 minutes with the tab visible, warn about new coins about to break.
+  // Watch mode. With the core online it speaks what the core opens and closes
+  // (the server already scans 24/7); without it, the browser scans as before.
   useEffect(() => {
     if (!prefs.watch) return;
     const seen = new Set<string>();
+    const announced = new Set<string>();
+    let primed = false;
     const check = async () => {
+      const snap = await loadCore();
+      if (snap && coreOnline(snap.heartbeat, Date.now())) {
+        const items = [...snap.open, ...snap.recent];
+        const keyOf = (x: JarvisSignal) => `${x.id}|${x.result}`;
+        if (!primed) {
+          items.forEach((x) => announced.add(keyOf(x)));
+          primed = true;
+          return;
+        }
+        const fresh = items.filter((x) => !announced.has(keyOf(x)));
+        fresh.forEach((x) => announced.add(keyOf(x)));
+        if (!fresh.length) return;
+        const parts = fresh.slice(0, 3).map((x) =>
+          x.result === "ABIERTA"
+            ? `el núcleo abrió ${signalSpeech(x).replace(/^Señal registrada: /, "")}`
+            : `${x.symbol.replace(/USDT$/, "")} cerró en ${x.result === "OBJETIVO" ? "objetivo" : x.result === "STOP" ? "stop" : "tiempo"}, ${(x.r ?? 0) >= 0 ? "más" : "menos"} ${Math.abs(x.r ?? 0).toFixed(1).replace(".", ",")} R.`,
+        );
+        setOpen(true);
+        speak(`Atención, ${prefs.name}: ${parts.join(" ")}`);
+        return;
+      }
       await resolveOpen();
       const [hot, sweeps] = await Promise.all([scanBreakouts("1h", 20).catch(() => []), scanMagnetSignals().catch(() => [])]);
       const added = record([...hot.map((b) => b.signal), ...sweeps]);
-      const fresh = hot.filter((b) => !seen.has(b.symbol));
-      fresh.forEach((b) => seen.add(b.symbol));
+      const freshHot = hot.filter((b) => !seen.has(b.symbol));
+      freshHot.forEach((b) => seen.add(b.symbol));
       const parts: string[] = [];
-      if (fresh.length) parts.push(`${fresh.slice(0, 3).map((b) => `${b.symbol.replace(/USDT$/, "")} está a punto de romper ${b.side === "ALCISTA" ? "hacia arriba" : b.side === "BAJISTA" ? "hacia abajo" : "sin dirección clara"}`).join("; ")}.`);
+      if (freshHot.length) parts.push(`${freshHot.slice(0, 3).map((b) => `${b.symbol.replace(/USDT$/, "")} está a punto de romper ${b.side === "ALCISTA" ? "hacia arriba" : b.side === "BAJISTA" ? "hacia abajo" : "sin dirección clara"}`).join("; ")}.`);
       if (added.length) parts.push(added.slice(0, 3).map(signalSpeech).join(" "));
       if (parts.length) {
         setOpen(true);
@@ -459,8 +547,14 @@ function JarvisInner() {
       }
     };
     void check();
-    return everyVisible(() => void check(), 300_000);
-  }, [prefs.watch, prefs.name, record, resolveOpen, speak]);
+    return everyVisible(() => void check(), 120_000);
+  }, [prefs.watch, prefs.name, record, resolveOpen, speak, loadCore]);
+
+  // While the panel is open, keep the core's status fresh (shared 60 s cache on the server).
+  useEffect(() => {
+    if (!open) return;
+    return everyVisible(() => void loadCore(), 120_000);
+  }, [open, loadCore]);
 
   // Keyboard: Alt+J opens and listens; Escape closes.
   useEffect(() => {
@@ -476,14 +570,25 @@ function JarvisInner() {
     return () => window.removeEventListener("keydown", onKey);
   }, [startListening]);
 
+  const refreshLedger = useCallback(() => {
+    if (ledgerTab === "core") void loadCore();
+    else void resolveOpen();
+  }, [ledgerTab, loadCore, resolveOpen]);
+
   const openPanel = () => {
     setOpen(true);
     void resolveOpen();
-    if (!lines.length) {
-      const today = new Date().toISOString().slice(0, 10);
-      if (prefs.lastBriefing !== today) void run({ kind: "BRIEFING" });
-      else speak(`${greeting(new Date().getHours(), prefs.name)} ¿En qué te ayudo?`);
-    }
+    void (async () => {
+      const snap = await loadCore();
+      const away = snap ? takeAway(snap) : null;
+      if (!lines.length) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (prefs.lastBriefing !== today) {
+          awayRef.current = away;
+          void run({ kind: "BRIEFING" });
+        } else speak(`${greeting(new Date().getHours(), prefs.name)}${away ? ` ${away}` : ""} ¿En qué te ayudo?`);
+      } else if (away) speak(away);
+    })();
   };
 
   const label = mode === "listening" ? "ESCUCHANDO" : mode === "thinking" ? "PROCESANDO" : mode === "speaking" ? "HABLANDO" : prefs.wake ? "EN ESPERA · DECÍ «JARVIS»" : "EN LÍNEA";
@@ -498,6 +603,13 @@ function JarvisInner() {
           <div className="jv-head">
             <b>J.A.R.V.I.S.</b>
             <em>{label}</em>
+            <button
+              className={`jv-core ${coreUp ? "on" : "off"}`}
+              onClick={() => void run({ kind: "CORE" })}
+              title={core?.heartbeat ? `Núcleo 24/7 · último latido ${new Date(core.heartbeat.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} · ${core.heartbeat.note}` : "Núcleo 24/7 en el servidor"}
+            >
+              <i />NÚCLEO
+            </button>
             <button className={showLedger ? "jv-tab on" : "jv-tab"} onClick={() => setShowLedger((v) => !v)} aria-pressed={showLedger} title="Registro de señales">📊</button>
             <button onClick={() => setOpen(false)} aria-label="Cerrar">✕</button>
           </div>
@@ -524,10 +636,21 @@ function JarvisInner() {
             {interim && <p className="yo interim">{interim}…</p>}
           </div>
           {showLedger && (() => {
-            const st = ledgerStats(ledger);
+            const onCore = ledgerTab === "core" && core !== null;
+            const list = onCore ? [...core.open, ...core.recent].sort((a, b) => (b.closedAt ?? b.time) - (a.closedAt ?? a.time)) : [...ledger].reverse();
+            const st = onCore ? core.stats : ledgerStats(ledger);
             const pfTxt = st.profitFactor === null ? "—" : st.profitFactor === Infinity ? "∞" : st.profitFactor.toFixed(2).replace(".", ",");
             return (
               <div className="jv-ledger">
+                <div className="jv-seg jv-ltabs" role="tablist">
+                  <button role="tab" aria-selected={ledgerTab === "core"} className={ledgerTab === "core" ? "on" : ""} onClick={() => setLedgerTab("core")}>
+                    NÚCLEO 24/7
+                  </button>
+                  <button role="tab" aria-selected={ledgerTab === "local"} className={ledgerTab === "local" ? "on" : ""} onClick={() => setLedgerTab("local")}>
+                    ESTE DISPOSITIVO
+                  </button>
+                </div>
+                {ledgerTab === "core" && !core && <p className="jv-empty">Conectando con el núcleo…</p>}
                 <div className="jv-kpis">
                   <span><b>{st.winRate === null ? "—" : `${Math.round(st.winRate * 100)}%`}</b>win rate</span>
                   <span><b>{pfTxt}</b>profit factor</span>
@@ -541,8 +664,8 @@ function JarvisInner() {
                   )}
                 </p>
                 <div className="jv-sigs">
-                  {ledger.length ? (
-                    [...ledger].reverse().slice(0, 12).map((x) => (
+                  {list.length ? (
+                    list.slice(0, 12).map((x) => (
                       <p key={x.id} className={x.r === null ? "" : x.r > 0 ? "up" : "down"}>
                         <b>{x.symbol.replace(/USDT$/, "")} {x.side === "LONG" ? "▲" : "▼"} {x.timeframe}</b>
                         <span>{fmtPx(x.entry)} → stop {fmtPx(x.stop)} · obj {fmtPx(x.target)}</span>
@@ -550,18 +673,22 @@ function JarvisInner() {
                       </p>
                     ))
                   ) : (
-                    <p className="jv-empty">Todavía no di señales con dirección. Activá la vigilancia o preguntame qué está por romper.</p>
+                    <p className="jv-empty">
+                      {onCore
+                        ? "El núcleo todavía no abrió señales: solo lo hace cuando una moneda está a punto de romper con dirección o un imán se barre y rechaza."
+                        : "Todavía no di señales con dirección en este dispositivo. Activá la vigilancia o preguntame qué está por romper."}
+                    </p>
                   )}
                 </div>
                 <div className="jv-ledger-actions">
-                  <button onClick={() => void resolveOpen()}>ACTUALIZAR</button>
-                  {ledger.length > 0 && (
+                  <button onClick={refreshLedger}>ACTUALIZAR</button>
+                  {list.length > 0 && (
                     <button
                       onClick={() => {
-                        const url = URL.createObjectURL(new Blob([ledgerCsv(ledger)], { type: "text/csv;charset=utf-8" }));
+                        const url = URL.createObjectURL(new Blob([ledgerCsv([...list].reverse())], { type: "text/csv;charset=utf-8" }));
                         const a = document.createElement("a");
                         a.href = url;
-                        a.download = "jarvis-senales.csv";
+                        a.download = onCore ? "jarvis-nucleo.csv" : "jarvis-senales.csv";
                         a.click();
                         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
                       }}
@@ -572,7 +699,11 @@ function JarvisInner() {
                 </div>
                 <small>
                   Cada señal queda con su plan desde que la doy y se resuelve con las velas siguientes: si una vela toca stop y objetivo, cuenta el stop; a las 48 velas
-                  se cierra a mercado; comisiones descontadas. Nada se borra ni se corrige después. Guardado en este dispositivo. No es asesoramiento financiero.
+                  se cierra a mercado; comisiones descontadas. Nada se borra ni se corrige después.{" "}
+                  {onCore
+                    ? `El núcleo corre en el servidor las 24 horas: ${core.heartbeat ? `último latido ${new Date(core.heartbeat.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} (${core.heartbeat.note})` : "todavía sin latido"}. Se ven las últimas 20 cerradas; el registro cuenta todas.`
+                    : "Guardado en este dispositivo."}{" "}
+                  No es asesoramiento financiero.
                 </small>
               </div>
             );
