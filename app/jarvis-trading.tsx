@@ -7,6 +7,8 @@ import { arTime, NOT_AVAILABLE, upcomingHighImpact, type AgentReport } from "@/l
 import { DESK_PROVIDERS, type DeskSnapshot } from "@/lib/jarvis-desk-data";
 import { compareDesks, macroBrief, type Comparison, type DeskDecision, type DeskSettings, type Plan, type RiskReview } from "@/lib/jarvis-desk";
 import { cachedDesk, deskFor, DESK_SHOW_EVENT, loadDeskSettings, saveDeskSettings, typedNumber } from "@/lib/jarvis-desk-run";
+import { withRecord } from "@/lib/jarvis-paper";
+import { PaperBlock, PaperFollow, usePaper } from "./jarvis-paper";
 
 /**
  * JARVIS TRADING: la mesa de especialistas de JARVIS sobre un activo, pensada
@@ -89,6 +91,8 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
   const [other, setOther] = useState("ETH");
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [comparing, setComparing] = useState(false);
+  // A plain toggle: it opens when a simulation starts and never closes by itself when a trade ends.
+  const [paperOpen, setPaperOpen] = useState(false);
   const ctxRef = useRef(getContext);
   useEffect(() => {
     ctxRef.current = getContext;
@@ -166,8 +170,16 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
     }
   };
 
-  const d = decision;
+  const paper = usePaper();
+  // The measured record of similar paper trades, next to the score (the plan does not change).
+  const d = decision ? withRecord(decision, paper.trades) : null;
   const coin = symbol.replace(/USDT$/, "");
+  const paperBlock = (
+    <details className="jt-block" open={paperOpen} onToggle={(e) => setPaperOpen(e.currentTarget.open)}>
+      <summary>Paper trading · simulado</summary>
+      <PaperBlock state={paper} />
+    </details>
+  );
   return (
     <section className="panel jt-desk" id="jarvis-trading">
       <header className="jt-head">
@@ -209,6 +221,7 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
       {d && state !== "loading" && (
         <>
           <DecisionCard d={d} />
+          <PaperFollow key={`${d.symbol}:${d.vela}:${d.direccion}`} d={d} onOpened={() => setPaperOpen(true)} />
           <details className="jt-block" open>
             <summary>¿Por qué?</summary>
             <p className="jt-lead">{d.resolucion}</p>
@@ -259,6 +272,8 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
             </form>
             {comparison && <CompareTable c={comparison} />}
           </details>
+
+          {paperBlock}
 
           <details className="jt-block">
             <summary>Agenda macro</summary>
@@ -319,6 +334,7 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
           <p className="disclaimer">{d.aviso} El puntaje mide cuánto coinciden los especialistas, no la probabilidad de acertar.</p>
         </>
       )}
+      {!d && state !== "loading" && paperBlock}
     </section>
   );
 }
