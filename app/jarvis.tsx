@@ -9,6 +9,8 @@ import { cachedDesk, deskFor, showInDesk } from "@/lib/jarvis-desk-run";
 import { canPaper, paperForAi, paperSpeech } from "@/lib/jarvis-paper";
 import { loadPaper, openFromDesk, paperTrades, refreshPaper } from "@/lib/jarvis-paper-run";
 import { arNumber } from "@/lib/ai-numbers";
+import { backtestForAi, backtestSpeech } from "@/lib/jarvis-backtest";
+import { lastBacktest, runBacktestFor } from "@/lib/jarvis-backtest-run";
 import { loadCalendar } from "@/lib/econ-calendar";
 import { compactSnapshot } from "@/lib/ai-analyst";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -786,6 +788,16 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
               "papel",
             );
           }
+          case "BACKTEST": {
+            const sym = intent.symbol ? `${intent.symbol}USDT` : (focusRef.current.symbol ?? "BTCUSDT");
+            const coin = sym.replace(/USDT$/, "");
+            screenRef.current = "JARVIS TRADING";
+            showSection("jarvis-trading");
+            showInDesk(sym);
+            setLines((l) => [...l, { who: "jarvis" as const, text: `Corro el backtest de ${coin} en ${intent.days} días con la misma mesa y las reglas del papel: tarda unos segundos…` }].slice(-40));
+            const r = await runBacktestFor(sym, intent.days);
+            return speak(r.ok ? `${backtestSpeech(r.result)}${r.nota ? ` ${r.nota}` : ""}` : r.error, "backtest");
+          }
           case "MACRO": {
             const cal = await loadCalendar().catch(() => null);
             return speak(macroSpeech(macroBrief(cal?.events ?? null, Date.now(), macroKindOf(intent.question))), "mesa");
@@ -843,6 +855,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                     mesa: subject && cachedDesk(subject) ? deskForAi(cachedDesk(subject)!) : null,
                     // Its own paper record (simulated), so it can discuss how its plans actually went.
                     papel: paperForAi(paperTrades()),
+                    backtest: subject && lastBacktest()?.symbol === subject ? backtestForAi(lastBacktest()!) : null,
                   },
                   history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
                 }),

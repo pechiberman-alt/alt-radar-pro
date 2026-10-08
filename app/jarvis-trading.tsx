@@ -9,6 +9,8 @@ import { compareDesks, macroBrief, type Comparison, type DeskDecision, type Desk
 import { cachedDesk, deskFor, DESK_SHOW_EVENT, loadDeskSettings, saveDeskSettings, typedNumber } from "@/lib/jarvis-desk-run";
 import { withRecord } from "@/lib/jarvis-paper";
 import { PaperBlock, PaperFollow, usePaper } from "./jarvis-paper";
+import { BacktestBlock } from "./jarvis-backtest";
+import { BACKTEST_EVENT } from "@/lib/jarvis-backtest-run";
 
 /**
  * JARVIS TRADING: la mesa de especialistas de JARVIS sobre un activo, pensada
@@ -93,6 +95,7 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
   const [comparing, setComparing] = useState(false);
   // A plain toggle: it opens when a simulation starts and never closes by itself when a trade ends.
   const [paperOpen, setPaperOpen] = useState(false);
+  const [backtestOpen, setBacktestOpen] = useState(false);
   const ctxRef = useRef(getContext);
   useEffect(() => {
     ctxRef.current = getContext;
@@ -150,9 +153,13 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
       document.getElementById("jarvis-trading")?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
     window.addEventListener(DESK_SHOW_EVENT, onShow);
+    // A backtest JARVIS ran from the chat shows up opened.
+    const onBacktest = () => setBacktestOpen(true);
+    window.addEventListener(BACKTEST_EVENT, onBacktest);
     return () => {
       live = false;
       window.removeEventListener(DESK_SHOW_EVENT, onShow);
+      window.removeEventListener(BACKTEST_EVENT, onBacktest);
     };
   }, [analyze, runCompare]);
 
@@ -274,6 +281,11 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
           </details>
 
           {paperBlock}
+
+          <details className="jt-block" open={backtestOpen} onToggle={(e) => setBacktestOpen(e.currentTarget.open)}>
+            <summary>Backtesting · histórico</summary>
+            <BacktestBlock symbol={symbol} d={d} />
+          </details>
 
           <details className="jt-block">
             <summary>Agenda macro</summary>
