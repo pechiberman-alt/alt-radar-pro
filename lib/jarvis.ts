@@ -32,6 +32,7 @@ export type JarvisIntent =
   | { kind: "INDICATORS"; symbol: string | null }
   | { kind: "MACRO"; question: string }
   | { kind: "PAPER" }
+  | { kind: "BACKTEST"; symbol: string | null; days: number }
   | { kind: "PAPER_OPEN"; symbol: string | null }
   | { kind: "AI"; question: string };
 
@@ -129,6 +130,22 @@ export function spokenLevel(raw: string): number | null {
 
 const OPEN_VERB = /\b(abri|abrime|abre|abrir|mostrame|muestrame|muestra|mostra|anda a|ir a|llevame|pone|pasa a|quiero ver|ver)\b/;
 
+const COUNT: Record<string, number> = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, nueve: 9, doce: 12 };
+
+/** The period of a backtest, said in days, months or years (normalized text); 90 days when not said. */
+export function backtestDays(text: string): number {
+  const clamp = (n: number) => Math.max(14, Math.min(365, Math.round(n)));
+  const d = text.match(/\b(\d{1,3})\s*(?:dias|d)\b/);
+  if (d) return clamp(Number(d[1]));
+  if (/\b(medio ano|semestre)\b/.test(text)) return 180;
+  if (/\btrimestre\b/.test(text)) return 90;
+  if (/\b(un ano|ultimo ano|el ano|doce meses|12 meses)\b/.test(text)) return 365;
+  const m = text.match(/\b(\d{1,2}|un|una|uno|dos|tres|cuatro|cinco|seis|nueve|doce)\s+mes(?:es)?\b/);
+  if (m) return clamp((COUNT[m[1]] ?? Number(m[1])) * 30);
+  if (/\b(el ultimo mes|un mes)\b/.test(text)) return 30;
+  return 90;
+}
+
 export function parseCommand(raw: string, known: Set<string> = new Set()): JarvisIntent {
   // A leading wake word is not part of the command.
   const text = normalize(raw).replace(/^(oye |hey |ok )?jarvis\b ?/, "");
@@ -162,6 +179,9 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
 
   const coins = findCoins(text, known);
   const question = raw.trim().replace(/^(oye |hey |ok )?jarvis[,:]?\s*/i, "");
+  // Backtesting (lib/jarvis-backtest.ts): the same desk walked forward over past candles.
+  if (/\b(backtest\w*|back test|prueba historica|probala en el pasado|como le (hubiera|habria) ido|como (hubiera|habria) funcionado)\b/.test(text))
+    return { kind: "BACKTEST", symbol: coins[0] ?? null, days: backtestDays(text) };
   // JARVIS TRADING (lib/jarvis-desk.ts): the desk of specialists, its plan, its scenarios.
   if (/\b(cpi|ppi|nfp|fomc|inflacion|nominas|dato macro|datos macro|agenda macro|calendario (economico|macro)|eventos? macro|la fed|tasa de (la fed|interes)|tasas de interes|desempleo|pbi|gdp)\b/.test(text))
     return { kind: "MACRO", question };
@@ -245,4 +265,4 @@ export const HELP_TEXT =
   "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. " +
   "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizá Solana, o analizalo para lo que tenés en pantalla. Tu lectura del mercado. " +
   "Trading: analizame Bitcoin, ¿dónde entrarías?, ¿qué pasa si pierde 110.000?, comparame Bitcoin contra Ethereum, ¿hay riesgo de liquidaciones?, ¿qué pasa si sale un CPI peor de lo esperado? " +
-  "Papel, sin plata real: simulá la operación, ¿cómo va mi paper trading? O preguntame lo que quieras sobre el mercado.";
+  "Papel, sin plata real: simulá la operación, ¿cómo va mi paper trading? Backtest de Solana de 6 meses. O preguntame lo que quieras sobre el mercado.";

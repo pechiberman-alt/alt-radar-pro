@@ -101,6 +101,23 @@
 .jt-row{display:flex;gap:8px;flex-wrap:wrap}
 .jt-audit{margin:6px 0;padding-left:20px;display:grid;gap:6px}
 .jt-audit li{font-size:12.5px;line-height:1.5;color:#c9d5ce}
+.jt-bt{display:grid;gap:8px}
+.jt-run{min-height:46px;padding:0 14px;border:1px solid var(--green2);background:#0c2d20;color:var(--green);border-radius:6px;font:11px var(--font-mono);letter-spacing:1px;font-weight:700;cursor:pointer}
+.jt-run:disabled,.jt-quick button:disabled{opacity:.6}
+.jt-progress{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.jt-progress progress{width:100%;height:8px;accent-color:var(--green)}
+.jt-curve{margin:4px 0;display:grid;gap:4px}
+.jt-curve figcaption{font:11px var(--font-mono);letter-spacing:1px;color:var(--muted)}
+.jt-curve-box{position:relative;border:1px solid var(--line);border-radius:6px;background:#0a100d;touch-action:pan-y}
+.jt-curve svg{display:block;width:100%;height:auto}
+.jt-curve-zero{stroke:#25332b;stroke-width:1}
+.jt-curve-cross{stroke:#4b5d53;stroke-width:1}
+.jt-curve-line{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.jt-curve-dot{fill:var(--green);stroke:#0a100d;stroke-width:2}
+.jt-curve-label{font:10px var(--font-mono);fill:var(--muted)}
+.jt-curve-label.strong{fill:var(--text);font-weight:700}
+.jt-readout{margin:0;min-height:20px;font-size:12px;color:var(--muted)}
+.jt-readout b{font:13px var(--font-mono);color:var(--text)}
 @media(min-width:760px){
   .jt-desk{padding:20px 22px}
   .jt-levels{grid-template-columns:repeat(5,1fr)}

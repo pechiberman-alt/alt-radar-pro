@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { briefingText, findCoins, findTimeframe, greeting, normalize, parseCommand, priceLine, spokenLevel } from "../lib/jarvis.ts";
+import { briefingText, findCoins, findTimeframe, greeting, normalize, parseCommand, priceLine, spokenLevel, backtestDays } from "../lib/jarvis.ts";
 
 const KNOWN = new Set(["BTC", "ETH", "SOL", "PEPE", "WIF", "ORDI"]);
 
@@ -95,6 +95,20 @@ test("JARVIS TRADING: the questions of the desk reach the desk", () => {
   assert.deepEqual(parseCommand("resultados de las simulaciones"), { kind: "PAPER" });
   assert.notEqual(parseCommand("¿qué papel juega la Fed?").kind, "PAPER", "a role is not paper trading");
   assert.deepEqual(parseCommand("decime tu win rate y profit factor"), { kind: "STATS" }, "JARVIS's own signals stay where they were");
+  // Backtesting: the same desk over past candles.
+  assert.deepEqual(parseCommand("hacé un backtest de SOL de 6 meses"), { kind: "BACKTEST", symbol: "SOL", days: 180 });
+  assert.deepEqual(parseCommand("backtesteá BTC"), { kind: "BACKTEST", symbol: "BTC", days: 90 });
+  assert.deepEqual(parseCommand("¿cómo le hubiera ido a la mesa con ETH el último mes?"), { kind: "BACKTEST", symbol: "ETH", days: 30 });
+});
+
+test("backtest periods in days, months or years", () => {
+  assert.equal(backtestDays(normalize("backtest de 45 días")), 45);
+  assert.equal(backtestDays(normalize("backtest de tres meses")), 90);
+  assert.equal(backtestDays(normalize("backtest de un mes")), 30);
+  assert.equal(backtestDays(normalize("backtest del último año")), 365);
+  assert.equal(backtestDays(normalize("backtest de medio año")), 180);
+  assert.equal(backtestDays(normalize("backtest de 2 días")), 14, "at least two weeks");
+  assert.equal(backtestDays(normalize("backtest")), 90);
 });
 
 test("prices said the Argentine way; timeframes and percentages are not prices", () => {
