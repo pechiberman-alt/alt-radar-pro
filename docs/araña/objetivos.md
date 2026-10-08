@@ -172,11 +172,12 @@ Pendiente:
 
 ## araña — La araña del proyecto y las instrucciones para trabajar en él
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
-Archivos: scripts/arana.mjs, docs/araña/**, tests/arana.test.ts, CLAUDE.md
+Archivos: scripts/arana.mjs, scripts/arana-vista.html, docs/araña/**, tests/arana.test.ts, CLAUDE.md
 Reglas:
 - Antes de leer archivos enteros: `npm run arana -- --buscar <tema>` o `--archivo <ruta>`.
 - Después de agregar, mover o borrar archivos, o cambiar estos objetivos: `npm run arana`. `npm run test:unit` avisa si el mapa quedó viejo.
 - La araña lee el código sin ejecutarlo: lo que se arma en tiempo de ejecución no aparece, y el mapa lo dice.
+- La vista (`npm run arana -- --vista`) dibuja el mismo mapa: la araña recorre cada objetivo por sus imports, con registro, cobertura, banderas y buscador. Se genera, no se commitea (docs/araña/vista.html está en .gitignore).
 
 ## calidad — Pruebas
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.

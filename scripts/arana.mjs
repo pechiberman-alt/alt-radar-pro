@@ -845,6 +845,88 @@ export function resumen(index) {
   return `${index.archivos.length} archivos · ${index.objetivos.length} objetivos · ${index.sinObjetivo.length} sin objetivo · ${index.tablas.size} tablas D1 · ${index.secretos.size} secretos · ${index.rutas.length} rutas /api.`;
 }
 
+// ── La vista: la araña dibujada (docs/araña/vista.html) ──
+
+export const VISTA_PLANTILLA = "scripts/arana-vista.html";
+export const VISTA = `${DOCS}/vista.html`;
+
+function tipoDe(f) {
+  if (f.esPrueba) return "prueba";
+  if (f.path.startsWith("app/api/")) return "api";
+  if (f.path.startsWith("app/")) return /\.css$/.test(f.path) ? "estilo" : "pantalla";
+  if (f.path.startsWith("lib/")) return "lib";
+  if (f.path.startsWith("worker/")) return "worker";
+  if (f.path.startsWith("scripts/")) return "script";
+  if (f.path.endsWith(".md")) return "doc";
+  return "otro";
+}
+
+/**
+ * Todo lo que muestra la vista, compacto: objetivos con sus reglas y
+ * pendientes, archivos (índice = posición), imports entre archivos, qué prueba
+ * cada test, tablas, secretos, rutas y las banderas que hay que atender.
+ */
+export function grafoDe(index, { generado = new Date().toISOString(), commit = null } = {}) {
+  const pos = new Map(index.archivos.map((f, i) => [f.path, i]));
+  const obj = new Map(index.objetivos.map((o, i) => [o.slug, i]));
+  const at = (p) => pos.get(p);
+  const archivos = index.archivos.map((f) => ({
+    p: f.path,
+    o: f.objetivo ? obj.get(f.objetivo) : -1,
+    k: tipoDe(f),
+    l: f.lineas,
+    r: f.resumen.slice(0, 180),
+    x: f.exporta.slice(0, 8),
+    c: f.cliente ? 1 : 0,
+    pr: f.probadoPor.length,
+    tb: [...new Set([...f.tablas.crea, ...f.tablas.menciones.filter((n) => index.tablas.has(n))])].slice(0, 6),
+    s: [...new Set(f.secretos.map((s) => s.nombre))],
+    ru: f.ruta ? f.ruta.ruta : null,
+  }));
+  const enlaces = [];
+  const pruebas = [];
+  for (const f of index.archivos) {
+    for (const dep of f.importa) (f.esPrueba ? pruebas : enlaces).push([at(f.path), at(dep)]);
+  }
+  const banderas = [
+    ...index.libSinPrueba.map((p) => ({ k: "sin-prueba", a: at(p), t: "sin prueba directa" })),
+    ...index.sinObjetivo.map((p) => ({ k: "sin-objetivo", a: at(p), t: "sin objetivo en objetivos.md" })),
+    ...index.cliente.problemas.map((pr) => ({ k: pr.tipo === "secreto" ? "secreto" : "api", a: at(pr.archivo), t: pr.detalle })),
+  ];
+  return {
+    v: 1,
+    generado,
+    commit,
+    resumen: {
+      archivos: index.archivos.length,
+      lineas: index.archivos.reduce((a, f) => a + f.lineas, 0),
+      objetivos: index.objetivos.length,
+      tablas: index.tablas.size,
+      secretos: index.secretos.size,
+      rutas: index.rutas.length,
+      enlaces: enlaces.length,
+      pruebas: pruebas.length,
+      clienteProblemas: index.cliente.problemas.length,
+    },
+    objetivos: index.objetivos.map((o) => ({ slug: o.slug, titulo: o.titulo, texto: o.texto, reglas: o.reglas, pendiente: o.pendiente, transversal: o.transversal })),
+    archivos,
+    enlaces,
+    pruebas,
+    banderas,
+    tablas: [...index.tablas].map(([n, t]) => ({ n, crea: t.crea.map(at), usa: t.usa.map(at) })),
+    secretos: [...index.secretos].map(([n, s]) => ({ n, lee: s.lee.map(at), guarda: s.guarda.map(at) })),
+    rutas: index.rutas.map((r) => ({ r: r.ruta, a: at(r.archivo), m: r.metodos })),
+    sinonimos: Object.fromEntries([...index.sinonimos].map(([k, set]) => [k, [...set].filter((x) => x !== k)])),
+  };
+}
+
+/** La plantilla con el grafo adentro (sin `</script>` que corte la página). */
+export function vistaHtml(plantilla, grafo) {
+  const json = JSON.stringify(grafo).replace(/</g, "\\u003c");
+  if (!plantilla.includes("/*__GRAFO__*/null")) throw new Error(`${VISTA_PLANTILLA}: falta el marcador /*__GRAFO__*/null`);
+  return plantilla.replace("/*__GRAFO__*/null", () => json);
+}
+
 const AYUDA = `La araña: el mapa de ALT RADAR PRO para consultar sin leer todo el repo.
 
   npm run arana                        reescribe docs/araña/MAPA.md y huellas.txt (después de cambiar archivos u objetivos)
@@ -856,6 +938,7 @@ const AYUDA = `La araña: el mapa de ALT RADAR PRO para consultar sin leer todo 
   npm run arana -- --secretos          secretos y variables de entorno, y si el navegador los toca
   npm run arana -- --cambios           qué cambió desde el último mapa
   npm run arana -- --check             falla si el mapa está viejo, si hay archivos sin objetivo o si el navegador toca secretos
+  npm run arana -- --vista [salida]    dibuja la araña recorriendo el proyecto en docs/araña/vista.html (no se commitea)
   npm run arana -- --ayuda
 
 La lectura es estática: los imports que se arman en tiempo de ejecución no aparecen.`;
@@ -898,6 +981,18 @@ export function ejecutar(args, index, { mapaGuardado = null, huellas = null } = 
   if (flag === "--check") {
     const r = chequear(index, mapaGuardado);
     return { codigo: r.ok ? 0 : 1, salida: textoCheck(r) };
+  }
+  if (flag === "--vista") {
+    const plantilla = readFileSync(join(ROOT, VISTA_PLANTILLA), "utf8");
+    let commit = null;
+    try {
+      commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+    } catch {
+      // Not a git checkout: the view just does not name the commit.
+    }
+    const salida = tema || VISTA;
+    writeFileSync(join(ROOT, salida), vistaHtml(plantilla, grafoDe(index, { commit })));
+    return { codigo: 0, salida: `Vista de la araña: ${salida} (${resumen(index)})` };
   }
   return { codigo: 2, salida: `No conozco «${flag}».\n\n${AYUDA}` };
 }

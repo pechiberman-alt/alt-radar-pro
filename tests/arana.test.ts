@@ -10,6 +10,7 @@ import {
   construirIndice,
   ejecutar,
   globToRegExp,
+  grafoDe,
   MAPA,
   objetivoDe,
   parseObjetivos,
@@ -17,6 +18,8 @@ import {
   renderMapa,
   ROOT,
   textoCambios,
+  VISTA_PLANTILLA,
+  vistaHtml,
 } from "../scripts/arana.mjs";
 
 /** A file as the araña reads it: its text and a fingerprint of that text. */
@@ -185,4 +188,38 @@ test("the committed map is the map the code gives today (npm run arana rewrites 
   const r = chequear(index, guardado);
   assert.equal(r.mapaViejo, false, "docs/araña/MAPA.md está viejo: corré npm run arana");
   assert.deepEqual(r.problemas, [], r.problemas.join("\n"));
+});
+
+test("the view's graph: every file once, imports and tests as edges between them, and the flags to look at", () => {
+  const index = construirIndice(FILES, parseObjetivos(FIXTURE_MD));
+  const g = grafoDe(index, { generado: "2026-10-08T09:00:00.000Z", commit: "abc1234" });
+  assert.equal(g.archivos.length, FILES.length);
+  const at = (p: string) => g.archivos.findIndex((f: { p: string }) => f.p === p);
+  assert.deepEqual(g.enlaces.map(([a, b]: number[]) => [g.archivos[a].p, g.archivos[b].p]).sort(), [["app/chico.tsx", "lib/c.ts"], ["app/cliente-api.tsx", "app/api/hola/route.ts"], ["app/page.tsx", "lib/a.ts"], ["lib/a.ts", "lib/b.ts"]]);
+  assert.deepEqual(g.pruebas, [[at("tests/a.test.ts"), at("lib/a.ts")]], "a test is an edge of its own kind");
+  assert.equal(g.archivos[at("lib/a.ts")].pr, 1);
+  assert.equal(g.archivos[at("lib/a.ts")].k, "lib");
+  assert.equal(g.archivos[at("app/api/hola/route.ts")].k, "api");
+  assert.equal(g.archivos[at("tests/a.test.ts")].k, "prueba");
+  assert.equal(g.objetivos[g.archivos[at("lib/a.ts")].o].slug, "cuentas");
+  assert.equal(g.archivos[at("misc/zz.ts")].o, -1);
+  const kinds = g.banderas.map((b: { k: string; a: number }) => `${b.k}:${g.archivos[b.a].p}`).sort();
+  assert.ok(kinds.includes("sin-objetivo:misc/zz.ts"));
+  assert.ok(kinds.includes("sin-prueba:lib/b.ts"));
+  assert.ok(kinds.includes("secreto:lib/c.ts"), "a secret reached from browser code is flagged on the file that reads it");
+  assert.ok(kinds.includes("api:app/cliente-api.tsx"));
+  assert.deepEqual(g.objetivos.find((o: { slug: string }) => o.slug === "cuentas").pendiente, ["Revisar el redondeo de LIMITE."]);
+  assert.equal(g.commit, "abc1234");
+  assert.deepEqual(g.tablas, [{ n: "notas", crea: [at("lib/d.ts")], usa: [at("lib/d.ts")] }]);
+  assert.ok(g.sinonimos.voz.includes("voice"));
+});
+
+test("the view: the graph goes inside the page once, and nothing in it can close the script", () => {
+  const plantilla = readFileSync(join(ROOT, VISTA_PLANTILLA), "utf8");
+  const g = grafoDe(construirIndice([...FILES, archivo("lib/raro.ts", "/** Cierra </script> a propósito. */\nexport const x = 1;\n")], parseObjetivos(FIXTURE_MD)));
+  const html = vistaHtml(plantilla, g);
+  assert.ok(!html.includes("/*__GRAFO__*/null"));
+  assert.equal(html.split("</script>").length, plantilla.split("</script>").length, "no extra </script> from the data");
+  assert.ok(html.includes("<title>Araña de ALT RADAR</title>"));
+  assert.throws(() => vistaHtml("<p>sin marcador</p>", g), /falta el marcador/);
 });
