@@ -11,6 +11,7 @@ type Status = {
   telegram: { configured: boolean; source: "cloudflare" | "app" | null };
   ai: { configured: boolean; source: "cloudflare" | "app" | null };
   groq?: { configured: boolean; source: "cloudflare" | "app" | null };
+  cmc?: { configured: boolean; source: "cloudflare" | "app" | null };
   freeAi?: { ok: boolean; at: number; ms: number; model: string; error: string | null } | null;
   encryption: "fuerte" | "local";
 };
@@ -30,6 +31,7 @@ export default function SettingsDesk() {
   const [telegramToken, setTelegramToken] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
   const [groqKey, setGroqKey] = useState("");
+  const [cmcKey, setCmcKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
@@ -69,13 +71,13 @@ export default function SettingsDesk() {
   };
 
   const save = async () => {
-    if (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim()) return;
+    if (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !cmcKey.trim()) return;
     setBusy(true);
     setResults({});
     const r = await fetch("/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telegramToken, anthropicKey, groqKey }),
+      body: JSON.stringify({ telegramToken, anthropicKey, groqKey, cmcKey }),
     }).catch(() => null);
     const d = (await r?.json().catch(() => ({}))) as { results?: Record<string, string>; error?: string } | undefined;
     setResults(d?.results ?? { error: d?.error ?? "No se pudo guardar." });
@@ -83,11 +85,12 @@ export default function SettingsDesk() {
     setTelegramToken("");
     setAnthropicKey("");
     setGroqKey("");
+    setCmcKey("");
     setBusy(false);
     await load();
   };
 
-  const remove = async (which: "telegram" | "ai" | "groq") => {
+  const remove = async (which: "telegram" | "ai" | "groq" | "cmc") => {
     await fetch(`/api/admin/settings?which=${which}`, { method: "DELETE" }).catch(() => undefined);
     await load();
   };
@@ -145,6 +148,13 @@ export default function SettingsDesk() {
                 {status.groq.source === "app" && <button onClick={() => remove("groq")}>BORRAR</button>}
               </div>
             )}
+            {status.cmc && (
+              <div className={status.cmc.configured ? "on" : ""}>
+                <span>DATOS · COINMARKETCAP</span>
+                <b>{sourceLabel(status.cmc)}</b>
+                {status.cmc.source === "app" && <button onClick={() => remove("cmc")}>BORRAR</button>}
+              </div>
+            )}
             <div className={status.freeAi?.ok ? "on" : ""}>
               <span>IA GRATIS · CLOUDFLARE</span>
               <b>
@@ -169,13 +179,17 @@ export default function SettingsDesk() {
             <span>Clave gratis de Groq, opcional (console.groq.com → API Keys): más respuestas de IA por día cuando se termina el cupo de Claude</span>
             <input type="password" value={groqKey} onChange={(e) => setGroqKey(e.target.value)} placeholder="gsk_…" autoComplete="off" />
           </label>
-          <button className="set-save" onClick={save} disabled={busy || (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim())}>
+          <label className="set-field">
+            <span>Clave gratis de CoinMarketCap, opcional (coinmarketcap.com/api → plan Basic): dominancia de BTC, USDT y capitalización desde el servidor</span>
+            <input type="password" value={cmcKey} onChange={(e) => setCmcKey(e.target.value)} placeholder="xxxxxxxx-xxxx-…" autoComplete="off" />
+          </label>
+          <button className="set-save" onClick={save} disabled={busy || (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !cmcKey.trim())}>
             {busy ? "VERIFICANDO…" : "VERIFICAR Y GUARDAR"}
           </button>
 
           {Object.entries(results).map(([k, v]) => (
             <p key={k} className={`set-result ${v.startsWith("OK") ? "ok" : "bad"}`}>
-              {k === "telegram" ? "Telegram" : k === "ai" ? "IA" : k === "groq" ? "Groq" : "Error"}: {v}
+              {k === "telegram" ? "Telegram" : k === "ai" ? "IA" : k === "groq" ? "Groq" : k === "cmc" ? "CoinMarketCap" : "Error"}: {v}
             </p>
           ))}
 

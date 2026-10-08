@@ -60,7 +60,13 @@ export const MAX_WATCHED = 6;
 export const CENTER_VOLUME = new Set(["BTCUSDT", "ETHUSDT", "SOLUSDT"]);
 
 /** Lo que la vigilancia recuerda de un activo entre dos lecturas. */
-export type WatchMemory = { at: number; trends: Record<string, string>; fundingPct: number | null };
+export type WatchMemory = {
+  at: number;
+  trends: Record<string, string>;
+  fundingPct: number | null;
+  /** De qué exchange salió ese funding (las guardadas antes no lo dicen: eran de Binance Futures). */
+  fundingFuente?: string | null;
+};
 /** Una lectura vieja no sirve para comparar: un cambio de días no es un cambio "ahora". */
 export const MEMORY_MAX_AGE_MS = 12 * 3_600_000;
 
@@ -98,7 +104,9 @@ export function watchAlerts(x: WatchInput): { alerts: Alert[]; memory: WatchMemo
   }
   const der = d.agentes.find((a) => a.id === "derivados");
   const fundingPct = der?.disponible && typeof der.datos.fundingPct === "number" ? der.datos.fundingPct : null;
-  const memory: WatchMemory = { at: now, trends, fundingPct };
+  // The exchange the derivatives came from (Binance Futures, or the fallback that answered: lib/market-providers.ts).
+  const fuente = der?.disponible && typeof der.datos.fuente === "string" ? der.datos.fuente : "Binance Futures";
+  const memory: WatchMemory = { at: now, trends, fundingPct, fundingFuente: fundingPct !== null ? fuente : null };
   const prev = x.prev && now - x.prev.at <= MEMORY_MAX_AGE_MS ? x.prev : null;
   const last = h1[h1.length - 1];
   const before = h1[h1.length - 2];
@@ -139,11 +147,12 @@ export function watchAlerts(x: WatchInput): { alerts: Alert[]; memory: WatchMemo
     const period = Math.floor(now / (8 * H));
     if (Math.abs(fundingPct) >= prefs.fundingPct) {
       const who = fundingPct > 0 ? "los largos pagan a los cortos" : "los cortos pagan a los largos";
-      out.push(alertOf(`funding:${sym}:${period}:${fundingPct > 0 ? "+" : "-"}`, Math.abs(fundingPct) >= 2 * prefs.fundingPct ? "IMPORTANTE" : "INFORMATIVA", sym, `${coin}: funding ${fundingPct > 0 ? "+" : ""}${arNumber(Number(fundingPct.toFixed(4)))}% cada 8 h`, `Funding extremo: ${who}. Posicionamiento cargado de un lado; suele anticipar barridas en contra. Fuente: Binance Futures. ${NOT_ADVICE}`, now));
+      out.push(alertOf(`funding:${sym}:${period}:${fundingPct > 0 ? "+" : "-"}`, Math.abs(fundingPct) >= 2 * prefs.fundingPct ? "IMPORTANTE" : "INFORMATIVA", sym, `${coin}: funding ${fundingPct > 0 ? "+" : ""}${arNumber(Number(fundingPct.toFixed(4)))}% cada 8 h`, `Funding extremo: ${who}. Posicionamiento cargado de un lado; suele anticipar barridas en contra. Fuente: ${fuente}. ${NOT_ADVICE}`, now));
     }
-    const was = prev?.fundingPct ?? null;
+    // A jump only between two readings of the same exchange: two venues' funding differ without anything changing.
+    const was = prev && (prev.fundingFuente ?? "Binance Futures") === fuente ? prev.fundingPct : null;
     if (was !== null && Math.abs(fundingPct - was) >= prefs.fundingSalto) {
-      out.push(alertOf(`funding-salto:${sym}:${period}:${Math.round(fundingPct * 1e4)}`, "INFORMATIVA", sym, `${coin}: el funding cambió fuerte`, `De ${arNumber(Number(was.toFixed(4)))}% a ${arNumber(Number(fundingPct.toFixed(4)))}% cada 8 h entre dos lecturas. Fuente: Binance Futures. ${NOT_ADVICE}`, now));
+      out.push(alertOf(`funding-salto:${sym}:${period}:${Math.round(fundingPct * 1e4)}`, "INFORMATIVA", sym, `${coin}: el funding cambió fuerte`, `De ${arNumber(Number(was.toFixed(4)))}% a ${arNumber(Number(fundingPct.toFixed(4)))}% cada 8 h entre dos lecturas. Fuente: ${fuente}. ${NOT_ADVICE}`, now));
     }
   }
 
@@ -152,7 +161,7 @@ export function watchAlerts(x: WatchInput): { alerts: Alert[]; memory: WatchMemo
   if (prefs.kinds.OI && typeof oi === "number" && oi >= prefs.oiPct && last) {
     const rising = h1.length > 24 ? last.close >= h1[h1.length - 25].close : null;
     const read = rising === null ? "" : rising ? " con el precio subiendo: entran posiciones nuevas a favor del movimiento" : " con el precio bajando: entran cortos o se cargan largos contra el movimiento";
-    out.push(alertOf(`oi:${sym}:${Math.floor(now / (24 * H))}:${Math.floor(oi / 5)}`, oi >= 2 * prefs.oiPct ? "IMPORTANTE" : "INFORMATIVA", sym, `${coin}: interés abierto +${n2(oi)}% en 24 h`, `Suba fuerte del interés abierto${read}. Fuente: Binance Futures. ${NOT_ADVICE}`, now));
+    out.push(alertOf(`oi:${sym}:${Math.floor(now / (24 * H))}:${Math.floor(oi / 5)}`, oi >= 2 * prefs.oiPct ? "IMPORTANTE" : "INFORMATIVA", sym, `${coin}: interés abierto +${n2(oi)}% en 24 h`, `Suba fuerte del interés abierto${read}. Fuente: ${fuente}. ${NOT_ADVICE}`, now));
   }
 
   // Divergences on 4 h, new on the last closed candles, with how they worked on this chart.

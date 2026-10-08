@@ -14,7 +14,7 @@ bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
 e23fd9d98482	81	app/alert-toasts.tsx
-043eacfd51d8	130	app/api/admin/settings/route.ts
+ab7409f8b7e4	148	app/api/admin/settings/route.ts
 45b256c81a5a	49	app/api/alerts/latest/route.ts
 03cbeef8a626	52	app/api/alerts/prebreak/route.ts
 6b4b0cad841f	58	app/api/analyst/ai/route.ts
@@ -46,7 +46,8 @@ a6895ac618b8	60	app/api/jarvis/paper/route.ts
 2837b6f7cd81	139	app/api/journal/route.ts
 ef3e2bf85432	160	app/api/klines/route.ts
 c1dc8c2ca83f	93	app/api/liquidity-history/route.ts
-4d00918361ea	180	app/api/market-structure/route.ts
+a9e76218b723	216	app/api/market-structure/route.ts
+d39de88931a8	50	app/api/market/derivatives/route.ts
 bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
@@ -149,7 +150,7 @@ d180ba5315c4	324	app/scalping-desk.tsx
 61aeec6728ee	43	app/sentiment-desk.css
 17158023a26f	214	app/sentiment-desk.tsx
 2f608ab498fd	21	app/settings-desk.css
-41710c00e063	195	app/settings-desk.tsx
+65fd254cfb17	209	app/settings-desk.tsx
 9acc1747570b	19	app/sign-in-prompt.tsx
 94eb31e12b92	41	app/signal-ledger.css
 2053366a2a2f	624	app/signal-ledger.tsx
@@ -168,7 +169,7 @@ f9aec051f520	355	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-8e433e78ddd2	195	docs/araña/objetivos.md
+895a9ac9b4b4	197	docs/araña/objetivos.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -196,7 +197,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 054288014395	51	lib/ai-probe.ts
 509da5ba4297	47	lib/alert-bus.ts
 dbd75245f8b8	366	lib/alerts.ts
-524aacbc59f1	153	lib/app-settings.ts
+374fb7012b3c	155	lib/app-settings.ts
 025856e9b96a	181	lib/asset-read.ts
 8b7646335b22	743	lib/assistant/index.ts
 861e6e35ec57	309	lib/assistant/knowledge.ts
@@ -239,10 +240,10 @@ f0f2156f892f	277	lib/jarvis-backtest.ts
 f61124d7437f	79	lib/jarvis-chat.ts
 67c2bd6e8989	495	lib/jarvis-core-db.ts
 104f734141fd	467	lib/jarvis-core.ts
-fc5276c6a3e9	541	lib/jarvis-desk-agents.ts
-cc86bf7a43ec	221	lib/jarvis-desk-data.ts
+cb4645381ac1	582	lib/jarvis-desk-agents.ts
+1cd992bd5876	204	lib/jarvis-desk-data.ts
 d29490ffe116	101	lib/jarvis-desk-run.ts
-9356616ef4ed	725	lib/jarvis-desk.ts
+1d3ea31e2bd1	728	lib/jarvis-desk.ts
 a054330ce1c8	133	lib/jarvis-execution.ts
 e65cb00f1d4d	483	lib/jarvis-learn.ts
 5df49d023ff9	179	lib/jarvis-ledger.ts
@@ -256,7 +257,7 @@ bdd44d2567fe	609	lib/jarvis-paper.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
 4b677046fbed	39	lib/jarvis-voice.ts
 53060301e170	160	lib/jarvis-watch-run.ts
-ce1a9045a8b1	216	lib/jarvis-watch.ts
+517ffa751a56	225	lib/jarvis-watch.ts
 e5d7beaeb1fb	53	lib/jarvis-world.ts
 42b112b81021	284	lib/jarvis.ts
 1235a48b5279	95	lib/key-levels.ts
@@ -275,7 +276,8 @@ ce35aedc59de	144	lib/live-market.ts
 da795f0e150a	194	lib/magnet-watch.ts
 a92115cf9ac5	439	lib/market-brain.ts
 c5ba3f905dda	317	lib/market-fetch.ts
-10cf98de00dc	197	lib/market-structure.ts
+69447ca24760	387	lib/market-providers.ts
+dca52626b743	252	lib/market-structure.ts
 780aee5014b9	238	lib/mm-robot.ts
 fd19498c8d8b	115	lib/mtf-zones.ts
 26c4321af593	374	lib/news-intelligence.ts
@@ -392,7 +394,7 @@ cf22fb64056e	59	tests/jarvis-analyst.test.ts
 ed1ff7a11a00	123	tests/jarvis-backtest.test.ts
 6d6b9ed4fa70	68	tests/jarvis-chat.test.ts
 45b5ffc94ac0	474	tests/jarvis-core.test.ts
-997903656a47	207	tests/jarvis-desk-risk.test.ts
+6a394787a7e2	233	tests/jarvis-desk-risk.test.ts
 8fe82178c57c	106	tests/jarvis-desk-run.test.ts
 727811ff841e	220	tests/jarvis-desk.test.ts
 2ca97216ec48	219	tests/jarvis-learn.test.ts
@@ -405,7 +407,7 @@ f509b7eb53bb	45	tests/jarvis-local.test.ts
 b95ca5216920	412	tests/jarvis-paper.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
 cc263e715076	62	tests/jarvis-watch-run.test.ts
-8984629257ab	170	tests/jarvis-watch.test.ts
+503532a31b9f	186	tests/jarvis-watch.test.ts
 56d6c268714e	153	tests/jarvis.test.ts
 a3b57999655c	66	tests/key-levels.test.ts
 ddb22425e6c1	206	tests/klines-server-fallback.test.ts
@@ -418,6 +420,8 @@ ce39bedad0f5	142	tests/liquidation-tiers.test.ts
 6977f95176f6	218	tests/live-feed.test.ts
 c90b4a2a66b4	70	tests/live-market.test.ts
 3679ba6f5014	114	tests/magnet-watch.test.ts
+66be909e5555	166	tests/market-providers.test.ts
+9894e04aa97c	43	tests/market-structure-cmc.test.ts
 1c697054fe3b	153	tests/mm-robot.test.ts
 6ab801ccfb7e	104	tests/mtf-zones.test.ts
 40823676548f	84	tests/news-sentiment.test.ts

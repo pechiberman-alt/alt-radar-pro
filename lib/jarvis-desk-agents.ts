@@ -262,7 +262,7 @@ export function volumeAgent(s: DeskSnapshot, a: Analysis): AgentReport {
 
 export function derivativesAgent(s: DeskSnapshot, a: Analysis): AgentReport {
   const d = s.derivatives;
-  if (!d) return missing("derivados", "Analista de derivados", "funding, interés abierto y ratio largo/corto de Binance Futures");
+  if (!d) return missing("derivados", "Analista de derivados", "funding, interés abierto y ratio largo/corto (no respondieron Binance Futures, Bybit, OKX ni Hyperliquid)");
   const ch = a.read.change24h;
   let b = 0;
   const f: string[] = [];
@@ -304,21 +304,28 @@ export function derivativesAgent(s: DeskSnapshot, a: Analysis): AgentReport {
     b += t > 1.1 ? 0.1 : t < 0.9 ? -0.1 : 0;
     f.push(`Flujo agresor de la última hora: ${n2(t)} (compras agresivas / ventas agresivas).`);
   } else falt.push("flujo agresor");
+  // One exchange per reading: the numbers above are all from it.
+  f.push(`Fuente: ${d.source}.`);
   return report("derivados", "Analista de derivados", {
     disponible: true,
     sesgo: b,
     hallazgos: f,
     faltantes: falt,
-    datos: { fundingPct: d.fundingPct, interesAbiertoUsd: d.openInterestUsd, cambioInteresAbierto24hPct: d.oiChange24hPct, ratioLargoCorto: d.longShortRatio, flujoAgresor: d.takerBuySell },
+    datos: { fundingPct: d.fundingPct, interesAbiertoUsd: d.openInterestUsd, cambioInteresAbierto24hPct: d.oiChange24hPct, ratioLargoCorto: d.longShortRatio, flujoAgresor: d.takerBuySell, fuente: d.source },
   });
 }
 
 // ── Liquidaciones (mapa estimado) ──
 
+/** "$1,2 millones", "$350 mil", "$900": montos de liquidaciones dichos como se leen. */
+export const usdShort = (v: number) => (v >= 1e6 ? `$${n2(v / 1e6)} millones` : v >= 1e3 ? `$${Math.round(v / 1e3)} mil` : `$${Math.round(v)}`);
+const arHour = (t: number) => new Date(t).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
 export function liquidationsAgent(s: DeskSnapshot, a: Analysis): AgentReport {
   const up = a.magnets.above;
   const dn = a.magnets.below;
-  if (!up && !dn) return missing("liquidaciones", "Analista de liquidaciones", "mapa de liquidaciones estimado (faltan velas)");
+  const tape = s.liquidations ?? null;
+  if (!up && !dn && !tape) return missing("liquidaciones", "Analista de liquidaciones", "mapa de liquidaciones estimado (faltan velas) y liquidaciones reales");
   let b = 0;
   const f: string[] = [];
   if (up && dn) {
@@ -337,14 +344,48 @@ export function liquidationsAgent(s: DeskSnapshot, a: Analysis): AgentReport {
   const crowdedLong = (s.derivatives?.fundingPct ?? 0) >= 0.05 || (s.derivatives?.longShortRatio ?? 0) >= 2.5;
   const crowdedShort = (s.derivatives?.fundingPct ?? 0) <= -0.03 || (s.derivatives?.longShortRatio ?? 9) <= 0.7;
   const riesgo = crowdedLong && dn && Math.abs(dn.distancePct) < 3 ? "ALTO para largos" : crowdedShort && up && Math.abs(up.distancePct) < 3 ? "ALTO para cortos" : "MODERADO";
-  f.push(`Riesgo de barrida: ${riesgo}.`);
-  f.push("Son liquidaciones ESTIMADAS con un modelo de apalancamiento, no liquidaciones reales informadas por el exchange.");
+  if (up || dn) {
+    f.push(`Riesgo de barrida: ${riesgo}.`);
+    f.push("Los imanes son liquidaciones ESTIMADAS con un modelo de apalancamiento, no liquidaciones informadas por el exchange.");
+  }
+  // Real liquidations (OKX): what actually happened, said as a measurement; it does not move the consensus.
+  const w = (h: number) => tape?.ventanas.find((x) => x.horas === h) ?? null;
+  if (tape) {
+    for (const h of [1, 24]) {
+      const x = w(h);
+      if (!x) continue;
+      const partial = x.completa ? "" : ` (al menos: OKX devolvió desde las ${arHour(tape.desde)})`;
+      f.push(
+        x.ordenes
+          ? `Liquidaciones reales en OKX, ${h === 1 ? "última hora" : "últimas 24 h"}: ${usdShort(x.largosUsd)} de largos y ${usdShort(x.cortosUsd)} de cortos (${x.ordenes} órdenes)${partial}.`
+          : `Liquidaciones reales en OKX, ${h === 1 ? "última hora" : "últimas 24 h"}: ninguna${partial}.`,
+      );
+    }
+    const last = w(1);
+    if (last && last.ordenes >= 3) {
+      const ratio = (a1: number, b1: number) => (b1 > 0 ? a1 / b1 : a1 > 0 ? Infinity : 0);
+      if (ratio(last.largosUsd, last.cortosUsd) >= 3) f.push("En la última hora se liquidaron sobre todo largos: hubo ventas forzadas.");
+      else if (ratio(last.cortosUsd, last.largosUsd) >= 3) f.push("En la última hora se liquidaron sobre todo cortos: hubo compras forzadas.");
+    }
+    if (tape.mayor) f.push(`La mayor en 24 h: ${usdShort(tape.mayor.usd)} de un ${tape.mayor.lado === "LARGO" ? "largo" : "corto"} a ${px(tape.mayor.precio)} (${arHour(tape.mayor.at)}).`);
+    f.push(`Fuente: ${tape.fuente}.`);
+  }
   return report("liquidaciones", "Analista de liquidaciones", {
     disponible: true,
     sesgo: b,
     hallazgos: f,
-    faltantes: ["liquidaciones reales con historial (Binance solo las da en vivo)"],
-    datos: { imanArriba: up?.price ?? null, imanArribaIntensidad: up?.intensity ?? null, imanAbajo: dn?.price ?? null, imanAbajoIntensidad: dn?.intensity ?? null, riesgoBarrida: riesgo },
+    faltantes: [...(tape ? [] : ["liquidaciones reales con historial (OKX no respondió)"]), ...(up || dn ? [] : ["mapa de liquidaciones estimado (faltan velas)"])],
+    datos: {
+      imanArriba: up?.price ?? null,
+      imanArribaIntensidad: up?.intensity ?? null,
+      imanAbajo: dn?.price ?? null,
+      imanAbajoIntensidad: dn?.intensity ?? null,
+      riesgoBarrida: up || dn ? riesgo : null,
+      liqLargos1hUsd: w(1)?.largosUsd ?? null,
+      liqCortos1hUsd: w(1)?.cortosUsd ?? null,
+      liqLargos24hUsd: w(24)?.largosUsd ?? null,
+      liqCortos24hUsd: w(24)?.cortosUsd ?? null,
+    },
   });
 }
 

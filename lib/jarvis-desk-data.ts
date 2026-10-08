@@ -2,7 +2,8 @@ import type { CryptoNewsItem } from "./crypto-news.ts";
 import { loadCalendar, type MacroEvent } from "./econ-calendar.ts";
 import type { FearGreed } from "./fear-greed.ts";
 import { closedOnly } from "./jarvis-core.ts";
-import { FUTURES_BASES, loadRows } from "./market-fetch.ts";
+import { loadRows } from "./market-fetch.ts";
+import { binanceDerivatives, loadBinanceDerivatives, type Attempt, type LiquidationTape, type ProviderId } from "./market-providers.ts";
 import type { MarketStructure } from "./market-structure.ts";
 import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
 
@@ -59,6 +60,8 @@ export type DeskSnapshot = {
   btc: SwingCandle[] | null;
   eth: SwingCandle[] | null;
   derivatives: Derivatives | null;
+  /** Liquidaciones reales con historial (OKX), si respondió. Opcional: lo que no lo trae, no lo tiene. */
+  liquidations?: LiquidationTape | null;
   macro: MacroData;
   news: CryptoNewsItem[] | null;
   fearGreed: FearGreed | null;
@@ -81,75 +84,46 @@ export type DeskProvider = {
 };
 
 export const DESK_PROVIDERS: DeskProvider[] = [
-  { id: "binance", label: "Binance Futures (API pública)", serves: ["velas", "derivados"], ready: true },
-  { id: "binance-ws", label: "Binance · liquidaciones en vivo (WebSocket)", serves: ["liquidaciones"], ready: false, needs: "solo en vivo, sin historial: la mesa usa el mapa de liquidaciones estimado" },
+  { id: "binance", label: "Binance Futures (API pública, desde tu navegador)", serves: ["velas", "derivados"], ready: true },
+  { id: "bybit", label: "Bybit v5 (API pública, desde el servidor)", serves: ["derivados"], ready: true },
+  { id: "okx", label: "OKX v5 (API pública, desde el servidor)", serves: ["derivados", "liquidaciones"], ready: true },
+  { id: "hyperliquid", label: "Hyperliquid (API pública, desde el servidor)", serves: ["derivados"], ready: true },
+  { id: "binance-ws", label: "Binance · liquidaciones en vivo (WebSocket)", serves: ["liquidaciones"], ready: true },
   { id: "alt-radar", label: "Servidor ALT RADAR (noticias cripto, Miedo y Avaricia)", serves: ["noticias", "sentimiento"], ready: true },
   { id: "forex-factory", label: "Calendario económico (Forex Factory)", serves: ["macro"], ready: true },
   { id: "coingecko", label: "CoinGecko (dominancia y capitalización)", serves: ["dominancia"], ready: true },
-  { id: "bybit", label: "Bybit", serves: ["velas", "derivados"], ready: false, needs: "API pública v5 (sin clave): falta el cliente y elegir cómo combinar dos exchanges" },
-  { id: "okx", label: "OKX", serves: ["velas", "derivados"], ready: false, needs: "API pública v5 (sin clave): falta el cliente" },
-  { id: "coinmarketcap", label: "CoinMarketCap", serves: ["dominancia"], ready: false, needs: "clave CMC_API_KEY como secreto del Worker (nunca en el navegador)" },
+  { id: "coinmarketcap", label: "CoinMarketCap", serves: ["dominancia"], ready: false, needs: "clave gratis de CoinMarketCap cargada en CONFIGURACIÓN (queda cifrada en el servidor, nunca en el navegador)" },
   { id: "tradingview", label: "TradingView", serves: [], ready: false, needs: "no tiene API pública de datos: solo widgets y webhooks de alertas" },
 ];
 
-async function firstJson(paths: string[], signal: AbortSignal): Promise<unknown> {
-  for (const url of paths) {
-    try {
-      const r = await fetch(url, { signal });
-      if (r.ok) return await r.json();
-    } catch {
-      // Next mirror.
-    }
-  }
-  return null;
-}
+/** Las respuestas crudas de Binance Futures, como Derivatives (aparte para probarlo sin red). */
+export const derivativesFrom = binanceDerivatives;
 
-const futures = (path: string) => FUTURES_BASES.map((b) => `${b}${path}`);
-const num = (v: unknown) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+type ServerMarket = {
+  derivados: { data: Derivatives | null; provider: ProviderId | null; tried: Attempt[] } | null;
+  liquidaciones: LiquidationTape | null;
 };
 
-/** Funding, interés abierto (ahora y 24 h), ratio largo/corto y flujo agresor de Binance Futures. */
-export async function loadDerivatives(symbol: string, price: number | null, signal: AbortSignal): Promise<Derivatives | null> {
-  const q = encodeURIComponent(symbol);
-  const [premium, oi, oiHist, ls, taker] = await Promise.all([
-    firstJson(futures(`/fapi/v1/premiumIndex?symbol=${q}`), signal),
-    firstJson(futures(`/fapi/v1/openInterest?symbol=${q}`), signal),
-    firstJson(futures(`/futures/data/openInterestHist?symbol=${q}&period=1h&limit=25`), signal),
-    firstJson(futures(`/futures/data/globalLongShortAccountRatio?symbol=${q}&period=1h&limit=1`), signal),
-    firstJson(futures(`/futures/data/takerlongshortRatio?symbol=${q}&period=1h&limit=1`), signal),
-  ]);
-  return derivativesFrom({ premium, oi, oiHist, ls, taker }, price);
+/** Lo que el servidor consigue de Bybit, OKX y Hyperliquid (sin claves; null si no respondió). */
+async function serverMarket(symbol: string, price: number | null, parts: string, signal: AbortSignal): Promise<ServerMarket | null> {
+  try {
+    const r = await fetch(`/api/market/derivatives?symbol=${encodeURIComponent(symbol)}&parts=${parts}${price ? `&price=${price}` : ""}`, { cache: "no-store", signal });
+    return r.ok ? ((await r.json()) as ServerMarket) : null;
+  } catch {
+    return null;
+  }
 }
 
-/** Las respuestas crudas de Binance, como Derivatives (aparte para probarlo sin red). */
-export function derivativesFrom(raw: { premium: unknown; oi: unknown; oiHist: unknown; ls: unknown; taker: unknown }, price: number | null): Derivatives | null {
-  const p = raw.premium as { lastFundingRate?: unknown; nextFundingTime?: unknown; markPrice?: unknown } | null;
-  const fundingRate = num(p?.lastFundingRate);
-  const markPrice = num(p?.markPrice);
-  const openInterest = num((raw.oi as { openInterest?: unknown } | null)?.openInterest);
-  const hist = Array.isArray(raw.oiHist) ? (raw.oiHist as { sumOpenInterest?: unknown; timestamp?: unknown }[]) : [];
-  const series = hist
-    .map((r) => ({ t: num(r.timestamp), oi: num(r.sumOpenInterest) }))
-    .filter((r): r is { t: number; oi: number } => r.t !== null && r.oi !== null && r.oi > 0)
-    .sort((a, b) => a.t - b.t);
-  const oiChange24hPct = series.length >= 2 ? ((series[series.length - 1].oi - series[0].oi) / series[0].oi) * 100 : null;
-  const lsRow = Array.isArray(raw.ls) ? (raw.ls as { longShortRatio?: unknown }[]).at(-1) : null;
-  const takerRow = Array.isArray(raw.taker) ? (raw.taker as { buySellRatio?: unknown }[]).at(-1) : null;
-  const out: Derivatives = {
-    fundingPct: fundingRate === null ? null : fundingRate * 100,
-    nextFundingAt: num(p?.nextFundingTime),
-    markPrice,
-    openInterest,
-    openInterestUsd: openInterest !== null && (markPrice ?? price) ? openInterest * (markPrice ?? price ?? 0) : null,
-    oiChange24hPct,
-    longShortRatio: num(lsRow?.longShortRatio),
-    takerBuySell: num(takerRow?.buySellRatio),
-    source: "Binance Futures",
-  };
-  const any = [out.fundingPct, out.openInterest, out.oiChange24hPct, out.longShortRatio, out.takerBuySell].some((v) => v !== null);
-  return any ? out : null;
+/**
+ * Funding, interés abierto (ahora y 24 h), ratio largo/corto y flujo agresor:
+ * de Binance Futures desde este navegador; si no responde, el servidor prueba
+ * Bybit, OKX y Hyperliquid. Una sola fuente por lectura, y dice cuál.
+ */
+export async function loadDerivatives(symbol: string, price: number | null, signal: AbortSignal): Promise<{ derivatives: Derivatives | null; viaServer: boolean }> {
+  const direct = await loadBinanceDerivatives(symbol, price, (u, i) => fetch(u, i), signal).catch(() => null);
+  if (direct) return { derivatives: direct, viaServer: false };
+  const server = await serverMarket(symbol, price, "derivados", signal);
+  return { derivatives: server?.derivados?.data ?? null, viaServer: true };
 }
 
 async function candlesOf(symbol: string, tf: "1h" | "4h" | "1d", limit: number, now: number, signal: AbortSignal, venues?: Set<string>): Promise<SwingCandle[] | null> {
@@ -191,10 +165,18 @@ export async function loadDeskSnapshot(symbol: string, opts: { now?: number; str
           .catch(() => null),
   ]);
   const price = h1?.at(-1)?.close ?? null;
-  const derivatives = h1 ? await loadDerivatives(symbol, price, signal).catch(() => null) : null;
+  const [deriv, liq] = h1
+    ? await Promise.all([loadDerivatives(symbol, price, signal).catch(() => null), serverMarket(symbol, price, "liquidaciones", signal)])
+    : [null, null];
+  const derivatives = deriv?.derivatives ?? null;
+  const liquidations = liq?.liquidaciones ?? null;
   // The venue that actually answered: futures first, spot or the server's copy when futures does not.
   const sources = [`Velas: ${venues.size ? [...venues].join(" + ") : "sin respuesta"} (1h, 4h y 1d, solo cerradas)`];
-  if (derivatives) sources.push("Derivados: Binance Futures (funding, interés abierto, ratio largo/corto, flujo agresor)");
+  if (derivatives) {
+    const fields = [derivatives.fundingPct !== null && "funding", derivatives.oiChange24hPct !== null && "interés abierto", derivatives.longShortRatio !== null && "ratio largo/corto", derivatives.takerBuySell !== null && "flujo agresor"].filter(Boolean).join(", ");
+    sources.push(`Derivados: ${derivatives.source}${deriv?.viaServer ? " (desde el servidor: Binance no respondió)" : ""} · ${fields}`);
+  }
+  if (liquidations) sources.push(`Liquidaciones reales: ${liquidations.fuente}`);
   if (sentiment?.news) sources.push("Noticias: CoinDesk, Cointelegraph, Decrypt, The Block, Bitcoin Magazine (titulares)");
   if (sentiment?.fearGreed) sources.push("Miedo y Avaricia: alternative.me");
   if (calendar) sources.push(`Calendario: ${calendar.source}${calendar.stale ? " (copia vieja)" : ""}`);
@@ -206,6 +188,7 @@ export async function loadDeskSnapshot(symbol: string, opts: { now?: number; str
     btc: isBtc ? h1 : btc,
     eth: isEth ? h1 : eth,
     derivatives,
+    liquidations,
     macro: {
       btcDominance: structure?.dominance.btc ?? null,
       usdtDominance: structure?.dominance.usdt ?? null,

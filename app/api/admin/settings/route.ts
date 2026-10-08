@@ -29,10 +29,11 @@ export async function GET(request: NextRequest) {
   const user = await who(request);
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   const admin = await adminUserId(env.DB);
-  const [telegram, ai, groq, probe] = await Promise.all([
+  const [telegram, ai, groq, cmc, probe] = await Promise.all([
     getSecret(env.DB, env, "telegram_bot_token"),
     getSecret(env.DB, env, "anthropic_api_key"),
     getSecret(env.DB, env, "groq_api_key"),
+    getSecret(env.DB, env, "cmc_api_key"),
     readProbe(env.DB).catch(() => null),
   ]);
   return NextResponse.json(
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
       telegram: { configured: Boolean(telegram.value), source: telegram.source },
       ai: { configured: Boolean(ai.value), source: ai.source },
       groq: { configured: Boolean(groq.value), source: groq.source },
+      cmc: { configured: Boolean(cmc.value), source: cmc.source },
       freeAi: probe ? { ok: probe.ok, at: probe.at, ms: probe.ms, model: probe.model, error: probe.error ?? null } : null,
       encryption: encryptionStrength(env),
     },
@@ -65,7 +67,7 @@ export async function PUT(request: NextRequest) {
   const user = await who(request);
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   if ((await adminUserId(env.DB)) !== user.id) return NextResponse.json({ error: "SÓLO ADMINISTRADOR" }, { status: 403 });
-  const body = ((await request.json().catch(() => ({}))) ?? {}) as { telegramToken?: string; anthropicKey?: string; groqKey?: string };
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { telegramToken?: string; anthropicKey?: string; groqKey?: string; cmcKey?: string };
   const results: Record<string, string> = {};
 
   const telegramToken = body.telegramToken?.trim();
@@ -113,6 +115,22 @@ export async function PUT(request: NextRequest) {
       }
     }
   }
+  // CoinMarketCap's free key: dominance and global capitalisation from the server (app/api/market-structure).
+  const cmcKey = body.cmcKey?.trim();
+  if (cmcKey) {
+    if (!/^[A-Za-z0-9-]{20,64}$/.test(cmcKey)) results.cmc = "NO PARECE UNA CLAVE DE COINMARKETCAP";
+    else {
+      // key/info costs no credits and only answers to a valid key.
+      const r = await fetch("https://pro-api.coinmarketcap.com/v1/key/info", { headers: { "X-CMC_PRO_API_KEY": cmcKey, Accept: "application/json" }, signal: AbortSignal.timeout(10_000) }).catch(() => null);
+      if (!r) results.cmc = "NO SE PUDO VERIFICAR: sin respuesta de CoinMarketCap";
+      else if (r.status === 401 || r.status === 403) results.cmc = "CLAVE INVÁLIDA: CoinMarketCap la rechazó";
+      else if (!r.ok) results.cmc = `NO SE PUDO VERIFICAR (HTTP ${r.status})`;
+      else {
+        await setSecret(env.DB, env, "cmc_api_key", cmcKey);
+        results.cmc = "OK · clave verificada";
+      }
+    }
+  }
   return NextResponse.json({ results });
 }
 
@@ -122,7 +140,7 @@ export async function DELETE(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   if ((await adminUserId(env.DB)) !== user.id) return NextResponse.json({ error: "SÓLO ADMINISTRADOR" }, { status: 403 });
   const which = request.nextUrl.searchParams.get("which");
-  const name: SecretName | null = which === "telegram" ? "telegram_bot_token" : which === "ai" ? "anthropic_api_key" : which === "groq" ? "groq_api_key" : null;
+  const name: SecretName | null = which === "telegram" ? "telegram_bot_token" : which === "ai" ? "anthropic_api_key" : which === "groq" ? "groq_api_key" : which === "cmc" ? "cmc_api_key" : null;
   if (!name) return NextResponse.json({ error: "¿CUÁL?" }, { status: 400 });
   await deleteSecret(env.DB, name);
   return NextResponse.json({ ok: true });

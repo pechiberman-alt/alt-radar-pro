@@ -14,7 +14,7 @@ const ON: WatchPrefs = { ...DEFAULT_WATCH_PREFS, enabled: true };
 
 const agent = (id: string, datos: AgentReport["datos"], disponible = true): AgentReport => ({ id: id as AgentReport["id"], nombre: id, disponible, sesgo: 0, peso: 0.1, hallazgos: [], faltantes: [], datos });
 
-function desk(over: Partial<DeskDecision> = {}, datos: { tendencia4h?: string; tendencia1d?: string; vol?: number; funding?: number | null; oi?: number | null } = {}): DeskDecision {
+function desk(over: Partial<DeskDecision> = {}, datos: { tendencia4h?: string; tendencia1d?: string; vol?: number; funding?: number | null; oi?: number | null; fuente?: string } = {}): DeskDecision {
   return {
     symbol: "XRPUSDT",
     moneda: "XRP",
@@ -38,7 +38,7 @@ function desk(over: Partial<DeskDecision> = {}, datos: { tendencia4h?: string; t
     agentes: [
       agent("estructura", { tendencia1h: "ALCISTA", tendencia4h: datos.tendencia4h ?? "ALCISTA", tendencia1d: datos.tendencia1d ?? "ALCISTA" }),
       agent("volumen", { volumenRelativo1h: datos.vol ?? 1 }),
-      agent("derivados", { fundingPct: datos.funding ?? 0.01, cambioInteresAbierto24hPct: datos.oi ?? 2 }, datos.funding !== null),
+      agent("derivados", { fundingPct: datos.funding ?? 0.01, cambioInteresAbierto24hPct: datos.oi ?? 2, ...(datos.fuente ? { fuente: datos.fuente } : {}) }, datos.funding !== null),
     ],
     faltantes: [],
     fuentes: [],
@@ -166,4 +166,20 @@ test("Telegram alerts from the app: direction from the price, the app's price on
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test("funding and open interest name the exchange they came from; a jump is only measured on the same exchange", () => {
+  const h1 = candles(3, 3);
+  const first = watchAlerts({ d: desk({}, { funding: 0.012, fuente: "Bybit (perpetuo USDT)" }), h1, h4: null, news: null, prev: null, now: NOW, prefs: ON });
+  assert.equal(first.memory.fundingFuente, "Bybit (perpetuo USDT)");
+  // Same exchange, a real jump: it fires and says where from.
+  const jump = watchAlerts({ d: desk({}, { funding: 0.06, oi: 30, fuente: "Bybit (perpetuo USDT)" }), h1, h4: null, news: null, prev: first.memory, now: NOW + 5 * 60_000, prefs: ON });
+  assert.ok(jump.alerts.some((a) => /cambió fuerte/.test(a.title) && /Fuente: Bybit \(perpetuo USDT\)/.test(a.body)), jump.alerts.map((a) => a.title).join(" | "));
+  assert.ok(jump.alerts.filter((a) => /funding|interés abierto/.test(a.title)).every((a) => !/Binance/.test(a.body)), "never says Binance when it was Bybit");
+  // Another exchange answered this time: the difference is between venues, not a change.
+  const switched = watchAlerts({ d: desk({}, { funding: 0.045, fuente: "OKX (perpetuo USDT)" }), h1, h4: null, news: null, prev: first.memory, now: NOW + 5 * 60_000, prefs: ON });
+  assert.ok(!switched.alerts.some((a) => /cambió fuerte/.test(a.title)));
+  // A memory saved before the source was recorded was Binance's.
+  const legacy = watchAlerts({ d: desk({}, { funding: 0.06 }), h1, h4: null, news: null, prev: { at: NOW, trends: {}, fundingPct: 0.01 }, now: NOW + 5 * 60_000, prefs: ON });
+  assert.ok(legacy.alerts.some((a) => /cambió fuerte/.test(a.title) && /Fuente: Binance Futures/.test(a.body)));
 });

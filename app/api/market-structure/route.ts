@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { env } from "cloudflare:workers";
 import { cached, offerCached } from "@/lib/upstream-cache";
 import { recordStructureSnapshot } from "@/lib/structure-archive";
+import { getSecret } from "@/lib/app-settings";
 import {
+  CMC_STABLE_IDS,
+  parseCmcGlobal,
   parseCoinGeckoGlobal,
   parseCoinLoreGlobal,
   type MarketStructure,
@@ -30,6 +33,38 @@ async function loadCoinGecko(): Promise<MarketStructure | null> {
   } catch {
     return null;
   }
+}
+
+/** CoinMarketCap's free plan has a monthly credit budget: one global reading every 15 minutes is ~2 credits each. */
+const CMC_TTL_MS = 15 * 60_000;
+const CMC_BASE = "https://pro-api.coinmarketcap.com";
+
+/**
+ * CoinMarketCap, only with the owner's key (CONFIGURACIÓN or the CMC_API_KEY
+ * Cloudflare secret). The key stays in the Worker: it is read here, sent only
+ * to CoinMarketCap, and never logged or returned.
+ */
+async function loadCoinMarketCap(): Promise<MarketStructure | null> {
+  if (!env.DB) return null;
+  const { value: key } = await getSecret(env.DB, env, "cmc_api_key").catch(() => ({ value: null }));
+  if (!key) return null;
+  const { value } = await cached<MarketStructure>(
+    "market-structure:cmc",
+    CMC_TTL_MS,
+    async () => {
+      const get = async (path: string) => {
+        const response = await fetch(`${CMC_BASE}${path}`, { headers: { Accept: "application/json", "X-CMC_PRO_API_KEY": key }, signal: AbortSignal.timeout(7_000) });
+        return response.ok ? response.json() : null;
+      };
+      const [global, stables] = await Promise.all([
+        get("/v1/global-metrics/quotes/latest").catch(() => null),
+        get(`/v2/cryptocurrency/quotes/latest?id=${CMC_STABLE_IDS.usdt},${CMC_STABLE_IDS.usdc}`).catch(() => null),
+      ]);
+      return parseCmcGlobal(global, stables);
+    },
+    STALE_WINDOW_MS,
+  );
+  return value;
 }
 
 async function loadCoinLore(): Promise<MarketStructure | null> {
@@ -156,9 +191,10 @@ export async function GET() {
   const { value, state, ageMs } = await cached<MarketStructure>(
     "market-structure",
     CACHE_TTL_MS,
-    // CoinGecko first: it is the only free source that breaks out stablecoin
-    // dominance. CoinLore covers total and BTC/ETH dominance if that fails.
-    async () => (await loadCoinGecko()) ?? (await loadCoinLore()),
+    // CoinMarketCap first when the owner loaded its key (it breaks out USDT and
+    // USDC from the server). Then CoinGecko, the only free source that does;
+    // CoinLore covers total and BTC/ETH dominance if both fail.
+    async () => (await loadCoinMarketCap()) ?? (await loadCoinGecko()) ?? (await loadCoinLore()),
     STALE_WINDOW_MS,
   );
 
