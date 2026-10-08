@@ -4,17 +4,18 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 461 · objetivos: 15 · sin objetivo: 0
-- Tablas D1: 43 · secretos: 3 · variables de entorno: 8 · rutas /api: 47 · hosts: 50
-- Código de navegador: 55 archivos con "use client" que alcanzan 149 · problemas: 0
-- Lib sin prueba directa: 20 de 142
+- Archivos: 467 · objetivos: 15 · sin objetivo: 0
+- Tablas D1: 43 · secretos: 3 · variables de entorno: 8 · rutas /api: 48 · hosts: 50
+- Código de navegador: 56 archivos con "use client" que alcanzan 152 · problemas: 0
+- Lib sin prueba directa: 20 de 144
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (49)
+### jarvis — JARVIS, la IA propia del software (53)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: faltan clientes de Bybit y OKX, la clave CMC_API_KEY y el historial real de liquidaciones; TradingView no tiene API pública.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
+- `app/api/jarvis/alert/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/chat/route.ts` — exporta: dynamic, GET, POST, DELETE
 - `app/api/jarvis/core/route.ts` — exporta: dynamic, GET
 - `app/api/jarvis/memory/route.ts` — exporta: dynamic, GET, POST, DELETE
@@ -27,6 +28,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `app/jarvis-trading.css` — JARVIS TRADING — la mesa de especialistas.
 - `app/jarvis-trading.tsx` — exporta: JarvisTrading, default
 - `app/jarvis-voice-player.ts` — Plays JARVIS's neural voice (app/api/jarvis/voice) fluidly: the reply is cut into sentences, the first two are requested at once and each next one while the current plays, so after
+- `app/jarvis-watch.tsx` — exporta: JarvisWatcher, WatchBlock
 - `app/jarvis.css` — JARVIS — HUD voice assistant
 - `app/jarvis.tsx` — exporta: Jarvis, default
 - `lib/ai-analyst-server.ts` — exporta: quotaFor, consumeQuota, alternate, askClaude
@@ -60,6 +62,8 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-paper.ts` — exporta: PAPER_HORIZON_H, LIMIT_EXPIRY_H, PaperState, ExitKind, PaperExit, PaperTrade (+21)
 - `lib/jarvis-voice-server.ts` — exporta: AiLike, VoiceModel, Bytes, Synth, AURA, MELO (+11)
 - `lib/jarvis-voice.ts` — JARVIS's neural voice, shared by the server route and the app.
+- `lib/jarvis-watch-run.ts` — exporta: WATCH_PREFS_KEY, WATCH_STATE_KEY, WATCH_EVENT, WatchStatus, loadWatchPrefs, saveWatchPrefs (+3)
+- `lib/jarvis-watch.ts` — exporta: WatchKind, WATCH_KINDS, WatchPrefs, DEFAULT_WATCH_PREFS, MAX_WATCHED, CENTER_VOLUME (+6)
 - `lib/jarvis-world.ts` — exporta: WorldNews, World, worldDigest, readWorld, saveWorld
 - `lib/jarvis.ts` — JARVIS: the app's voice assistant.
 - `lib/speech-text.ts` — What JARVIS writes, turned into what a Spanish voice should say.
@@ -189,7 +193,7 @@ Pendiente: Notas de voz: con Groq si está la clave; si no, Whisper de Workers A
 - `app/api/telegram/link/route.ts` — exporta: dynamic, GET, POST, PUT, DELETE
 - `app/api/telegram/test/route.ts` — exporta: dynamic, POST
 - `app/telegram-card.tsx` — exporta: TelegramCard, default
-- `lib/price-alerts-server.ts` — exporta: PRICE_ALERTS_SCHEMA, ensurePriceAlertsSchema, listUserAlerts, fetchSpotPrice, handleAlertCommand, runPriceAlerts
+- `lib/price-alerts-server.ts` — exporta: PRICE_ALERTS_SCHEMA, ensurePriceAlertsSchema, listUserAlerts, fetchSpotPrice, CreateResult, createPriceAlert (+2)
 - `lib/price-alerts.ts` — exporta: AlertDirection, PriceAlert, MAX_ALERTS_PER_USER, LOOKBACK_MINUTES, MIN_DISTANCE, normalizeSymbol (+9)
 - `lib/telegram-ai-server.ts` — exporta: loadServerSnapshot, clearChat, answerInTelegram, answerVoiceInTelegram
 - `lib/telegram-ai.ts` — Telegram answers from the ALT RADAR analyst: the pure parts.
@@ -306,7 +310,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+38)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (114)
+### calidad — Pruebas (116)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
@@ -364,6 +368,8 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/jarvis-paper-run.test.ts` — pruebas: signed in but the record does not answer: an honest error, never an empty list t, signed out: the record lives on this device, opens once, refuses stale plans, re, signed in: opened and advanced through the server, whose version wins
 - `tests/jarvis-paper.test.ts` — pruebas: three targets: a third at each, fees on both sides, a candle that touches the stop and a target counts as the stop, TP1 then the stop: a third won, two thirds lost; the stop does not move (+1)
 - `tests/jarvis-voice.test.ts` — pruebas: voices: Cloudflare, synthesis: premium voice first; the simpler one if premium fails or is not allow, allowance: per person and premium for everyone, per UTC day (+1)
+- `tests/jarvis-watch-run.test.ts` — pruebas: switched off, the watch asks nothing, switched on: alerts published once, remembered across runs, memory kept on this 
+- `tests/jarvis-watch.test.ts` — pruebas: a close across a desk level is a break, once per candle, with its stars, a change of structure needs a recent previous reading, volume, funding and open interest past their thresholds; missing derivatives fir (+1)
 - `tests/jarvis.test.ts` — pruebas: normalize strips accents, punctuation and the case, coins by name, ticker or alias; ambiguous Spanish words need a cue, timeframes in words or short form (+1)
 - `tests/key-levels.test.ts` — pruebas: a range turned at 110 and 100 four times: strong resistance above, strong suppor, two turns make a weak level; one turn is not a level, which side a level is on depends only on where price closed (+1)
 - `tests/klines-server-fallback.test.ts` — pruebas: spot 403 (blocked data centre): one try per firewall, then futures; next calls s, spot working: unchanged; thin market only after spot and futures fail, Binance refuses the server: Kraken in dollars, with the reason; Binance is not a (+1)
@@ -564,7 +570,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `structure_snapshots` — crea: lib/structure-archive.ts · usa: lib/jarvis-mind-db.ts, lib/structure-archive.ts, lib/telegram-ai-server.ts · índices: structure_snapshots_time_idx
 - `telegram_chat` — crea: lib/telegram-ai-server.ts · usa: lib/telegram-ai-server.ts · sin índice visible en el código
 - `telegram_link_codes` — crea: lib/telegram.ts · usa: app/api/telegram/link/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-dispatch.ts · sin índice visible en el código
-- `telegram_links` — crea: lib/telegram.ts, tests/telegram-signals.test.ts · usa: app/api/alerts/prebreak/route.ts, app/api/robot/signal/route.ts, app/api/telegram/link/route.ts, app/api/telegram/test/route.ts, app/api/telegram/webhook/route.ts, lib/price-alerts-server.ts (+3) · sin índice visible en el código
+- `telegram_links` — crea: lib/telegram.ts, tests/telegram-signals.test.ts · usa: app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts, app/api/robot/signal/route.ts, app/api/telegram/link/route.ts, app/api/telegram/test/route.ts, app/api/telegram/webhook/route.ts (+4) · sin índice visible en el código
 - `telegram_price_alerts` — crea: lib/price-alerts-server.ts · usa: app/api/telegram/webhook/route.ts, lib/price-alerts-server.ts · índices: telegram_price_alerts_user_idx
 - `telegram_sent` — crea: lib/telegram.ts · usa: app/api/alerts/prebreak/route.ts, app/api/robot/signal/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-dispatch.ts · sin índice visible en el código
 - `telegram_state` — crea: lib/telegram.ts, tests/telegram-signals.test.ts · usa: app/api/admin/settings/route.ts, app/api/telegram/link/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-dispatch.ts, lib/telegram-jarvis.ts, lib/telegram-server.ts (+1) · sin índice visible en el código
@@ -575,7 +581,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 - `anthropic_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
 - `groq_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/jarvis-mind-db.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
-- `telegram_bot_token` (secreto) — lee: app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/robot/signal/route.ts, app/api/telegram/link/route.ts (+3) · guarda: app/api/admin/settings/route.ts
+- `telegram_bot_token` (secreto) — lee: app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts, app/api/robot/signal/route.ts (+4) · guarda: app/api/admin/settings/route.ts
 - variable `ASSETS` — en: worker/index.ts
 - variable `CODEX_SANDBOX` — en: vite.config.ts
 - variable `ENCRYPTION_KEY` — en: lib/app-settings.ts
@@ -610,6 +616,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/etf-flows` [GET] — app/api/etf-flows/route.ts · datos-mercado
 - `/api/exchange-flows` [GET] — app/api/exchange-flows/route.ts · datos-mercado
 - `/api/institutional` [GET] — app/api/institutional/route.ts · datos-mercado
+- `/api/jarvis/alert` [POST] — app/api/jarvis/alert/route.ts · jarvis
 - `/api/jarvis/chat` [GET, POST, DELETE] — app/api/jarvis/chat/route.ts · jarvis
 - `/api/jarvis/core` [GET] — app/api/jarvis/core/route.ts · jarvis
 - `/api/jarvis/memory` [GET, POST, DELETE] — app/api/jarvis/memory/route.ts · jarvis
@@ -690,7 +697,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-paper.tsx, app/jarvis-trading.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-paper.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa

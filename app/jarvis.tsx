@@ -788,6 +788,15 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
               "papel",
             );
           }
+          case "ALERT": {
+            const sym = intent.symbol ? `${intent.symbol}USDT` : (focusRef.current.symbol ?? "BTCUSDT");
+            const coin = sym.replace(/USDT$/, "");
+            const r = await fetch("/api/jarvis/alert", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sym, target: intent.level, reference: cachedDesk(sym)?.precio ?? null }) });
+            const body = (await r.json().catch(() => ({}))) as { error?: string; alert?: { direction: "ARRIBA" | "ABAJO" } };
+            if (r.status === 401) return speak("Para avisarte por Telegram necesito que inicies sesión y vincules Telegram en ALERTAS.");
+            if (!r.ok || !body.alert) return speak(body.error ?? "No pude crear la alerta.");
+            return speak(`Listo: te aviso por Telegram cuando ${coin} ${body.alert.direction === "ARRIBA" ? "suba a" : "baje a"} ${arNumber(intent.level)}, aunque la app esté cerrada. Lo reviso cada 5 minutos.`, "alertas");
+          }
           case "BACKTEST": {
             const sym = intent.symbol ? `${intent.symbol}USDT` : (focusRef.current.symbol ?? "BTCUSDT");
             const coin = sym.replace(/USDT$/, "");

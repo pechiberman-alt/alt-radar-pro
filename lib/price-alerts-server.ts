@@ -1,6 +1,6 @@
 import { fetchKlinesServer, FUTURES_BASES_SERVER, GLOBAL_BASES, isOutside, marketOf, VENUE_LABEL, type Venue } from "./klines-server.ts";
 import {
-  ALERT_USAGE, createdMessage, directionFor, firstTouch, listMessage, LOOKBACK_MINUTES, MAX_ALERTS_PER_USER, parseAlertArgs, parseTarget,
+  ALERT_USAGE, createdMessage, directionFor, firstTouch, listMessage, LOOKBACK_MINUTES, MAX_ALERTS_PER_USER, MIN_DISTANCE, normalizeSymbol, parseAlertArgs, parseTarget,
   triggeredMessage, type AlertDirection, type PriceAlert,
 } from "./price-alerts.ts";
 import { parsePrefs, sendMessage } from "./telegram.ts";
@@ -74,6 +74,40 @@ async function spotPrices(symbols: string[]): Promise<Record<string, number>> {
     }),
   );
   return out;
+}
+
+export type CreateResult = { ok: true; alert: Pick<PriceAlert, "symbol" | "target" | "direction">; price: number; message: string } | { ok: false; status: number; error: string };
+
+/**
+ * A price alert asked for from the app (JARVIS TRADING): the same table and
+ * the same 5-minute check as /alerta, so it fires on Telegram with the app
+ * closed. `reference` is the price the app showed; it only stands in when
+ * Binance does not answer the Worker, and only to decide the direction.
+ */
+export async function createPriceAlert(db: D1Database, userId: number, rawSymbol: string, target: number, reference: number | null, now = Date.now()): Promise<CreateResult> {
+  await ensurePriceAlertsSchema(db);
+  const symbol = normalizeSymbol(rawSymbol);
+  if (!symbol) return { ok: false, status: 400, error: "No reconozco esa moneda." };
+  if (!(typeof target === "number" && Number.isFinite(target) && target > 0)) return { ok: false, status: 400, error: "El nivel tiene que ser un precio positivo." };
+  let price: number | null = null;
+  try {
+    price = await fetchSpotPrice(symbol);
+    if (price === null) return { ok: false, status: 404, error: `No encontré ${symbol.replace(/USDT$/, "")} en Binance.` };
+  } catch {
+    price = typeof reference === "number" && Number.isFinite(reference) && reference > 0 ? reference : null;
+  }
+  if (price === null) return { ok: false, status: 503, error: "No pude leer el precio ahora. Este dato no está disponible actualmente." };
+  const direction = directionFor(target, price);
+  if (!direction) return { ok: false, status: 400, error: "Ese precio es prácticamente el de ahora: elegí un nivel más lejos." };
+  const existing = await listUserAlerts(db, userId);
+  if (existing.length >= MAX_ALERTS_PER_USER) return { ok: false, status: 409, error: `Ya tenés ${MAX_ALERTS_PER_USER} alertas de precio, el máximo. Borrá alguna en Telegram con /borrar N.` };
+  if (existing.some((a) => a.symbol === symbol && Math.abs(a.target - target) <= target * MIN_DISTANCE)) return { ok: false, status: 409, error: "Ya tenés una alerta en ese nivel." };
+  await db
+    .prepare("INSERT INTO telegram_price_alerts (user_id, symbol, target, direction, created_at, created_price) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
+    .bind(userId, symbol, target, direction, now, price)
+    .run();
+  const alert = { symbol, target, direction };
+  return { ok: true, alert, price, message: createdMessage(alert, price) };
 }
 
 /** /alerta, /alertas and /borrar. Always answers the chat. */

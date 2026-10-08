@@ -11,7 +11,7 @@ f78d8e271837	683	app/account-panel.tsx
 064cf5eb7605	229	app/active-signals.tsx
 63b274d443fe	122	app/agenda-macro.tsx
 bfbfb1a0c0ba	85	app/alert-center.css
-63f30c41ffbb	440	app/alert-center.tsx
+c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
 e23fd9d98482	81	app/alert-toasts.tsx
 043eacfd51d8	130	app/api/admin/settings/route.ts
@@ -37,6 +37,7 @@ f56379f0953b	52	app/api/diario/fills/route.ts
 7409f2aa8952	75	app/api/etf-flows/route.ts
 dbf4555e4b39	35	app/api/exchange-flows/route.ts
 a18fb46bcc50	42	app/api/institutional/route.ts
+6325deaafd0c	41	app/api/jarvis/alert/route.ts
 ca07248c2d46	37	app/api/jarvis/chat/route.ts
 e3ef06d45c39	23	app/api/jarvis/core/route.ts
 ec39df2aab15	38	app/api/jarvis/memory/route.ts
@@ -107,11 +108,12 @@ def492abf855	146	app/install-panel.tsx
 58e9409bb2ba	192	app/institutional-desk.tsx
 1a240eea27ad	246	app/jarvis-backtest.tsx
 81859de0df06	275	app/jarvis-paper.tsx
-33a03d8d7491	129	app/jarvis-trading.css
-97aed1ee33b4	570	app/jarvis-trading.tsx
+ce9d2b1a3564	142	app/jarvis-trading.css
+41c9f1c38879	576	app/jarvis-trading.tsx
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
+719061eef9e9	192	app/jarvis-watch.tsx
 39c4819ab1a5	121	app/jarvis.css
-55032cd8ab91	1625	app/jarvis.tsx
+bfaa98feb9f3	1634	app/jarvis.tsx
 aa4d7c876c20	51	app/laptop.css
 34ec9337ceb1	130	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -135,7 +137,7 @@ f6c0da2d5db5	170	app/pressure-desk.tsx
 9f9d72a3dd57	87	app/pump-radar.css
 74db3d1c5d80	350	app/pump-radar.tsx
 f58412c957a0	53	app/pwa-register.tsx
-7729ed586c3f	1358	app/radar-app.tsx
+10965b818dbe	1361	app/radar-app.tsx
 72da20719972	274	app/responsive-fixes.css
 119930fcab22	76	app/risk-desk.css
 57216ff5dacb	344	app/risk-desk.tsx
@@ -166,7 +168,7 @@ f9aec051f520	355	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-82fb74fe4100	193	docs/araña/objetivos.md
+350518d7b654	194	docs/araña/objetivos.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -193,7 +195,7 @@ ca2b9e224c43	81	lib/ai-cascade.ts
 b8e38621b74b	46	lib/ai-numbers.ts
 054288014395	51	lib/ai-probe.ts
 509da5ba4297	47	lib/alert-bus.ts
-51c941d7f026	362	lib/alerts.ts
+dbd75245f8b8	366	lib/alerts.ts
 524aacbc59f1	153	lib/app-settings.ts
 025856e9b96a	181	lib/asset-read.ts
 8b7646335b22	743	lib/assistant/index.ts
@@ -237,7 +239,7 @@ b0f479478c6c	127	lib/jarvis-backtest-run.ts
 f61124d7437f	79	lib/jarvis-chat.ts
 67c2bd6e8989	495	lib/jarvis-core-db.ts
 104f734141fd	467	lib/jarvis-core.ts
-4859aacb35ab	531	lib/jarvis-desk-agents.ts
+fc5276c6a3e9	541	lib/jarvis-desk-agents.ts
 cc86bf7a43ec	221	lib/jarvis-desk-data.ts
 bbbaa707d9a0	94	lib/jarvis-desk-run.ts
 89a3e7d5c2d7	593	lib/jarvis-desk.ts
@@ -252,8 +254,10 @@ e8c3810830b7	158	lib/jarvis-paper-db.ts
 064829378a16	486	lib/jarvis-paper.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
 4b677046fbed	39	lib/jarvis-voice.ts
+53060301e170	160	lib/jarvis-watch-run.ts
+ce1a9045a8b1	216	lib/jarvis-watch.ts
 e5d7beaeb1fb	53	lib/jarvis-world.ts
-86c8c129101f	269	lib/jarvis.ts
+e0d38ed7c3db	275	lib/jarvis.ts
 1235a48b5279	95	lib/key-levels.ts
 8a0b07fa9373	50	lib/klines-history.ts
 d7b23d66a3bf	269	lib/klines-server.ts
@@ -280,7 +284,7 @@ fd19498c8d8b	115	lib/mtf-zones.ts
 fe173d15015d	227	lib/oscillators.ts
 07f49ca99e51	406	lib/paper-bot.ts
 7533116803f8	189	lib/pre-breakout.ts
-052152cc15aa	202	lib/price-alerts-server.ts
+6bc98e7e1a03	236	lib/price-alerts-server.ts
 268aea814077	165	lib/price-alerts.ts
 19ed36506676	86	lib/pump-plan.ts
 357bfd64bf54	170	lib/pump-pressure.ts
@@ -398,7 +402,9 @@ f509b7eb53bb	45	tests/jarvis-local.test.ts
 0f7893f6e95b	131	tests/jarvis-paper-run.test.ts
 9f9d13df75e5	297	tests/jarvis-paper.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
-0334d9263ba2	128	tests/jarvis.test.ts
+cc263e715076	62	tests/jarvis-watch-run.test.ts
+8984629257ab	170	tests/jarvis-watch.test.ts
+d889ce5883b2	134	tests/jarvis.test.ts
 a3b57999655c	66	tests/key-levels.test.ts
 ddb22425e6c1	206	tests/klines-server-fallback.test.ts
 d6740b560f54	108	tests/level-engine.test.ts

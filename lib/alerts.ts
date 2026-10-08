@@ -28,7 +28,7 @@
 import { dec, SPIKE_DISCLAIMER, spikeSentence, type VolumeSpike } from "./volume-spike.ts";
 
 export type AlertPriority = "CRITICA" | "IMPORTANTE" | "INFORMATIVA";
-export type AlertCategory = "SEÑAL" | "RIESGO" | "ZONA" | "LIQUIDACIÓN" | "FLUJO" | "DCA" | "VOLUMEN";
+export type AlertCategory = "SEÑAL" | "RIESGO" | "ZONA" | "LIQUIDACIÓN" | "FLUJO" | "DCA" | "VOLUMEN" | "MESA";
 
 /**
  * Evidence attached to an alert.
@@ -99,6 +99,8 @@ export const CATEGORY_COOLDOWN_MINUTES: Record<AlertCategory, number> = {
   // how often it should fire, so the cooldown only needs to block true
   // duplicates within the same day.
   DCA: 600,
+  // JARVIS TRADING's watch (lib/jarvis-watch.ts): each kind already fires once per candle or event.
+  MESA: 3,
 };
 
 export type AlertPreferences = {
@@ -122,6 +124,8 @@ export const DEFAULT_ALERT_PREFERENCES: AlertPreferences = {
     // On by default: it is what someone asks for when they say "tell me when
     // volume is big", and it only fires on the coins the centre already watches.
     VOLUMEN: true,
+    // On: these alerts only exist once the reader turned the watch on in JARVIS TRADING.
+    MESA: true,
   },
 };
 

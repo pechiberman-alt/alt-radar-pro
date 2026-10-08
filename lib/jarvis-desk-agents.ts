@@ -206,7 +206,17 @@ export function structureAgent(s: DeskSnapshot, a: Analysis): AgentReport {
     sesgo: b,
     hallazgos: f,
     faltantes: [],
-    datos: { precio: price, alineacion: a.read.alignment, estructura4h: swing, soporte: sup?.price ?? null, resistencia: res?.price ?? null, rango48hMin: a.read.low48, rango48hMax: a.read.high48 },
+    datos: {
+      precio: price,
+      alineacion: a.read.alignment,
+      estructura4h: swing,
+      soporte: sup?.price ?? null,
+      resistencia: res?.price ?? null,
+      rango48hMin: a.read.low48,
+      rango48hMax: a.read.high48,
+      // Per timeframe, so a change of structure between two readings can be noticed (lib/jarvis-watch.ts).
+      ...Object.fromEntries(a.tfs.map((t) => [`tendencia${t.tf}`, t.trend])),
+    },
   });
 }
 

@@ -33,6 +33,7 @@ export type JarvisIntent =
   | { kind: "MACRO"; question: string }
   | { kind: "PAPER" }
   | { kind: "BACKTEST"; symbol: string | null; days: number }
+  | { kind: "ALERT"; symbol: string | null; level: number }
   | { kind: "PAPER_OPEN"; symbol: string | null }
   | { kind: "AI"; question: string };
 
@@ -186,6 +187,11 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   if (/\b(cpi|ppi|nfp|fomc|inflacion|nominas|dato macro|datos macro|agenda macro|calendario (economico|macro)|eventos? macro|la fed|tasa de (la fed|interes)|tasas de interes|desempleo|pbi|gdp)\b/.test(text))
     return { kind: "MACRO", question };
   if (coins.length >= 2 && /\b(compara(me|las|los)?|comparacion|versus|vs|contra|mas fuerte|mas debil|mejor|conviene mas)\b/.test(text)) return { kind: "COMPARE", a: coins[0], b: coins[1] };
+  // "Avisame si pierde 110.000": a Telegram price alert, checked by the server with the app closed.
+  if (/\b(avisame|alertame|aviseme|poneme una alerta|pone una alerta|creame una alerta|crea una alerta|haceme una alerta)\b/.test(text)) {
+    const level = spokenLevel(raw);
+    if (level !== null) return { kind: "ALERT", symbol: coins[0] ?? null, level };
+  }
   if (/\b(que pasa si|y si|si (pierde|rompe|cae|baja|sube|supera|perfora|pasa))\b/.test(text)) {
     const level = spokenLevel(raw);
     if (level !== null) return { kind: "WHATIF", symbol: coins[0] ?? null, level };
@@ -265,4 +271,4 @@ export const HELP_TEXT =
   "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. " +
   "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizá Solana, o analizalo para lo que tenés en pantalla. Tu lectura del mercado. " +
   "Trading: analizame Bitcoin, ¿dónde entrarías?, ¿qué pasa si pierde 110.000?, comparame Bitcoin contra Ethereum, ¿hay riesgo de liquidaciones?, ¿qué pasa si sale un CPI peor de lo esperado? " +
-  "Papel, sin plata real: simulá la operación, ¿cómo va mi paper trading? Backtest de Solana de 6 meses. O preguntame lo que quieras sobre el mercado.";
+  "Papel, sin plata real: simulá la operación, ¿cómo va mi paper trading? Backtest de Solana de 6 meses. Avisame si Bitcoin pierde 110.000. O preguntame lo que quieras sobre el mercado.";

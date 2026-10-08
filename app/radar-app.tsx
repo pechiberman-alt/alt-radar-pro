@@ -31,6 +31,7 @@ import BigTradesDesk from "./big-trades-desk";
 import ZonesDesk from "./zones-desk";
 import PressureDesk from "./pressure-desk";
 import AlertCenter from "./alert-center";
+import { JarvisWatcher } from "./jarvis-watch";
 import AlertToasts from "./alert-toasts";
 import TradeJournalDesk from "./trade-journal-desk";
 import DcaDesk from "./dca-desk";
@@ -934,6 +935,8 @@ export default function RadarApp() {
           <span className={error ? "offline" : "live"}>● {error ? "DEGRADADO" : "EN VIVO"}</span>
           <AccountPanel />
           <AlertToasts />
+          {/* JARVIS TRADING's watch runs whatever sections are shown or folded. */}
+          <JarvisWatcher />
           <FuturesRecorder />
           {installPrompt && <button className="install-app" onClick={installApp}>↓ INSTALAR</button>}
           <button
