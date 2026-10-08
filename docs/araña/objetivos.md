@@ -68,7 +68,7 @@ Reglas:
 - Backtesting (lib/jarvis-backtest*.ts): la misma mesa y las reglas del papel sobre velas pasadas, una operación a la vez; en cada cierre de 4 h solo ve lo cerrado (test de no mirar el futuro). Lo que no tiene historial (derivados, noticias, sentimiento, calendario) pesa cero y se dice. Nunca se presenta como garantía.
 Pendiente:
 - Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI).
-- Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). Bybit, OKX y Hyperliquid desde el Worker: confirmar en producción cuáles responden (/api/market/derivatives?symbol=BTCUSDT dice cuál contestó).
+- Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó.
 
 ## honestidad — Nunca inventar: probabilidades, precios, noticias
 Texto: transversal a todo el producto. Lo que no se sabe se dice, no se estima a escondidas.
@@ -95,7 +95,7 @@ Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden 
 Archivos: lib/klines*.ts, lib/market-*.ts, lib/live-*.ts, lib/upstream-cache*.ts, lib/shared-cache*.ts, lib/etf-flows*.ts, lib/exchange-reserves*.ts, lib/token-unlocks*.ts, lib/econ-calendar*.ts, lib/crypto-news*.ts, lib/news-*.ts, lib/fear-greed*.ts, app/binance-klines*.ts, app/api/klines/**, app/api/tickers/**, app/api/rolling/**, app/api/orderbook/**, app/api/market-structure/**, app/api/structure-trend/**, app/api/etf-flows/**, app/api/exchange-flows/**, app/api/institutional/**, app/api/calendar/**, app/api/sentiment/**, app/api/market/**
 Reglas:
 - Binance responde 403 al Worker (cron): fuera de Binance se usa Kraken o Coinbase en USD, solo para precio y estructura, con `venue` visible.
-- Derivados con respaldo (lib/market-providers.ts): Binance Futures desde el navegador; si no responde, el servidor (/api/market/derivatives) prueba Bybit, OKX y Hyperliquid, en ese orden. Una sola fuente por lectura (nunca se mezclan campos de dos exchanges), funding llevado a 8 h, y la fuente se dice. Liquidaciones reales con historial: OKX, que es una parte del mercado y así se dice. Son APIs públicas: ninguna clave.
+- Derivados con respaldo (lib/market-providers.ts): Binance Futures y después Bybit desde el navegador; si no responden, el servidor (/api/market/derivatives) prueba OKX, Hyperliquid, Bybit y Binance, en ese orden (medido en producción: OKX contesta al Worker con todo; Bybit lo rechaza por región). Una sola fuente por lectura (nunca se mezclan campos de dos exchanges), funding llevado a 8 h, y la fuente se dice. Liquidaciones reales con historial: OKX, que es una parte del mercado y así se dice. Son APIs públicas: ninguna clave.
 - CoinMarketCap solo con la clave del dueño (CONFIGURACIÓN o el secreto CMC_API_KEY), en el servidor, una lectura cada 15 min; sin clave, CoinGecko y CoinLore como siempre.
 - Nunca Binance.US para volumen (es mínimo). Nunca Kraken/Coinbase para alertas de volumen ni para XAU/XAG.
 - Un dato viejo se rechaza (maxAgeMs). Nunca se completa con otro.
