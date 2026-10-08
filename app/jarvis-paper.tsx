@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { arNumber } from "@/lib/ai-numbers";
 import type { DeskDecision } from "@/lib/jarvis-desk";
-import { auditOf, canPaper, MIN_SAMPLE, openR, paperCsv, paperStats, statsBy, type PaperTrade } from "@/lib/jarvis-paper";
+import { auditOf, canPaper, entryOf, MIN_SAMPLE, openR, paperCsv, paperStats, statsBy, type PaperTrade } from "@/lib/jarvis-paper";
 import { closeNow, lastPrice, loadPaper, openFromDesk, PAPER_EVENT, paperState, refreshPaper } from "@/lib/jarvis-paper-run";
 import { everyVisible } from "@/lib/visible-interval";
 
@@ -17,6 +17,7 @@ const px = (v: number) => arNumber(v);
 const r2 = (v: number) => `${v >= 0 ? "+" : "−"}${arNumber(Number(Math.abs(v).toFixed(2)))} R`;
 const when = (t: number) => new Date(t).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const isLive = (t: PaperTrade) => t.estado === "ABIERTA" || t.estado === "PENDIENTE";
+const clock = (t: number) => new Date(t).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 function subscribe(cb: () => void) {
   window.addEventListener(PAPER_EVENT, cb);
@@ -59,14 +60,17 @@ export function PaperFollow({ d, onOpened }: { d: DeskDecision; onOpened?: () =>
           if (r.ok) onOpened?.();
           setMsg(
             r.ok
-              ? { ok: true, text: `En papel: ${r.trade.lado} ${d.moneda} ${r.trade.tipoEntrada === "LÍMITE" ? `con orden límite en ${px(r.trade.entrada)}` : `desde ${px(r.trade.entrada)}`}. La sigo con velas de 1 h y te muestro el resultado abajo, en Paper trading.` }
+              ? {
+                  ok: true,
+                  text: `En papel: ${r.trade.lado} ${d.moneda} ${r.trade.tipoEntrada === "LÍMITE" ? `con orden límite en ${px(r.trade.entrada)}` : `a mercado: entra al precio del minuto de las ${clock(r.trade.inicio ?? r.trade.abiertaA)} (solo cuentan los precios desde que la abriste)`}. La sigo minuto a minuto esta hora y después con velas de 1 h; el resultado va abajo, en Paper trading.`,
+                }
               : { ok: false, text: r.error },
           );
         }}
       >
         {busy ? "ABRIENDO…" : "📝 SIMULAR EN PAPEL"}
       </button>
-      <small>Sin plata real: sigue este plan tal cual y mide qué habría pasado.</small>
+      <small>Sin plata real: sigue este plan desde ahora (nunca con precios que ya pasaron) y mide qué habría pasado.</small>
       {msg && <p className={msg.ok ? "jt-ok" : "jt-error"}>{msg.text}</p>}
     </div>
   );
@@ -146,13 +150,13 @@ export function PaperBlock({ state }: { state: ReturnType<typeof usePaper> }) {
                         <b>
                           {t.symbol.replace(/USDT$/, "")} {t.lado}
                         </b>
-                        <i>{t.estado === "PENDIENTE" ? "LÍMITE SIN LLENAR" : now === null ? "ABIERTA" : r2(now)}</i>
+                        <i>{t.estado === "PENDIENTE" ? (t.tipoEntrada === "LÍMITE" ? "LÍMITE SIN LLENAR" : "ENTRANDO…") : now === null ? "ABIERTA" : r2(now)}</i>
                       </div>
                       <p>
-                        Entrada {px(t.entrada)} · Stop {px(t.stop)} · TP {t.tp.map((p, i) => `${px(p)}${t.salidas.some((e) => e.kind === `TP${i + 1}`) ? " ✓" : ""}`).join(" / ")}
+                        Entrada {t.llenadaA !== null && entryOf(t) !== t.entrada ? `${px(entryOf(t))} (plan ${px(t.entrada)})` : px(t.entrada)} · Stop {px(t.stop)} · TP {t.tp.map((p, i) => `${px(p)}${t.salidas.some((e) => e.kind === `TP${i + 1}`) ? " ✓" : ""}`).join(" / ")}
                       </p>
                       <p className="jt-note">
-                        Abierta {when(t.abiertaA)} · confluencia {t.confianza}/100{lp ? ` · último cierre de 1 h ${px(lp.price)}` : ""}
+                        Abierta {when(t.abiertaA)} · confluencia {t.confianza}/100{lp ? ` · último cierre revisado ${px(lp.price)}` : ""}
                       </p>
                       <button
                         type="button"
@@ -165,7 +169,7 @@ export function PaperBlock({ state }: { state: ReturnType<typeof usePaper> }) {
                           setNote(r.ok ? "" : r.error);
                         }}
                       >
-                        {busy === t.id ? "CERRANDO…" : t.estado === "PENDIENTE" ? "CANCELAR" : "CERRAR AL ÚLTIMO CIERRE"}
+                        {busy === t.id ? "CERRANDO…" : t.estado === "PENDIENTE" ? "CANCELAR" : "CERRAR AL ÚLTIMO MINUTO"}
                       </button>
                     </div>
                   );
@@ -205,7 +209,7 @@ export function PaperBlock({ state }: { state: ReturnType<typeof usePaper> }) {
                           <b>APRENDIZAJE.</b> {a.aprendizaje}
                         </li>
                       </ol>
-                      {t.fuenteVelas && <p className="jt-note">Resuelta con velas de 1 h de {t.fuenteVelas}.</p>}
+                      {t.fuenteVelas && <p className="jt-note">Resuelta con velas de {t.fuenteVelas}{t.inicio !== undefined ? " (1 minuto en la hora en que se abrió, 1 h después)" : " (1 h)"}.</p>}
                     </details>
                   );
                 })}
@@ -267,7 +271,7 @@ export function PaperBlock({ state }: { state: ReturnType<typeof usePaper> }) {
         )}
       </div>
       <p className="jt-note">
-        Reglas fijas: entrada al cierre de la vela que leyó la mesa (o al tocar la límite), un tercio en cada objetivo, stop fijo, si una vela toca stop y objetivo cuenta el stop, comisión 0,05% por lado, cierre a los 7 días. Simulado: no es asesoramiento financiero.
+        Reglas fijas: solo cuentan los precios desde que la abrís (a mercado entra al precio del minuto siguiente y, si ahí el R:R ya no llega a 1:1,5, no entra; la límite, al tocar el nivel), un tercio en cada objetivo, stop fijo, si una vela toca stop y objetivo cuenta el stop, comisión 0,05% por lado, cierre a los 7 días. Simulado: no es asesoramiento financiero.
       </p>
     </div>
   );

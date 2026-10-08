@@ -5,7 +5,8 @@ import type { AssistantContext } from "@/lib/assistant/index";
 import { arNumber } from "@/lib/ai-numbers";
 import { arTime, NOT_AVAILABLE, upcomingHighImpact, type AgentReport } from "@/lib/jarvis-desk-agents";
 import { DESK_PROVIDERS, type DeskSnapshot } from "@/lib/jarvis-desk-data";
-import { compareDesks, macroBrief, type Comparison, type DeskDecision, type DeskSettings, type Plan, type RiskReview } from "@/lib/jarvis-desk";
+import { compareDesks, deskTicket, macroBrief, type Comparison, type DeskDecision, type DeskSettings, type Plan, type RiskReview } from "@/lib/jarvis-desk";
+import { DESK_MODES, manualTicket, type DeskMode } from "@/lib/jarvis-execution";
 import { cachedDesk, deskFor, DESK_SHOW_EVENT, loadDeskSettings, saveDeskSettings, typedNumber } from "@/lib/jarvis-desk-run";
 import { withRecord } from "@/lib/jarvis-paper";
 import { PaperBlock, PaperFollow, usePaper } from "./jarvis-paper";
@@ -97,6 +98,8 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
   // A plain toggle: it opens when a simulation starts and never closes by itself when a trade ends.
   const [paperOpen, setPaperOpen] = useState(false);
   const [backtestOpen, setBacktestOpen] = useState(false);
+  const [realOpen, setRealOpen] = useState(false);
+  const [mode, setMode] = useState<DeskMode>("ANALISIS");
   const ctxRef = useRef(getContext);
   useEffect(() => {
     ctxRef.current = getContext;
@@ -133,19 +136,42 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
     }
   }, []);
 
-  // First reading, and JARVIS asking to show a coin ("analizame SOL").
+  // First reading only once the section is on screen (a collapsed section costs nothing on the phone),
+  // and JARVIS asking to show a coin ("analizame SOL") at any time.
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const startedRef = useRef(false);
+  const pickModeRef = useRef<((m: DeskMode) => void) | null>(null);
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      startedRef.current = true;
+      void (async () => {
+        await Promise.resolve();
+        await analyze("BTC");
+      })();
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      if (startedRef.current || !entries.some((x) => x.isIntersecting)) return;
+      startedRef.current = true;
+      io.disconnect();
+      void analyze("BTC");
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [analyze]);
+
   useEffect(() => {
     let live = true;
-    void (async () => {
-      await Promise.resolve();
-      if (live) await analyze("BTC");
-    })();
     const onShow = (e: Event) => {
-      const d = (e as CustomEvent<{ symbol?: string; compareWith?: string }>).detail;
+      const d = (e as CustomEvent<{ symbol?: string; compareWith?: string; mode?: DeskMode }>).detail;
       if (!d?.symbol) return;
       const coin = d.symbol.replace(/USDT$/, "");
+      startedRef.current = true;
       setInput(coin);
       void analyze(coin).then(() => {
+        if (!live) return;
+        if (d.mode) pickModeRef.current?.(d.mode);
         if (d.compareWith) {
           setOther(d.compareWith.replace(/USDT$/, ""));
           void runCompare(coin, d.compareWith);
@@ -183,13 +209,23 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
   const d = decision ? withRecord(decision, paper.trades) : null;
   const coin = symbol.replace(/USDT$/, "");
   const paperBlock = (
-    <details className="jt-block" open={paperOpen} onToggle={(e) => setPaperOpen(e.currentTarget.open)}>
+    <details className="jt-block" id="jt-paper" open={paperOpen} onToggle={(e) => setPaperOpen(e.currentTarget.open)}>
       <summary>Paper trading · simulado</summary>
       <PaperBlock state={paper} />
     </details>
   );
+  const pickMode = useCallback((m: DeskMode) => {
+    setMode(m);
+    if (m === "PAPEL") setPaperOpen(true);
+    if (m === "REAL") setRealOpen(true);
+    const id = m === "PAPEL" ? "jt-paper" : m === "REAL" ? "jt-real" : "jt-card";
+    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }, []);
+  useEffect(() => {
+    pickModeRef.current = pickMode;
+  }, [pickMode]);
   return (
-    <section className="panel jt-desk" id="jarvis-trading">
+    <section className="panel jt-desk" id="jarvis-trading" ref={sectionRef}>
       <header className="jt-head">
         <div>
           <p className="eyebrow">JARVIS · MESA DE ESPECIALISTAS</p>
@@ -197,6 +233,14 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
         </div>
         <span className="jt-tag">ANÁLISIS · NO EJECUTA</span>
       </header>
+      <div className="jt-modes" role="tablist" aria-label="Modo">
+        {DESK_MODES.map((m) => (
+          <button key={m.id} role="tab" aria-selected={mode === m.id} className={`${mode === m.id ? "on" : ""} ${m.id === "REAL" ? "lock" : ""}`} onClick={() => pickMode(m.id)} title={m.detail}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <p className="jt-mode-note">{DESK_MODES.find((m) => m.id === mode)?.detail}</p>
 
       <form
         className="jt-search"
@@ -229,6 +273,12 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
       {d && state !== "loading" && (
         <>
           <DecisionCard d={d} />
+          <div className="jt-row">
+            <CopyButton label="COPIAR FICHA" text={() => deskTicket(d)} />
+            <button type="button" className="jt-mini" disabled={state !== "idle"} onClick={() => void analyze(coin, true)}>
+              ACTUALIZAR
+            </button>
+          </div>
           <PaperFollow key={`${d.symbol}:${d.vela}:${d.direccion}`} d={d} onOpened={() => setPaperOpen(true)} />
           <details className="jt-block" open>
             <summary>¿Por qué?</summary>
@@ -291,6 +341,11 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
           <details className="jt-block">
             <summary>Alertas de la mesa</summary>
             <WatchBlock d={d} />
+          </details>
+
+          <details className="jt-block" id="jt-real" open={realOpen} onToggle={(e) => setRealOpen(e.currentTarget.open)}>
+            <summary>Ejecución real · manual 🔒</summary>
+            <RealBlock d={d} settings={settings} />
           </details>
 
           <details className="jt-block">
@@ -357,16 +412,85 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
   );
 }
 
+const hour = (t: number) => new Date(t).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/** Copies text to the clipboard and says so; if the browser refuses, it says that too. */
+function CopyButton({ label, text, disabled }: { label: string; text: () => string; disabled?: boolean }) {
+  const [done, setDone] = useState<"" | "ok" | "no">("");
+  return (
+    <button
+      type="button"
+      className="jt-mini"
+      disabled={disabled}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text());
+          setDone("ok");
+        } catch {
+          setDone("no");
+        }
+        window.setTimeout(() => setDone(""), 2500);
+      }}
+    >
+      {done === "ok" ? "COPIADO ✓" : done === "no" ? "NO SE PUDO COPIAR" : label}
+    </button>
+  );
+}
+
+/**
+ * EJECUCIÓN REAL: JARVIS no envía órdenes. Muestra los controles y, si todos
+ * pasan y la persona confirma, el ticket para que cargue la orden ella misma.
+ */
+function RealBlock({ d, settings }: { d: DeskDecision; settings: DeskSettings }) {
+  const [confirmed, setConfirmed] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const t = manualTicket(d, settings, now, confirmed);
+  return (
+    <div className="jt-real">
+      <p className="jt-note">
+        <span className="jt-tag jt-tag-real">REAL · BLOQUEADO</span> JARVIS no envía órdenes a ningún exchange: no tiene cómo. Si todos los controles pasan y confirmás, te arma el ticket y la orden la cargás vos, en tu cuenta.
+      </p>
+      <ul className="jt-checks">
+        {t.checks.map((c) => (
+          <li key={c.id} className={c.ok ? "ok" : "no"}>
+            <b>{c.ok ? "✓" : "✗"} {c.label}</b>
+            <span>{c.detail}</span>
+          </li>
+        ))}
+      </ul>
+      <label className="jt-confirm">
+        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+        <span>Entiendo que JARVIS no opera por mí: la orden la cargo yo, con mi dinero y bajo mi responsabilidad.</span>
+      </label>
+      {t.ready && t.text ? (
+        <>
+          <pre className="jt-ticket">{t.text}</pre>
+          <CopyButton label="COPIAR TICKET" text={() => t.text ?? ""} />
+        </>
+      ) : (
+        <p className="jt-note">Sin ticket hasta que todos los controles estén en verde.</p>
+      )}
+    </div>
+  );
+}
+
 function DecisionCard({ d }: { d: DeskDecision }) {
   const p = d.plan;
   const r = d.riesgo;
   const trade = d.direccion === "LONG" || d.direccion === "SHORT";
   return (
-    <article className={`jt-card ${d.direccion === "LONG" ? "long" : d.direccion === "SHORT" ? "short" : "wait"}`}>
+    <article id="jt-card" className={`jt-card ${d.direccion === "LONG" ? "long" : d.direccion === "SHORT" ? "short" : "wait"}`}>
       <div className="jt-card-top">
         <div>
           <b className="jt-pair">{d.moneda}/USDT</b>
-          <span className="jt-price">${px(d.precio)}</span>
+          <span className="jt-price">${px(d.precioVivo ?? d.precio)}</span>
+          <small className="jt-price-note">
+            {d.precioVivo !== null ? `ahora · ${d.precioVivoFuente} · cierre 1 h leído $${px(d.precio)} (${hour(d.vela + 3_600_000)})` : `cierre 1 h de las ${hour(d.vela + 3_600_000)} · precio en vivo no disponible`}
+          </small>
         </div>
         <div className="jt-dir">
           <strong>
@@ -457,8 +581,14 @@ function RiskBlock({ d, settings }: { d: DeskDecision; settings: DeskSettings })
           R:R por objetivo: {r.rr.map(rr).join(" · ")} · ponderado saliendo un tercio en cada TP: {rr(r.rrPonderado)}.
         </li>
         <li>
-          Apalancamiento sugerido {r.apalancamiento}x (máximo seguro {r.apalancamientoMaxSeguro}x: la liquidación queda al menos 3 veces más lejos que el stop). Liquidación aproximada: ${px(r.liquidacionAprox)}.
+          Apalancamiento sugerido {r.apalancamiento}x (máximo seguro {r.apalancamientoMaxSeguro}x: la liquidación queda al menos 3 veces más lejos que el stop). Liquidación aproximada: ${px(r.liquidacionAprox)}, {arNumber(Number(r.liquidacionVsStop.toFixed(1)))} veces más lejos que el stop.
         </li>
+        {r.precioVivo !== null && (
+          <li>
+            Precio ahora ${px(r.precioVivo)}: {r.rrVivo === null ? "ya está del otro lado del stop o del TP1." : `entrando a ese precio el R:R sería ${rr(r.rrVivo)}.`}
+          </li>
+        )}
+        {r.exposicionX !== null && <li>Exposición: la posición equivale a {arNumber(Number(r.exposicionX.toFixed(2)))} veces tu capital.</li>}
         {settings.capital ? (
           <li>
             Con {money(settings.capital)} y {arNumber(settings.riesgoPct)}% de riesgo: arriesgás {money(r.riesgoUsd)}, posición de {money(r.posicionUsd)} ({px(r.cantidad)} {d.moneda}), margen {money(r.margenUsd)}.

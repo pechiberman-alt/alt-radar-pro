@@ -57,6 +57,12 @@ function rising(start: number, n: number) {
   });
 }
 
+/** Binance-shaped 1 minute klines from `start`, quiet around 100,2 (the price a trade opened at 15:20 enters at). */
+function quiet(start: number, n: number) {
+  const M = 60_000;
+  return Array.from({ length: n }, (_, i) => [start + i * M, "100.2", "100.4", "100", "100.2", "1", start + (i + 1) * M - 1, "1", 1, "1", "1", "0"]);
+}
+
 type Call = { method: string; url: string; body: unknown };
 function stubFetch(paper: (method: string, body: unknown) => Response) {
   const calls: Call[] = [];
@@ -66,8 +72,8 @@ function stubFetch(paper: (method: string, body: unknown) => Response) {
     const body = init?.body ? JSON.parse(String(init.body)) : null;
     calls.push({ method, url, body });
     if (url.startsWith("/api/jarvis/paper")) return paper(method, body);
-    const m = url.match(/\/fapi\/v1\/klines\?symbol=(\w+)&interval=1h&startTime=(\d+)/);
-    if (m) return new Response(JSON.stringify(rising(Number(m[2]), 30)));
+    const m = url.match(/\/fapi\/v1\/klines\?symbol=(\w+)&interval=(1h|1m)&startTime=(\d+)/);
+    if (m) return new Response(JSON.stringify(m[2] === "1m" ? quiet(Number(m[3]), 120) : rising(Number(m[3]), 30)));
     return new Response("", { status: 404 });
   }) as typeof fetch;
   return calls;
@@ -96,11 +102,15 @@ test("signed out: the record lives on this device, opens once, refuses stale pla
   const vetoed = await openFromDesk(decision({ direccion: "NO TRADE", riesgo: { ...decision().riesgo!, vetos: ["x"] } }), NOW);
   assert.equal(vetoed.ok, false, "never a plan the risk manager vetoed");
   assert.equal(JSON.parse(local.get(PAPER_LOCAL_KEY)!).length, 1);
+  const opened = JSON.parse(local.get(PAPER_LOCAL_KEY)!)[0] as PaperTrade;
+  assert.equal(opened.estado, "PENDIENTE", "a market trade waits for its first price after now");
+  assert.equal(opened.inicio, NOW);
   const later = VELA + 20 * H;
   const done = await refreshPaper(later);
   assert.equal(done.changed, 1);
   const t = paperState().trades[0];
   assert.equal(t.estado, "CERRADA");
+  assert.equal(t.entradaReal, 100.2, "the 15:20 minute, not the 15:00 close the desk read");
   assert.deepEqual(t.salidas.map((e) => e.kind), ["TP1", "TP2", "TP3"]);
   assert.equal(t.fuenteVelas, "Binance Futures");
   assert.equal(JSON.parse(local.get(PAPER_LOCAL_KEY)!)[0].estado, "CERRADA", "kept on this device");
@@ -127,4 +137,61 @@ test("signed in: opened and advanced through the server, whose version wins", as
   assert.equal(put.length, 1);
   assert.equal((put[0].body as { trades: PaperTrade[] }).trades.length, 1);
   assert.match(paperState().trades[0].motivoCierre!, /\(servidor\)$/);
+});
+
+test("closing by hand checks every minute up to now first: a stop in between is never skipped", async () => {
+  const local = fakeWindow();
+  const M = 60_000;
+  // A dip to 94 at 15:30 (below the stop at 95), then back to 101 by 15:44.
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.startsWith("/api/jarvis/paper")) return Response.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
+    const m = url.match(/interval=(1h|1m)&startTime=(\d+)/);
+    if (!m) return new Response("", { status: 404 });
+    if (m[1] === "1h") return new Response(JSON.stringify([]));
+    const start = Number(m[2]);
+    return new Response(
+      JSON.stringify(
+        Array.from({ length: 30 }, (_, i) => {
+          const t = start + i * M;
+          const low = t === NOW + 10 * M ? "94" : "100";
+          return [t, "100.2", "101", low, "101", "1", t + M - 1, "1", 1, "1", "1", "0"];
+        }),
+      ),
+    );
+  }) as typeof fetch;
+  assert.equal((await loadPaper(true)).mode, "equipo");
+  const r = await openFromDesk(decision({ vela: VELA }), NOW);
+  assert.ok(r.ok);
+  const closing = await closeNow(r.ok ? r.trade.id : "", NOW + 25 * M);
+  assert.equal(closing.ok, false, "it had already hit the stop at 15:30");
+  const t = paperState().trades[0];
+  assert.equal(t.estado, "CERRADA");
+  assert.equal(t.salidas[0].kind, "STOP");
+  assert.equal(JSON.parse(local.get(PAPER_LOCAL_KEY)!)[0].estado, "CERRADA");
+});
+
+test("closing by hand without a dip: at the close of the last minute already checked", async () => {
+  fakeWindow();
+  const M = 60_000;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.startsWith("/api/jarvis/paper")) return Response.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
+    const m = url.match(/interval=(1h|1m)&startTime=(\d+)/);
+    if (!m) return new Response("", { status: 404 });
+    if (m[1] === "1h") return new Response(JSON.stringify([]));
+    const start = Number(m[2]);
+    return new Response(JSON.stringify(Array.from({ length: 30 }, (_, i) => [start + i * M, "100.2", String(Math.max(102, 100.2 + i / 10)), "100", String(100.2 + i / 10), "1", start + (i + 1) * M - 1, "1", 1, "1", "1", "0"])));
+  }) as typeof fetch;
+  await loadPaper(true);
+  const r = await openFromDesk(decision({ vela: VELA }), NOW);
+  assert.ok(r.ok);
+  const closing = await closeNow(r.ok ? r.trade.id : "", NOW + 25 * M + 30_000);
+  assert.ok(closing.ok);
+  if (closing.ok) {
+    const exit = closing.trade.salidas.at(-1)!;
+    assert.equal(exit.kind, "MANUAL");
+    assert.equal(exit.at, NOW + 25 * M, "the end of the last closed minute");
+    assert.ok(Math.abs(exit.price - (100.2 + 24 / 10)) < 1e-9, "that minute's close");
+  }
 });

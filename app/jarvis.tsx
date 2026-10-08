@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { openInMap, showSection } from "@/lib/account-events";
 import { eligible } from "@/lib/decoupling";
 import { briefingText, findCoins, findTimeframe, greeting, HELP_TEXT, parseCommand, priceLine, type JarvisIntent, type Ticker } from "@/lib/jarvis";
-import { compareDesks, deskForAi, deskSpeech, entrySpeech, indicatorsSpeech, liquidationRisk, macroBrief, macroKindOf, macroSpeech, whatIf, type DeskDecision } from "@/lib/jarvis-desk";
+import { compareDesks, deskForAi, deskSpeech, deskTicket, entrySpeech, indicatorsSpeech, liquidationRisk, macroBrief, macroKindOf, macroSpeech, whatIf, type DeskDecision } from "@/lib/jarvis-desk";
 import { cachedDesk, deskFor, showInDesk } from "@/lib/jarvis-desk-run";
 import { canPaper, paperForAi, paperSpeech } from "@/lib/jarvis-paper";
 import { loadPaper, openFromDesk, paperTrades, refreshPaper } from "@/lib/jarvis-paper-run";
@@ -540,9 +540,10 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   }, []);
 
   const speak = useCallback(
-    (text: string, tag?: string) => {
-      keepTurn("assistant", text);
-      setLines((l) => [...l, { who: "jarvis" as const, text, ...(tag ? { tag } : {}) }].slice(-40));
+    /** `shown` is what the chat shows when it is not what the voice says (the desk's full ticket, spoken short). */
+    (text: string, tag?: string, shown?: string) => {
+      keepTurn("assistant", shown ?? text);
+      setLines((l) => [...l, { who: "jarvis" as const, text: shown ?? text, ...(tag ? { tag } : {}) }].slice(-40));
       if (!prefs.voice) {
         setMode("idle");
         return;
@@ -749,7 +750,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             }
             const said =
               intent.kind === "DESK" ? deskSpeech(d) : intent.kind === "ENTRY" ? entrySpeech(d) : intent.kind === "INDICATORS" ? indicatorsSpeech(d) : intent.kind === "LIQ_RISK" ? liquidationRisk(d) : whatIf(d, intent.level);
-            return speak(said, "mesa");
+            // An analysis or a trade request shows the full ticket in the chat (ACTIVO, DIRECCIÓN, …); the voice says it short.
+            return speak(said, "mesa", intent.kind === "DESK" || intent.kind === "ENTRY" ? deskTicket(d) : undefined);
           }
           case "COMPARE": {
             const ctxNow = deskContext();
@@ -784,7 +786,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             showInDesk(sym);
             const t = r.trade;
             return speak(
-              `Listo, en papel: ${t.lado === "LONG" ? "largo" : "corto"} en ${coin} ${t.tipoEntrada === "LÍMITE" ? `con orden límite en ${arNumber(t.entrada)}` : `desde ${arNumber(t.entrada)}`}, stop ${arNumber(t.stop)}, objetivos ${t.tp.map((x) => arNumber(x)).join(", ")}. La sigo con velas de una hora y mido el resultado. Simulado, sin plata real.`,
+              `Listo, en papel: ${t.lado === "LONG" ? "largo" : "corto"} en ${coin} ${t.tipoEntrada === "LÍMITE" ? `con orden límite en ${arNumber(t.entrada)}` : "a mercado, al precio del minuto que viene (solo cuentan los precios desde ahora)"}, stop ${arNumber(t.stop)}, objetivos ${t.tp.map((x) => arNumber(x)).join(", ")}. Si a ese precio el riesgo beneficio ya no alcanza, no entra. La sigo minuto a minuto esta hora y después con velas de una hora. Simulado, sin plata real.`,
               "papel",
             );
           }
@@ -806,6 +808,17 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             setLines((l) => [...l, { who: "jarvis" as const, text: `Corro el backtest de ${coin} en ${intent.days} días con la misma mesa y las reglas del papel: tarda unos segundos…` }].slice(-40));
             const r = await runBacktestFor(sym, intent.days);
             return speak(r.ok ? `${backtestSpeech(r.result)}${r.nota ? ` ${r.nota}` : ""}` : r.error, "backtest");
+          }
+          case "REAL": {
+            // Real money is the person's own action: JARVIS never sends an order (lib/jarvis-execution.ts).
+            const sym = intent.symbol ? `${intent.symbol}USDT` : (focusRef.current.symbol ?? "BTCUSDT");
+            screenRef.current = "JARVIS TRADING";
+            showSection("jarvis-trading");
+            showInDesk(sym, undefined, "REAL");
+            return speak(
+              `No opero en tu cuenta: JARVIS no envía órdenes, y no tiene cómo. Análisis, papel y ejecución real están separados. Te abro la ejecución manual de ${sym.replace(/USDT$/, "")}: si el plan pasa todos los controles y lo confirmás, te armo el ticket y la orden la cargás vos en tu exchange. Si querés practicar sin plata, decime «simulá la operación».`,
+              "mesa",
+            );
           }
           case "MACRO": {
             const cal = await loadCalendar().catch(() => null);

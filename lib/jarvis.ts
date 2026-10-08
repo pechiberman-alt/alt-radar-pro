@@ -35,6 +35,7 @@ export type JarvisIntent =
   | { kind: "BACKTEST"; symbol: string | null; days: number }
   | { kind: "ALERT"; symbol: string | null; level: number }
   | { kind: "PAPER_OPEN"; symbol: string | null }
+  | { kind: "REAL"; symbol: string | null }
   | { kind: "AI"; question: string };
 
 /** Lowercase, no accents, no punctuation, single spaces. */
@@ -164,6 +165,13 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   if (remember) return { kind: "REMEMBER", text: remember[1].trim() };
   if (/\b(tu lectura|lectura del mercado|que ves en el mercado|como ves el mercado|que pensas del mercado|tu (vision|opinion) del mercado|tus tesis|tu mente)\b/.test(text)) return { kind: "MIND" };
   if (/\b(que aprendiste|que (has )?aprendido|aprendizaje|que descubriste|lecciones|que estudiaste|que sabes del mercado)\b/.test(text)) return { kind: "LEARN" };
+  // Real money: JARVIS never sends an order (lib/jarvis-execution.ts); it explains and opens the manual ticket.
+  if (
+    /\b(opera(me|lo|la)? (\w+ )?(por mi|en mi cuenta|en real|con plata real)|ejecuta(la|lo)\b|ejecuta(r|me)? (la |una |esa )?(orden|operacion|compra|venta)|ejecucion real|modo real|con (plata|dinero) real|manda(la|me)? (la )?orden|abri(la|me|lo)? (la |una )?(orden|posicion|operacion) (real|en binance)|compra(me|la|lo)? (\w+ )?por mi|vende(me|la|lo)? (\w+ )?por mi|operar en (mi )?cuenta|ticket (manual|de la orden))/.test(text) &&
+    !/\b(papel|simula)/.test(text)
+  )
+    // "en Binance" is where, not the coin (findCoins reads "binance" as BNB).
+    return { kind: "REAL", symbol: findCoins(text.replace(/\b(en|de) binance\b/g, " "), known)[0] ?? null };
   // Paper trading (lib/jarvis-paper.ts): follow the desk's plan without real money; its measured record.
   if (/\b(simula(la|lo|me)?|abri(la|lo)? en papel|segui(la|lo)? en papel|opera(la|lo)? en papel|pone(la|lo) en papel)\b/.test(text) && !/\b(como (va|van|vienen?|fue)|resultados?|historial|estadisticas)\b/.test(text))
     return { kind: "PAPER_OPEN", symbol: findCoins(text, known)[0] ?? null };
@@ -271,4 +279,5 @@ export const HELP_TEXT =
   "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. " +
   "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizá Solana, o analizalo para lo que tenés en pantalla. Tu lectura del mercado. " +
   "Trading: analizame Bitcoin, ¿dónde entrarías?, ¿qué pasa si pierde 110.000?, comparame Bitcoin contra Ethereum, ¿hay riesgo de liquidaciones?, ¿qué pasa si sale un CPI peor de lo esperado? " +
-  "Papel, sin plata real: simulá la operación, ¿cómo va mi paper trading? Backtest de Solana de 6 meses. Avisame si Bitcoin pierde 110.000. O preguntame lo que quieras sobre el mercado.";
+  "Papel, sin plata real: simulá la operación, ¿cómo va mi paper trading? Backtest de Solana de 6 meses. Avisame si Bitcoin pierde 110.000. " +
+  "No opero en tu cuenta: para plata real te armo un ticket manual con controles y la orden la cargás vos. O preguntame lo que quieras sobre el mercado.";

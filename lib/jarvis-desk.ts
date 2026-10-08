@@ -1,7 +1,7 @@
 import { arNumber } from "./ai-numbers.ts";
 import type { MacroEvent } from "./econ-calendar.ts";
 import { analyzeAsset, type Analysis } from "./jarvis-analyst.ts";
-import { arTime, consensus, framesOf, pct, px, runAgents, upcomingHighImpact, type AgentReport, type VolRegime } from "./jarvis-desk-agents.ts";
+import { arTime, consensus, framesOf, n2, pct, px, runAgents, upcomingHighImpact, type AgentReport, type VolRegime } from "./jarvis-desk-agents.ts";
 import { DESK_FRAMES, type DeskSnapshot } from "./jarvis-desk-data.ts";
 import { closedOnly } from "./jarvis-core.ts";
 import { atrOf } from "./level-engine.ts";
@@ -44,7 +44,14 @@ export type DeskSettings = {
   riesgoPct: number;
   /** Tope de apalancamiento que la persona acepta. */
   apalancamientoMax: number;
+  /** Riesgo en dólares de las operaciones de papel abiertas (lo pone quien llama; no se guarda). */
+  riesgoAbiertoUsd?: number | null;
 };
+
+/** Riesgo abierto total (papel) que dispara el aviso, en % del capital. */
+export const MAX_OPEN_RISK_PCT = 5;
+/** Con riesgo ALTO, el R:R mínimo sube a este. */
+export const MIN_RR_HIGH_RISK = 2;
 
 export const DEFAULT_DESK_SETTINGS: DeskSettings = { capital: null, riesgoPct: 1, apalancamientoMax: 10 };
 
@@ -64,6 +71,13 @@ export type RiskReview = {
   apalancamientoMaxSeguro: number;
   margenUsd: number | null;
   liquidacionAprox: number;
+  /** Cuántas veces más lejos que el stop queda la liquidación (con el apalancamiento sugerido). */
+  liquidacionVsStop: number;
+  /** Posición / capital (null sin capital cargado). */
+  exposicionX: number | null;
+  /** Precio ahora (mark de futuros) y el R:R entrando a ese precio, si se pudo leer. */
+  precioVivo: number | null;
+  rrVivo: number | null;
   nivel: RiskLevel;
   /** Motivos de NO TRADE. */
   vetos: string[];
@@ -78,7 +92,11 @@ export type LevelLite = { precio: number; estrellas: number };
 export type DeskDecision = {
   symbol: string;
   moneda: string;
+  /** Cierre de la última vela de 1 h que leyó la mesa: el precio del análisis. */
   precio: number;
+  /** El precio ahora (mark de futuros), si se pudo leer; solo para el control de riesgo de la entrada. */
+  precioVivo: number | null;
+  precioVivoFuente: string | null;
   /** Apertura de la última vela de 1 h cerrada que se leyó. */
   vela: number;
   generadoA: number;
@@ -108,7 +126,8 @@ export type DeskDecision = {
 
 export type DeskRecord = { n: number; ganadas: number; winRate: number | null; expectativaR: number | null; etiqueta: string };
 
-const MIN_RR = 1.5;
+/** R:R ponderado mínimo que aprueba el gestor de riesgo (también al entrar en papel). */
+export const MIN_RR = 1.5;
 const CONSENSUS_EDGE = 0.15;
 const MMR = 0.005;
 
@@ -174,9 +193,19 @@ export function rrOf(p: Plan): { rr: [number, number, number]; rrPonderado: numb
  * El gestor de riesgo. Tiene la última palabra: veta lo que no cierra aunque
  * todo lo demás diga que sí. Calcula tamaño, apalancamiento y liquidación.
  */
+/** R:R ponderado (un tercio por objetivo) entrando a `price`; null si ya está del otro lado del stop o del TP1. */
+export function rrFrom(p: Pick<Plan, "lado" | "stop" | "tp">, price: number): number | null {
+  const s = p.lado === "LONG" ? 1 : -1;
+  const risk = s * (price - p.stop);
+  if (!(risk > 0) || !(s * (p.tp[0].price - price) > 0)) return null;
+  return p.tp.reduce((acc, t) => acc + (s * (t.price - price)) / risk, 0) / 3;
+}
+
+const usd = (v: number) => `$${v.toLocaleString("es-AR", { maximumFractionDigits: v >= 100 ? 0 : 2 })}`;
+
 export function reviewRisk(
   p: Plan,
-  ctx: { atr: number; regime: VolRegime; events: MacroEvent[] | null; now: number; fundingPct: number | null; longShort: number | null; coverage: number; consensus: number },
+  ctx: { atr: number; regime: VolRegime; events: MacroEvent[] | null; now: number; fundingPct: number | null; longShort: number | null; coverage: number; consensus: number; livePrice?: number | null },
   settings: DeskSettings,
 ): RiskReview {
   const { rr, rrPonderado } = rrOf(p);
@@ -186,6 +215,20 @@ export function reviewRisk(
   const esperas: string[] = [];
   const avisos: string[] = [];
   if (rrPonderado < MIN_RR) vetos.push(`Relación riesgo/beneficio insuficiente: 1:${arNumber(Number(rrPonderado.toFixed(2)))} (mínimo 1:${arNumber(MIN_RR)}).`);
+  // The plan is priced at the close the desk read; the market kept moving. A market entry is judged at today's price.
+  const live = typeof ctx.livePrice === "number" && ctx.livePrice > 0 ? ctx.livePrice : null;
+  const rrVivo = live !== null ? rrFrom(p, live) : null;
+  if (live !== null && p.tipoEntrada === "MERCADO") {
+    const movedPct = ((live - p.entrada) / p.entrada) * 100;
+    if (rrVivo === null) {
+      const beyondStop = (p.lado === "LONG" ? live <= p.stop : live >= p.stop);
+      esperas.push(`El precio ahora (${px(live)}) ya está ${beyondStop ? "del otro lado del stop" : "más allá del TP1"}: este plan es del cierre de la vela y ya no sirve. La mesa vuelve a leer al próximo cierre.`);
+    } else if (rrVivo < MIN_RR) {
+      esperas.push(`El precio ya se movió ${pct(movedPct, 2)} desde el cierre (ahora ${px(live)}): a mercado el R:R quedaría en 1:${arNumber(Number(rrVivo.toFixed(2)))} (mínimo 1:${arNumber(MIN_RR)}). Esperá un retroceso hacia ${px(p.entrada)} o el próximo cierre.`);
+    } else if (Math.abs(movedPct) >= 0.1) {
+      avisos.push(`El precio ahora es ${px(live)} (${pct(movedPct, 2)} desde el cierre leído): a ese precio el R:R es 1:${arNumber(Number(rrVivo.toFixed(2)))}.`);
+    }
+  }
   if (stopPct < 0.25) vetos.push(`Stop a ${pct(stopPct, 2, false)}: dentro del ruido normal del precio.`);
   if (stopPct > 10 || stopAtr > 3.5) vetos.push(`Stop demasiado lejos (${pct(stopPct, 1, false)}, ${arNumber(Number(stopAtr.toFixed(1)))} ATR).`);
   const against = p.lado === "LONG" ? ctx.consensus <= -CONSENSUS_EDGE : ctx.consensus >= CONSENSUS_EDGE;
@@ -202,16 +245,59 @@ export function reviewRisk(
 
   // Apalancamiento: la liquidación tiene que quedar al menos 3 veces más lejos que el stop.
   const maxSafe = Math.max(1, Math.min(settings.apalancamientoMax, Math.floor(100 / (stopPct * 3))));
-  const apalancamiento = Math.max(1, Math.min(maxSafe, Math.round(maxSafe / 2)));
-  const liquidacionAprox = p.lado === "LONG" ? p.entrada * (1 - 1 / apalancamiento + MMR) : p.entrada * (1 + 1 / apalancamiento - MMR);
-  const riesgoUsd = settings.capital && settings.capital > 0 ? (settings.capital * settings.riesgoPct) / 100 : null;
+  let apalancamiento = Math.max(1, Math.min(maxSafe, Math.round(maxSafe / 2)));
+  const capital = settings.capital && settings.capital > 0 ? settings.capital : null;
+  const riesgoUsd = capital !== null ? (capital * settings.riesgoPct) / 100 : null;
   const posicionUsd = riesgoUsd !== null ? riesgoUsd / (stopPct / 100) : null;
   const cantidad = posicionUsd !== null ? posicionUsd / p.entrada : null;
+  // The size the risk asks for has to fit the capital at a safe leverage; if not, it is not a trade.
+  if (posicionUsd !== null && capital !== null) {
+    if (posicionUsd / maxSafe > capital) {
+      vetos.push(`Con ${arNumber(settings.riesgoPct)}% de riesgo y el stop a ${pct(stopPct, 2, false)}, la posición (${usd(posicionUsd)}) no entra en tu capital ni con el apalancamiento máximo seguro (${maxSafe}x): bajá el riesgo por operación.`);
+    } else if (posicionUsd / apalancamiento > capital) {
+      apalancamiento = Math.min(maxSafe, Math.ceil(posicionUsd / capital));
+      avisos.push(`Para que el margen entre en tu capital, el apalancamiento sube a ${apalancamiento}x (sigue dentro del máximo seguro, ${maxSafe}x).`);
+    }
+  }
+  const liquidacionAprox = p.lado === "LONG" ? p.entrada * (1 - 1 / apalancamiento + MMR) : p.entrada * (1 + 1 / apalancamiento - MMR);
+  const liquidacionVsStop = Math.abs(p.entrada - liquidacionAprox) / Math.abs(p.entrada - p.stop);
   const margenUsd = posicionUsd !== null ? posicionUsd / apalancamiento : null;
-  if (margenUsd !== null && settings.capital && margenUsd > settings.capital) avisos.push("El margen necesario supera el capital: bajá el riesgo por operación.");
+  const exposicionX = posicionUsd !== null && capital !== null ? posicionUsd / capital : null;
+  if (settings.riesgoPct > 2) avisos.push(`Riesgo por operación de ${arNumber(settings.riesgoPct)}%: por encima del 1–2% que permite aguantar una racha perdedora.`);
+  if (exposicionX !== null && exposicionX > 3) avisos.push(`Exposición: la posición equivale a ${n2(exposicionX)} veces tu capital.`);
+  const open = typeof settings.riesgoAbiertoUsd === "number" && settings.riesgoAbiertoUsd > 0 ? settings.riesgoAbiertoUsd : 0;
+  if (capital !== null && riesgoUsd !== null && open > 0 && ((open + riesgoUsd) / capital) * 100 > MAX_OPEN_RISK_PCT) {
+    avisos.push(`Con las operaciones de papel abiertas (${usd(open)} en riesgo) más esta, el riesgo abierto sería ${pct(((open + riesgoUsd) / capital) * 100, 1, false)} de tu capital (más de ${MAX_OPEN_RISK_PCT}%).`);
+  }
 
   const nivel: RiskLevel = stopAtr > 2.2 || ctx.regime === "EXPANDIDA" || soon.length > 0 || ctx.coverage < 0.5 ? "ALTO" : stopPct > 3 || avisos.length >= 2 ? "MEDIO" : "BAJO";
-  return { lado: p.lado, rr, rrPonderado, stopPct, stopAtr, riesgoUsd, posicionUsd, cantidad, apalancamiento, apalancamientoMaxSeguro: maxSafe, margenUsd, liquidacionAprox, nivel, vetos, esperas, avisos, aprobado: vetos.length === 0 && esperas.length === 0 };
+  // High risk has to pay more: a thin reward does not compensate it.
+  if (nivel === "ALTO" && rrPonderado >= MIN_RR && rrPonderado < MIN_RR_HIGH_RISK) {
+    vetos.push(`Riesgo alto con R:R 1:${arNumber(Number(rrPonderado.toFixed(2)))}: no compensa (con riesgo alto la mesa pide 1:${arNumber(MIN_RR_HIGH_RISK)} o más).`);
+  }
+  return {
+    lado: p.lado,
+    rr,
+    rrPonderado,
+    stopPct,
+    stopAtr,
+    riesgoUsd,
+    posicionUsd,
+    cantidad,
+    apalancamiento,
+    apalancamientoMaxSeguro: maxSafe,
+    margenUsd,
+    liquidacionAprox,
+    liquidacionVsStop,
+    exposicionX,
+    precioVivo: live,
+    rrVivo,
+    nivel,
+    vetos,
+    esperas,
+    avisos,
+    aprobado: vetos.length === 0 && esperas.length === 0,
+  };
 }
 
 /** Con entrada a mercado no cierra: probar una entrada límite en el nivel a favor más cercano. */
@@ -280,7 +366,9 @@ export function runDesk(raw: DeskSnapshot, settings: DeskSettings = DEFAULT_DESK
   const atr = atrOf(frames.h4);
   const price = a.read.price;
   const regime = (agents.find((x) => x.id === "volatilidad")?.datos.regimen as VolRegime | undefined) ?? "NORMAL";
-  const ctx = { atr, regime, events: s.macro.events, now: s.now, fundingPct: s.derivatives?.fundingPct ?? null, longShort: s.derivatives?.longShortRatio ?? null, coverage: cons.coverage, consensus: cons.value };
+  // The price now (futures mark), read with the derivatives: it never enters the analysis, only the risk check of a market entry.
+  const livePrice = raw.derivatives?.markPrice ?? null;
+  const ctx = { atr, regime, events: s.macro.events, now: s.now, fundingPct: s.derivatives?.fundingPct ?? null, longShort: s.derivatives?.longShortRatio ?? null, coverage: cons.coverage, consensus: cons.value, livePrice };
   const bull = bestPlan("LONG", a, atr, ctx, settings);
   const bear = bestPlan("SHORT", a, atr, ctx, settings);
   const favored: Side | null = cons.value >= CONSENSUS_EDGE ? "LONG" : cons.value <= -CONSENSUS_EDGE ? "SHORT" : null;
@@ -333,6 +421,8 @@ export function runDesk(raw: DeskSnapshot, settings: DeskSettings = DEFAULT_DESK
     symbol: s.symbol,
     moneda: s.symbol.replace(/USDT$/, ""),
     precio: price,
+    precioVivo: livePrice !== null && livePrice > 0 ? livePrice : null,
+    precioVivoFuente: livePrice !== null && livePrice > 0 ? `${raw.derivatives?.source ?? "futuros"} (mark)` : null,
     vela: a.read.at,
     generadoA: s.now,
     direccion,
@@ -558,6 +648,48 @@ export function macroKindOf(text: string): MacroKind | null {
 export function macroSpeech(b: MacroBrief): string {
   if (!b.evento) return b.nota;
   return `${b.evento}: ${b.hora}, impacto ${b.impacto?.toLowerCase()}. Pronóstico ${b.pronostico ?? "sin dato"}, previo ${b.previo ?? "sin dato"}. Si sale caliente: ${b.hot} Si sale frío: ${b.cool} ${b.btc} ${b.nota}`;
+}
+
+const ARROW: Record<Direction, string> = { LONG: "🟢 LONG", SHORT: "🔴 SHORT", ESPERAR: "⏸ ESPERAR", "NO TRADE": "⛔ NO TRADE" };
+const hourAr = (t: number) => new Date(t).toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/**
+ * La ficha de la operación, con el formato de siempre (ACTIVO, DIRECCIÓN,
+ * CONFIANZA, ENTRADA, STOP LOSS, TP1-3, RIESGO, R:R, APALANCAMIENTO,
+ * INVALIDACIÓN, RAZONAMIENTO, ESCENARIO ALTERNATIVO), para leer y copiar.
+ * Sin operación lo dice; nunca rellena un número que no hay.
+ */
+export function deskTicket(d: DeskDecision): string {
+  const lines: string[] = [];
+  const close = `cierre 1 h de las ${hourAr(d.vela + 3_600_000)}`;
+  lines.push(`ACTIVO: ${d.moneda}/USDT`);
+  lines.push(`DIRECCIÓN: ${ARROW[d.direccion]}`);
+  lines.push(`CONFIANZA: ${d.puntaje}/100 (confluencia de la mesa; no es probabilidad de acierto)`);
+  lines.push(`ACIERTO MEDIDO: ${d.historial?.etiqueta ?? "todavía sin historial de setups parecidos"}`);
+  lines.push(`PRECIO: ${px(d.precio)} · ${close}${d.precioVivo !== null ? ` · ahora ${px(d.precioVivo)} · ${d.precioVivoFuente}` : " · precio en vivo: este dato no está disponible actualmente"}`);
+  const trade = (d.direccion === "LONG" || d.direccion === "SHORT") && d.plan && d.riesgo;
+  if (trade && d.plan && d.riesgo) {
+    const p = d.plan;
+    const r = d.riesgo;
+    lines.push(`ENTRADA: ${px(p.entrada)} · ${p.tipoEntrada === "LÍMITE" ? "orden límite" : "a mercado"}`);
+    lines.push(`STOP LOSS: ${px(p.stop)} · ${p.stopRazon}`);
+    p.tp.forEach((t, i) => lines.push(`TAKE PROFIT ${i + 1}: ${px(t.price)} · ${t.label}`));
+    lines.push(`RIESGO: ${r.nivel}`);
+    lines.push(`R:R: ${rrText(r.rrPonderado)} · ponderado, un tercio en cada objetivo (por objetivo ${r.rr.map(rrText).join(" / ")})`);
+    lines.push(`APALANCAMIENTO SUGERIDO: ${r.apalancamiento}x · máximo seguro ${r.apalancamientoMaxSeguro}x · liquidación aprox. ${px(r.liquidacionAprox)}, ${arNumber(Number(r.liquidacionVsStop.toFixed(1)))} veces más lejos que el stop`);
+    lines.push(r.posicionUsd !== null && r.riesgoUsd !== null ? `TAMAÑO: posición ${usd(r.posicionUsd)} (${px(r.cantidad ?? 0)} ${d.moneda}) · arriesgás ${usd(r.riesgoUsd)}${r.exposicionX !== null ? ` · exposición ${n2(r.exposicionX)}x tu capital` : ""}` : "TAMAÑO: cargá tu capital en «Mi riesgo» para calcularlo");
+  } else {
+    lines.push(`POR QUÉ: ${d.resolucion}`);
+    if (d.direccion === "ESPERAR" && d.plan) lines.push(`SI SE DA: ${d.plan.lado} en ${px(d.plan.entrada)}, stop ${px(d.plan.stop)}, objetivos ${d.plan.tp.map((t) => px(t.price)).join(" / ")}${d.riesgo ? ` (R:R ${rrText(d.riesgo.rrPonderado)})` : ""}`);
+    else lines.push("ENTRADA, STOP Y OBJETIVOS: sin operación");
+    if (d.riesgo) lines.push(`RIESGO: ${d.riesgo.nivel}`);
+  }
+  lines.push(`INVALIDACIÓN: ${d.invalidacion}`);
+  lines.push(`RAZONAMIENTO: ${trade ? d.resolucion : ""}${d.razonamiento.length ? `${trade ? " " : ""}${d.razonamiento.map((x) => `• ${x}`).join(" ")}` : ""}`.trim());
+  lines.push(`ESCENARIO ALTERNATIVO: ${d.alternativo}`);
+  if (d.faltantes.length) lines.push(`DATOS QUE FALTAN: ${d.faltantes.slice(0, 4).join("; ")}. Este dato no está disponible actualmente.`);
+  lines.push(d.aviso);
+  return lines.join("\n");
 }
 
 /** "¿Dónde entrarías?": el plan, o por qué no hay entrada. */

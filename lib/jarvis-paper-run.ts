@@ -1,13 +1,14 @@
 import type { DeskDecision } from "./jarvis-desk.ts";
-import { closeManually, paperFromDesk, resolvePaper, type PaperTrade } from "./jarvis-paper.ts";
+import { closeManually, cursorOf, MINUTE, needsMinutes, paperFromDesk, resolvePaper, type PaperTrade } from "./jarvis-paper.ts";
 import { BROWSER_BASES, FUTURES_BASES } from "./market-fetch.ts";
 import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
 
 /**
  * Paper trading en el navegador. Con sesión, las operaciones viven en tu
  * cuenta (/api/jarvis/paper); sin sesión, en este equipo. Se resuelven acá,
- * con velas de 1 h de Binance (la misma fuente del plan): como se usan velas
- * pasadas, el resultado es el mismo aunque abras la app días después.
+ * con velas de Binance (la misma fuente del plan): 1 minuto para el pedazo
+ * de hora en que se abrió cada una y 1 h después. Como se usan velas pasadas,
+ * el resultado es el mismo aunque abras la app días después.
  */
 
 export const PAPER_LOCAL_KEY = "alt-radar-pro:jarvis-paper:v1";
@@ -127,6 +128,7 @@ export async function openFromDesk(d: DeskDecision, now = Date.now()): Promise<O
     if (!r.ok || !body.trade) return { ok: false, error: body.error ?? "No se pudo abrir la operación de papel." };
     store = { ...store, trades: sortTrades([body.trade, ...store.trades]) };
     emit();
+    refreshSoon(body.trade, now);
     return { ok: true, trade: body.trade };
   }
   if (store.trades.some((x) => x.id === t.id)) return { ok: false, error: "Ya estás siguiendo este plan en papel." };
@@ -134,12 +136,22 @@ export async function openFromDesk(d: DeskDecision, now = Date.now()): Promise<O
   store = { ...store, trades: sortTrades([t, ...store.trades]) };
   writeLocal(store.trades);
   emit();
+  refreshSoon(t, now);
   return { ok: true, trade: t };
 }
 
-/** Velas de 1 h desde `startTime`: futuros primero (la fuente del plan), spot si no responde. */
-export async function candlesSince(symbol: string, startTime: number, signal: AbortSignal): Promise<{ candles: SwingCandle[]; venue: string } | null> {
-  const q = `symbol=${encodeURIComponent(symbol)}&interval=1h&startTime=${Math.floor(startTime)}&limit=1000`;
+/** Pide revisar las de papel apenas cierra el primer minuto de una recién abierta (con la pestaña visible). */
+export function refreshSoon(t: PaperTrade, now = Date.now()) {
+  if (typeof window === "undefined" || typeof window.setTimeout !== "function" || typeof document === "undefined") return;
+  const wait = Math.max(5_000, cursorOf(t) + MINUTE + 15_000 - now);
+  window.setTimeout(() => {
+    if (document.visibilityState === "visible") void refreshPaper().catch(() => null);
+  }, wait);
+}
+
+/** Velas desde `startTime` (de 1 h, o de 1 minuto): futuros primero (la fuente del plan), spot si no responde. */
+export async function candlesSince(symbol: string, startTime: number, signal: AbortSignal, interval: "1h" | "1m" = "1h"): Promise<{ candles: SwingCandle[]; venue: string } | null> {
+  const q = `symbol=${encodeURIComponent(symbol)}&interval=${interval}&startTime=${Math.floor(startTime)}&limit=1000`;
   const routes: [string[], string, string][] = [
     [FUTURES_BASES, "/fapi/v1/klines", "Binance Futures"],
     [BROWSER_BASES, "/api/v3/klines", "Binance Spot"],
@@ -159,8 +171,53 @@ export async function candlesSince(symbol: string, startTime: number, signal: Ab
   return null;
 }
 
+const nextHour = (t: number) => Math.floor(t / H) * H + H;
+
+/**
+ * Lleva una lista de operaciones de una moneda hasta `now`: primero completa
+ * con velas de 1 minuto la hora en que se abrió cada una, después avanza con
+ * velas de 1 h y, con `toNow`, revisa también los minutos ya cerrados de la
+ * hora en curso (para cerrar a mano sin saltear nada). Si una parte no tiene
+ * datos, esa operación espera: nunca se saltea un tramo sin revisar.
+ */
+async function advanceSymbol(symbol: string, list: PaperTrade[], now: number, toNow: boolean): Promise<{ trades: PaperTrade[]; ok: boolean }> {
+  let ok = true;
+  let trades = list;
+  const minutePass = async (until: (t: PaperTrade) => number, want: (t: PaperTrade) => boolean) => {
+    const need = trades.filter((t) => live(t) && want(t) && Math.min(now, until(t)) - cursorOf(t) >= MINUTE);
+    if (!need.length) return;
+    const got = await candlesSince(symbol, Math.min(...need.map(cursorOf)), AbortSignal.timeout(15_000), "1m");
+    if (!got) {
+      ok = false;
+      return;
+    }
+    const closed = got.candles.filter((c) => c.openTime + MINUTE <= now);
+    const last = closed[closed.length - 1];
+    if (last) lastClose.set(symbol, { price: last.close, at: last.openTime + MINUTE });
+    trades = trades.map((t) => (need.includes(t) ? resolvePaper(t, got.candles, now, got.venue, MINUTE, until(t)) : t));
+  };
+  // 1. The rest of the hour each one was opened in, minute by minute.
+  await minutePass((t) => nextHour(cursorOf(t)), needsMinutes);
+  // 2. Whole hours.
+  const hourly = trades.filter((t) => live(t) && !needsMinutes(t) && now - cursorOf(t) >= H);
+  if (hourly.length) {
+    const got = await candlesSince(symbol, Math.min(...hourly.map(cursorOf)), AbortSignal.timeout(15_000), "1h");
+    if (!got) ok = false;
+    else {
+      const closed = got.candles.filter((c) => c.openTime + H <= now);
+      const last = closed[closed.length - 1];
+      const known = lastClose.get(symbol);
+      if (last && (!known || known.at < last.openTime + H)) lastClose.set(symbol, { price: last.close, at: last.openTime + H });
+      trades = trades.map((t) => (hourly.includes(t) ? resolvePaper(t, got.candles, now, got.venue, H) : t));
+    }
+  }
+  // 3. To close by hand: the minutes already closed in the current hour too.
+  if (toNow) await minutePass(() => now, () => true);
+  return { trades, ok };
+}
+
 /** Avanza las abiertas con las velas cerradas desde la última revisión. */
-export async function refreshPaper(now = Date.now()): Promise<{ changed: number; sinDatos: string[] }> {
+export async function refreshPaper(now = Date.now(), opts: { toNow?: boolean } = {}): Promise<{ changed: number; sinDatos: string[] }> {
   const s = await loadPaper();
   const open = s.trades.filter(live);
   const sinDatos: string[] = [];
@@ -169,39 +226,31 @@ export async function refreshPaper(now = Date.now()): Promise<{ changed: number;
   for (const t of open) bySymbol.set(t.symbol, [...(bySymbol.get(t.symbol) ?? []), t]);
   const changed: PaperTrade[] = [];
   for (const [symbol, list] of bySymbol) {
-    const start = Math.min(...list.map((t) => (t.revisadaHasta ?? t.vela) + H));
-    if (now - start < H) continue;
-    const got = await candlesSince(symbol, start, AbortSignal.timeout(15_000));
-    if (!got) {
-      sinDatos.push(symbol.replace(/USDT$/, ""));
-      continue;
-    }
-    const closed = got.candles.filter((c) => c.openTime + H <= now);
-    const last = closed[closed.length - 1];
-    if (last) lastClose.set(symbol, { price: last.close, at: last.openTime + H });
-    for (const t of list) {
-      const next = resolvePaper(t, got.candles, now, got.venue);
-      if (next !== t) changed.push(next);
-    }
+    const r = await advanceSymbol(symbol, list, now, opts.toNow === true);
+    if (!r.ok) sinDatos.push(symbol.replace(/USDT$/, ""));
+    r.trades.forEach((t, i) => {
+      if (t !== list[i]) changed.push(t);
+    });
   }
   await persist(changed);
   if (changed.length) emit();
   return { changed: changed.length, sinDatos };
 }
 
-/** Cierra a mano al último cierre de 1 h (antes revisa si tocó stop u objetivos). */
+/**
+ * Cierra a mano al cierre del último minuto (antes revisa minuto a minuto si
+ * tocó stop u objetivos: nada queda sin revisar entre el último cierre de 1 h
+ * y ahora).
+ */
 export async function closeNow(id: string, now = Date.now()): Promise<OpenOutcome> {
-  await refreshPaper(now);
+  const r = await refreshPaper(now, { toNow: true });
   const t = store.trades.find((x) => x.id === id);
   if (!t || !live(t)) return { ok: false, error: "Esa operación ya está cerrada." };
-  let price = lastClose.get(t.symbol)?.price ?? null;
-  if (price === null && t.estado === "ABIERTA") {
-    const got = await candlesSince(t.symbol, now - 3 * H, AbortSignal.timeout(15_000));
-    const last = got?.candles.filter((c) => c.openTime + H <= now).at(-1);
-    price = last?.close ?? null;
-  }
-  if (price === null && t.estado === "ABIERTA") return { ok: false, error: "Binance no respondió: no hay precio para cerrarla. Este dato no está disponible actualmente." };
-  const next = closeManually(t, price ?? 0, now);
+  if (t.estado === "ABIERTA" && r.sinDatos.includes(t.symbol.replace(/USDT$/, ""))) return { ok: false, error: "Binance no respondió: no se puede revisar hasta ahora. Este dato no está disponible actualmente." };
+  const last = lastClose.get(t.symbol) ?? null;
+  // The exit is the last minute already checked: never a price from before a stretch left unchecked.
+  if (t.estado === "ABIERTA" && (!last || last.at !== cursorOf(t))) return { ok: false, error: "Todavía no hay un precio revisado para cerrarla. Probá en un minuto." };
+  const next = closeManually(t, last?.price ?? 0, t.estado === "ABIERTA" ? cursorOf(t) : now);
   await persist([next]);
   emit();
   return { ok: true, trade: store.trades.find((x) => x.id === id) ?? next };
