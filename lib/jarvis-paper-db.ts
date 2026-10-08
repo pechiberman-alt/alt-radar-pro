@@ -1,4 +1,4 @@
-import { validatePaper, type PaperState, type PaperTrade } from "./jarvis-paper.ts";
+import { cursorOf, nextMinute, validatePaper, type PaperState, type PaperTrade } from "./jarvis-paper.ts";
 
 /**
  * Las operaciones de papel de JARVIS TRADING, por cuenta. El plan de cada una
@@ -69,8 +69,12 @@ export async function openPaper(db: D1Database, userId: number, raw: unknown, no
   const counts = await paperCounts(db, userId);
   if (counts.abiertas >= MAX_OPEN_PER_USER) return { ok: false, status: 409, error: `Ya tenés ${MAX_OPEN_PER_USER} operaciones de papel abiertas: cerrá alguna primero.` };
   if (counts.total >= MAX_TOTAL_PER_USER) return { ok: false, status: 409, error: `El registro llegó al máximo de ${MAX_TOTAL_PER_USER} operaciones.` };
-  // The server's clock says when it was opened.
-  const trade: PaperTrade = { ...t, abiertaA: now };
+  // The server's clock says when it was opened, and prices count only from the next whole minute:
+  // a browser cannot backdate a trade into a move it already saw.
+  const inicio = Math.max(t.vela + 3_600_000, nextMinute(now));
+  const trade: PaperTrade = { ...t, abiertaA: now, inicio, cursor: inicio, revisadaHasta: null, mfeR: t.estado === "ABIERTA" ? 0 : null, maeR: t.estado === "ABIERTA" ? 0 : null };
+  // A market trade fills at its first price after opening (lib/jarvis-paper.ts): it starts pending.
+  if (trade.tipoEntrada === "MERCADO" && trade.estado === "ABIERTA") Object.assign(trade, { estado: "PENDIENTE", llenadaA: null, entradaReal: null, mfeR: null, maeR: null });
   const ins = await db
     .prepare("INSERT OR IGNORE INTO jarvis_paper (user_id, id, symbol, estado, abierta_a, data) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(userId, trade.id, trade.symbol, trade.estado, trade.abiertaA, JSON.stringify(trade))
@@ -83,7 +87,7 @@ export async function openPaper(db: D1Database, userId: number, raw: unknown, no
   return { ok: true, trade };
 }
 
-const FROZEN = ["id", "symbol", "lado", "abiertaA", "vela", "tipoEntrada", "entrada", "stop", "tp", "rrPlan", "confianza", "analisis", "decision"] as const;
+const FROZEN = ["id", "symbol", "lado", "abiertaA", "vela", "tipoEntrada", "entrada", "stop", "tp", "rrPlan", "confianza", "analisis", "decision", "inicio"] as const;
 const ORDER: Record<PaperState, number> = { PENDIENTE: 0, ABIERTA: 1, CERRADA: 2, CANCELADA: 2 };
 
 /**
@@ -102,6 +106,12 @@ export function mergeProgress(stored: PaperTrade, incoming: PaperTrade, now: num
     const b = incoming.salidas[i];
     if (a.kind !== b.kind || a.price !== b.price || a.at !== b.at || Math.abs(a.fraction - b.fraction) > 1e-9) return null;
   }
+  // The real entry is set once, when it fills, and never changes after.
+  const storedReal = typeof stored.entradaReal === "number" ? stored.entradaReal : null;
+  const incomingReal = typeof incoming.entradaReal === "number" ? incoming.entradaReal : null;
+  if (storedReal !== null && incomingReal !== storedReal) return null;
+  // What was already checked stays checked.
+  if (cursorOf(incoming) < cursorOf(stored)) return null;
   const merged: PaperTrade = {
     ...stored,
     estado: incoming.estado,
@@ -113,6 +123,8 @@ export function mergeProgress(stored: PaperTrade, incoming: PaperTrade, now: num
     revisadaHasta: incoming.revisadaHasta,
     fuenteVelas: incoming.fuenteVelas,
     motivoCierre: incoming.motivoCierre,
+    ...(incoming.cursor !== undefined ? { cursor: incoming.cursor } : {}),
+    ...(incomingReal !== null ? { entradaReal: incomingReal } : {}),
   };
   const at = [merged.llenadaA, merged.cerradaA, merged.revisadaHasta, ...merged.salidas.map((e) => e.at)].filter((v): v is number => v !== null);
   if (at.some((v) => v > now + 60_000 || v < stored.vela)) return null;

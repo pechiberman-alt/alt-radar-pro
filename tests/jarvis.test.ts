@@ -131,3 +131,22 @@ test("prices said the Argentine way; timeframes and percentages are not prices",
   assert.equal(spokenLevel("si en 4 horas pierde 98.500"), 98_500);
   assert.equal(spokenLevel("si pierde el soporte"), null);
 });
+
+test("real money is asked for in many ways and always lands on the manual ticket, never on an order", () => {
+  const known = new Set(["BTC", "ETH", "SOL", "BNB"]);
+  for (const [q, symbol] of [
+    ["operame BTC por mí", "BTC"],
+    ["ejecutala", null],
+    ["ejecutá la orden de SOL", "SOL"],
+    ["abrí la posición en Binance", null],
+    ["comprame ETH por mí", "ETH"],
+    ["modo real", null],
+  ] as const) {
+    assert.deepEqual(parseCommand(q, known), { kind: "REAL", symbol }, q);
+  }
+  // Not about real money: left to the other intents.
+  assert.equal(parseCommand("¿de verdad sube BTC?", known).kind, "AI");
+  assert.equal(parseCommand("en realidad me gusta ETH", known).kind, "AI");
+  assert.equal(parseCommand("simulá la operación", known).kind, "PAPER_OPEN");
+  assert.equal(parseCommand("simulá la operación en real", known).kind, "PAPER_OPEN", "paper wins when it is named");
+});

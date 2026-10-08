@@ -4,7 +4,7 @@ import { aggregate } from "../lib/asset-read.ts";
 import { runDesk } from "../lib/jarvis-desk.ts";
 import type { DeskSnapshot } from "../lib/jarvis-desk-data.ts";
 import { FEE_PCT } from "../lib/jarvis-ledger.ts";
-import { auditOf, canPaper, closeManually, LIMIT_EXPIRY_H, openR, PAPER_HORIZON_H, paperCsv, paperForAi, paperFromDesk, paperSpeech, paperStats, recordFor, resolvePaper, statsBy, validatePaper, withRecord, type PaperTrade } from "../lib/jarvis-paper.ts";
+import { auditOf, canPaper, closeManually, cursorOf, entryOf, LIMIT_EXPIRY_H, MINUTE, needsMinutes, openR, PAPER_HORIZON_H, paperCsv, paperForAi, paperFromDesk, paperSpeech, paperStats, recordFor, resolvePaper, rrAt, statsBy, validatePaper, withRecord, type PaperTrade } from "../lib/jarvis-paper.ts";
 import { mergeProgress, MAX_OPEN_PER_USER, openPaper, paperCounts, listPaper, ensurePaperSchema, updatePaper } from "../lib/jarvis-paper-db.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
 import { makeDb, sqlite } from "./helpers/fake-d1.ts";
@@ -250,8 +250,17 @@ test("following the desk: only an approved plan, frozen with its analysis; the r
     assert.deepEqual(t.tp, d.plan!.tp.map((x) => x.price));
     assert.equal(t.vela, d.vela);
     assert.equal(t.confianza, d.puntaje);
-    assert.equal(t.estado, d.plan!.tipoEntrada === "LÍMITE" ? "PENDIENTE" : "ABIERTA");
+    // Opened by a person: it waits for its first price after now, whatever the entry type.
+    assert.equal(t.estado, "PENDIENTE");
+    assert.ok(t.inicio! >= now && t.inicio! % MINUTE === 0, "prices count from the next whole minute");
     assert.ok(validatePaper(t, now), "what the browser builds, the server accepts");
+    // The backtest decides at the close: a market plan enters at that close.
+    const atClose = paperFromDesk(d, now, { atClose: true })!;
+    assert.equal(atClose.inicio, d.vela + H);
+    if (d.plan!.tipoEntrada === "MERCADO") {
+      assert.equal(atClose.estado, "ABIERTA");
+      assert.equal(entryOf(atClose), d.plan!.entrada);
+    }
   }
   const vetoed = { ...d, direccion: "NO TRADE" as const, riesgo: d.riesgo ? { ...d.riesgo, vetos: ["prueba"] } : null };
   assert.equal(canPaper(vetoed), false);
@@ -281,7 +290,14 @@ test("per account: open once, at most 20 open, progress forward, counters withou
   assert.equal(full.ok, false);
   if (!full.ok) assert.match(full.error, /20 operaciones de papel abiertas/);
   const later = T0 + 10 * H;
-  const closed = resolvePaper(trade({ abiertaA: now }), [c(1, 106, 99), c(2, 111, 104), c(3, 116, 109)], later);
+  // The server opened it: market, pending, counting from its own next minute (T0 + 2 h is already whole).
+  assert.ok(opened.ok);
+  const stored = opened.ok ? opened.trade : t;
+  assert.equal(stored.estado, "PENDIENTE");
+  assert.equal(stored.inicio, now);
+  const closed = resolvePaper(stored, [c(2, 101, 99.5), c(3, 111, 104), c(4, 116, 109)], later);
+  assert.equal(closed.estado, "CERRADA");
+  assert.equal(entryOf(closed), 100.25, "entered at the open of its first candle");
   const r = await updatePaper(db, 7, [{ ...closed, resultadoR: 50 }, { ...closed, id: "S:0", stop: 1 }], later);
   assert.equal(r.saved.length, 1);
   assert.deepEqual(r.rejected, ["S:0"]);
@@ -293,4 +309,103 @@ test("per account: open once, at most 20 open, progress forward, counters withou
   assert.equal(list.length, 20);
   assert.equal(list.find((x) => x.id === t.id)!.estado, "CERRADA");
   assert.equal((await listPaper(db, 8)).length, 0);
+});
+
+// ── No hindsight: only prices after the moment it was opened ──
+
+/** A 1 minute candle `k` minutes after `t0`. */
+const m = (t0: number, k: number, open: number, high: number, low: number, close: number): SwingCandle => ({ openTime: t0 + k * MINUTE, open, high, low, close, volume: 1, quoteVolume: 1 });
+
+/** A market trade opened by a person at 14:37:20 on a plan read at the 14:00 close. */
+function liveTrade(over: Partial<PaperTrade> = {}): PaperTrade {
+  const opened = T0 + 14 * H + 37 * MINUTE + 20_000;
+  return trade({ vela: T0 + 13 * H, abiertaA: opened, estado: "PENDIENTE", llenadaA: null, mfeR: null, maeR: null, inicio: T0 + 14 * H + 38 * MINUTE, cursor: T0 + 14 * H + 38 * MINUTE, entradaReal: null, ...over });
+}
+
+test("a market trade enters at its first price after opening, never at a move it already saw", () => {
+  const t = liveTrade();
+  const hour14 = T0 + 14 * H;
+  // At 14:10 the price touched TP1 (105): that was before the person opened it, so it does not count.
+  const before = m(hour14, 10, 104, 105.5, 103.9, 104.2);
+  const first = m(hour14, 38, 100.4, 100.6, 100.1, 100.5);
+  const next = m(hour14, 39, 100.5, 100.9, 100.2, 100.7);
+  const x = resolvePaper(t, [before, first, next], hour14 + 41 * MINUTE, "Binance Futures", MINUTE);
+  assert.equal(x.estado, "ABIERTA");
+  assert.equal(x.entradaReal, 100.4, "the open of 14:38");
+  assert.equal(x.salidas.length, 0, "the TP1 at 14:10 never counts");
+  assert.equal(x.llenadaA, hour14 + 38 * MINUTE);
+  assert.equal(cursorOf(x), hour14 + 40 * MINUTE);
+  assert.ok(needsMinutes(x), "the rest of the hour still goes minute by minute");
+  // Hourly candles cannot jump over the minutes still unchecked.
+  const hourly = resolvePaper(x, [c(14, 106, 99), c(15, 106, 100)], T0 + 17 * H);
+  assert.equal(hourly, x);
+  // The risk is measured from the real entry.
+  const won = resolvePaper(resolvePaper(x, Array.from({ length: 20 }, (_, k) => m(hour14, 40 + k, 100.7, 100.9, 100.3, 100.6)), T0 + 15 * H, null, MINUTE), [c(15, 106, 100), c(16, 111, 104), c(17, 116, 109)], T0 + 20 * H);
+  assert.equal(won.estado, "CERRADA");
+  const risk = 100.4 - 95;
+  const expected = ((105 - 100.4) + (110 - 100.4) + (115 - 100.4)) / 3 / risk - fee(100.4, [[105, 1 / 3], [110, 1 / 3], [115, 1 / 3]], risk);
+  assert.ok(Math.abs(won.resultadoR! - expected) < 1e-9, `${won.resultadoR} vs ${expected}`);
+});
+
+test("the minute pass completes only the hour it opened in; stop first on every candle", () => {
+  const t = liveTrade();
+  const hour14 = T0 + 14 * H;
+  const minutes = Array.from({ length: 40 }, (_, k) => m(hour14, 38 + k, 100.2, 100.4, 100, 100.2));
+  const done = resolvePaper(t, minutes, T0 + 16 * H, null, MINUTE, T0 + 15 * H);
+  assert.equal(cursorOf(done), T0 + 15 * H, "stops at the whole hour");
+  assert.equal(needsMinutes(done), false);
+  const stopped = resolvePaper(t, [m(hour14, 38, 100.3, 105.2, 94.9, 99)], T0 + 15 * H, null, MINUTE);
+  assert.equal(stopped.estado, "CERRADA");
+  assert.equal(stopped.salidas[0].kind, "STOP", "the stop and TP1 on the fill minute: the stop");
+});
+
+test("it does not enter when, at its first price, the plan no longer pays", () => {
+  const hour14 = T0 + 14 * H;
+  // Plan 100 / stop 95 / TPs 105-110-115: at 102 the R:R is (3+8+13)/3/7 = 1,14 < 1,5.
+  const chased = resolvePaper(liveTrade(), [m(hour14, 38, 102, 102.2, 101.8, 102)], T0 + 15 * H, null, MINUTE);
+  assert.equal(chased.estado, "CANCELADA");
+  assert.match(chased.motivoCierre!, /quedaba en 1:1,14/);
+  assert.equal(rrAt(chased, 102)!.toFixed(2), "1.14");
+  const below = resolvePaper(liveTrade(), [m(hour14, 38, 94, 94.5, 93, 94)], T0 + 15 * H, null, MINUTE);
+  assert.equal(below.estado, "CANCELADA");
+  assert.match(below.motivoCierre!, /del otro lado del stop/);
+  assert.equal(paperStats([chased, below]).cerradas, 0, "a trade that never entered is not a result");
+});
+
+test("a limit order opened mid-hour cannot be filled by a candle from before it was opened", () => {
+  const hour14 = T0 + 14 * H;
+  const t = liveTrade({ tipoEntrada: "LÍMITE", entrada: 99, stop: 95, tp: [105, 110, 115], id: "SOLUSDT:13:LONG:L" });
+  const dipBefore = m(hour14, 5, 99.5, 99.6, 98.5, 99.2);
+  const after = m(hour14, 38, 100, 100.3, 99.8, 100.1);
+  const x = resolvePaper(t, [dipBefore, after], T0 + 15 * H, null, MINUTE);
+  assert.equal(x.estado, "PENDIENTE", "the dip at 14:05 was before it existed");
+});
+
+test("the server: prices from its own next minute, the real entry set once, no going back", () => {
+  const t = liveTrade();
+  const hour14 = T0 + 14 * H;
+  assert.equal(validatePaper({ ...t, inicio: t.vela }, hour14 + 40 * MINUTE), null, "never before the close the desk read");
+  const filled = resolvePaper(t, [m(hour14, 38, 100.4, 100.6, 100.1, 100.5)], hour14 + 40 * MINUTE, null, MINUTE);
+  assert.ok(validatePaper(filled, hour14 + 40 * MINUTE));
+  assert.equal(validatePaper({ ...filled, entradaReal: 94 }, hour14 + 40 * MINUTE), null, "an entry beyond the stop");
+  assert.equal(validatePaper({ ...filled, entradaReal: null }, hour14 + 40 * MINUTE), null, "opened live, open without a real entry");
+  assert.equal(mergeProgress(filled, { ...filled, entradaReal: 100.1 }, hour14 + 40 * MINUTE), null, "the real entry does not change");
+  assert.equal(mergeProgress(filled, { ...t }, hour14 + 40 * MINUTE), null, "progress does not go back");
+  const further = resolvePaper(filled, [m(hour14, 39, 100.5, 100.8, 100.2, 100.6)], hour14 + 41 * MINUTE, null, MINUTE);
+  assert.ok(mergeProgress(filled, further, hour14 + 41 * MINUTE));
+  assert.equal(Object.hasOwn(validatePaper({ ...filled, extra: "x".repeat(10_000) } as PaperTrade, hour14 + 40 * MINUTE)!, "extra"), false, "unknown fields are not stored");
+});
+
+test("the server dates a new trade itself: a browser cannot backdate it into a move", { skip: !sqlite }, async () => {
+  const db = makeDb();
+  await ensurePaperSchema(db);
+  const now = T0 + 14 * H + 37 * MINUTE + 20_000;
+  const sent = liveTrade({ inicio: T0 + 14 * H, cursor: T0 + 14 * H, abiertaA: T0 + 14 * H, id: "SOLUSDT:13:LONG:M" });
+  const r = await openPaper(db, 9, sent, now);
+  assert.ok(r.ok);
+  if (r.ok) {
+    assert.equal(r.trade.inicio, T0 + 14 * H + 38 * MINUTE);
+    assert.equal(r.trade.abiertaA, now);
+    assert.equal(r.trade.estado, "PENDIENTE");
+  }
 });

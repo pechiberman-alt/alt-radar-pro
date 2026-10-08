@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 467 · objetivos: 15 · sin objetivo: 0
+- Archivos: 469 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 43 · secretos: 3 · variables de entorno: 8 · rutas /api: 48 · hosts: 50
-- Código de navegador: 56 archivos con "use client" que alcanzan 152 · problemas: 0
-- Lib sin prueba directa: 20 de 144
+- Código de navegador: 56 archivos con "use client" que alcanzan 153 · problemas: 0
+- Lib sin prueba directa: 20 de 145
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (53)
+### jarvis — JARVIS, la IA propia del software (54)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: faltan clientes de Bybit y OKX, la clave CMC_API_KEY y el historial real de liquidaciones; TradingView no tiene API pública.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -49,8 +49,9 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-core.ts` — exporta: CORE_TF, CORE_FRAME, CORE_COINS, CORE_MAGNETS, CYCLE_MIN, CoreTask (+36)
 - `lib/jarvis-desk-agents.ts` — exporta: AgentId, AgentReport, NOT_AVAILABLE, AGENT_WEIGHTS, pct, px (+18)
 - `lib/jarvis-desk-data.ts` — exporta: DESK_FRAMES, Derivatives, MacroData, DeskSnapshot, DeskProvider, DESK_PROVIDERS (+3)
-- `lib/jarvis-desk-run.ts` — exporta: DESK_SETTINGS_KEY, DESK_SHOW_EVENT, typedNumber, loadDeskSettings, saveDeskSettings, deskFor (+2)
-- `lib/jarvis-desk.ts` — exporta: Side, Direction, Target, Plan, DeskSettings, DEFAULT_DESK_SETTINGS (+25)
+- `lib/jarvis-desk-run.ts` — exporta: DESK_SETTINGS_KEY, DESK_SHOW_EVENT, typedNumber, loadDeskSettings, saveDeskSettings, openPaperRiskUsd (+3)
+- `lib/jarvis-desk.ts` — exporta: Side, Direction, Target, Plan, DeskSettings, MAX_OPEN_RISK_PCT (+30)
+- `lib/jarvis-execution.ts` — exporta: DeskMode, DESK_MODES, REAL_ORDERS_FROM_JARVIS, TICKET_TTL_MS, TICKET_MAX_AGE_MS, MAX_TICKET_RISK_PCT (+3)
 - `lib/jarvis-learn.ts` — exporta: Regime, Features, DIMS, D, ALPHA, MIN_CASES (+37)
 - `lib/jarvis-ledger.ts` — exporta: HORIZON, FEE_PCT, LearnedSource, JarvisSource, JarvisSignal, breakoutSignal (+7)
 - `lib/jarvis-local.ts` — exporta: Focus, pointsAtScreen, SCREEN_TOPIC, SECTION_SCREEN, withFocus, localAnswer
@@ -58,8 +59,8 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-mind-db.ts` — exporta: MIND_MINUTE, MindDeps, runMindHour, mindStatus
 - `lib/jarvis-mind.ts` — exporta: MindThesis, MindReading, MIND_MAX_THESES, MIND_MAX_OUTPUT, MIND_SYSTEM, thesisRecord (+14)
 - `lib/jarvis-paper-db.ts` — exporta: MAX_OPEN_PER_USER, MAX_TOTAL_PER_USER, LIST_LIMIT, ensurePaperSchema, listPaper, paperCounts (+5)
-- `lib/jarvis-paper-run.ts` — exporta: PAPER_LOCAL_KEY, PAPER_EVENT, PaperMode, paperState, paperTrades, lastPrice (+6)
-- `lib/jarvis-paper.ts` — exporta: PAPER_HORIZON_H, LIMIT_EXPIRY_H, PaperState, ExitKind, PaperExit, PaperTrade (+21)
+- `lib/jarvis-paper-run.ts` — exporta: PAPER_LOCAL_KEY, PAPER_EVENT, PaperMode, paperState, paperTrades, lastPrice (+7)
+- `lib/jarvis-paper.ts` — exporta: PAPER_HORIZON_H, LIMIT_EXPIRY_H, MINUTE, PaperState, ExitKind, PaperExit (+27)
 - `lib/jarvis-voice-server.ts` — exporta: AiLike, VoiceModel, Bytes, Synth, AURA, MELO (+11)
 - `lib/jarvis-voice.ts` — JARVIS's neural voice, shared by the server route and the app.
 - `lib/jarvis-watch-run.ts` — exporta: WATCH_PREFS_KEY, WATCH_STATE_KEY, WATCH_EVENT, WatchStatus, loadWatchPrefs, saveWatchPrefs (+3)
@@ -310,7 +311,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+38)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (116)
+### calidad — Pruebas (117)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
@@ -357,6 +358,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/jarvis-backtest.test.ts` — pruebas: the backtest trades with the desk and the paper rules, one trade at a time, no lookahead: changing the future after a moment never changes the trades that c, the desk at a past hour only sees candles closed at that hour, and no history it (+1)
 - `tests/jarvis-chat.test.ts` — pruebas: only question and answer turns are kept, trimmed and bounded, the thread comes back in order, and only to its owner, a thread older than six hours starts fresh, as the Telegram thread does (+1)
 - `tests/jarvis-core.test.ts` — pruebas: the 15-minute cycle covers 20 coins, 3 magnets, one resolution and a study minut, live reading: no lookahead, the same 200-candle window as the history walk, grad, magnet sweeps from the stored previous map: swept and closed back = reversal sig (+1)
+- `tests/jarvis-desk-risk.test.ts` — pruebas: the risk manager judges a market entry at today, no live price: nothing is assumed, the plan stands on its own numbers, a size that does not fit the capital at a safe leverage is NO TRADE; one that fi (+1)
 - `tests/jarvis-desk-run.test.ts` — pruebas: risk settings: nonsense falls back to the safe defaults, never to a bigger risk, risk settings round-trip; leverage is a whole number, nothing cached is nothing, not a made-up decision (+1)
 - `tests/jarvis-desk.test.ts` — pruebas: the desk never reads a candle still forming, on any series (no lookahead), a steady advance is never read as a short; any plan has its stop and targets on , a steady decline is never read as a long (+1)
 - `tests/jarvis-learn.test.ts` — pruebas: encoding: one column per non-baseline value,, the regression recovers real effects, and says, incremental sums equal the batch, whatever the order (+1)
@@ -365,7 +367,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/jarvis-memory.test.ts` — pruebas: notes are kept tidy: no leading, memory: per person, the same note once, the oldest dropped past the limit, forgo, every brain gets the notes as one block; none, nothing (+1)
 - `tests/jarvis-mind-verify.test.ts` — pruebas: numbers are read the Argentine way, and broken ones are not numbers, the 19:17 reading: the broken number and the magnet called support are taken out, a price off by thousands (the old (+1)
 - `tests/jarvis-mind.test.ts` — pruebas: the answer, a thesis is kept only as a real plan from the current price, the hourly mind: once an hour from hh:17, with fresh reads only, theses checked  (+1)
-- `tests/jarvis-paper-run.test.ts` — pruebas: signed in but the record does not answer: an honest error, never an empty list t, signed out: the record lives on this device, opens once, refuses stale plans, re, signed in: opened and advanced through the server, whose version wins
+- `tests/jarvis-paper-run.test.ts` — pruebas: signed in but the record does not answer: an honest error, never an empty list t, signed out: the record lives on this device, opens once, refuses stale plans, re, signed in: opened and advanced through the server, whose version wins (+1)
 - `tests/jarvis-paper.test.ts` — pruebas: three targets: a third at each, fees on both sides, a candle that touches the stop and a target counts as the stop, TP1 then the stop: a third won, two thirds lost; the stop does not move (+1)
 - `tests/jarvis-voice.test.ts` — pruebas: voices: Cloudflare, synthesis: premium voice first; the simpler one if premium fails or is not allow, allowance: per person and premium for everyone, per UTC day (+1)
 - `tests/jarvis-watch-run.test.ts` — pruebas: switched off, the watch asks nothing, switched on: alerts published once, remembered across runs, memory kept on this 

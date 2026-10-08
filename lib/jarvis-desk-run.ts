@@ -57,9 +57,16 @@ export function saveDeskSettings(s: DeskSettings) {
   for (const [sym, e] of cache) cache.set(sym, { ...e, decision: decide(e.snapshot, s, e.record) });
 }
 
+/** Riesgo en dólares de las operaciones de papel abiertas (para el aviso de riesgo abierto total). */
+export function openPaperRiskUsd(): number {
+  return paperTrades()
+    .filter((t) => t.estado === "ABIERTA" || t.estado === "PENDIENTE")
+    .reduce((acc, t) => acc + (typeof t.decision.riesgoUsd === "number" && t.decision.riesgoUsd > 0 ? t.decision.riesgoUsd : 0), 0);
+}
+
 /** The desk's decision, with the measured record of similar paper trades next to the score (the plan does not change). */
 function decide(snapshot: DeskSnapshot, settings: DeskSettings, record: DeskRecord | null): DeskDecision | null {
-  const d = runDesk(snapshot, settings, record);
+  const d = runDesk(snapshot, { ...settings, riesgoAbiertoUsd: openPaperRiskUsd() }, record);
   return d && !record ? withRecord(d, paperTrades()) : d;
 }
 
@@ -87,7 +94,7 @@ export function cachedDesk(symbol: string): DeskDecision | null {
   return cache.get(symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`)?.decision ?? null;
 }
 
-/** Pide a la sección JARVIS TRADING que muestre un activo (y la abre). */
-export function showInDesk(symbol: string, compareWith?: string) {
-  window.dispatchEvent(new CustomEvent(DESK_SHOW_EVENT, { detail: { symbol, compareWith } }));
+/** Pide a la sección JARVIS TRADING que muestre un activo (y la abre), en un modo si se pide. */
+export function showInDesk(symbol: string, compareWith?: string, mode?: "ANALISIS" | "PAPEL" | "REAL") {
+  window.dispatchEvent(new CustomEvent(DESK_SHOW_EVENT, { detail: { symbol, compareWith, mode } }));
 }

@@ -1,6 +1,6 @@
 import { arNumber } from "./ai-numbers.ts";
 import { FEE_PCT } from "./jarvis-ledger.ts";
-import type { DeskDecision, DeskRecord, Direction, Side } from "./jarvis-desk.ts";
+import { MIN_RR, type DeskDecision, type DeskRecord, type Direction, type Side } from "./jarvis-desk.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
 /**
@@ -8,14 +8,21 @@ import type { SwingCandle } from "./swing-entries.ts";
  * medir qué habría pasado. Reglas fijas desde que se abre, nada se edita
  * después:
  *
- *  - Entrada al cierre de la vela de 1 h que leyó la mesa (a mercado), o
- *    cuando el precio toca el nivel (límite). Una orden límite que ve el TP1
- *    antes de llenarse, o que pasa 48 h sin llenarse, se cancela.
+ *  - Sin ventaja retrospectiva: solo cuentan los precios posteriores al
+ *    momento en que se abrió. A mercado entra al precio de apertura del primer
+ *    minuto después de tocar el botón (si a ese precio el R:R ya no llega a
+ *    1:1,5, o el precio está del otro lado del stop o del TP1, no entra). El
+ *    pedazo de hora en que se abrió se revisa con velas de 1 minuto; después,
+ *    con velas de 1 h. Una límite se llena cuando el precio toca el nivel; si
+ *    ve el TP1 antes de llenarse, o pasan 48 h, se cancela.
  *  - Salida de un tercio en cada objetivo; el stop no se mueve (es el plan que
- *    mostró la tarjeta y su R:R ponderado).
+ *    mostró la tarjeta).
  *  - Peor caso primero: si una vela toca el stop y un objetivo, cuenta el stop.
  *    En la vela que llena una límite, solo cuenta el stop.
  *  - Comisión de 0,05% por lado. A los 7 días se cierra lo que quede al cierre.
+ *
+ * El backtest (jarvis-backtest.ts) usa este mismo motor; ahí la decisión se
+ * toma al cierre de la vela, así que entra a ese cierre.
  *
  * Cada operación guarda su cadena de auditoría: ANÁLISIS (qué leyó la mesa),
  * DECISIÓN (el plan), RESULTADO (las salidas), ERROR o ACIERTO, y APRENDIZAJE:
@@ -26,6 +33,7 @@ import type { SwingCandle } from "./swing-entries.ts";
 export const PAPER_HORIZON_H = 168;
 export const LIMIT_EXPIRY_H = 48;
 const H = 3_600_000;
+export const MINUTE = 60_000;
 
 export type PaperState = "PENDIENTE" | "ABIERTA" | "CERRADA" | "CANCELADA";
 export type ExitKind = "TP1" | "TP2" | "TP3" | "STOP" | "TIEMPO" | "MANUAL";
@@ -68,15 +76,47 @@ export type PaperTrade = {
   /** Máximo a favor y en contra, en R, desde que se llenó. */
   mfeR: number | null;
   maeR: number | null;
-  /** Última vela de 1 h ya revisada. */
+  /** Apertura de la última vela ya revisada (de 1 h, o de 1 minuto en la primera hora). */
   revisadaHasta: number | null;
   /** De dónde salieron las velas que la resolvieron. */
   fuenteVelas: string | null;
   motivoCierre: string | null;
+  /**
+   * Desde cuándo cuentan los precios (en punto de minuto). Las operaciones
+   * guardadas antes de esta regla no lo tienen: cuentan desde el cierre de la
+   * vela que leyó la mesa, como entonces.
+   */
+  inicio?: number;
+  /** Hasta dónde se revisó (fin de la última vela revisada). */
+  cursor?: number;
+  /** Precio al que entró de verdad una operación a mercado (el plan queda en `entrada`). */
+  entradaReal?: number | null;
 };
 
 const dirOf = (side: Side) => (side === "LONG" ? 1 : -1);
-const riskOf = (t: Pick<PaperTrade, "entrada" | "stop">) => Math.abs(t.entrada - t.stop);
+/** El precio con el que se mide: el de entrada real si lo hay, si no el del plan. */
+export const entryOf = (t: Pick<PaperTrade, "entrada"> & { entradaReal?: number | null }) => (typeof t.entradaReal === "number" && t.entradaReal > 0 ? t.entradaReal : t.entrada);
+const riskOf = (t: Pick<PaperTrade, "entrada" | "stop"> & { entradaReal?: number | null }) => Math.abs(entryOf(t) - t.stop);
+
+/** R:R ponderado (un tercio en cada objetivo) entrando a `price`; null si ese precio ya está del otro lado del stop o del TP1. */
+export function rrAt(t: Pick<PaperTrade, "lado" | "stop" | "tp">, price: number): number | null {
+  const s = dirOf(t.lado);
+  const risk = s * (price - t.stop);
+  if (!(risk > 0) || !(s * (t.tp[0] - price) > 0)) return null;
+  const rr = t.tp.map((p) => (s * (p - price)) / risk);
+  return (rr[0] + rr[1] + rr[2]) / 3;
+}
+
+/** Desde qué momento faltan revisar velas (inclusive). */
+export function cursorOf(t: PaperTrade): number {
+  if (typeof t.cursor === "number" && Number.isFinite(t.cursor)) return t.cursor;
+  // Saved before minute resolution existed: hourly, from the candle after the one the desk read.
+  if (t.revisadaHasta !== null) return t.revisadaHasta + H;
+  return typeof t.inicio === "number" && Number.isFinite(t.inicio) ? t.inicio : t.vela + H;
+}
+
+/** ¿Le falta revisar un pedazo de hora con velas de 1 minuto antes de seguir con las de 1 h? */
+export const needsMinutes = (t: PaperTrade) => (t.estado === "ABIERTA" || t.estado === "PENDIENTE") && cursorOf(t) % H !== 0;
 
 /**
  * ¿Se puede seguir este plan en papel? Solo un plan que el gestor de riesgo
@@ -88,19 +128,32 @@ export function canPaper(d: DeskDecision): boolean {
   return d.direccion === "ESPERAR" && d.plan.tipoEntrada === "LÍMITE" && d.riesgo.esperas.every((e) => e.startsWith("Entrada límite"));
 }
 
-/** La operación de papel que sigue el plan de la mesa, con su análisis congelado. */
-export function paperFromDesk(d: DeskDecision, now: number): PaperTrade | null {
+/** El primer minuto en punto desde `t`: desde ahí cuentan los precios de una operación abierta en `t`. */
+export const nextMinute = (t: number) => Math.ceil(t / MINUTE) * MINUTE;
+
+/**
+ * La operación de papel que sigue el plan de la mesa, con su análisis
+ * congelado. Abierta por una persona (`atClose` falso), cuenta desde el minuto
+ * siguiente y entra a mercado al precio de ese minuto. El backtest decide al
+ * cierre de la vela (`atClose`), así que entra a ese cierre.
+ */
+export function paperFromDesk(d: DeskDecision, now: number, opts: { atClose?: boolean } = {}): PaperTrade | null {
   if (!canPaper(d) || !d.plan || !d.riesgo) return null;
   const p = d.plan;
   const sesgos: Record<string, number> = {};
   for (const a of d.agentes) if (a.disponible && a.peso > 0) sesgos[a.id] = Number(a.sesgo.toFixed(3));
   const regimen = d.agentes.find((a) => a.id === "volatilidad")?.datos.regimen;
+  const closeAt = d.vela + H;
+  const atClose = opts.atClose === true;
+  const limit = p.tipoEntrada === "LÍMITE";
+  const inicio = atClose ? closeAt : Math.max(closeAt, nextMinute(now));
+  const filledNow = atClose && !limit;
   return {
-    id: `${d.symbol}:${d.vela}:${p.lado}:${p.tipoEntrada === "LÍMITE" ? "L" : "M"}`,
+    id: `${d.symbol}:${d.vela}:${p.lado}:${limit ? "L" : "M"}`,
     symbol: d.symbol,
     lado: p.lado,
-    estado: p.tipoEntrada === "LÍMITE" ? "PENDIENTE" : "ABIERTA",
-    abiertaA: now,
+    estado: filledNow ? "ABIERTA" : "PENDIENTE",
+    abiertaA: atClose ? closeAt : now,
     vela: d.vela,
     tipoEntrada: p.tipoEntrada,
     entrada: p.entrada,
@@ -120,14 +173,17 @@ export function paperFromDesk(d: DeskDecision, now: number): PaperTrade | null {
     },
     decision: { riesgoNivel: d.riesgo.nivel, apalancamiento: d.riesgo.apalancamiento, riesgoUsd: d.riesgo.riesgoUsd, posicionUsd: d.riesgo.posicionUsd, stopPct: d.riesgo.stopPct },
     salidas: [],
-    llenadaA: p.tipoEntrada === "LÍMITE" ? null : d.vela + H,
+    llenadaA: filledNow ? closeAt : null,
     cerradaA: null,
     resultadoR: null,
-    mfeR: null,
-    maeR: null,
+    mfeR: filledNow ? 0 : null,
+    maeR: filledNow ? 0 : null,
     revisadaHasta: null,
     fuenteVelas: null,
     motivoCierre: null,
+    inicio,
+    cursor: inicio,
+    entradaReal: filledNow ? p.entrada : null,
   };
 }
 
@@ -140,51 +196,67 @@ export function validPlan(t: Pick<PaperTrade, "lado" | "entrada" | "stop" | "tp"
 }
 
 /** El resultado en R de una lista de salidas, neto de comisiones (las dos puntas). */
-export function resultOf(t: Pick<PaperTrade, "lado" | "entrada" | "stop">, salidas: PaperExit[]): number {
+export function resultOf(t: Pick<PaperTrade, "lado" | "entrada" | "stop"> & { entradaReal?: number | null }, salidas: PaperExit[]): number {
+  const entry = entryOf(t);
   const risk = riskOf(t);
   const s = dirOf(t.lado);
   let r = 0;
-  let fees = (FEE_PCT / 100) * t.entrada;
+  let fees = (FEE_PCT / 100) * entry;
   for (const x of salidas) {
-    r += x.fraction * ((s * (x.price - t.entrada)) / risk);
+    r += x.fraction * ((s * (x.price - entry)) / risk);
     fees += x.fraction * (FEE_PCT / 100) * x.price;
   }
   return r - fees / risk;
 }
 
+const r2t = (v: number) => arNumber(Number(v.toFixed(2)));
+
 /**
- * Avanza una operación con las velas de 1 h (de cualquier rango: usa solo las
- * cerradas a `now` y posteriores a lo ya revisado). Devuelve la operación
- * nueva; si no hay velas nuevas, la misma.
+ * Avanza una operación con velas de `frameMs` (1 h por defecto; 1 minuto
+ * para el pedazo de hora en que se abrió). Usa solo velas cerradas a `now` y
+ * posteriores a lo ya revisado, en orden; con `until`, ninguna que termine
+ * después. Con velas de 1 h no avanza mientras falte revisar minutos de una
+ * hora empezada. Devuelve la operación nueva; si no hay velas nuevas, la misma.
  */
-export function resolvePaper(t: PaperTrade, candles: SwingCandle[], now: number, fuente: string | null = null): PaperTrade {
+export function resolvePaper(t: PaperTrade, candles: SwingCandle[], now: number, fuente: string | null = null, frameMs = H, until?: number): PaperTrade {
   if (t.estado === "CERRADA" || t.estado === "CANCELADA") return t;
-  const from = t.revisadaHasta ?? t.vela;
-  const fresh = candles.filter((c) => c.openTime > from && c.openTime + H <= now).sort((a, b) => a.openTime - b.openTime);
+  const start = cursorOf(t);
+  // Hourly candles only from a whole hour: the part of the hour it opened in goes minute by minute first.
+  if (frameMs >= H && start % H !== 0) return t;
+  const limitEnd = Math.min(now, until ?? Infinity);
+  const fresh = candles.filter((c) => c.openTime >= start && c.openTime + frameMs <= limitEnd).sort((a, b) => a.openTime - b.openTime);
   if (!fresh.length) return t;
   const s = dirOf(t.lado);
-  const risk = riskOf(t);
   let x: PaperTrade = { ...t, salidas: [...t.salidas], fuenteVelas: fuente ?? t.fuenteVelas };
   const remaining = () => 1 - x.salidas.reduce((p, e) => p + e.fraction, 0);
   const close = (motivo: string, at: number): PaperTrade => {
     x = { ...x, estado: "CERRADA", cerradaA: at, resultadoR: resultOf(x, x.salidas), motivoCierre: motivo };
     return x;
   };
+  const cancel = (motivo: string, at: number): PaperTrade => ({ ...x, estado: "CANCELADA", cerradaA: at, motivoCierre: motivo });
   for (const c of fresh) {
     x.revisadaHasta = c.openTime;
-    const end = c.openTime + H;
-    const hiR = (s > 0 ? c.high - x.entrada : x.entrada - c.low) / risk;
-    const loR = (s > 0 ? x.entrada - c.low : c.high - x.entrada) / risk;
+    const end = c.openTime + frameMs;
+    x.cursor = end;
     const touchesStop = s > 0 ? c.low <= x.stop : c.high >= x.stop;
-    if (x.estado === "PENDIENTE") {
+    if (x.estado === "PENDIENTE" && x.tipoEntrada === "MERCADO") {
+      // A market entry: the open of the first candle after it was opened, if the plan still holds at that price.
+      const price = c.open;
+      const rr = rrAt(x, price);
+      if (rr === null) return cancel(`Al entrar, el precio (${arNumber(price)}) ya estaba del otro lado del stop o del TP1: no se entró.`, end);
+      if (rr < MIN_RR) return cancel(`A ${arNumber(price)} la relación riesgo/beneficio quedaba en 1:${r2t(rr)} (mínimo 1:${arNumber(MIN_RR)}): no se entró.`, end);
+      x = { ...x, estado: "ABIERTA", entradaReal: price, llenadaA: c.openTime, mfeR: 0, maeR: 0 };
+      // Filled at the open: this same candle counts, worst case first (below).
+    } else if (x.estado === "PENDIENTE") {
       const touchesEntry = s > 0 ? c.low <= x.entrada : c.high >= x.entrada;
       const touchesTp1 = s > 0 ? c.high >= x.tp[0] : c.low <= x.tp[0];
       if (!touchesEntry) {
-        if (touchesTp1) return { ...x, estado: "CANCELADA", cerradaA: end, motivoCierre: "Se fue al TP1 sin llenar la orden límite." };
-        if (end - (x.abiertaA ?? x.vela) >= LIMIT_EXPIRY_H * H) return { ...x, estado: "CANCELADA", cerradaA: end, motivoCierre: `Pasaron ${LIMIT_EXPIRY_H} h sin llenar la orden límite.` };
+        if (touchesTp1) return cancel("Se fue al TP1 sin llenar la orden límite.", end);
+        if (end - (x.abiertaA ?? x.vela) >= LIMIT_EXPIRY_H * H) return cancel(`Pasaron ${LIMIT_EXPIRY_H} h sin llenar la orden límite.`, end);
         continue;
       }
-      // Filled on this candle. Worst case first: only the stop counts on the fill candle.
+      // Filled somewhere inside this candle. Worst case first: only the stop counts on the fill candle.
+      const loR = (s > 0 ? x.entrada - c.low : c.high - x.entrada) / Math.abs(x.entrada - x.stop);
       x = { ...x, estado: "ABIERTA", llenadaA: c.openTime, mfeR: 0, maeR: Math.max(0, loR) };
       if (touchesStop) {
         x.salidas.push({ kind: "STOP", price: x.stop, at: end, fraction: remaining() });
@@ -192,6 +264,10 @@ export function resolvePaper(t: PaperTrade, candles: SwingCandle[], now: number,
       }
       continue;
     }
+    const entry = entryOf(x);
+    const risk = riskOf(x);
+    const hiR = (s > 0 ? c.high - entry : entry - c.low) / risk;
+    const loR = (s > 0 ? entry - c.low : c.high - entry) / risk;
     x.mfeR = Math.max(x.mfeR ?? 0, hiR);
     x.maeR = Math.max(x.maeR ?? 0, loR);
     if (touchesStop) {
@@ -215,7 +291,10 @@ export function resolvePaper(t: PaperTrade, candles: SwingCandle[], now: number,
   return x;
 }
 
-/** Cierre manual al precio dado (la última vela cerrada que vio la persona). */
+/**
+ * Cierre manual al precio dado: el cierre de la última vela ya revisada (para
+ * que no quede nada sin revisar entre medio, quien llama la avanza antes).
+ */
 export function closeManually(t: PaperTrade, price: number, at: number): PaperTrade {
   if (t.estado === "PENDIENTE") return { ...t, estado: "CANCELADA", cerradaA: at, motivoCierre: "Cancelada a mano antes de llenarse." };
   if (t.estado !== "ABIERTA" || !(price > 0)) return t;
@@ -255,11 +334,14 @@ export function auditOf(t: PaperTrade): Audit {
   const fav = Object.entries(t.analisis.sesgos).filter(([, v]) => dirOf(t.lado) * v >= 0.05).map(([k]) => AGENT_NAMES[k] ?? k);
   const against = Object.entries(t.analisis.sesgos).filter(([, v]) => dirOf(t.lado) * v <= -0.05).map(([k]) => AGENT_NAMES[k] ?? k);
   const analisis = `La mesa leyó ${coin} con consenso ${r1(t.analisis.consenso)} y ${Math.round(t.analisis.cobertura * 100)}% del peso con datos${t.analisis.regimen ? `, volatilidad ${t.analisis.regimen.toLowerCase()}` : ""}. A favor: ${fav.join(", ") || "nadie"}. En contra: ${against.join(", ") || "nadie"}.`;
-  const decision = `${t.lado} ${t.tipoEntrada === "LÍMITE" ? "con orden límite" : "a mercado"} en ${px(t.entrada)}, stop ${px(t.stop)}, objetivos ${t.tp.map(px).join(" / ")} · R:R 1:${r1(t.rrPlan)} · confluencia ${t.confianza}/100 · riesgo ${t.decision.riesgoNivel.toLowerCase()}.`;
+  const real = typeof t.entradaReal === "number" && t.entradaReal > 0 && Math.abs(t.entradaReal - t.entrada) > t.entrada * 1e-9 ? t.entradaReal : null;
+  const rrReal = real !== null ? rrAt(t, real) : null;
+  const fill = real !== null ? ` Entró a ${px(real)} (el primer precio después de abrirla)${rrReal !== null ? `, R:R 1:${r1(rrReal)}` : ""}.` : "";
+  const decision = `${t.lado} ${t.tipoEntrada === "LÍMITE" ? "con orden límite" : "a mercado"} en ${px(t.entrada)}, stop ${px(t.stop)}, objetivos ${t.tp.map(px).join(" / ")} · R:R 1:${r1(t.rrPlan)} · confluencia ${t.confianza}/100 · riesgo ${t.decision.riesgoNivel.toLowerCase()}.${fill}`;
   if (t.estado === "CANCELADA") return { analisis, decision, resultado: t.motivoCierre ?? "Cancelada.", veredicto: "CANCELADA", detalle: "No cuenta en las estadísticas: nunca se llenó.", aprendizaje: "Sin resultado que medir." };
   if (t.estado !== "CERRADA" || t.resultadoR === null) {
     const hit = t.salidas.map((e) => e.kind).join(", ");
-    return { analisis, decision, resultado: t.estado === "PENDIENTE" ? "Esperando que el precio llene la orden límite." : `Abierta${hit ? `; ya cobró ${hit}` : ""}.`, veredicto: "ABIERTA", detalle: "Todavía sin resultado.", aprendizaje: "Se mide al cerrar." };
+    return { analisis, decision, resultado: t.estado === "PENDIENTE" ? (t.tipoEntrada === "LÍMITE" ? "Esperando que el precio llene la orden límite." : "Entrando: toma el precio del primer minuto después de abrirla.") : `Abierta${hit ? `; ya cobró ${hit}` : ""}.`, veredicto: "ABIERTA", detalle: "Todavía sin resultado.", aprendizaje: "Se mide al cerrar." };
   }
   const hours = t.cerradaA && t.llenadaA ? Math.max(1, Math.round((t.cerradaA - t.llenadaA) / H)) : null;
   const exits = t.salidas.map((e) => `${e.kind} ${px(e.price)}${e.kind === "TP1" || e.kind === "TP2" || (e.kind === "TP3" && e.fraction < 0.34) ? " (un tercio)" : ""}`).join(" · ");
@@ -399,11 +481,11 @@ export function paperSpeech(trades: PaperTrade[]): string {
 }
 
 export function paperCsv(trades: PaperTrade[]): string {
-  const head = "abierta;moneda;lado;tipo;entrada;stop;tp1;tp2;tp3;confluencia;rr_plan;estado;salidas;resultado_R;pnl_usd;horas;motivo";
+  const head = "abierta;moneda;lado;tipo;entrada_plan;entrada_real;stop;tp1;tp2;tp3;confluencia;rr_plan;estado;salidas;resultado_R;pnl_usd;horas;motivo";
   const rows = trades.map((t) => {
     const hours = t.cerradaA && t.llenadaA ? ((t.cerradaA - t.llenadaA) / H).toFixed(1) : "";
     const pnl = t.resultadoR !== null && t.decision.riesgoUsd !== null ? (t.resultadoR * t.decision.riesgoUsd).toFixed(2) : "";
-    return [new Date(t.abiertaA).toISOString(), t.symbol, t.lado, t.tipoEntrada, t.entrada, t.stop, t.tp[0], t.tp[1], t.tp[2], t.confianza, t.rrPlan.toFixed(2), t.estado, t.salidas.map((e) => `${e.kind}@${e.price}`).join(" "), t.resultadoR === null ? "" : t.resultadoR.toFixed(3), pnl, hours, (t.motivoCierre ?? "").replace(/;/g, ",")]
+    return [new Date(t.abiertaA).toISOString(), t.symbol, t.lado, t.tipoEntrada, t.entrada, t.llenadaA === null ? "" : entryOf(t), t.stop, t.tp[0], t.tp[1], t.tp[2], t.confianza, t.rrPlan.toFixed(2), t.estado, t.salidas.map((e) => `${e.kind}@${e.price}`).join(" "), t.resultadoR === null ? "" : t.resultadoR.toFixed(3), pnl, hours, (t.motivoCierre ?? "").replace(/;/g, ",")]
       .map((v) => (typeof v === "number" ? String(v).replace(".", ",") : String(v).replace(/^(-?\d+)\.(\d+)$/, "$1,$2")))
       .join(";");
   });
@@ -437,9 +519,50 @@ export function validatePaper(raw: unknown, now: number): PaperTrade | null {
   if (t.estado === "CERRADA" && Math.abs(fraction - 1) > 1e-6) return null;
   if ((t.estado === "PENDIENTE" || t.estado === "CANCELADA") && t.salidas.length) return null;
   if (t.estado === "ABIERTA" && fraction > 1 - 1e-6) return null;
+  // Since when prices count: never before the close of the candle the desk read, never in the future.
+  const closeAt = t.vela + H;
+  const inicio = t.inicio === undefined || t.inicio === null ? undefined : t.inicio;
+  if (inicio !== undefined && (!num(inicio) || inicio < closeAt || inicio > now + 120_000)) return null;
+  const cursor = t.cursor === undefined || t.cursor === null ? undefined : t.cursor;
+  if (cursor !== undefined && (!num(cursor) || cursor < (inicio ?? closeAt) || cursor > now + 60_000)) return null;
+  // The real entry of a market trade: between the stop and TP1, close to the plan's price.
+  const entradaReal = t.entradaReal === undefined || t.entradaReal === null ? null : t.entradaReal;
+  if (entradaReal !== null) {
+    if (!num(entradaReal) || t.tipoEntrada !== "MERCADO" || t.estado === "PENDIENTE" || rrAt(t, entradaReal) === null || Math.abs(entradaReal / t.entrada - 1) > 0.1) return null;
+  }
+  // A market trade opened after the close enters at its own first price: open or closed without one, it is not valid.
+  if (t.tipoEntrada === "MERCADO" && inicio !== undefined && inicio > closeAt && (t.estado === "ABIERTA" || t.estado === "CERRADA") && entradaReal === null) return null;
   const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+  const base: PaperTrade = {
+    id: t.id,
+    symbol: t.symbol,
+    lado: t.lado,
+    estado: t.estado,
+    abiertaA: t.abiertaA,
+    vela: t.vela,
+    tipoEntrada: t.tipoEntrada,
+    entrada: t.entrada,
+    stop: t.stop,
+    tp: [t.tp[0], t.tp[1], t.tp[2]],
+    rrPlan: t.rrPlan,
+    confianza: t.confianza,
+    analisis: t.analisis,
+    decision: t.decision,
+    salidas: t.salidas.map((e) => ({ kind: e.kind, price: e.price, at: e.at, fraction: e.fraction })),
+    llenadaA: num(t.llenadaA) ? t.llenadaA : null,
+    cerradaA: num(t.cerradaA) ? t.cerradaA : null,
+    resultadoR: null,
+    mfeR: num(t.mfeR) ? t.mfeR : null,
+    maeR: num(t.maeR) ? t.maeR : null,
+    revisadaHasta: num(t.revisadaHasta) ? t.revisadaHasta : null,
+    fuenteVelas: null,
+    motivoCierre: null,
+    ...(inicio !== undefined ? { inicio } : {}),
+    ...(cursor !== undefined ? { cursor } : {}),
+    ...(t.entradaReal !== undefined ? { entradaReal } : {}),
+  };
   return {
-    ...t,
+    ...base,
     analisis: {
       direccionMesa: t.analisis.direccionMesa,
       consenso: num(t.analisis.consenso) ? t.analisis.consenso : 0,
@@ -459,8 +582,8 @@ export function validatePaper(raw: unknown, now: number): PaperTrade | null {
     },
     motivoCierre: t.motivoCierre === null || t.motivoCierre === undefined ? null : text(t.motivoCierre, 200),
     fuenteVelas: t.fuenteVelas === null || t.fuenteVelas === undefined ? null : text(t.fuenteVelas, 80),
-    // The result is never taken from the browser: it is the exits, priced by the plan.
-    resultadoR: t.estado === "CERRADA" ? resultOf(t, t.salidas) : null,
+    // The result is never taken from the browser: it is the exits, priced by the plan (from the real entry).
+    resultadoR: t.estado === "CERRADA" ? resultOf(base, base.salidas) : null,
   };
 }
 
