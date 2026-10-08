@@ -159,7 +159,8 @@ export function stepBacktest(input: BacktestInput, state: BacktestState, maxStep
     else if (d.direccion === "ESPERAR") lecturas.esperar += 1;
     else lecturas.noTrade += 1;
     if (!canPaper(d)) continue;
-    const t = paperFromDesk(d, now);
+    // The desk decided at this close: a market plan enters at it (a person opening by hand enters at the next minute).
+    const t = paperFromDesk(d, now, { atClose: true });
     if (!t) continue;
     trades.push(resolvePaper(t, input.h1, dataEnd, input.fuente));
   }

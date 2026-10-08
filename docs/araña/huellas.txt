@@ -235,7 +235,7 @@ dfc52ea472c0	115	lib/futures-risk.ts
 cd4af39e8ba8	322	lib/institutional-flows.ts
 f83a7c4a72ca	222	lib/jarvis-analyst.ts
 b0f479478c6c	127	lib/jarvis-backtest-run.ts
-4910cdccb46e	276	lib/jarvis-backtest.ts
+f0f2156f892f	277	lib/jarvis-backtest.ts
 f61124d7437f	79	lib/jarvis-chat.ts
 67c2bd6e8989	495	lib/jarvis-core-db.ts
 104f734141fd	467	lib/jarvis-core.ts
