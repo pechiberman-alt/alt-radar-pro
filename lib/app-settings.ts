@@ -18,14 +18,16 @@ import { open, seal } from "./secret-box.ts";
 export const SETTINGS_SCHEMA =
   "CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)";
 
-export type SecretName = "telegram_bot_token" | "anthropic_api_key" | "groq_api_key";
-export type SettingsEnv = { ENCRYPTION_KEY?: string; TELEGRAM_BOT_TOKEN?: string; ANTHROPIC_API_KEY?: string; GROQ_API_KEY?: string };
+export type SecretName = "telegram_bot_token" | "anthropic_api_key" | "groq_api_key" | "cmc_api_key";
+export type SettingsEnv = { ENCRYPTION_KEY?: string; TELEGRAM_BOT_TOKEN?: string; ANTHROPIC_API_KEY?: string; GROQ_API_KEY?: string; CMC_API_KEY?: string };
 export type SecretSource = "cloudflare" | "app" | null;
 
-const ENV_NAME: Record<SecretName, "TELEGRAM_BOT_TOKEN" | "ANTHROPIC_API_KEY" | "GROQ_API_KEY"> = {
+const ENV_NAME: Record<SecretName, "TELEGRAM_BOT_TOKEN" | "ANTHROPIC_API_KEY" | "GROQ_API_KEY" | "CMC_API_KEY"> = {
   telegram_bot_token: "TELEGRAM_BOT_TOKEN",
   anthropic_api_key: "ANTHROPIC_API_KEY",
   groq_api_key: "GROQ_API_KEY",
+  // CoinMarketCap: dominance and global capitalisation from the server (app/api/market-structure).
+  cmc_api_key: "CMC_API_KEY",
 };
 
 export type Packed = { k: "env" | "local"; c: string };

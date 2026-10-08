@@ -513,10 +513,13 @@ export function liquidationRisk(d: DeskDecision): string {
   const parts = [`${d.moneda}:`];
   if (liq?.disponible) parts.push(...liq.hallazgos.slice(1));
   else parts.push("El mapa de liquidaciones no está disponible ahora.");
-  if (der?.disponible) parts.push(...der.hallazgos.filter((h) => /Funding|Ratio|Interés abierto/.test(h)).slice(0, 3));
-  else parts.push("Funding e interés abierto: este dato no está disponible actualmente.");
+  if (der?.disponible) {
+    parts.push(...der.hallazgos.filter((h) => /Funding|Ratio|Interés abierto/.test(h)).slice(0, 3));
+    if (typeof der.datos.fuente === "string") parts.push(`(Derivados de ${der.datos.fuente}.)`);
+  } else parts.push("Funding e interés abierto: este dato no está disponible actualmente.");
   if (d.riesgo) parts.push(`Con el apalancamiento sugerido (${d.riesgo.apalancamiento}x) la liquidación quedaría cerca de ${px(d.riesgo.liquidacionAprox)}.`);
-  parts.push("Las liquidaciones del mapa son estimadas, no reales.");
+  const real = typeof liq?.datos.liqLargos24hUsd === "number";
+  parts.push(real ? "Los imanes del mapa son estimados; las liquidaciones de OKX son reales, pero de un solo exchange." : "Las liquidaciones del mapa son estimadas, no reales.");
   return parts.join(" ");
 }
 

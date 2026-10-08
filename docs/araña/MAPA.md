@@ -4,16 +4,16 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 469 · objetivos: 15 · sin objetivo: 0
-- Tablas D1: 43 · secretos: 3 · variables de entorno: 8 · rutas /api: 48 · hosts: 50
-- Código de navegador: 56 archivos con "use client" que alcanzan 153 · problemas: 0
-- Lib sin prueba directa: 20 de 145
+- Archivos: 473 · objetivos: 15 · sin objetivo: 0
+- Tablas D1: 43 · secretos: 4 · variables de entorno: 8 · rutas /api: 49 · hosts: 54
+- Código de navegador: 56 archivos con "use client" que alcanzan 154 · problemas: 0
+- Lib sin prueba directa: 20 de 146
 
 ## Objetivos
 
 ### jarvis — JARVIS, la IA propia del software (54)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
-Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: faltan clientes de Bybit y OKX, la clave CMC_API_KEY y el historial real de liquidaciones; TradingView no tiene API pública.
+Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). Bybit, OKX y Hyperliquid desde el Worker: confirmar en producción cuáles responden (/api/market/derivatives?symbol=BTCUSDT dice cuál contestó).
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/alert/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/chat/route.ts` — exporta: dynamic, GET, POST, DELETE
@@ -47,7 +47,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-chat.ts` — The conversation with JARVIS in the app, kept for each signed-in person, so a reload does not lose the thread.
 - `lib/jarvis-core-db.ts` — exporta: ensureCoreSchema, rowToSignal, readCoreStats, recordCoreSignals, openCoreSignals, isBusy (+12)
 - `lib/jarvis-core.ts` — exporta: CORE_TF, CORE_FRAME, CORE_COINS, CORE_MAGNETS, CYCLE_MIN, CoreTask (+36)
-- `lib/jarvis-desk-agents.ts` — exporta: AgentId, AgentReport, NOT_AVAILABLE, AGENT_WEIGHTS, pct, px (+18)
+- `lib/jarvis-desk-agents.ts` — exporta: AgentId, AgentReport, NOT_AVAILABLE, AGENT_WEIGHTS, pct, px (+19)
 - `lib/jarvis-desk-data.ts` — exporta: DESK_FRAMES, Derivatives, MacroData, DeskSnapshot, DeskProvider, DESK_PROVIDERS (+3)
 - `lib/jarvis-desk-run.ts` — exporta: DESK_SETTINGS_KEY, DESK_SHOW_EVENT, typedNumber, loadDeskSettings, saveDeskSettings, openPaperRiskUsd (+3)
 - `lib/jarvis-desk.ts` — exporta: Side, Direction, Target, Plan, DeskSettings, MAX_OPEN_RISK_PCT (+30)
@@ -143,7 +143,7 @@ Pendiente: Alertas de volumen siguen silenciosas desde el 30/09: Binance solo. F
 - `lib/trendlines.ts` — exporta: Pivot, LineSide, Trendline, Outcome, TrendBreak, RangeBreak (+8)
 - `lib/volume-spike.ts` — exporta: VOLUME_LOOKBACK, VOLUME_THRESHOLD, VolumeSpike, detectVolumeSpike, dec, dollars (+2)
 
-### datos-mercado — Velas, precios, noticias y frescura (27)
+### datos-mercado — Velas, precios, noticias y frescura (29)
 Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden tardar. Siempre se dice la fuente.
 - `app/api/calendar/route.ts` — exporta: dynamic, GET
 - `app/api/etf-flows/route.ts` — exporta: dynamic, GET
@@ -151,6 +151,7 @@ Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden 
 - `app/api/institutional/route.ts` — exporta: dynamic, GET
 - `app/api/klines/route.ts` — exporta: dynamic, POST, GET
 - `app/api/market-structure/route.ts` — exporta: dynamic, POST, GET
+- `app/api/market/derivatives/route.ts` — exporta: dynamic, GET
 - `app/api/orderbook/route.ts` — exporta: dynamic, GET
 - `app/api/rolling/route.ts` — exporta: dynamic, GET
 - `app/api/sentiment/route.ts` — exporta: dynamic, GET
@@ -168,6 +169,7 @@ Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden 
 - `lib/live-market.ts` — Live feed for the liquidation map: the forming candle and REAL liquidations.
 - `lib/market-brain.ts` — exporta: BRAIN_TIMEFRAMES, BrainTimeframe, MarketBias, MarketVenue, TIMEFRAME_MINUTES, Candle (+12)
 - `lib/market-fetch.ts` — Browser-side market fetchers, shared by the panels that need them.
+- `lib/market-providers.ts` — exporta: ProviderId, Fetcher, Attempt, PROVIDER_LABEL, BINANCE_FUTURES, BYBIT (+18)
 - `lib/news-intelligence.ts` — exporta: RawNewsItem, NewsIntelligenceResult, parseRss, classifyNewsItems, loadGlobalNews
 - `lib/shared-cache.ts` — Shared, short-lived cache for database-backed JSON that is the same for everyone (signal ledger, performance totals).
 - `lib/token-unlocks.ts` — Supply overhang: how much of each token still has to reach the market.
@@ -311,7 +313,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+38)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (117)
+### calidad — Pruebas (119)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
@@ -384,6 +386,8 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/live-feed.test.ts` — pruebas: the socket uses the routed /market URL, an open socket that delivers nothing is not called live, live is claimed on the first candle, and the price reaches the chart (+1)
 - `tests/live-market.test.ts` — pruebas: a forced SELL is a long liquidated; a forced BUY is a short, notional uses the average fill, not the order, empty fill fields fall back to the order (+1)
 - `tests/magnet-watch.test.ts` — pruebas: strongest magnet each side, by density, within range, CERCA: a strong magnet within half an ATR (at least 0,4%), BARRIDA: the last candle trades through a magnet of the previous map; rejection  (+1)
+- `tests/market-providers.test.ts` — pruebas: each exchange, Bybit: funding per 8 h whatever the contract, OKX: funding brought to 8 h, OI in dollars and its 24 h change, accounts ratio a (+1)
+- `tests/market-structure-cmc.test.ts` — pruebas: CoinMarketCap: dominance, totals and the stablecoin shares from the server, CoinMarketCap: a missing stablecoin answer is unknown, never zero; a broken answ
 - `tests/mm-robot.test.ts` — pruebas: liquidity at a moment: only levels formed by then and not yet taken, within rang, target: the pool when it is 1R–4R away, otherwise 2R, filters: volume, flushed liquidations, liquidity on the target side, trend (+1)
 - `tests/mtf-zones.test.ts` — pruebas: a level present on two timeframes is reported with both, one level is one row, not one row per timeframe, price inside a zone is reported as standing in it (+1)
 - `tests/news-sentiment.test.ts` — pruebas: headlines are classified by fundamental type, security incidents outrank everything else in the same headline, a strong verb in a fundamental category is high impact (+1)
@@ -582,6 +586,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 ## Secretos y variables de entorno
 
 - `anthropic_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
+- `cmc_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/market-structure/route.ts · guarda: app/api/admin/settings/route.ts
 - `groq_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/jarvis-mind-db.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
 - `telegram_bot_token` (secreto) — lee: app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts, app/api/robot/signal/route.ts (+4) · guarda: app/api/admin/settings/route.ts
 - variable `ASSETS` — en: worker/index.ts
@@ -628,6 +633,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/klines` [POST, GET] — app/api/klines/route.ts · datos-mercado
 - `/api/liquidity-history` [GET, POST] — app/api/liquidity-history/route.ts · senales-radar
 - `/api/market-structure` [POST, GET] — app/api/market-structure/route.ts · datos-mercado
+- `/api/market/derivatives` [GET] — app/api/market/derivatives/route.ts · datos-mercado
 - `/api/orderbook` [GET] — app/api/orderbook/route.ts · datos-mercado
 - `/api/performance` [GET] — app/api/performance/route.ts · riesgo-diario
 - `/api/push/subscribe` [POST, DELETE] — app/api/push/subscribe/route.ts · alertas
@@ -654,10 +660,12 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `api.anthropic.com` — app/api/admin/settings/route.ts, lib/ai-analyst-server.ts
 - `api.binance.com` — app/api/brain/route.ts, app/api/klines/route.ts, app/api/orderbook/route.ts, app/api/radar/route.ts, app/api/rolling/route.ts, app/api/scalping/route.ts (+15)
 - `api.binance.us` — app/api/scalping/route.ts, app/scalping-desk.tsx, lib/klines-server.ts, lib/scalping-automation.ts
+- `api.bybit.com` — lib/market-providers.ts
 - `api.coingecko.com` — app/api/market-structure/route.ts, app/api/radar/route.ts, app/radar-app.tsx, app/unlock-desk.tsx, lib/spot-plan-client.ts, lib/token-unlocks.ts (+1)
 - `api.coinlore.net` — app/api/market-structure/route.ts, app/api/radar/route.ts, app/radar-app.tsx, lib/automation.ts, worker/index.ts
 - `api.exchange.coinbase.com` — lib/klines-server.ts
 - `api.groq.com` — lib/ai-brains.ts, lib/telegram-voice.ts, tests/arana.test.ts
+- `api.hyperliquid.xyz` — lib/market-providers.ts
 - `api.kraken.com` — app/api/orderbook/route.ts, lib/klines-server.ts
 - `api.llama.fi` — lib/exchange-reserves.ts
 - `api.telegram.org` — lib/telegram-voice.ts, lib/telegram.ts
@@ -672,10 +680,10 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `data-api.binance.vision` — app/api/brain/route.ts, app/api/klines/route.ts, app/api/orderbook/route.ts, app/api/radar/route.ts, app/api/rolling/route.ts, app/api/scalping/route.ts (+13)
 - `decrypt.co` — lib/crypto-news.ts
 - `example.test` — tests/radar.test.ts
-- `fapi.binance.com` — app/api/brain/route.ts, app/api/orderbook/route.ts, app/big-trades-desk.tsx, app/bookmap-timeframe-chart.tsx, app/live-bookmap.tsx, app/market-brain.tsx (+4)
+- `fapi.binance.com` — app/api/brain/route.ts, app/api/orderbook/route.ts, app/big-trades-desk.tsx, app/bookmap-timeframe-chart.tsx, app/live-bookmap.tsx, app/market-brain.tsx (+5)
 - `fapi.test` — tests/live-feed.test.ts
-- `fapi1.binance.com` — app/api/brain/route.ts, app/big-trades-desk.tsx, app/bookmap-timeframe-chart.tsx, app/market-brain.tsx, lib/binance-futures.ts, lib/klines-server.ts (+1)
-- `fapi2.binance.com` — app/api/brain/route.ts, app/big-trades-desk.tsx, app/bookmap-timeframe-chart.tsx, app/market-brain.tsx, lib/binance-futures.ts, lib/klines-server.ts (+1)
+- `fapi1.binance.com` — app/api/brain/route.ts, app/big-trades-desk.tsx, app/bookmap-timeframe-chart.tsx, app/market-brain.tsx, lib/binance-futures.ts, lib/klines-server.ts (+2)
+- `fapi2.binance.com` — app/api/brain/route.ts, app/big-trades-desk.tsx, app/bookmap-timeframe-chart.tsx, app/market-brain.tsx, lib/binance-futures.ts, lib/klines-server.ts (+2)
 - `fapi3.binance.com` — app/api/brain/route.ts, app/bookmap-timeframe-chart.tsx, app/market-brain.tsx
 - `fapi4.binance.com` — app/api/brain/route.ts, app/bookmap-timeframe-chart.tsx, app/market-brain.tsx
 - `farside.co.uk` — app/api/etf-flows/route.ts
@@ -686,6 +694,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `news.un.org` — lib/news-intelligence.ts
 - `nextjs.org` — next-env.d.ts
 - `nfs.faireconomy.media` — app/api/calendar/route.ts, lib/econ-calendar.ts
+- `pro-api.coinmarketcap.com` — app/api/admin/settings/route.ts, app/api/market-structure/route.ts
 - `rss.nytimes.com` — lib/news-intelligence.ts
 - `spot.test` — tests/live-feed.test.ts
 - `t.me` — app/api/telegram/link/route.ts
@@ -693,6 +702,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `www.aljazeera.com` — lib/news-intelligence.ts
 - `www.cnbc.com` — lib/news-intelligence.ts
 - `www.coindesk.com` — lib/crypto-news.ts
+- `www.okx.com` — lib/market-providers.ts
 - `www.tftc.io` — lib/institutional-flows.ts
 - `www.theblock.co` — lib/crypto-news.ts
 - `www.theguardian.com` — lib/news-intelligence.ts

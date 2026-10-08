@@ -204,3 +204,29 @@ test("real execution: JARVIS never sends orders; the manual ticket needs every c
   const vetoed = { ...d, direccion: "NO TRADE" as const, riesgo: { ...r, vetos: ["x"], aprobado: false } };
   assert.equal(manualTicket(vetoed, settings, NOW, true).ready, false, "never a vetoed plan");
 });
+
+test("real liquidations (OKX) are read as a measurement, with their source; without them, they are listed as missing", () => {
+  const base = snapshot(up, null);
+  const tape = {
+    fuente: "OKX, perpetuos USDT (una parte del mercado, no el total)",
+    desde: base.now - 30 * H,
+    hasta: base.now,
+    ventanas: [
+      { horas: 1, largosUsd: 1_250_000, cortosUsd: 150_000, ordenes: 12, completa: true },
+      { horas: 4, largosUsd: 2_000_000, cortosUsd: 400_000, ordenes: 30, completa: true },
+      { horas: 24, largosUsd: 5_000_000, cortosUsd: 3_000_000, ordenes: 90, completa: true },
+    ],
+    mayor: { usd: 800_000, lado: "LARGO" as const, precio: 140.2, at: base.now - 20 * 60_000 },
+  };
+  const withTape = runDesk({ ...base, liquidations: tape })!;
+  const liq = withTape.agentes.find((x) => x.id === "liquidaciones")!;
+  assert.ok(liq.hallazgos.some((h) => /Liquidaciones reales en OKX, última hora: \$1,25 millones de largos y \$150 mil de cortos \(12 órdenes\)\./.test(h)), liq.hallazgos.join(" | "));
+  assert.ok(liq.hallazgos.some((h) => /sobre todo largos: hubo ventas forzadas/.test(h)));
+  assert.ok(liq.hallazgos.some((h) => /La mayor en 24 h: \$800 mil de un largo/.test(h)));
+  assert.equal(liq.datos.liqLargos1hUsd, 1_250_000);
+  assert.ok(!liq.faltantes.some((x) => /liquidaciones reales/.test(x)));
+  const without = runDesk(base)!;
+  assert.ok(without.agentes.find((x) => x.id === "liquidaciones")!.faltantes.some((x) => /liquidaciones reales con historial \(OKX no respondió\)/.test(x)));
+  // A measurement, not a vote: the consensus does not move with the tape.
+  assert.equal(withTape.consenso, without.consenso);
+});

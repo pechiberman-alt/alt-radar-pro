@@ -112,6 +112,61 @@ export function parseCoinGeckoGlobal(payload: unknown): MarketStructure | null {
   };
 }
 
+type CmcGlobal = {
+  data?: {
+    btc_dominance?: number;
+    eth_dominance?: number;
+    quote?: { USD?: { total_market_cap?: number; total_volume_24h?: number; total_market_cap_yesterday_percentage_change?: number } };
+  };
+};
+type CmcQuotes = { data?: Record<string, { quote?: { USD?: { market_cap?: number } } } | { quote?: { USD?: { market_cap?: number } } }[]> };
+
+/** CoinMarketCap ids: USDT and USDC. */
+export const CMC_STABLE_IDS = { usdt: "825", usdc: "3408" } as const;
+
+/**
+ * CoinMarketCap (with the owner's key, on the server only): global metrics,
+ * plus USDT and USDC market caps for the stablecoin shares when that second
+ * answer came back. Accepts unknown because it parses a third-party response.
+ */
+export function parseCmcGlobal(global: unknown, stables: unknown = null): MarketStructure | null {
+  const data = (global as CmcGlobal | null)?.data;
+  const usd = data?.quote?.USD;
+  const totalMarketCap = finite(usd?.total_market_cap);
+  if (!data || totalMarketCap === null || totalMarketCap <= 0) return null;
+  const btc = finite(data.btc_dominance);
+  const eth = finite(data.eth_dominance);
+  const capOf = (id: string): number | null => {
+    const row = (stables as CmcQuotes | null)?.data?.[id];
+    const one = Array.isArray(row) ? row[0] : row;
+    const cap = finite(one?.quote?.USD?.market_cap);
+    return cap !== null && cap > 0 ? cap : null;
+  };
+  const usdtCap = capOf(CMC_STABLE_IDS.usdt);
+  const usdcCap = capOf(CMC_STABLE_IDS.usdc);
+  const usdt = usdtCap !== null ? (usdtCap / totalMarketCap) * 100 : null;
+  const usdc = usdcCap !== null ? (usdcCap / totalMarketCap) * 100 : null;
+  const { total2, total3 } = deriveTotals(totalMarketCap, btc, eth);
+  return {
+    totalMarketCap,
+    total2,
+    total3,
+    totalVolume24h: finite(usd?.total_volume_24h),
+    marketCapChange24h: finite(usd?.total_market_cap_yesterday_percentage_change),
+    dominance: {
+      btc,
+      eth,
+      usdt,
+      usdc,
+      // Both or none: a missing one is unknown, not zero.
+      stablecoins: usdt !== null && usdc !== null ? usdt + usdc : null,
+      altcoins: btc !== null && eth !== null ? Math.max(0, 100 - btc - eth) : null,
+    },
+    source: "CoinMarketCap",
+    timestamp: new Date().toISOString(),
+  };
+}
+
 /** Accepts unknown because it parses a third-party response. */
 export function parseCoinLoreGlobal(rows: unknown): MarketStructure | null {
   const row = Array.isArray(rows) ? (rows[0] as CoinLoreGlobal | undefined) : null;
