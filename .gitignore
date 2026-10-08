@@ -47,3 +47,6 @@ yarn-error.log*
 # typescript incremental build cache
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# la araña dibujada: se genera con npm run arana -- --vista
+/docs/araña/vista.html

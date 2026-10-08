@@ -4,7 +4,7 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 473 · objetivos: 15 · sin objetivo: 0
+- Archivos: 474 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 43 · secretos: 4 · variables de entorno: 8 · rutas /api: 49 · hosts: 54
 - Código de navegador: 56 archivos con "use client" que alcanzan 154 · problemas: 0
 - Lib sin prueba directa: 20 de 146
@@ -306,11 +306,12 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/auth.ts` — Per-client authentication: email + password, isolated by user_id.
 - `lib/secret-box.ts` — AES-GCM with a base64 32-byte key: iv (12 bytes) + ciphertext, base64.
 
-### araña — La araña del proyecto y las instrucciones para trabajar en él (4)
+### araña — La araña del proyecto y las instrucciones para trabajar en él (5)
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
 - `CLAUDE.md` — ALT RADAR PRO — reglas del proyecto
 - `docs/araña/objetivos.md` — Objetivos de ALT RADAR PRO
-- `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+38)
+- `scripts/arana-vista.html`
+- `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+42)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
 ### calidad — Pruebas (119)

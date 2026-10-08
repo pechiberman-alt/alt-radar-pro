@@ -1,9 +1,9 @@
 # Huellas de la araña: hash corto, líneas y ruta de cada archivo. Lo escribe npm run arana; lo lee --cambios.
 b531751b31a2	27	.github/workflows/claude.yml
 bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
-487c070ad6dc	0	.gitignore
+ceaa106c98e0	0	.gitignore
 6b5886c6306e	5	.openai/hosting.json
-f4fcd83bffb6	56	CLAUDE.md
+f9d30a787fbd	57	CLAUDE.md
 8b27e3600b59	64	README.md
 5aac31cab73c	36	THIRD_PARTY_NOTICES.md
 7d7e53d1533b	103	app/account-panel.css
@@ -169,7 +169,7 @@ f9aec051f520	355	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d56742809afb	197	docs/araña/objetivos.md
+03d928b31d1d	198	docs/araña/objetivos.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -346,7 +346,8 @@ bc7491d499a6	0	public/globe.svg
 fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
-b7859aa50094	929	scripts/arana.mjs
+9f6da9fc755a	898	scripts/arana-vista.html
+aaabbc98195f	1024	scripts/arana.mjs
 30cfa0e96f19	19	scripts/write-build-info.mjs
 a6bc231bf554	374	tests/account-journal.test.ts
 bc528d50d94b	74	tests/ai-analyst.test.ts
@@ -356,7 +357,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
-a97845f99e5f	189	tests/arana.test.ts
+e9f096df4918	226	tests/arana.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
 8dffdd6b09f6	386	tests/assistant.test.ts
 dff2674006ae	17	tests/auth-pbkdf2.test.ts
@@ -420,7 +421,7 @@ ce39bedad0f5	142	tests/liquidation-tiers.test.ts
 6977f95176f6	218	tests/live-feed.test.ts
 c90b4a2a66b4	70	tests/live-market.test.ts
 3679ba6f5014	114	tests/magnet-watch.test.ts
-66be909e5555	166	tests/market-providers.test.ts
+3b55b01f226c	202	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
 1c697054fe3b	153	tests/mm-robot.test.ts
 6ab801ccfb7e	104	tests/mtf-zones.test.ts

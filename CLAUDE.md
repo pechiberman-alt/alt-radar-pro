@@ -8,6 +8,7 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
 - docs/araña/objetivos.md dice a qué objetivo pertenece cada archivo, con sus reglas y pendientes. Un archivo sin objetivo hace fallar `npm run test:unit`: agregalo ahí.
 - Después de agregar, mover o borrar archivos, o cambiar código y objetivos: `npm run arana` y commiteá docs/araña/ junto con el cambio. `npm run arana -- --cambios` dice qué cambió desde el último mapa.
 - No leas docs/araña/MAPA.md entero: es el mapa completo; usá las consultas.
+- `npm run arana -- --vista` dibuja la araña recorriendo el proyecto (docs/araña/vista.html, no se commitea): la página que ve Uri, publicada como artifact.
 
 ## Antes de proponer un cambio
 - `npm ci --no-audit --no-fund`, después `npm run lint`, `npm run test:unit` y `npm run build`. Los tres tienen que pasar.
