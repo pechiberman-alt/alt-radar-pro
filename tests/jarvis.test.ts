@@ -99,6 +99,12 @@ test("JARVIS TRADING: the questions of the desk reach the desk", () => {
   assert.deepEqual(parseCommand("hacé un backtest de SOL de 6 meses"), { kind: "BACKTEST", symbol: "SOL", days: 180 });
   assert.deepEqual(parseCommand("backtesteá BTC"), { kind: "BACKTEST", symbol: "BTC", days: 90 });
   assert.deepEqual(parseCommand("¿cómo le hubiera ido a la mesa con ETH el último mes?"), { kind: "BACKTEST", symbol: "ETH", days: 30 });
+  // Alerts: a level becomes a Telegram alert; without a level it is not one.
+  assert.deepEqual(parseCommand("avisame si BTC pierde 110.000"), { kind: "ALERT", symbol: "BTC", level: 110_000 });
+  assert.deepEqual(parseCommand("Jarvis, alertame si rompe 125 mil"), { kind: "ALERT", symbol: null, level: 125_000 });
+  assert.deepEqual(parseCommand("poneme una alerta en sol a 200"), { kind: "ALERT", symbol: "SOL", level: 200 });
+  assert.notEqual(parseCommand("avisame cuando haya algo").kind, "ALERT");
+  assert.deepEqual(parseCommand("¿Qué pasa si pierde 110.000?"), { kind: "WHATIF", symbol: null, level: 110_000 }, "a question stays a scenario");
 });
 
 test("backtest periods in days, months or years", () => {

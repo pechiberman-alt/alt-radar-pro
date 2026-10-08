@@ -10,6 +10,7 @@ import { cachedDesk, deskFor, DESK_SHOW_EVENT, loadDeskSettings, saveDeskSetting
 import { withRecord } from "@/lib/jarvis-paper";
 import { PaperBlock, PaperFollow, usePaper } from "./jarvis-paper";
 import { BacktestBlock } from "./jarvis-backtest";
+import { WatchBlock } from "./jarvis-watch";
 import { BACKTEST_EVENT } from "@/lib/jarvis-backtest-run";
 
 /**
@@ -285,6 +286,11 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
           <details className="jt-block" open={backtestOpen} onToggle={(e) => setBacktestOpen(e.currentTarget.open)}>
             <summary>Backtesting · histórico</summary>
             <BacktestBlock symbol={symbol} d={d} />
+          </details>
+
+          <details className="jt-block">
+            <summary>Alertas de la mesa</summary>
+            <WatchBlock d={d} />
           </details>
 
           <details className="jt-block">

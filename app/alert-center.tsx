@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import TelegramCard from "./telegram-card";
-import { publishAlert } from "@/lib/alert-bus";
+import { publishAlert, subscribeToAlerts } from "@/lib/alert-bus";
 import { buildMtfZones } from "@/lib/mtf-zones";
 import { isDueToday, type DcaSchedule } from "@/lib/dca-tracker";
 import { readFibZone } from "@/lib/fib-zone";
@@ -33,6 +33,7 @@ const CATEGORIES: { id: AlertCategory; label: string; hint: string }[] = [
   { id: "FLUJO", label: "FLUJO", hint: "Cambios de régimen institucional" },
   { id: "VOLUMEN", label: "VOLUMEN", hint: "Vela con 3× el volumen normal en BTC, ETH o SOL (15m, 1h, 4h)" },
   { id: "DCA", label: "DCA", hint: "Día programado de compra — te avisa, no compra" },
+  { id: "MESA", label: "JARVIS · MESA", hint: "Lo que configuraste en JARVIS TRADING: rupturas, estructura, derivados, liquidaciones, divergencias y noticias" },
 ];
 
 const PRIORITIES: { id: AlertPriority; label: string; hint: string }[] = [
@@ -186,7 +187,16 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
     if (result === "granted") setPrefs((current) => ({ ...current, enabled: true }));
   }, []);
 
-  const incoming = [...pending, ...detected];
+  // JARVIS TRADING's watch publishes on the bus; here it joins the feed and, with permission, the notifications.
+  const [desk, setDesk] = useState<Alert[]>([]);
+  useEffect(
+    () =>
+      subscribeToAlerts((alert) => {
+        if (alert.category === "MESA") setDesk((current) => [alert, ...current.filter((a) => a.id !== alert.id)].slice(0, 30));
+      }),
+    [],
+  );
+  const incoming = [...pending, ...detected, ...desk];
 
   useEffect(() => {
     if (!incoming.length) return;
@@ -208,7 +218,7 @@ export default function AlertCenter({ pending = [] }: { pending?: Alert[] }) {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, detected, prefs, permission]);
+  }, [pending, detected, desk, prefs, permission]);
 
   // Reflect whatever subscription the browser already holds, so the button
   // never offers to enable something that is already on.
