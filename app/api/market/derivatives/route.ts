@@ -7,12 +7,14 @@ export const dynamic = "force-dynamic";
 
 /**
  * Derivados y liquidaciones reales desde el servidor, para cuando el
- * navegador no puede: Bybit y OKX no siempre dejan leerse desde una página
- * (CORS), y las liquidaciones con historial solo las publica OKX. APIs
+ * navegador no puede: OKX y Hyperliquid no siempre dejan leerse desde una
+ * página (CORS), y las liquidaciones con historial solo las publica OKX. APIs
  * públicas, sin claves. Un resultado por moneda y por minuto se comparte
  * entre todos los que preguntan.
  */
-const ORDER: ProviderId[] = ["bybit", "okx", "hyperliquid", "binance"];
+// Measured in production (oct 2026): OKX answers the Worker with every field; Bybit refuses it (region block)
+// and Binance refuses the crons. Hyperliquid has no 24 h open-interest change or long/short ratio.
+const ORDER: ProviderId[] = ["okx", "hyperliquid", "bybit", "binance"];
 const TTL_MS = 60_000;
 const STALE_MS = 10 * 60_000;
 

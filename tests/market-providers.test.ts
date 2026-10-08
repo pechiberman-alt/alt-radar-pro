@@ -163,3 +163,39 @@ test("OKX liquidations: pages back with 'after' until a short page or a day back
   assert.equal(t.ventanas.find((x) => x.horas === 24)!.ordenes, 140);
   assert.equal(await loadOkxLiquidations("BTCUSDT", NOW, stub([]).f), null, "no contract value, no tape");
 });
+
+test("from the browser: Binance, then Bybit, and only then the server's fallbacks", async () => {
+  const { loadDerivatives } = await import("../lib/jarvis-desk-data.ts");
+  const calls: string[] = [];
+  const bybitOk = (url: string) => {
+    if (url.includes("/v5/market/tickers")) return Response.json({ retCode: 0, result: { list: [{ fundingRate: "0.0001", nextFundingTime: "1791504000000", markPrice: "82000", openInterest: "50000", openInterestValue: "4100000000", fundingIntervalHour: "8" }] } });
+    if (url.includes("/v5/market/open-interest")) return Response.json({ retCode: 0, result: { list: Array.from({ length: 25 }, (_, i) => ({ openInterest: String(50000 - i * 10), timestamp: String(1791504000000 - i * 3_600_000) })) } });
+    return Response.json({ retCode: 0, result: { list: [{ buyRatio: "0.6", sellRatio: "0.4", timestamp: "1791504000000" }] } });
+  };
+  const stub = (bybit: boolean) =>
+    (async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes("binance.com")) return new Response("", { status: 403 });
+      if (url.includes("api.bybit.com")) return bybit ? bybitOk(url) : Promise.reject(new TypeError("CORS"));
+      if (url.startsWith("/api/market/derivatives")) return Response.json({ derivados: { data: { fundingPct: -0.001, nextFundingAt: null, markPrice: null, openInterest: 1, openInterestUsd: 82000, oiChange24hPct: 0.5, longShortRatio: 1.6, takerBuySell: 1.1, source: "OKX (perpetuo USDT)" }, provider: "okx", tried: [] }, liquidaciones: null });
+      return new Response("", { status: 404 });
+    }) as typeof fetch;
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = stub(true);
+    const a = await loadDerivatives("BTCUSDT", 82000, AbortSignal.timeout(5000));
+    assert.equal(a.derivatives?.source, "Bybit (perpetuo USDT)");
+    assert.equal(a.viaServer, false);
+    assert.ok(!calls.some((u) => u.startsWith("/api/")), "the server is not asked when Bybit answers");
+    calls.length = 0;
+    globalThis.fetch = stub(false);
+    const b = await loadDerivatives("BTCUSDT", 82000, AbortSignal.timeout(5000));
+    assert.equal(b.derivatives?.source, "OKX (perpetuo USDT)");
+    assert.equal(b.viaServer, true);
+    const order = calls.map((u) => (u.includes("binance") ? "binance" : u.includes("bybit") ? "bybit" : u.startsWith("/api/") ? "servidor" : "otro"));
+    assert.ok(order.lastIndexOf("binance") < order.indexOf("bybit") && order.lastIndexOf("bybit") < order.indexOf("servidor"), order.join(","));
+  } finally {
+    globalThis.fetch = original;
+  }
+});

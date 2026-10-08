@@ -47,7 +47,7 @@ a6895ac618b8	60	app/api/jarvis/paper/route.ts
 ef3e2bf85432	160	app/api/klines/route.ts
 c1dc8c2ca83f	93	app/api/liquidity-history/route.ts
 a9e76218b723	216	app/api/market-structure/route.ts
-d39de88931a8	50	app/api/market/derivatives/route.ts
+d3204ba0eb2d	52	app/api/market/derivatives/route.ts
 bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
@@ -169,7 +169,7 @@ f9aec051f520	355	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-895a9ac9b4b4	197	docs/araña/objetivos.md
+d56742809afb	197	docs/araña/objetivos.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -241,7 +241,7 @@ f61124d7437f	79	lib/jarvis-chat.ts
 67c2bd6e8989	495	lib/jarvis-core-db.ts
 104f734141fd	467	lib/jarvis-core.ts
 cb4645381ac1	582	lib/jarvis-desk-agents.ts
-1cd992bd5876	204	lib/jarvis-desk-data.ts
+ed58663ee313	208	lib/jarvis-desk-data.ts
 d29490ffe116	101	lib/jarvis-desk-run.ts
 1d3ea31e2bd1	728	lib/jarvis-desk.ts
 a054330ce1c8	133	lib/jarvis-execution.ts

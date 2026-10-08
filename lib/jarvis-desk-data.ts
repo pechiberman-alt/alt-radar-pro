@@ -3,7 +3,7 @@ import { loadCalendar, type MacroEvent } from "./econ-calendar.ts";
 import type { FearGreed } from "./fear-greed.ts";
 import { closedOnly } from "./jarvis-core.ts";
 import { loadRows } from "./market-fetch.ts";
-import { binanceDerivatives, loadBinanceDerivatives, type Attempt, type LiquidationTape, type ProviderId } from "./market-providers.ts";
+import { binanceDerivatives, loadBinanceDerivatives, loadBybitDerivatives, type Attempt, type LiquidationTape, type ProviderId } from "./market-providers.ts";
 import type { MarketStructure } from "./market-structure.ts";
 import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
 
@@ -85,7 +85,7 @@ export type DeskProvider = {
 
 export const DESK_PROVIDERS: DeskProvider[] = [
   { id: "binance", label: "Binance Futures (API pública, desde tu navegador)", serves: ["velas", "derivados"], ready: true },
-  { id: "bybit", label: "Bybit v5 (API pública, desde el servidor)", serves: ["derivados"], ready: true },
+  { id: "bybit", label: "Bybit v5 (API pública, desde tu navegador; al servidor no le responde)", serves: ["derivados"], ready: true },
   { id: "okx", label: "OKX v5 (API pública, desde el servidor)", serves: ["derivados", "liquidaciones"], ready: true },
   { id: "hyperliquid", label: "Hyperliquid (API pública, desde el servidor)", serves: ["derivados"], ready: true },
   { id: "binance-ws", label: "Binance · liquidaciones en vivo (WebSocket)", serves: ["liquidaciones"], ready: true },
@@ -116,12 +116,16 @@ async function serverMarket(symbol: string, price: number | null, parts: string,
 
 /**
  * Funding, interés abierto (ahora y 24 h), ratio largo/corto y flujo agresor:
- * de Binance Futures desde este navegador; si no responde, el servidor prueba
- * Bybit, OKX y Hyperliquid. Una sola fuente por lectura, y dice cuál.
+ * de Binance Futures desde este navegador, después Bybit desde acá mismo; si
+ * ninguno responde, el servidor prueba OKX y Hyperliquid. Una sola fuente por
+ * lectura, y dice cuál.
  */
 export async function loadDerivatives(symbol: string, price: number | null, signal: AbortSignal): Promise<{ derivatives: Derivatives | null; viaServer: boolean }> {
   const direct = await loadBinanceDerivatives(symbol, price, (u, i) => fetch(u, i), signal).catch(() => null);
   if (direct) return { derivatives: direct, viaServer: false };
+  // Bybit refuses the Worker (region) but answers people: from here first, then the server's fallbacks.
+  const bybit = await loadBybitDerivatives(symbol, price, (u, i) => fetch(u, i), signal).catch(() => null);
+  if (bybit) return { derivatives: bybit, viaServer: false };
   const server = await serverMarket(symbol, price, "derivados", signal);
   return { derivatives: server?.derivados?.data ?? null, viaServer: true };
 }
