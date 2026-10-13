@@ -112,9 +112,10 @@ def492abf855	146	app/install-panel.tsx
 08966d25ae55	67	app/institutional-desk.css
 58e9409bb2ba	192	app/institutional-desk.tsx
 674a9d7b1cd9	246	app/jarvis-backtest.tsx
+e7261e72c9f7	299	app/jarvis-council.tsx
 5954976b79de	279	app/jarvis-paper.tsx
-0afde52c0a7a	160	app/jarvis-trading.css
-a65c938674a6	707	app/jarvis-trading.tsx
+76315385a19a	242	app/jarvis-trading.css
+7584988b98ae	711	app/jarvis-trading.tsx
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
 719061eef9e9	192	app/jarvis-watch.tsx
 39c4819ab1a5	121	app/jarvis.css
@@ -173,7 +174,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-0e216727442b	202	docs/araña/objetivos.md
+de441ccb97c5	203	docs/araña/objetivos.md
 081dd8a501f7	96	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 0207ee45bc91	144	docs/mesa-reglas-v2.md
@@ -247,10 +248,11 @@ b0f479478c6c	127	lib/jarvis-backtest-run.ts
 f61124d7437f	79	lib/jarvis-chat.ts
 67c2bd6e8989	495	lib/jarvis-core-db.ts
 104f734141fd	467	lib/jarvis-core.ts
+7b2813e75f44	352	lib/jarvis-council.ts
 cb4645381ac1	582	lib/jarvis-desk-agents.ts
 ed58663ee313	208	lib/jarvis-desk-data.ts
 d29490ffe116	101	lib/jarvis-desk-run.ts
-b02eb9993ace	743	lib/jarvis-desk.ts
+fa37d4a7b3d9	743	lib/jarvis-desk.ts
 7490f7cc5ddc	134	lib/jarvis-execution.ts
 e65cb00f1d4d	483	lib/jarvis-learn.ts
 5df49d023ff9	179	lib/jarvis-ledger.ts
@@ -413,6 +415,7 @@ cf22fb64056e	59	tests/jarvis-analyst.test.ts
 ed1ff7a11a00	123	tests/jarvis-backtest.test.ts
 6d6b9ed4fa70	68	tests/jarvis-chat.test.ts
 45b5ffc94ac0	474	tests/jarvis-core.test.ts
+400c6c695de7	432	tests/jarvis-council.test.ts
 d847995430f7	236	tests/jarvis-desk-risk.test.ts
 8fe82178c57c	106	tests/jarvis-desk-run.test.ts
 727811ff841e	220	tests/jarvis-desk.test.ts
@@ -424,7 +427,7 @@ f509b7eb53bb	45	tests/jarvis-local.test.ts
 66e7d8e4f1e8	167	tests/jarvis-mind.test.ts
 310a163bc5a2	198	tests/jarvis-paper-run.test.ts
 c977b546798a	414	tests/jarvis-paper.test.ts
-899114edc693	283	tests/jarvis-rules-v2.test.ts
+871655c35609	284	tests/jarvis-rules-v2.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
 cc263e715076	62	tests/jarvis-watch-run.test.ts
 503532a31b9f	186	tests/jarvis-watch.test.ts
