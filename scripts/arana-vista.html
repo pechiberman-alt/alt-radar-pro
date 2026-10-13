@@ -1,194 +1,379 @@
 <title>Araña de ALT RADAR</title>
-<meta name="description" content="La araña recorre ALT RADAR PRO: objetivos, archivos, imports, pruebas y banderas.">
+<meta name="description" content="La araña recorre ALT RADAR PRO: una esfera con cada archivo, sus objetivos, imports, pruebas y banderas.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;700&display=swap">
 <style>
-/* Concepto: una consola de observatorio. Arriba los contadores y los objetivos; al medio la tela,
-   donde la araña camina por los imports; abajo los instrumentos, como en una sala de control.
+/* Concepto: el puesto de mando de un radar. En el centro, la esfera del proyecto: cada archivo es un punto,
+   cada objetivo un casquete de color, los imports son arcos y las banderas, pinchos rosas. Alrededor, los
+   instrumentos con datos reales del mapa: cobertura, objetivos, cinta de lectura, densidad de imports.
    Un solo mundo oscuro a propósito: es la misma identidad de ALT RADAR PRO. */
 :root {
   --bg: #030605;
   --panel: #07100c;
   --panel-2: #0a1611;
   --line: #16241d;
+  --line-2: #20382d;
   --ink: #dfe9e3;
   --muted: #6f8278;
+  --soft: #9fb4a9;
   --web: #4fd8c4;
   --live: #39f29a;
   --flag: #ff4d8d;
   --warn: #f4b84a;
+  --blue: #6b8cff;
+  --violet: #b18cff;
   --display: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --body: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { background: var(--bg); color: var(--ink); }
-body { margin: 0; font: 14px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
-.app { padding-inline: 16px; padding-block: 12px 28px; max-width: 1480px; margin: 0 auto; display: grid; gap: 12px; }
-button { font: inherit; color: inherit; }
+body { margin: 0; font: 13px/1.5 var(--body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }
 :focus-visible { outline: 2px solid var(--web); outline-offset: 2px; }
+.app { max-width: 1560px; margin: 0 auto; padding: 10px 12px 28px; display: grid; gap: 10px; }
+.vacio > :not(#empty) { display: none; }
+.empty { padding: 40px 0; color: var(--muted); }
+.empty code { color: var(--web); }
 
 /* Barra superior */
-.bar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; border-bottom: 1px solid var(--line); padding-block: 4px 10px; }
-.brand { display: flex; align-items: baseline; gap: 10px; font: 600 15px var(--display); letter-spacing: .2px; }
-.brand span { font: 11px var(--display); color: var(--muted); letter-spacing: 1px; }
-.counters { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font: 10px var(--display); letter-spacing: .9px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.counters div { display: flex; gap: 6px; }
-.counters dt { text-transform: uppercase; }
-.counters dd { margin: 0; color: var(--ink); }
-.counters .flagc dd { color: var(--flag); }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand clock" "pills pills" "find find"; gap: 8px 12px; align-items: center; padding: 2px 0 8px; border-bottom: 1px solid var(--line); }
+.brand { grid-area: brand; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); box-shadow: 0 0 10px var(--live); animation: pulse 2.2s ease-in-out infinite; flex: 0 0 auto; }
+.brand b { font: 700 15px var(--display); letter-spacing: .6px; white-space: nowrap; }
+.brand span { font: 11px var(--display); color: var(--muted); letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clock { grid-area: clock; font: 600 12px var(--display); letter-spacing: .8px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.clock small { display: block; font: 10px var(--display); color: var(--muted); letter-spacing: 1px; }
+.pills { grid-area: pills; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill { font: 10px var(--display); letter-spacing: .8px; padding: 2px 8px; border: 1px solid var(--line-2); color: var(--soft); border-radius: 2px; white-space: nowrap; }
+.pill.ok { color: var(--live); border-color: #1d4a35; }
+.find { position: relative; grid-area: find; }
+.find input { width: 100%; min-height: 38px; padding: 0 12px; border: 1px solid var(--line-2); background: #040907; color: var(--ink); border-radius: 3px; font: 12.5px var(--display); }
+.find input:focus { border-color: var(--web); outline: none; }
+.results { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 6px; list-style: none; display: grid; gap: 5px; max-height: min(60vh, 440px); overflow-y: auto; background: #050b08; border: 1px solid var(--line-2); border-radius: 3px; box-shadow: 0 14px 40px rgba(0, 0, 0, .6); }
+.results li button { width: 100%; text-align: left; display: grid; gap: 2px; padding: 7px 9px; border: 1px solid var(--line); background: var(--panel-2); border-radius: 3px; }
+.results li button:hover { border-color: var(--web); }
+.results b { font: 500 12px var(--display); overflow-wrap: anywhere; }
+.results small { font-size: 12px; color: var(--muted); }
+.results .note { padding: 6px 8px; font-size: 12px; color: var(--muted); }
 
-/* Objetivos (pestañas) */
-.tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-.tabs::-webkit-scrollbar { display: none; }
-.tabs button { flex: 0 0 auto; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; font: 11px var(--display); letter-spacing: .6px; color: var(--muted); cursor: pointer; }
-.tabs button[aria-pressed="true"] { color: #03100b; background: var(--web); border-color: var(--web); }
-.tabs button.done:not([aria-pressed="true"]) { color: var(--live); border-color: #1d4a35; }
+/* Cinta de reglas */
+.tick { display: flex; align-items: stretch; height: 28px; border: 1px solid var(--line); background: #050b08; border-radius: 3px; overflow: hidden; }
+.tick-tag { flex: 0 0 auto; display: flex; align-items: center; padding: 0 10px; font: 700 10px var(--display); letter-spacing: 1.6px; color: var(--flag); background: #1a0912; border-right: 1px solid #4a1d31; }
+.tick-view { position: relative; flex: 1; min-width: 0; overflow: hidden; display: flex; align-items: center; -webkit-mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, transparent, #000 22px, #000 calc(100% - 22px), transparent); }
+.tick-track { display: inline-flex; flex: 0 0 auto; gap: 34px; padding-left: 34px; white-space: nowrap; font: 10.5px var(--display); color: var(--soft); animation: marquee 220s linear infinite; }
+.tick-track b { color: var(--web); font-weight: 600; margin-right: 8px; letter-spacing: .6px; }
 
-/* Escena */
-.stage { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #0a1a15 0%, var(--bg) 62%); }
-.head { position: absolute; left: 0; top: 0; right: 0; padding: 12px 14px 22px; pointer-events: none; display: grid; gap: 2px; background: linear-gradient(180deg, rgba(3, 6, 5, .94) 0%, rgba(3, 6, 5, .7) 62%, rgba(3, 6, 5, 0) 100%); }
-.head .num { font: 700 12px var(--display); color: var(--web); letter-spacing: 1.4px; }
-.head h1 { margin: 0; font: 700 clamp(20px, 5.4vw, 30px)/1.05 var(--display); letter-spacing: -.5px; text-transform: uppercase; text-wrap: balance; }
-.head p { margin: 0; font: 12px var(--display); color: var(--muted); max-width: 62ch; }
-canvas#web { display: block; width: 100%; height: min(64vh, 620px); min-height: 380px; touch-action: none; cursor: grab; }
-canvas#web.dragging { cursor: grabbing; }
-.controls { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; }
-.controls button { min-height: 36px; min-width: 40px; padding: 0 10px; border: 1px solid var(--line); background: rgba(7, 16, 12, .86); border-radius: 4px; font: 11px var(--display); letter-spacing: .6px; cursor: pointer; }
+/* Los números del proyecto */
+.band { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.band > div { background: var(--panel); padding: 7px 10px 8px; display: grid; gap: 1px; align-content: center; min-width: 0; }
+.band span { font: 9.5px var(--display); letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
+.band b { font: 700 16px var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.band .flagc b { color: var(--flag); }
+.band .hero { grid-column: 1 / -1; grid-template-columns: auto minmax(0, 1fr); column-gap: 18px; align-items: center; padding: 10px 14px; background: linear-gradient(90deg, #08150f, var(--panel)); }
+.band .hero span { grid-column: 1; }
+.band .hero b { grid-column: 1; grid-row: 2; font-size: clamp(38px, 11vw, 54px); line-height: 1; color: var(--live); text-shadow: 0 0 22px rgba(57, 242, 154, .35); }
+.band .hero .rd { grid-column: 2; grid-row: 1 / 3; display: grid; gap: 4px; align-content: center; }
+.band .hero .rd small { font: 10.5px var(--display); color: var(--soft); }
+.band .hero .rd small b { font-size: 13px; color: var(--web); }
+.bar { display: block; height: 4px; background: #10201a; border-radius: 2px; overflow: hidden; }
+.bar u { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--web), var(--live)); text-decoration: none; transition: width .3s; }
+
+/* La esfera */
+.stage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--line); border-radius: 3px; background: radial-gradient(ellipse at 50% 48%, #0c1f18 0%, #050b08 56%, #030605 100%); overflow: hidden; }
+.stage > * { position: relative; z-index: 2; }
+.stage > canvas { position: absolute; z-index: 1; display: block; touch-action: pan-y; cursor: grab; }
+.stage > canvas.dragging { cursor: grabbing; }
+.st-head { display: flex; align-items: center; gap: 10px; padding: 9px 12px 4px; }
+.st-head h2 { flex: 1 1 auto; }
+.live { font: 10px var(--display); letter-spacing: .8px; color: var(--live); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 4px 12px 6px; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex: 0 0 auto; min-height: 30px; padding: 0 10px; border: 1px solid var(--line-2); background: rgba(5, 11, 8, .82); border-radius: 2px; font: 10.5px var(--display); letter-spacing: .5px; color: var(--soft); display: flex; align-items: center; gap: 6px; }
+.chips button i { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--web)); box-shadow: 0 0 8px var(--c, var(--web)); }
+.chips button[aria-pressed="true"] { color: #03100b; background: var(--c, var(--web)); border-color: var(--c, var(--web)); }
+.chips button[aria-pressed="true"] i { background: #03100b; box-shadow: none; }
+.chips button.done:not([aria-pressed="true"]) { border-color: #1d4a35; color: var(--live); }
+.core { pointer-events: none; }
+.core-view { position: relative; aspect-ratio: 1 / 1.12; pointer-events: none; }
+.hint { position: absolute; left: 0; right: 0; top: 4px; margin: 0; text-align: center; font: 10.5px var(--display); color: var(--muted); transition: opacity .8s; }
+.hint.off { opacity: 0; }
+.legend { position: absolute; left: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 3px; max-width: calc(100% - 190px); font: 9.5px var(--display); color: var(--muted); }
+.legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+.controls { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; pointer-events: auto; }
+.controls button { min-height: 34px; min-width: 38px; padding: 0 10px; border: 1px solid var(--line-2); background: rgba(5, 11, 8, .9); border-radius: 3px; font: 600 10.5px var(--display); letter-spacing: .8px; }
 .controls button[aria-pressed="true"] { border-color: var(--web); color: var(--web); }
-.legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; max-width: 58%; font: 10px var(--display); color: var(--muted); pointer-events: none; }
-.legend i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
 
-/* Instrumentos */
-.panels { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.panel { min-width: 0; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 12px; display: grid; gap: 8px; align-content: start; }
-.panel h2 { margin: 0; display: flex; justify-content: space-between; gap: 8px; font: 600 11px var(--display); letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
-.panel h2 em { font-style: normal; color: var(--live); letter-spacing: .6px; }
-.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font: 11.5px/1.45 var(--display); min-height: 13em; }
-.log li { display: grid; grid-template-columns: 4.6em minmax(0, 1fr); gap: 8px; color: #b9c9c0; }
-.log li span { color: var(--muted); }
-.log li.enlace span { color: var(--web); }
-.log li.flag span, .log li.flag b { color: var(--flag); }
-.log li.pasar span, .log li.listo span { color: var(--live); }
-.log li b { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.secs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.secs li button { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; padding: 4px 0; background: none; border: 0; cursor: pointer; text-align: left; }
-.secs li span { font: 12px var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.secs li small { font: 11px var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
-.secs li i { grid-column: 1 / -1; height: 3px; background: #13211b; border-radius: 2px; overflow: hidden; }
-.secs li i b { display: block; height: 100%; width: 0; background: var(--web); transition: width .3s; }
-.secs li.done i b { background: var(--live); }
-.secs li.active span { color: var(--web); }
+/* Ficha y objetivo */
+.card { pointer-events: auto; margin: 0 10px 10px; padding: 10px 12px 12px; border: 1px solid var(--line-2); border-radius: 3px; background: rgba(4, 9, 7, .96); display: grid; gap: 7px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+.card[hidden] { display: none; }
+.card .top-row { display: flex; align-items: center; gap: 8px; }
+.card .top-row .kind { font: 600 10px var(--display); letter-spacing: 1.4px; color: var(--web); text-transform: uppercase; }
+.card .x { margin-left: auto; width: 32px; height: 32px; border: 1px solid var(--line-2); background: transparent; border-radius: 3px; font: 14px var(--display); color: var(--soft); }
+.card .path { margin: 0; font: 600 13px var(--display); overflow-wrap: anywhere; }
+.card .sum { margin: 0; font-size: 12.5px; color: #b9c9c0; }
+.card dl { margin: 0; display: grid; gap: 5px; max-height: 220px; overflow-y: auto; }
+.card dl div { display: grid; grid-template-columns: 6.6em minmax(0, 1fr); gap: 8px; }
+.card dt { font: 10px var(--display); letter-spacing: .8px; color: var(--muted); text-transform: uppercase; padding-top: 2px; }
+.card dd { margin: 0; font: 11.5px/1.45 var(--display); overflow-wrap: anywhere; color: #c9d7cf; }
+.card ul { margin: 0; padding: 0 0 0 16px; display: grid; gap: 4px; font-size: 12px; color: #c9d7cf; max-height: 200px; overflow-y: auto; }
+.card ul.pend { color: var(--warn); }
+.card h3 { margin: 4px 0 0; font: 600 10px var(--display); letter-spacing: 1.4px; color: var(--muted); text-transform: uppercase; }
+.chip { display: inline-block; font: 10px var(--display); letter-spacing: .6px; padding: 1px 6px; border: 1px solid #1d4a40; color: var(--web); border-radius: 2px; margin-right: 6px; }
+.bad { color: var(--flag); }
+.lnk { background: none; border: 0; padding: 0; font: inherit; color: var(--web); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+
+/* Paneles */
+.panel { position: relative; min-width: 0; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(10, 22, 17, .94), rgba(5, 11, 8, .97)); border-radius: 3px; padding: 10px 12px 12px; display: grid; gap: 8px; align-content: start; }
+.panel::before { content: ""; position: absolute; left: -1px; top: -1px; width: 14px; height: 14px; border-left: 2px solid var(--web); border-top: 2px solid var(--web); opacity: .65; pointer-events: none; }
+h2.ph { margin: 0; display: flex; align-items: center; gap: 8px; min-width: 0; font: 600 10px var(--display); letter-spacing: 1.6px; text-transform: uppercase; color: #a8bcb1; }
+h2.ph i { width: 6px; height: 6px; background: var(--web); box-shadow: 0 0 8px var(--web); flex: 0 0 auto; }
+h2.ph span { white-space: nowrap; }
+h2.ph em { margin-left: auto; font-style: normal; color: var(--muted); letter-spacing: .5px; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { margin: 0; font-size: 12px; color: var(--muted); }
+
+/* Entradas (cobertura) y objetivos: columnas de la esfera */
+.inputs, .leaders { display: grid; gap: 8px; align-content: start; padding: 4px 10px 10px; }
+.inputs .ph, .leaders .ph { padding: 4px 2px 0; }
+.inp-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.inp { text-align: left; display: grid; gap: 2px; padding: 7px 9px 7px; border: 1px solid var(--line); border-radius: 3px; background: rgba(5, 11, 8, .84); }
+.inp:hover { border-color: var(--c); }
+.inp .t { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.inp b { font: 600 9.5px var(--display); letter-spacing: 1.2px; color: var(--c); }
+.inp .v { font: 700 17px var(--display); font-variant-numeric: tabular-nums; color: var(--ink); }
+.inp svg { display: block; width: 100%; height: 28px; }
+.inp small { font: 9.5px/1.35 var(--display); color: var(--muted); }
+.lead-list { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.lead { width: 100%; height: 100%; text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; align-content: start; padding: 6px 8px 7px; border: 1px solid var(--line); border-left: 3px solid var(--c); background: rgba(5, 11, 8, .84); border-radius: 2px; }
+.lead b { font: 600 11px var(--display); color: var(--c); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lead span { font: 700 12px var(--display); font-variant-numeric: tabular-nums; }
+.lead small { grid-column: 1 / -1; font: 9.5px var(--display); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lead i { grid-column: 1 / -1; display: block; height: 2px; margin-top: 3px; background: #10201a; overflow: hidden; }
+.lead i u { display: block; height: 100%; width: 0; background: var(--c); text-decoration: none; }
+.lead[aria-pressed="true"] { border-color: var(--web); border-left-color: var(--c); background: rgba(12, 34, 28, .92); }
+.lead.trans { opacity: .72; }
+
+/* Paneles de abajo */
+.lower { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+svg text { font-family: "Geist Mono", ui-monospace, monospace; }
+.chart { width: 100%; height: auto; display: block; }
+.chart .mk { fill: transparent; stroke: none; cursor: pointer; }
+.chart .mk.on { fill: rgba(79, 216, 196, .10); stroke: var(--web); stroke-width: 1; }
+.chart .cell { cursor: pointer; }
+.chart .cell:hover { stroke: #fff; stroke-width: 1; }
+.keys { display: flex; flex-wrap: wrap; gap: 3px 10px; font: 9.5px var(--display); color: var(--muted); }
+.keys i { display: inline-block; width: 7px; height: 7px; margin-right: 5px; }
+.hubs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.hubs button { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 42% 2.4em; gap: 8px; align-items: center; padding: 3px 0; background: none; border: 0; text-align: left; }
+.hubs button span { font: 11px var(--display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hubs button i { height: 7px; background: #10201a; border-radius: 1px; overflow: hidden; }
+.hubs button i u { display: block; height: 100%; background: linear-gradient(90deg, #1f8f6a, var(--live)); text-decoration: none; }
+.hubs button b { font: 600 11px var(--display); text-align: right; font-variant-numeric: tabular-nums; color: var(--live); }
+.hubs button:hover span { color: var(--web); }
+.tape-wrap { overflow: hidden; }
+table.tape { width: 100%; table-layout: fixed; border-collapse: collapse; font: 11px var(--display); font-variant-numeric: tabular-nums; }
+.tape th { text-align: left; font: 500 9px var(--display); letter-spacing: 1.1px; color: var(--muted); padding: 3px 6px; border-bottom: 1px solid var(--line); text-transform: uppercase; }
+.tape td { padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid rgba(22, 36, 29, .6); color: #b9c9c0; }
+.tape tr:first-child td { background: rgba(57, 242, 154, .07); }
+.tape .c-t { width: 46px; color: var(--muted); }
+.tape .c-a { width: 66px; }
+.tape .c-l { width: 52px; text-align: right; }
+.tape .c-o, .tape .c-k { display: none; }
+.tag { display: inline-block; min-width: 54px; text-align: center; padding: 0 4px; font: 700 9.5px var(--display); letter-spacing: .6px; border-radius: 2px; }
+.tag.lee { background: rgba(57, 242, 154, .16); color: var(--live); }
+.tag.enlace { background: rgba(79, 216, 196, .14); color: var(--web); }
+.tag.flag { background: rgba(255, 77, 141, .18); color: var(--flag); }
+.tag.pasar { background: rgba(244, 184, 74, .16); color: var(--warn); }
+.tag.listo { background: rgba(107, 140, 255, .18); color: var(--blue); }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tile { min-width: 0; padding: 6px 9px 7px; border: 1px solid var(--tc, var(--line-2)); border-radius: 3px; background: rgba(5, 11, 8, .7); box-shadow: inset 0 0 16px rgba(0, 0, 0, .4); display: grid; gap: 1px; }
+.tile span { font: 9px var(--display); letter-spacing: 1.2px; color: var(--muted); text-transform: uppercase; white-space: nowrap; }
+.tile b { font: 700 15px var(--display); font-variant-numeric: tabular-nums; color: var(--tc, var(--ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile small { font: 10px var(--display); color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dens { display: grid; gap: 8px; }
+.dens #heat { max-width: 340px; justify-self: center; }
+.heat-note { margin: 0; min-height: 1.4em; font: 11px var(--display); color: var(--soft); }
 .radar svg { width: 100%; max-width: 340px; height: auto; justify-self: center; }
 .radar .meters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.radar .meters div { border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; display: grid; }
-.radar .meters span { font: 10px var(--display); color: var(--muted); letter-spacing: .8px; text-transform: uppercase; }
+.radar .meters div { border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; display: grid; }
+.radar .meters span { font: 9.5px var(--display); color: var(--muted); letter-spacing: .8px; text-transform: uppercase; }
 .radar .meters b { font: 600 16px var(--display); font-variant-numeric: tabular-nums; }
-.radar p, .note { margin: 0; font-size: 12px; color: var(--muted); }
-.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 20em; overflow-y: auto; }
-.flags li button { width: 100%; text-align: left; display: grid; gap: 2px; padding: 7px 9px; border: 1px solid #4a1d31; border-left: 3px solid var(--flag); background: #12080d; border-radius: 4px; cursor: pointer; }
+.flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 22em; overflow-y: auto; }
+.flags li button { width: 100%; text-align: left; display: grid; gap: 2px; padding: 7px 9px; border: 1px solid #4a1d31; border-left: 3px solid var(--flag); background: #12080d; border-radius: 3px; }
 .flags li.pend button { border-color: #4a3a1a; border-left-color: var(--warn); background: #120f07; }
 .flags li b { font: 500 11.5px var(--display); overflow-wrap: anywhere; }
 .flags li small { font-size: 12px; color: var(--muted); }
-.find input { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 4px; font: 13px var(--display); }
-.find input:focus { border-color: var(--web); outline: none; }
-.results { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.results li button { width: 100%; text-align: left; display: grid; gap: 2px; padding: 7px 9px; border: 1px solid var(--line); background: var(--panel-2); border-radius: 4px; cursor: pointer; }
-.results li b { font: 500 12px var(--display); overflow-wrap: anywhere; }
-.results li small { font-size: 12px; color: var(--muted); }
-.chip { display: inline-block; font: 10px var(--display); letter-spacing: .6px; padding: 1px 6px; border: 1px solid #1d4a40; color: var(--web); border-radius: 3px; margin-right: 6px; }
-.card dl { margin: 0; display: grid; gap: 6px; }
-.card dl div { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 8px; }
-.card dt { font: 10px var(--display); letter-spacing: .8px; color: var(--muted); text-transform: uppercase; padding-top: 2px; }
-.card dd { margin: 0; font: 12px var(--display); overflow-wrap: anywhere; color: #c9d7cf; }
-.card .path { font: 600 13px var(--display); overflow-wrap: anywhere; }
-.card .sum { font-size: 13px; color: #b9c9c0; }
+.meta h3 { margin: 4px 0 0; font: 600 10px var(--display); letter-spacing: 1.4px; color: var(--muted); text-transform: uppercase; }
+.meta .names { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; max-height: 132px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #1f3a2e transparent; align-content: flex-start; }
+.meta .names button { padding: 2px 7px; border: 1px solid var(--line-2); background: var(--panel-2); border-radius: 2px; font: 10.5px var(--display); color: #b9c9c0; }
+.meta .names button:hover { border-color: var(--web); color: var(--web); }
+.meta .names .sec { border-color: #4a3a1a; color: var(--warn); }
 .cli ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .cli li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
-.cli code { font: 11.5px var(--display); color: #c9d7cf; overflow-x: auto; white-space: nowrap; display: block; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; }
-.cli button { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); background: var(--panel-2); border-radius: 4px; font: 10px var(--display); letter-spacing: .8px; cursor: pointer; }
-footer { font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 90ch; }
+.cli code { font: 11.5px var(--display); color: #c9d7cf; overflow-x: auto; white-space: nowrap; display: block; padding: 6px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 3px; }
+.cli button { min-height: 34px; padding: 0 10px; border: 1px solid var(--line-2); background: var(--panel-2); border-radius: 3px; font: 10px var(--display); letter-spacing: .8px; }
+footer { font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 100ch; }
 footer code { font: 11.5px var(--display); color: #b9c9c0; }
-.empty { padding: 40px 0; color: var(--muted); }
+
+@keyframes pulse { 50% { opacity: .45; } }
+@keyframes marquee { to { transform: translateX(-50%); } }
 
 @media (min-width: 720px) {
-  .panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lower { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .band { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .band .hero { grid-column: 1 / -1; }
+  .inp-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lead-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tape .c-o, .tape .c-k { display: table-cell; }
+  .tape .c-o { width: 118px; }
+  .tape .c-k { width: 78px; }
+  .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-@media (min-width: 1100px) {
-  .panels { grid-template-columns: 1.15fr 1fr 1fr 1fr; }
-  .panels .find, .panels .card { grid-column: span 2; }
-  .panels .cli { grid-column: span 4; }
-  canvas#web { height: min(66vh, 680px); }
+@media (min-width: 720px) and (max-width: 999px) {
+  .lower .wide { grid-column: 1 / -1; }
+}
+@media (min-width: 1000px) {
+  .app { padding-inline: 16px; }
+  .top { grid-template-columns: auto minmax(0, 1fr) minmax(260px, 420px) auto; grid-template-areas: "brand pills find clock"; }
+  .pills { justify-content: flex-end; }
+  .band { grid-template-columns: minmax(250px, 1.5fr) repeat(8, minmax(0, 1fr)); }
+  .band .hero { grid-column: auto; }
+  .stage { grid-template-columns: 244px minmax(0, 1fr) 262px; grid-template-rows: auto auto minmax(560px, 1fr); }
+  .st-head, .chips { grid-column: 1 / -1; }
+  .inputs { grid-column: 1; grid-row: 3; align-content: start; }
+  .core { grid-column: 2; grid-row: 3; position: relative; }
+  .leaders { grid-column: 3; grid-row: 3; align-content: start; }
+  .inp-list, .lead-list { grid-template-columns: minmax(0, 1fr); }
+  .lead-list { max-height: 560px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #1f3a2e transparent; }
+  .core-view { position: absolute; inset: 0; aspect-ratio: auto; }
+  .card { position: absolute; left: 10px; bottom: 44px; margin: 0; width: min(430px, calc(100% - 20px)); z-index: 4; }
+  .legend { bottom: 12px; max-width: 46%; flex-direction: row; flex-wrap: wrap; gap: 3px 10px; }
+  .lower { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .p-bars { grid-column: span 4; order: 1; }
+  .p-hubs { grid-column: span 3; order: 2; }
+  .p-lace { grid-column: span 5; order: 3; }
+  .p-tape { grid-column: span 7; order: 4; }
+  .p-dens { grid-column: span 5; order: 5; }
+  .p-radar { grid-column: span 3; order: 6; }
+  .p-flags { grid-column: span 3; order: 7; }
+  .p-meta { grid-column: span 3; order: 8; }
+  .p-cli { grid-column: span 3; order: 9; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .secs li i b { transition: none; }
+  .tick-track { animation: none; }
+  .tick-view { overflow-x: auto; }
+  .dot { animation: none; }
+  .bar u { transition: none; }
 }
 </style>
 
-<div class="app">
-  <header class="bar">
-    <div class="brand"><b>araña</b><span>ALT-RADAR-PRO</span></div>
-    <dl class="counters" aria-live="off">
-      <div><dt>Archivos</dt><dd id="c-files">0</dd></div>
-      <div><dt>Líneas</dt><dd id="c-lines">0</dd></div>
-      <div><dt>Enlaces</dt><dd id="c-links">0</dd></div>
-      <div class="flagc"><dt>Banderas</dt><dd id="c-flags">0</dd></div>
-      <div><dt>T</dt><dd id="c-time">0,00</dd></div>
-      <div><dt>Cuadro</dt><dd id="c-frame">0000</dd></div>
-    </dl>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand"><i class="dot"></i><b>ARAÑA</b><span>// ALT-RADAR-PRO</span></div>
+    <div class="pills" id="pills"></div>
+    <div class="find">
+      <input id="q" type="search" placeholder="buscá un tema: binance, telegram, riesgo, voz…" autocomplete="off" aria-label="Buscar archivos por tema">
+      <ul class="results" id="results" hidden></ul>
+    </div>
+    <div class="clock"><span id="clk-utc">00:00:00</span> UTC<small id="clk-arg">ARG 00:00</small></div>
   </header>
 
-  <nav class="tabs" id="tabs" aria-label="Objetivos del proyecto"></nav>
+  <div class="tick" aria-hidden="true"><span class="tick-tag">REGLAS</span><div class="tick-view"><div class="tick-track" id="tick"></div></div></div>
 
-  <section class="stage" aria-label="La tela del proyecto">
-    <div class="head">
-      <span class="num" id="h-num">01</span>
-      <h1 id="h-title">—</h1>
-      <p id="h-sub"></p>
+  <section class="band" aria-label="El proyecto en números">
+    <div class="hero">
+      <span>Archivos</span>
+      <b id="k-files">0</b>
+      <div class="rd"><small>leídos por la araña <b id="k-read">0</b></small><i class="bar"><u id="k-prog"></u></i><small id="k-sub"></small></div>
     </div>
-    <canvas id="web" role="img" aria-label="Mapa del proyecto: cada punto es un archivo agrupado por objetivo, unido a los archivos que importa. La araña los recorre uno por uno."></canvas>
-    <div class="legend" id="legend"></div>
-    <div class="controls">
-      <button type="button" id="b-play" aria-pressed="false" aria-label="Pausar o seguir">❚❚</button>
-      <button type="button" id="b-speed" aria-label="Velocidad">1×</button>
-      <button type="button" id="b-follow" aria-pressed="true">SEGUIR</button>
-    </div>
+    <div><span>Líneas</span><b id="k-lines">0</b></div>
+    <div><span>Objetivos</span><b id="k-obj">0</b></div>
+    <div><span>Imports</span><b id="k-links">0</b></div>
+    <div><span>Pruebas</span><b id="k-tests">0</b></div>
+    <div><span>Tablas D1</span><b id="k-tables">0</b></div>
+    <div><span>Rutas /api</span><b id="k-routes">0</b></div>
+    <div><span>Secretos</span><b id="k-secrets">0</b></div>
+    <div class="flagc"><span>Banderas</span><b id="k-flags">0</b></div>
   </section>
 
-  <section class="panels">
-    <article class="panel">
-      <h2>Registro <em id="rate">0 a/s</em></h2>
-      <ul class="log" id="log"></ul>
+  <section class="stage" id="stage" aria-label="La esfera del proyecto">
+    <div class="st-head"><h2 class="ph"><i></i><span>La esfera</span><em id="st-sub"></em></h2><span class="live" id="st-live"></span></div>
+    <nav class="chips" id="chips" aria-label="Objetivos del proyecto"></nav>
+    <canvas id="sphere" role="img" aria-label="Esfera del proyecto: cada punto es un archivo, agrupado por objetivo y unido con arcos a los archivos que importa. Los pinchos rosas son banderas. La araña los recorre uno por uno."></canvas>
+    <div class="core" id="core">
+      <div class="core-view" id="coreView">
+        <p class="hint" id="hint">Arrastrá para girar · tocá un punto para ver el archivo</p>
+        <div class="legend" id="legend"></div>
+        <div class="controls">
+          <button type="button" id="b-play" aria-pressed="false" aria-label="Pausar o seguir la lectura">❚❚</button>
+          <button type="button" id="b-speed" aria-label="Velocidad de lectura">1×</button>
+          <button type="button" id="b-follow" aria-pressed="true" aria-label="Seguir a la araña">SEGUIR</button>
+        </div>
+      </div>
+      <article class="card" id="card" hidden aria-live="polite"></article>
+    </div>
+    <aside class="leaders" id="leaders"><h2 class="ph"><i></i><span>Objetivos</span><em>por archivos</em></h2><ul class="lead-list" id="lead-list"></ul></aside>
+    <aside class="inputs" id="inputs"><h2 class="ph"><i></i><span>Cobertura</span><em>por objetivo</em></h2><div class="inp-list" id="inp-list"></div></aside>
+  </section>
+
+  <div class="lower">
+    <article class="panel p-tape wide">
+      <h2 class="ph"><i></i><span>Cinta de lectura</span><em id="rate">0,0 archivos/s</em></h2>
+      <div class="tape-wrap"><table class="tape" aria-label="Lo último que leyó la araña"><thead><tr><th class="c-t">T+</th><th class="c-a">Acción</th><th>Archivo</th><th class="c-o">Objetivo</th><th class="c-k">Tipo</th><th class="c-l">Líneas</th></tr></thead><tbody id="tape"></tbody></table></div>
+      <div class="tiles">
+        <div class="tile" style="--tc:#6b8cff"><span>Último archivo</span><b id="t-file">—</b><small id="t-file-s"></small></div>
+        <div class="tile" style="--tc:#39f29a"><span>Líneas leídas</span><b id="t-lines">0</b><small id="t-lines-s"></small></div>
+        <div class="tile" style="--tc:#b18cff"><span>Objetivo</span><b id="t-obj">—</b><small id="t-obj-s"></small></div>
+        <div class="tile" style="--tc:#4fd8c4"><span>Imports vistos</span><b id="t-links">0</b><small id="t-links-s"></small></div>
+      </div>
     </article>
-    <article class="panel">
-      <h2>Objetivos <em id="sec-count"></em></h2>
-      <ul class="secs" id="secs"></ul>
+    <article class="panel p-bars">
+      <h2 class="ph"><i></i><span>Líneas por objetivo</span><em id="bars-sub"></em></h2>
+      <svg class="chart" id="bars" viewBox="0 0 320 170" aria-label="Líneas de código por objetivo, separadas por tipo de archivo"></svg>
+      <div class="keys" id="bars-keys"></div>
+      <div class="keys" id="num-keys-1"></div>
     </article>
-    <article class="panel radar">
-      <h2>Radar de cobertura <em id="radar-name"></em></h2>
-      <svg id="radar" viewBox="0 0 360 270" aria-label="Cobertura del objetivo"></svg>
+    <article class="panel p-hubs">
+      <h2 class="ph"><i></i><span>Más importados</span><em>quién depende de quién</em></h2>
+      <ul class="hubs" id="hubs"></ul>
+    </article>
+    <article class="panel p-lace wide">
+      <h2 class="ph"><i></i><span>Encaje de imports</span><em>un arco por par</em></h2>
+      <svg class="chart" id="lace" viewBox="0 0 520 190" aria-label="Arcos entre los objetivos que se importan entre sí"></svg>
+      <div class="keys" id="num-keys-3" hidden></div>
+      <p class="note">El grosor es la cantidad de imports entre los dos objetivos (en los dos sentidos). Tocá un punto para ir a ese objetivo.</p>
+    </article>
+    <article class="panel p-dens">
+      <h2 class="ph"><i></i><span>Densidad de imports</span><em>fila → columna</em></h2>
+      <div class="dens">
+        <svg class="chart" id="heat" viewBox="0 0 300 300" aria-label="Matriz de imports entre objetivos"></svg>
+        <p class="heat-note" id="heat-note">Tocá una celda para ver cuántos imports hay.</p>
+        <div class="keys" id="num-keys-2"></div>
+        <h2 class="ph"><i></i><span>Líneas por archivo</span><em id="hist-sub"></em></h2>
+        <svg class="chart" id="hist" viewBox="0 0 300 110" aria-label="Cuántos archivos hay por tamaño"></svg>
+      </div>
+    </article>
+    <article class="panel p-radar radar">
+      <h2 class="ph"><i></i><span>Radar de cobertura</span><em id="radar-name"></em></h2>
+      <svg id="radar" viewBox="-18 0 356 250" aria-label="Cobertura del objetivo"></svg>
       <div class="meters" id="meters"></div>
-      <p>Probado: archivos de código con una prueba que los importa. Documentado: con un comentario que dice qué hacen. Conectado: no están sueltos. Seguro: el navegador no toca secretos. Al día: pocos pendientes.</p>
+      <p class="note">Probado: archivos de lógica con una prueba que los importa. Documentado: con un comentario que dice qué hacen. Conectado: no están sueltos. Reglas y pendientes se cuentan, no se miden en porcentaje.</p>
     </article>
-    <article class="panel">
-      <h2>Banderas <em id="flag-count"></em></h2>
+    <article class="panel p-flags">
+      <h2 class="ph"><i></i><span>Banderas</span><em id="flag-count"></em></h2>
       <ul class="flags" id="flags"></ul>
     </article>
-    <article class="panel find">
-      <h2>Buscar en el proyecto</h2>
-      <input id="q" type="search" placeholder="binance, telegram, riesgo, voz…" autocomplete="off" aria-label="Buscar archivos por tema">
-      <ul class="results" id="results"></ul>
+    <article class="panel p-meta meta">
+      <h2 class="ph"><i></i><span>Tablas, rutas y secretos</span></h2>
+      <div id="meta"></div>
     </article>
-    <article class="panel card" id="card">
-      <h2>Ficha <em id="card-tag">la araña está acá</em></h2>
-      <div id="card-body"></div>
-    </article>
-    <article class="panel cli">
-      <h2>Consultas para Claude <em>sin leer todo el repo</em></h2>
+    <article class="panel p-cli cli">
+      <h2 class="ph"><i></i><span>Consultas para Claude</span><em>ahorra tokens</em></h2>
       <ul id="cli"></ul>
     </article>
-  </section>
+  </div>
 
   <footer id="foot"></footer>
   <p class="empty" id="empty" hidden>No hay mapa adentro de esta página. Generala con <code>npm run arana -- --vista</code>.</p>
@@ -198,17 +383,20 @@ footer code { font: 11.5px var(--display); color: #b9c9c0; }
 const G = /*__GRAFO__*/null;
 (function () {
   "use strict";
-  if (!G) { document.getElementById("empty").hidden = false; return; }
   const $ = (id) => document.getElementById(id);
+  if (!G) { $("app").classList.add("vacio"); $("empty").hidden = false; return; }
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const nf = new Intl.NumberFormat("es-AR");
   const norm = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const pad = (n, w) => String(n).padStart(w, "0");
   const base = (p) => p.split("/").pop();
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const small = window.innerWidth < 720;
+  const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
   // ── Datos ──
-  const F = G.archivos, O = G.objetivos, N = F.length;
+  const F = G.archivos, O = G.objetivos, N = F.length, NO = O.length;
   const out = F.map(() => []), inn = F.map(() => []), testsOf = F.map(() => []), adj = F.map(() => new Set());
   for (const [a, b] of G.enlaces) if (a != null && b != null) { out[a].push(b); inn[b].push(a); adj[a].add(b); adj[b].add(a); }
   for (const [t, b] of G.pruebas) if (t != null && b != null) { testsOf[b].push(t); adj[t].add(b); adj[b].add(t); }
@@ -218,46 +406,83 @@ const G = /*__GRAFO__*/null;
   const orphans = [];
   F.forEach((f, i) => (f.o >= 0 ? filesOf[f.o] : orphans).push(i));
   const linesOf = O.map((_, k) => filesOf[k].reduce((a, i) => a + F[i].l, 0));
+  const hasFiles = filesOf.some((l) => l.length > 0);
   const CODE = new Set(["lib", "api", "pantalla", "worker", "script"]);
-  const COLORS = { lib: "#4fd8c4", api: "#f4b84a", pantalla: "#39f29a", estilo: "#2f8f6f", prueba: "#6b86a8", worker: "#c5a3ff", script: "#c5a3ff", doc: "#dfe9e3", otro: "#7f948a" };
   const KIND_NAME = { lib: "lógica", pantalla: "pantalla", api: "ruta /api", prueba: "prueba", estilo: "estilo", doc: "documento", worker: "worker", script: "script", otro: "otro" };
+  const KIND_COLOR = { lib: "#4fd8c4", pantalla: "#39f29a", api: "#f4b84a", worker: "#c5a3ff", script: "#b18cff", estilo: "#2f8f6f", doc: "#dfe9e3", prueba: "#6b86a8", otro: "#7f948a" };
+  const PAL = ["#4fd8c4", "#39f29a", "#a6f04a", "#f4d84a", "#f4b84a", "#ff8a3d", "#ff6b5e", "#e46bff", "#b18cff", "#7b8cff", "#4fa8ff", "#4fe3ff", "#7af5d0", "#c9e86a", "#f0a0c8"];
+  const OC = O.map((_, k) => PAL[k % PAL.length]);
+  const OCR = OC.map(hexRgb);
+  const ORPHAN = "#8aa096";
+  const colorOf = (i) => (F[i].o >= 0 ? OC[F[i].o] : ORPHAN);
+  const hubs = F.map((_, i) => i).filter((i) => F[i].k !== "prueba" && inn[i].length > 0).sort((a, b) => inn[b].length - inn[a].length || F[b].l - F[a].l).slice(0, 12);
+  const when = new Date(G.generado).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const SEV = { secreto: 1, api: 1, "sin-objetivo": 0.6, "sin-prueba": 0.3 };
+  const flagged = F.map((_, i) => (flagsOf[i].length ? Math.max(...flagsOf[i].map((f) => SEV[f.k] ?? 0.3)) : 0));
 
-  // ── Disposición: cada objetivo un cúmulo, los archivos en espiral (los más conectados al centro) ──
-  const SP = 15;
-  const clusters = O.map((o, k) => ({ k, n: filesOf[k].length, R: Math.max(46, Math.sqrt(Math.max(1, filesOf[k].length)) * SP * 1.22), x: 0, y: 0 }));
-  [...clusters].sort((a, b) => b.n - a.n).forEach((c, i) => { const a = i * 2.39996; const r = 150 * Math.sqrt(i); c.x = Math.cos(a) * r; c.y = Math.sin(a) * r; });
-  for (let it = 0; it < 500; it++) {
-    for (const c of clusters) { c.x *= 0.994; c.y *= 0.994; }
-    for (let i = 0; i < clusters.length; i++) for (let j = i + 1; j < clusters.length; j++) {
-      const a = clusters[i], b = clusters[j];
-      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 0.01, min = a.R + b.R + 70;
-      if (d < min) { const p = (min - d) / 2, ux = dx / d, uy = dy / d; a.x -= ux * p; a.y -= uy * p; b.x += ux * p; b.y += uy * p; }
+  // ── La esfera: dónde va cada archivo (lo calcula el script, siempre igual para el mismo proyecto) ──
+  const P = new Float32Array(N * 3);
+  if (G.esfera && G.esfera.p.length === N * 3) P.set(G.esfera.p);
+  else for (let i = 0; i < N; i++) { const y = 1 - (2 * (i + 0.5)) / N, r = Math.sqrt(Math.max(0, 1 - y * y)), a = i * 2.39996323; P[i * 3] = r * Math.cos(a); P[i * 3 + 1] = y; P[i * 3 + 2] = r * Math.sin(a); }
+  const CEN = O.map((_, k) => (G.esfera && G.esfera.r[k] > 0 ? [G.esfera.c[k * 3], G.esfera.c[k * 3 + 1], G.esfera.c[k * 3 + 2]] : null));
+  const CAP = O.map((_, k) => (G.esfera ? G.esfera.r[k] : 0));
+  const vec = (i) => [P[i * 3], P[i * 3 + 1], P[i * 3 + 2]];
+  const angleOf = (a, b) => Math.acos(clamp(a[0] * b[0] + a[1] * b[1] + a[2] * b[2], -1, 1));
+  const unit = (v) => { const n = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / n, v[1] / n, v[2] / n]; };
+
+  // Malla fina: cada punto con sus vecinos más cercanos en la esfera. Es adorno, no dato.
+  const mesh = [];
+  {
+    const seen = new Set();
+    const cosMax = Math.cos(0.19);
+    for (let i = 0; i < N; i++) {
+      const near = [];
+      for (let j = 0; j < N; j++) {
+        if (j === i) continue;
+        const d = P[i * 3] * P[j * 3] + P[i * 3 + 1] * P[j * 3 + 1] + P[i * 3 + 2] * P[j * 3 + 2];
+        if (d > cosMax) near.push([d, j]);
+      }
+      near.sort((x, y) => y[0] - x[0]);
+      for (const [, j] of near.slice(0, 3)) {
+        const key = i < j ? i * N + j : j * N + i;
+        if (!seen.has(key)) { seen.add(key); mesh.push(i < j ? [i, j] : [j, i]); }
+      }
     }
   }
-  const X = new Float32Array(N), Y = new Float32Array(N);
-  clusters.forEach((c) => {
-    [...filesOf[c.k]].sort((a, b) => adj[b].size - adj[a].size || F[b].l - F[a].l).forEach((i, j) => {
-      const a = j * 2.39996 + c.k, r = SP * Math.sqrt(j + 0.6);
-      X[i] = c.x + Math.cos(a) * r; Y[i] = c.y + Math.sin(a) * r;
-    });
-  });
-  orphans.forEach((i, j) => { const a = j * 2.39996; X[i] = Math.cos(a) * 30; Y[i] = Math.sin(a) * 30; });
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const c of clusters) { minX = Math.min(minX, c.x - c.R); maxX = Math.max(maxX, c.x + c.R); minY = Math.min(minY, c.y - c.R); maxY = Math.max(maxY, c.y + c.R); }
 
-  // Polvo: la nube de cada objetivo y los filamentos de los imports entre archivos.
-  const small = window.innerWidth < 720;
-  const dust = [];
-  const rnd = (() => { let s = 7; return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646; })();
-  const gauss = () => { let u = 0, v = 0; while (u === 0) u = rnd(); while (v === 0) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  clusters.forEach((c) => {
-    const n = Math.round(Math.min(320, 40 + linesOf[c.k] / 70) * (small ? 0.55 : 1));
-    for (let j = 0; j < n; j++) dust.push(c.x + gauss() * c.R * 0.55, c.y + gauss() * c.R * 0.55, rnd() * 6.28, 0.08 + rnd() * 0.16);
-  });
-  for (const [a, b] of G.enlaces) {
-    if (a == null || b == null || rnd() > (small ? 0.45 : 0.8)) continue;
-    const t = rnd(), nx = -(Y[b] - Y[a]), ny = X[b] - X[a], d = Math.hypot(nx, ny) || 1, w = gauss() * 7;
-    dust.push(X[a] + (X[b] - X[a]) * t + (nx / d) * w, Y[a] + (Y[b] - Y[a]) * t + (ny / d) * w, rnd() * 6.28, 0.1 + rnd() * 0.14);
+  // Adorno: una retícula de meridianos y paralelos y polvo parejo sobre toda la esfera, para que se lea como esfera.
+  const GRAT = [];
+  const GSEG = [];
+  {
+    const add = (lat, lon) => { GRAT.push(Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)); return GRAT.length / 3 - 1; };
+    for (let m = 0; m < 12; m++) { let prev = -1; for (let j = 0; j <= 24; j++) { const id = add(-Math.PI / 2 + (j * Math.PI) / 24, (m * Math.PI) / 6); if (prev >= 0) GSEG.push(prev, id); prev = id; } }
+    for (let q = 1; q <= 8; q++) { let first = -1, prev = -1; for (let j = 0; j < 48; j++) { const id = add(-Math.PI / 2 + (q * Math.PI) / 9, (j * Math.PI) / 24); if (prev >= 0) GSEG.push(prev, id); else first = id; prev = id; } GSEG.push(prev, first); }
+  }
+  const GRATN = GRAT.length / 3, GRATP = new Float32Array(GRAT);
+  const DUSTN = small ? 420 : 700, DUST = new Float32Array(DUSTN * 3);
+  for (let i = 0; i < DUSTN; i++) { const y = 1 - (2 * (i + 0.5)) / DUSTN, r = Math.sqrt(1 - y * y), a = i * 2.39996323; DUST[i * 3] = r * Math.cos(a); DUST[i * 3 + 1] = y; DUST[i * 3 + 2] = r * Math.sin(a); }
+
+  // Arcos: un import es un arco que sale de la esfera; cuanto más lejos están los dos archivos, más alto va.
+  function controlOf(a, b, into, at) {
+    const pa = a * 3, pb = b * 3;
+    let mx = P[pa] + P[pb], my = P[pa + 1] + P[pb + 1], mz = P[pa + 2] + P[pb + 2];
+    let ml = Math.hypot(mx, my, mz);
+    if (ml < 1e-3) { mx = -P[pa + 2]; my = 0; mz = P[pa]; ml = Math.hypot(mx, mz); if (ml < 1e-3) { mx = 1; ml = 1; } }
+    const d = Math.acos(clamp(P[pa] * P[pb] + P[pa + 1] * P[pb + 1] + P[pa + 2] * P[pb + 2], -1, 1));
+    const h = 2 * (1 + Math.min(0.3, 0.025 + 0.16 * d)) - Math.cos(d / 2);
+    into[at] = (mx / ml) * h; into[at + 1] = (my / ml) * h; into[at + 2] = (mz / ml) * h;
+  }
+  const EA = [], EB = [];
+  for (const [a, b] of G.enlaces) if (a != null && b != null) { EA.push(a); EB.push(b); }
+  const NE = EA.length;
+  const ECTL = new Float32Array(NE * 3);
+  const edgesOf = F.map(() => []);
+  const edgeBucket = Array.from({ length: Math.max(1, NO + 1) * 2 }, () => []);
+  for (let e = 0; e < NE; e++) {
+    controlOf(EA[e], EB[e], ECTL, e * 3);
+    edgesOf[EA[e]].push(e); edgesOf[EB[e]].push(e);
+    const oa = F[EA[e]].o < 0 ? NO : F[EA[e]].o, inter = F[EA[e]].o !== F[EB[e]].o ? 1 : 0;
+    edgeBucket[oa * 2 + inter].push(e);
   }
 
   // ── El recorrido: objetivo por objetivo, por sus imports (BFS desde el más conectado) ──
@@ -281,132 +506,336 @@ const G = /*__GRAFO__*/null;
   }
   const paths = O.map((_, k) => pathOf(k));
   const visited = new Uint8Array(N);
-  const doneK = new Uint8Array(O.length);
-  const revealed = new Set();
-  const state = { k: 0, step: -1, phase: "idle", tPhase: 0, from: [0, 0], to: [0, 0], pos: [clusters[0].x, clusters[0].y], heading: 0, file: -1, playing: !reduce, speed: 1, follow: true, view: "objetivo", focus: -1, filesRead: 0, linesRead: 0, flags: 0, t: 0, frame: 0, readTimes: [] };
-  const firstK = O.findIndex((o, k) => filesOf[k].length > 0);
-  state.k = firstK < 0 ? 0 : firstK;
+  const doneK = new Uint8Array(NO);
+  const lit = new Float32Array(N).fill(-99);
+  const readIn = new Int32Array(NO + 1);
+  const firstK = Math.max(0, O.findIndex((_, k) => filesOf[k].length > 0));
+  const state = {
+    k: firstK, step: -1, phase: "idle", tPhase: 0, dur: 0.3, dist: 0,
+    from: [0, 0, 1], to: [0, 0, 1], pos: CEN[firstK] ? CEN[firstK].slice() : [0, 0, 1], lift: 0,
+    file: -1, playing: !reduce, speed: 1, follow: true, pinned: false, focus: -1,
+    filesRead: 0, linesRead: 0, linksSeen: 0, flags: 0, t: 0, readTimes: [], lastFile: -1,
+  };
+  const WALK_MIN = 0.14, WALK_VAR = 0.2, READ_S = 0.34;
+  const ease = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
 
-  // ── Registro ──
-  const logEl = $("log");
-  const LOG_MAX = small ? 10 : 14;
-  function log(kind, verb, text) {
-    const li = document.createElement("li");
-    li.className = kind;
-    li.innerHTML = `<span>${esc(verb)}</span><b>${esc(text)}</b>`;
-    logEl.prepend(li);
-    while (logEl.children.length > LOG_MAX) logEl.lastChild.remove();
+  // ── La cinta de lectura (lo que va leyendo la araña) ──
+  const tapeEl = $("tape");
+  const TAPE_MAX = small ? 8 : window.innerWidth >= 1000 ? 26 : 16;
+  const ACT = { lee: "LEE", enlace: "ENLAZA", flag: "BANDERA", pasar: "PASA", listo: "LISTO" };
+  function tapeRow(act, c) {
+    const mm = Math.floor(state.t / 60), ss = Math.floor(state.t % 60);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="c-t">${pad(mm, 2)}:${pad(ss, 2)}</td><td class="c-a"><span class="tag ${act}">${ACT[act]}</span></td><td>${c.file}</td><td class="c-o">${c.obj || ""}</td><td class="c-k">${c.kind || ""}</td><td class="c-l">${c.lines || ""}</td>`;
+    tapeEl.prepend(tr);
+    while (tapeEl.children.length > TAPE_MAX) tapeEl.lastChild.remove();
   }
+  // La cinta reserva el alto de todas sus filas desde el principio: así la página no se estira mientras se va llenando.
+  function reserveTape() {
+    const row = tapeEl.rows[0], wrap = tapeEl.closest(".tape-wrap"), head = wrap && wrap.querySelector("thead");
+    if (row && head) wrap.style.minHeight = `${Math.ceil(head.offsetHeight + TAPE_MAX * row.offsetHeight + 2)}px`;
+  }
+  const fileCell = (i) => `<span style="color:${KIND_COLOR[F[i].k] || "#dfe9e3"}" title="${esc(F[i].p)}">${esc(base(F[i].p))}</span>`;
+  const objCell = (i) => (F[i].o >= 0 ? `<span style="color:${OC[F[i].o]}">${esc(O[F[i].o].slug)}</span>` : "—");
 
-  // ── Pestañas y objetivos ──
-  const tabs = $("tabs");
-  const all = document.createElement("button");
-  all.type = "button"; all.textContent = "TODO"; all.dataset.k = "-1";
-  tabs.append(all);
-  O.forEach((o, k) => { const b = document.createElement("button"); b.type = "button"; b.textContent = o.slug; b.dataset.k = String(k); tabs.append(b); });
-  tabs.addEventListener("click", (e) => {
-    const b = e.target.closest("button");
-    if (!b) return;
-    const k = Number(b.dataset.k);
-    if (k < 0) { state.view = "todo"; state.follow = true; syncFollow(); updateHead(); updateTabs(); return; }
-    jumpTo(k);
-  });
-  const secs = $("secs");
-  O.forEach((o, k) => {
-    const li = document.createElement("li");
-    li.innerHTML = `<button type="button" data-k="${k}"><span>${esc(o.slug)}</span><small id="sec-n-${k}"></small><i><b id="sec-b-${k}"></b></i></button>`;
-    secs.append(li);
-  });
-  secs.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) jumpTo(Number(b.dataset.k)); });
-  $("sec-count").textContent = String(O.length);
-
-  function updateTabs() {
-    for (const b of tabs.children) {
-      const k = Number(b.dataset.k);
-      b.setAttribute("aria-pressed", String(k < 0 ? state.view === "todo" : state.view !== "todo" && k === state.k));
-      b.classList.toggle("done", k >= 0 && doneK[k] === 1);
+  function jumpTo(k, pin = true) {
+    if (!filesOf[k].length) { state.pinned = false; showObjective(k); updateAll(); return; }
+    state.k = k;
+    state.step = -1;
+    state.phase = "idle";
+    state.pinned = pin;
+    state.follow = true;
+    state.focus = -1;
+    syncFollow();
+    tapeRow("pasar", { file: `→ <span style="color:${OC[k]}">${esc(O[k].slug)}</span>`, obj: esc(O[k].slug) });
+    showObjective(k);
+    updateAll();
+  }
+  function nextStep() {
+    if (!hasFiles) { state.playing = false; syncPlay(); return; }
+    const p = paths[state.k];
+    if (state.step + 1 >= p.length) {
+      if (!doneK[state.k]) {
+        doneK[state.k] = 1;
+        const fl = G.banderas.filter((f) => f.a != null && F[f.a].o === state.k).length;
+        tapeRow("listo", { file: `${esc(O[state.k].slug)} · ${filesOf[state.k].length} archivos · ${fl} banderas`, obj: esc(O[state.k].slug) });
+      }
+      let k = state.k;
+      for (let n = 0; n < NO; n++) { k = (k + 1) % NO; if (filesOf[k].length) break; }
+      state.k = k;
+      state.step = -1;
+      state.pinned = false;
+      tapeRow("pasar", { file: `→ <span style="color:${OC[k]}">${esc(O[k].slug)}</span>`, obj: esc(O[k].slug) });
+      updateAll();
+      return nextStep();
     }
-    O.forEach((o, k) => {
-      const n = filesOf[k].length;
-      const v = filesOf[k].reduce((a, i) => a + visited[i], 0);
-      $("sec-n-" + k).textContent = n ? `${v}/${n}` : "transversal";
-      $("sec-b-" + k).style.width = n ? `${(100 * v) / n}%` : doneK[k] ? "100%" : "0";
-      const li = $("sec-n-" + k).closest("li");
-      li.classList.toggle("done", doneK[k] === 1);
-      li.classList.toggle("active", k === state.k);
-    });
+    state.step += 1;
+    const i = p[state.step];
+    state.from = state.pos.slice();
+    state.to = vec(i);
+    state.dist = angleOf(state.from, state.to);
+    state.dur = WALK_MIN + WALK_VAR * Math.min(1, state.dist / 1.1);
+    state.file = i;
+    state.phase = "walk";
+    state.tPhase = 0;
   }
-
-  function updateHead() {
-    const k = state.k;
-    const o = O[k];
-    if (state.view === "todo") {
-      $("h-num").textContent = `${O.length} OBJETIVOS`;
-      $("h-title").textContent = "Todo el proyecto";
-      $("h-sub").textContent = `${nf.format(G.resumen.archivos)} archivos · ${nf.format(G.resumen.lineas)} líneas · ${nf.format(G.resumen.enlaces)} imports · ${nf.format(G.resumen.pruebas)} enlaces de prueba`;
-    } else {
-      const n = filesOf[k].length;
-      const v = filesOf[k].reduce((a, i) => a + visited[i], 0);
-      $("h-num").textContent = pad(k + 1, 2);
-      $("h-title").textContent = o.slug;
-      $("h-sub").textContent = `${o.titulo} · ${n ? `${v}/${n} archivos · ${doneK[k] ? "listo" : state.k === k ? "leyendo" : "en cola"}` : "transversal: sin archivos propios"}`;
+  function arrive() {
+    const i = state.file;
+    state.phase = "read";
+    state.tPhase = 0;
+    state.lift = 0;
+    const first = !visited[i];
+    if (first) {
+      visited[i] = 1;
+      readIn[F[i].o < 0 ? NO : F[i].o] += 1;
+      state.filesRead += 1;
+      state.linesRead += F[i].l;
+      state.linksSeen += out[i].length;
+      state.flags += flagsOf[i].length;
+      state.readTimes.push(state.t);
     }
-    renderRadar(state.view === "todo" ? -1 : k);
-    renderFlags(state.view === "todo" ? -1 : k);
+    lit[i] = state.t;
+    state.lastFile = i;
+    tapeRow("lee", { file: fileCell(i), obj: objCell(i), kind: KIND_NAME[F[i].k] || F[i].k, lines: nf.format(F[i].l) });
+    const d = out[i][0];
+    if (d !== undefined) tapeRow("enlace", { file: `→ ${fileCell(d)}`, obj: objCell(d), kind: KIND_NAME[F[d].k] || F[d].k, lines: nf.format(F[d].l) });
+    if (flagsOf[i].length) { recentFlags.push(i); if (recentFlags.length > 2) recentFlags.shift(); }
+    if (flagsOf[i].length) tapeRow("flag", { file: `<span class="bad">⚑ ${esc(base(F[i].p))} · ${esc(flagsOf[i][0].t)}</span>`, obj: objCell(i), kind: KIND_NAME[F[i].k] || F[i].k, lines: nf.format(F[i].l) });
+    if (state.step % 4 === 0) updateAll();
+  }
+  function step(dt) {
+    state.t += dt;
+    const s = dt * state.speed;
+    if (state.phase === "idle") nextStep();
+    else if (state.phase === "walk") {
+      state.tPhase += s / state.dur;
+      const u = Math.min(1, state.tPhase), e = ease(u);
+      state.pos = unit([state.from[0] + (state.to[0] - state.from[0]) * e, state.from[1] + (state.to[1] - state.from[1]) * e, state.from[2] + (state.to[2] - state.from[2]) * e]);
+      state.lift = 0.14 * Math.sin(Math.PI * e) * Math.min(1, state.dist / 0.9);
+      if (u >= 1) arrive();
+    } else if (state.phase === "read") {
+      state.tPhase += s / READ_S;
+      if (state.tPhase >= 1) nextStep();
+    }
   }
 
-  // ── Radar de cobertura ──
-  function coverage(k) {
+  // ── Cobertura: lo que se puede medir con el mapa, objetivo por objetivo ──
+  const ratio = (a, b) => (b ? a / b : null);
+  const pctTxt = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : "—");
+  function cov(k) {
     const files = k < 0 ? F.map((_, i) => i) : filesOf[k];
     const code = files.filter((i) => CODE.has(F[i].k));
     const libs = files.filter((i) => F[i].k === "lib");
-    const tested = (libs.length ? libs : code).filter((i) => F[i].pr > 0).length;
-    const testBase = (libs.length ? libs : code).length;
-    const documented = files.filter((i) => F[i].r && F[i].r.length > 8).length;
-    const connected = files.filter((i) => adj[i].size > 0).length;
-    const insecure = G.banderas.some((f) => (f.k === "secreto" || f.k === "api") && (k < 0 || F[f.a]?.o === k));
-    const reglas = k < 0 ? O.reduce((a, o) => a + o.reglas.length, 0) / O.length : O[k].reglas.length;
-    const pend = k < 0 ? O.reduce((a, o) => a + o.pendiente.length, 0) / O.length : O[k].pendiente.length;
-    const routes = G.rutas.filter((r) => k < 0 || F[r.a]?.o === k).length;
-    const tables = G.tablas.filter((t) => k < 0 || [...t.crea, ...t.usa].some((i) => F[i]?.o === k)).length;
-    const secrets = G.secretos.filter((s) => k < 0 || [...s.lee, ...s.guarda].some((i) => F[i]?.o === k)).length;
+    const tb = libs.length ? libs : code;
+    const inScope = (a) => a != null && (k < 0 || F[a].o === k);
     return {
-      axes: [
-        ["Probado", testBase ? tested / testBase : null],
-        ["Documentado", files.length ? documented / files.length : null],
-        ["Reglas", Math.min(1, reglas / 8)],
-        ["Conectado", files.length ? connected / files.length : null],
-        ["Seguro", insecure ? 0 : 1],
-        ["Al día", 1 - Math.min(1, pend / 6)],
-      ],
-      routes, tables, secrets,
+      files: files.length,
+      probado: [tb.filter((i) => F[i].pr > 0).length, tb.length],
+      documentado: [files.filter((i) => F[i].r && F[i].r.length > 8).length, files.length],
+      conectado: [files.filter((i) => adj[i].size > 0).length, files.length],
+      unsafe: G.banderas.filter((f) => (f.k === "secreto" || f.k === "api") && inScope(f.a)).length,
+      reglas: k < 0 ? O.reduce((a, o) => a + o.reglas.length, 0) : O[k].reglas.length,
+      pend: k < 0 ? O.reduce((a, o) => a + o.pendiente.length, 0) : O[k].pendiente.length,
+      routes: G.rutas.filter((r) => inScope(r.a)).length,
+      tables: G.tablas.filter((t) => [...t.crea, ...t.usa].some((a) => inScope(a))).length,
+      secrets: G.secretos.filter((s) => [...s.lee, ...s.guarda].some((a) => inScope(a))).length,
     };
   }
+  const COV = O.map((_, k) => cov(k));
+  const COVALL = cov(-1);
+  const INPUTS = [
+    { name: "PROBADO", color: "#4fd8c4", kind: "ratio", get: (c) => c.probado, sub: (c) => `${nf.format(c.probado[0])} de ${nf.format(c.probado[1])} con una prueba`, weak: "más flojo", none: "sin puntos flojos" },
+    { name: "DOCUMENTADO", color: "#39f29a", kind: "ratio", get: (c) => c.documentado, sub: (c) => `${nf.format(c.documentado[0])} de ${nf.format(c.documentado[1])} dicen qué hacen`, weak: "más flojo", none: "sin puntos flojos" },
+    { name: "CONECTADO", color: "#6b8cff", kind: "ratio", get: (c) => c.conectado, sub: (c) => `${nf.format(c.conectado[0])} de ${nf.format(c.conectado[1])} no están sueltos`, weak: "más flojo", none: "sin puntos flojos" },
+    { name: "REGLAS", color: "#f4d84a", kind: "count", worst: "min", get: (c) => c.reglas, sub: () => "escritas en objetivos.md", weak: "menos reglas", none: "parejo" },
+    { name: "PENDIENTES", color: "#ff8a3d", kind: "count", worst: "max", get: (c) => c.pend, sub: () => "anotados en objetivos.md", weak: "más pendientes", none: "sin pendientes" },
+    { name: "SEGURIDAD", color: "#ff4d8d", kind: "count", worst: "max", get: (c) => c.unsafe, sub: () => "banderas de secretos o /api en el navegador", weak: "más banderas", none: "sin banderas" },
+  ];
+  function weakestOf(inp) {
+    const ks = O.map((_, k) => k).filter((k) => filesOf[k].length);
+    if (!ks.length) return -1;
+    if (inp.kind === "ratio") {
+      let c = ks.filter((k) => inp.get(COV[k])[1] >= 5);
+      if (!c.length) c = ks.filter((k) => inp.get(COV[k])[1] > 0);
+      if (!c.length) return -1;
+      const r = (k) => { const [a, b] = inp.get(COV[k]); return a / b; };
+      c.sort((x, y) => r(x) - r(y) || inp.get(COV[y])[1] - inp.get(COV[x])[1] || x - y);
+      return r(c[0]) >= 1 ? -1 : c[0];
+    }
+    const v = (k) => inp.get(COV[k]);
+    const s = [...ks].sort((x, y) => (inp.worst === "min" ? v(x) - v(y) : v(y) - v(x)) || x - y);
+    if (inp.worst === "max") return v(s[0]) > 0 ? s[0] : -1;
+    return v(s[0]) === v(s[s.length - 1]) ? -1 : s[0];
+  }
+  const INP_TARGET = INPUTS.map(weakestOf);
+  function weakText(inp, k) {
+    const c = inp.get(COV[k]);
+    if (inp.kind === "ratio") return `${O[k].slug} ${pctTxt(c[0], c[1])} (n=${c[1]}${c[1] < 15 ? ", muestra mínima" : ""})`;
+    return `${O[k].slug} ${nf.format(c)}`;
+  }
+  function spark(vals, color, mark) {
+    const w = 100, h = 28, n = vals.length;
+    const x = (j) => (n > 1 ? (j * w) / (n - 1) : w / 2), y = (v) => h - 2 - v * (h - 6);
+    const segs = [];
+    let cur = [];
+    vals.forEach((v, j) => { if (v === null) { if (cur.length) segs.push(cur); cur = []; } else cur.push([x(j).toFixed(1), y(v).toFixed(1)]); });
+    if (cur.length) segs.push(cur);
+    let s = `<line x1="0" y1="${h - 1}" x2="${w}" y2="${h - 1}" stroke="#16241d" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    for (const sg of segs) {
+      const pts = sg.map((p) => p.join(",")).join(" ");
+      if (sg.length > 1) s += `<polygon points="${pts} ${sg[sg.length - 1][0]},${h - 1} ${sg[0][0]},${h - 1}" fill="${color}" opacity=".14"/>`;
+      s += sg.length > 1 ? `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>` : `<line x1="${Number(sg[0][0]) - 1.5}" y1="${sg[0][1]}" x2="${Number(sg[0][0]) + 1.5}" y2="${sg[0][1]}" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+    }
+    if (mark >= 0 && vals[mark] !== null) s += `<line x1="${x(mark).toFixed(1)}" y1="0" x2="${x(mark).toFixed(1)}" y2="${h}" stroke="${color}" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" opacity=".85"/>`;
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">${s}</svg>`;
+  }
+  // La línea de cada entrada recorre solo los objetivos que tienen archivos (los transversales no tienen qué medir).
+  const KS = O.map((_, k) => k).filter((k) => filesOf[k].length);
+  $("inp-list").innerHTML = INPUTS.map((inp, j) => {
+    const all = inp.get(COVALL);
+    let vals;
+    if (inp.kind === "ratio") vals = KS.map((k) => { const [a, b] = inp.get(COV[k]); return b ? a / b : null; });
+    else { const raw = KS.map((k) => inp.get(COV[k])); const mx = Math.max(1, ...raw); vals = raw.map((v) => v / mx); }
+    const t = INP_TARGET[j];
+    const value = inp.kind === "ratio" ? pctTxt(all[0], all[1]) : nf.format(all);
+    return `<button type="button" class="inp" data-j="${j}" style="--c:${inp.color}"><span class="t"><b>${inp.name}</b><span class="v">${value}</span></span>${spark(vals, inp.color, KS.indexOf(t))}<small>${esc(inp.sub(COVALL))} · ${esc(t >= 0 ? `${inp.weak}: ${weakText(inp, t)}` : inp.none)}</small></button>`;
+  }).join("");
+  $("inp-list").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; const t = INP_TARGET[Number(b.dataset.j)]; if (t >= 0) jumpTo(t); });
+
+  // ── Tarjeta: la ficha de un archivo o de un objetivo ──
+  const card = $("card");
+  function closeCard() { card.hidden = true; state.focus = -1; wake(); }
+  card.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.close) closeCard();
+    else if (b.dataset.k) jumpTo(Number(b.dataset.k));
+    else if (b.dataset.i) select(Number(b.dataset.i));
+  });
+  function showFile(i) {
+    const f = F[i];
+    const nm = (arr) => (arr.length ? arr.slice(0, 6).map((j) => `<button type="button" class="lnk" data-i="${j}">${esc(base(F[j].p))}</button>`).join(", ") + (arr.length > 6 ? ` y ${arr.length - 6} más` : "") : "—");
+    const row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+    card.innerHTML =
+      `<div class="top-row"><span class="kind">Archivo</span>${f.o >= 0 ? `<button type="button" class="chip" data-k="${f.o}" style="color:${OC[f.o]};border-color:${OC[f.o]}66;background:none;cursor:pointer">${esc(O[f.o].slug)}</button>` : ""}<button type="button" class="x" data-close="1" aria-label="Cerrar la ficha">✕</button></div>` +
+      `<p class="path">${esc(f.p)}</p>` +
+      (f.r ? `<p class="sum">${esc(f.r)}</p>` : "") +
+      `<dl>` +
+      row("Objetivo", f.o >= 0 ? esc(O[f.o].titulo) : "sin objetivo") +
+      row("Tipo", `${esc(KIND_NAME[f.k] ?? f.k)} · ${nf.format(f.l)} líneas${f.c ? " · corre en el navegador" : ""}`) +
+      (f.x.length ? row("Exporta", esc(f.x.join(", "))) : "") +
+      row("Importa", nm(out[i])) +
+      row("Lo usan", nm(inn[i])) +
+      row("Pruebas", testsOf[i].length ? nm(testsOf[i]) : CODE.has(f.k) ? `<span class="bad">ninguna directa</span>` : "—") +
+      (f.tb.length ? row("Tablas", esc(f.tb.join(", "))) : "") +
+      (f.s.length ? row("Secretos", esc(f.s.join(", "))) : "") +
+      (f.ru ? row("Ruta", esc(f.ru)) : "") +
+      (flagsOf[i].length ? row("Bandera", `<span class="bad">${esc(flagsOf[i].map((x) => x.t).join("; "))}</span>`) : "") +
+      `</dl>`;
+    card.hidden = false;
+  }
+  function showObjective(k) {
+    const o = O[k], n = filesOf[k].length;
+    card.innerHTML =
+      `<div class="top-row"><span class="kind">Objetivo</span><span class="chip" style="color:${OC[k]};border-color:${OC[k]}66">${esc(o.slug)}</span><button type="button" class="x" data-close="1" aria-label="Cerrar">✕</button></div>` +
+      `<p class="path">${esc(o.titulo)}</p>` +
+      (o.texto ? `<p class="sum">${esc(o.texto)}</p>` : "") +
+      `<p class="note">${n ? `${nf.format(n)} archivos · ${nf.format(linesOf[k])} líneas · ${nf.format(readIn[k])} leídos` : "Transversal: sus reglas valen para todo el proyecto y no tiene archivos propios."}</p>` +
+      `<h3>Reglas (${o.reglas.length})</h3>` +
+      (o.reglas.length ? `<ul>${o.reglas.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : `<p class="note">Sin reglas escritas.</p>`) +
+      (o.pendiente.length ? `<h3>Pendientes (${o.pendiente.length})</h3><ul class="pend">${o.pendiente.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : "");
+    card.hidden = false;
+  }
+  function select(i) {
+    if (F[i].o >= 0 && (F[i].o !== state.k || !state.pinned)) jumpTo(F[i].o);
+    state.focus = i;
+    state.follow = false;
+    cam.goal = faceAngles(vec(i));
+    cam.hold = true;
+    syncFollow();
+    showFile(i);
+    updateAll();
+    wake();
+  }
+  function clearPin() {
+    state.pinned = false;
+    state.follow = true;
+    cam.hold = false;
+    closeCard();
+    syncFollow();
+    updateAll();
+  }
+
+  // ── Chips y lista de objetivos ──
+  const chipsEl = $("chips");
+  chipsEl.innerHTML = `<button type="button" data-k="-1" aria-pressed="false" style="--c:#dfe9e3"><i></i>TODO</button>` + O.map((o, k) => `<button type="button" data-k="${k}" aria-pressed="false" style="--c:${OC[k]}"><i></i>${esc(o.slug)}</button>`).join("");
+  chipsEl.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; const k = Number(b.dataset.k); if (k < 0) clearPin(); else jumpTo(k); });
+  const leadEl = $("lead-list");
+  const leadOrder = O.map((_, k) => k).sort((a, b) => filesOf[b].length - filesOf[a].length || a - b);
+  leadEl.innerHTML = leadOrder.map((k) => `<li><button type="button" class="lead${filesOf[k].length ? "" : " trans"}" data-k="${k}" style="--c:${OC[k]}" aria-pressed="false"><b>${esc(O[k].slug)}</b><span>${filesOf[k].length ? nf.format(filesOf[k].length) : "—"}</span><small>${filesOf[k].length ? `${nf.format(linesOf[k])} líneas` : "transversal · sin archivos propios"}</small><i><u id="lb-${k}"></u></i></button></li>`).join("");
+  leadEl.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) jumpTo(Number(b.dataset.k)); });
+
+  function updateChips() {
+    for (const b of chipsEl.children) {
+      const k = Number(b.dataset.k);
+      b.setAttribute("aria-pressed", String(k < 0 ? !state.pinned : state.pinned && state.k === k));
+      b.classList.toggle("done", k >= 0 && doneK[k] === 1);
+    }
+  }
+  function updateLeaders() {
+    for (const b of leadEl.querySelectorAll(".lead")) b.setAttribute("aria-pressed", String(Number(b.dataset.k) === state.k));
+    const li = leadEl.querySelector(`[data-k="${state.k}"]`)?.parentElement;
+    if (li && leadEl.scrollHeight > leadEl.clientHeight + 4) {
+      const top = li.offsetTop - leadEl.offsetTop;
+      if (top < leadEl.scrollTop || top + li.offsetHeight > leadEl.scrollTop + leadEl.clientHeight) leadEl.scrollTop = Math.max(0, top - 44);
+    }
+  }
+  let lastScope = -2;
+  function updateAll() {
+    updateChips();
+    updateLeaders();
+    const scope = state.pinned ? state.k : -1;
+    if (scope !== lastScope) { lastScope = scope; renderRadar(scope); renderFlags(scope); }
+    for (const el of document.querySelectorAll(".mk")) el.classList.toggle("on", Number(el.dataset.k) === state.k);
+    layoutAnchors();
+    wake();
+  }
+
+  // ── Radar de cobertura ──
   function renderRadar(k) {
-    const c = coverage(k);
-    $("radar-name").textContent = k < 0 ? "todo" : O[k].slug;
-    const cx = 180, cy = 134, R = 84;
+    const c = k < 0 ? COVALL : COV[k];
+    $("radar-name").textContent = k < 0 ? "todo el proyecto" : O[k].slug;
+    const axes = [
+      ["Probado", ratio(c.probado[0], c.probado[1]), pctTxt(c.probado[0], c.probado[1]), `n=${c.probado[1]}`],
+      ["Documentado", ratio(c.documentado[0], c.documentado[1]), pctTxt(c.documentado[0], c.documentado[1]), `n=${c.documentado[1]}`],
+      ["Conectado", ratio(c.conectado[0], c.conectado[1]), pctTxt(c.conectado[0], c.conectado[1]), `n=${c.conectado[1]}`],
+      ["Reglas", Math.min(1, c.reglas / (k < 0 ? 40 : 8)), String(c.reglas), "escritas"],
+      ["Seguro", c.unsafe ? 0 : 1, c.unsafe ? `${c.unsafe} banderas` : "sin banderas", ""],
+      ["Al día", 1 - Math.min(1, c.pend / (k < 0 ? 12 : 6)), `${c.pend} pend.`, "anotados"],
+    ];
+    const cx = 160, cy = 124, R = 70;
     const pt = (i, v) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / 6; return [cx + Math.cos(a) * R * v, cy + Math.sin(a) * R * v]; };
     let s = "";
     for (const ring of [0.25, 0.5, 0.75, 1]) s += `<polygon points="${[0, 1, 2, 3, 4, 5].map((i) => pt(i, ring).join(",")).join(" ")}" fill="none" stroke="#16241d" stroke-width="1"/>`;
-    c.axes.forEach((_, i) => { const [x, y] = pt(i, 1); s += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#16241d"/>`; });
-    const vals = c.axes.map(([, v]) => (v === null ? 0 : v));
+    axes.forEach((_, i) => { const [x, y] = pt(i, 1); s += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#16241d"/>`; });
+    const vals = axes.map((a) => (a[1] === null ? 0 : a[1]));
     s += `<polygon points="${vals.map((v, i) => pt(i, Math.max(0.03, v)).join(",")).join(" ")}" fill="rgba(79,216,196,.16)" stroke="#4fd8c4" stroke-width="1.5"/>`;
-    vals.forEach((v, i) => { const [x, y] = pt(i, Math.max(0.03, v)); s += `<circle cx="${x}" cy="${y}" r="2.6" fill="${c.axes[i][1] === null ? "#6f8278" : "#4fd8c4"}"/>`; });
-    c.axes.forEach(([name, v], i) => {
-      const [x, y] = pt(i, 1.2);
+    vals.forEach((v, i) => { const [x, y] = pt(i, Math.max(0.03, v)); s += `<circle cx="${x}" cy="${y}" r="2.6" fill="${axes[i][1] === null ? "#6f8278" : "#4fd8c4"}"/>`; });
+    axes.forEach(([name, v, text, nn], i) => {
+      const [x, y0] = pt(i, 1.2), y = i === 0 ? y0 - 27 : y0;
       const anchor = Math.abs(x - cx) < 4 ? "middle" : x > cx ? "start" : "end";
-      s += `<text x="${x}" y="${y}" text-anchor="${anchor}" fill="#6f8278" font-family="Geist Mono, monospace" font-size="9.5" letter-spacing=".8">${name.toUpperCase()}</text>`;
-      s += `<text x="${x}" y="${y + 12}" text-anchor="${anchor}" fill="#dfe9e3" font-family="Geist Mono, monospace" font-size="11">${v === null ? "—" : Math.round(v * 100) + "%"}</text>`;
+      s += `<text x="${x}" y="${y}" text-anchor="${anchor}" fill="#6f8278" font-size="10.5" letter-spacing=".8">${name.toUpperCase()}</text>`;
+      s += `<text x="${x}" y="${y + 13}" text-anchor="${anchor}" fill="#dfe9e3" font-size="12.5">${v === null ? "sin datos" : esc(text)}</text>`;
+      if (nn) s += `<text x="${x}" y="${y + 25}" text-anchor="${anchor}" fill="#6f8278" font-size="9.5">${esc(nn)}</text>`;
     });
     $("radar").innerHTML = s;
     $("meters").innerHTML = [["Rutas /api", c.routes], ["Tablas D1", c.tables], ["Secretos", c.secrets]].map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join("");
   }
 
-  // ── Banderas ──
+  // ── Banderas y pendientes ──
   function renderFlags(k) {
     const list = G.banderas.filter((f) => f.a != null && (k < 0 || F[f.a].o === k));
-    const pend = (k < 0 ? O.flatMap((o, kk) => o.pendiente.map((t) => [kk, t])) : O[k].pendiente.map((t) => [k, t]));
+    const pend = k < 0 ? O.flatMap((o, kk) => o.pendiente.map((t) => [kk, t])) : O[k].pendiente.map((t) => [k, t]);
     $("flag-count").textContent = `${list.length} · ${pend.length} pendientes`;
     const ul = $("flags");
     ul.innerHTML = "";
@@ -421,37 +850,28 @@ const G = /*__GRAFO__*/null;
       li.innerHTML = `<button type="button" data-k="${kk}"><b>pendiente · ${esc(O[kk].slug)}</b><small>${esc(t)}</small></button>`;
       ul.append(li);
     }
-    if (!ul.children.length) ul.innerHTML = `<li class="note">Sin banderas en este objetivo.</li>`;
+    if (!ul.children.length) ul.innerHTML = `<li class="note">Sin banderas ni pendientes en este objetivo.</li>`;
   }
   $("flags").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
-    if (b.dataset.i) select(Number(b.dataset.i), true);
+    if (b.dataset.i) select(Number(b.dataset.i));
     else if (b.dataset.k) jumpTo(Number(b.dataset.k));
   });
 
-  // ── Ficha ──
-  function renderCard(i, mine) {
-    $("card-tag").textContent = mine ? "elegido" : "la araña está acá";
-    if (i < 0) { $("card-body").innerHTML = `<p class="note">Tocá un punto de la tela o buscá un archivo.</p>`; return; }
-    const f = F[i];
-    const names = (arr) => (arr.length ? arr.slice(0, 6).map((j) => esc(base(F[j].p))).join(", ") + (arr.length > 6 ? ` y ${arr.length - 6} más` : "") : "—");
-    const row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
-    $("card-body").innerHTML =
-      `<p class="path">${esc(f.p)}</p>` +
-      (f.r ? `<p class="sum">${esc(f.r)}</p>` : "") +
-      `<dl>` +
-      row("Objetivo", f.o >= 0 ? `<span class="chip">${esc(O[f.o].slug)}</span>${esc(O[f.o].titulo)}` : "sin objetivo") +
-      row("Tipo", `${KIND_NAME[f.k] ?? f.k} · ${nf.format(f.l)} líneas${f.c ? " · corre en el navegador" : ""}`) +
-      (f.x.length ? row("Exporta", esc(f.x.join(", "))) : "") +
-      row("Importa", names(out[i])) +
-      row("Lo usan", names(inn[i])) +
-      row("Pruebas", testsOf[i].length ? names(testsOf[i]) : CODE.has(f.k) ? `<span style="color:var(--flag)">ninguna directa</span>` : "—") +
-      (f.tb.length ? row("Tablas", esc(f.tb.join(", "))) : "") +
-      (f.s.length ? row("Secretos", esc(f.s.join(", "))) : "") +
-      (f.ru ? row("Ruta", esc(f.ru)) : "") +
-      (flagsOf[i].length ? row("Bandera", `<span style="color:var(--flag)">${esc(flagsOf[i].map((x) => x.t).join("; "))}</span>`) : "") +
-      `</dl>`;
+  // ── Tablas, rutas y secretos: solo los nombres ──
+  {
+    const names = (arr, cls = "") => `<div class="names">${arr.join("")}</div>`;
+    const first = (arr) => (arr.find((x) => x != null) ?? "");
+    $("meta").innerHTML =
+      `<h3>Tablas D1 · ${G.tablas.length}</h3>` +
+      names(G.tablas.map((t) => `<button type="button" data-i="${first([...t.crea, ...t.usa])}" title="la crea ${t.crea.length ? esc(base(F[t.crea[0]].p)) : "—"} · la usan ${t.usa.length}">${esc(t.n)}</button>`)) +
+      `<h3>Rutas /api · ${G.rutas.length}</h3>` +
+      names(G.rutas.map((r) => `<button type="button" data-i="${r.a ?? ""}" title="${esc((r.m || []).join(", "))}">${esc(r.r.replace(/^\/api/, "") || "/")}</button>`)) +
+      `<h3>Secretos · ${G.secretos.length}</h3>` +
+      names(G.secretos.map((s) => `<button type="button" class="sec" data-i="${first([...s.lee, ...s.guarda])}" title="lo leen ${s.lee.length} · lo guardan ${s.guarda.length}">${esc(s.n)}</button>`)) +
+      `<p class="note">Solo los nombres: nunca los valores.</p>`;
+    $("meta").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && b.dataset.i) select(Number(b.dataset.i)); });
   }
 
   // ── Buscar (como npm run arana -- --buscar) ──
@@ -472,17 +892,23 @@ const G = /*__GRAFO__*/null;
       return { i, score: hits === terms.length ? score + 2 : (score * hits) / terms.length / 2 };
     }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
   }
+  const resultsEl = $("results");
   let qTimer = 0;
   $("q").addEventListener("input", (e) => {
     clearTimeout(qTimer);
     qTimer = setTimeout(() => {
-      const r = search(e.target.value);
-      $("results").innerHTML = r.length
+      const text = e.target.value.trim();
+      const r = search(text);
+      resultsEl.hidden = !text;
+      resultsEl.innerHTML = r.length
         ? r.map(({ i }) => `<li><button type="button" data-i="${i}"><b>${esc(F[i].p)}</b><small>${F[i].o >= 0 ? `<span class="chip">${esc(O[F[i].o].slug)}</span>` : ""}${esc(F[i].r || KIND_NAME[F[i].k] || "")}</small></button></li>`).join("")
-        : e.target.value.trim() ? `<li class="note">Nada con «${esc(e.target.value.trim())}». Probá otra palabra o un sinónimo.</li>` : "";
+        : text ? `<li class="note">Nada con «${esc(text)}». Probá otra palabra o un sinónimo.</li>` : "";
     }, 120);
   });
-  $("results").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) select(Number(b.dataset.i), true); });
+  resultsEl.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { resultsEl.hidden = true; select(Number(b.dataset.i)); } });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".find")) resultsEl.hidden = true; });
+  $("q").addEventListener("keydown", (e) => { if (e.key === "Escape") resultsEl.hidden = true; });
+  $("q").addEventListener("focus", () => { if (resultsEl.children.length) resultsEl.hidden = false; });
 
   // ── Consultas para Claude ──
   const CLI = [
@@ -499,399 +925,698 @@ const G = /*__GRAFO__*/null;
     if (!b) return;
     const text = CLI[Number(b.dataset.j)][0];
     const done = () => { b.textContent = "COPIADO"; setTimeout(() => (b.textContent = "COPIAR"), 1400); };
-    try {
-      navigator.clipboard.writeText(text).then(done, () => selectCode(b));
-    } catch { selectCode(b); }
+    const select_ = () => { const r = document.createRange(); r.selectNodeContents(b.previousElementSibling); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); };
+    try { navigator.clipboard.writeText(text).then(done, select_); } catch { select_(); }
   });
-  function selectCode(b) {
-    const code = b.previousElementSibling;
-    const r = document.createRange();
-    r.selectNodeContents(code);
-    const s = window.getSelection();
-    s.removeAllRanges();
-    s.addRange(r);
-  }
 
-  // ── Leyenda y pie ──
-  $("legend").innerHTML = [["lib", "lógica"], ["pantalla", "pantalla"], ["api", "ruta /api"], ["prueba", "prueba"]].map(([k, n]) => `<span><i style="background:${COLORS[k]}"></i>${n}</span>`).join("") + `<span><i style="background:var(--flag)"></i>bandera</span>`;
-  const when = new Date(G.generado).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  $("foot").innerHTML = `Mapa del ${esc(when)} (hora argentina)${G.commit ? `, commit <code>${esc(G.commit)}</code>` : ""}: ${nf.format(G.resumen.archivos)} archivos, ${G.resumen.objetivos} objetivos, ${G.resumen.tablas} tablas D1, ${G.resumen.secretos} secretos, ${G.resumen.rutas} rutas /api. La araña lee el código sin ejecutarlo: los imports que se arman en tiempo de ejecución no aparecen. Se regenera con <code>npm run arana -- --vista</code>.`;
+  // ── Cinta de reglas, números, leyenda y pie ──
+  {
+    const cut = (s, n) => { if (s.length <= n) return s; const at = s.lastIndexOf(" ", n); return s.slice(0, at > n * 0.6 ? at : n).replace(/[\s,;:.]+$/, "") + "…"; };
+    const items = [];
+    O.forEach((o, k) => o.reglas.slice(0, 2).forEach((r) => items.push(`<span><b style="color:${OC[k]}">${esc(o.slug)}</b>${esc(cut(r, 150))}</span>`)));
+    const track = $("tick");
+    track.innerHTML = items.join("") + items.join("");
+    if (!reduce) track.style.animationDuration = `${Math.max(60, Math.round(track.scrollWidth / 2 / 42))}s`;
+  }
+  $("k-files").textContent = nf.format(N);
+  $("k-lines").textContent = nf.format(G.resumen.lineas);
+  $("k-obj").textContent = String(NO);
+  $("k-links").textContent = nf.format(G.resumen.enlaces);
+  $("k-tests").textContent = nf.format(F.filter((f) => f.k === "prueba").length);
+  $("k-tables").textContent = String(G.resumen.tablas);
+  $("k-routes").textContent = String(G.resumen.rutas);
+  $("k-secrets").textContent = String(G.resumen.secretos);
+  $("k-flags").textContent = String(G.banderas.length);
+  $("k-sub").textContent = "El mapa se lee del código, sin ejecutarlo.";
+  $("pills").innerHTML = `<span class="pill" title="hora argentina">mapa del ${esc(when)}</span>${G.commit ? `<span class="pill">commit ${esc(G.commit)}</span>` : ""}<span class="pill ok">lee sin ejecutar</span>`;
+  $("st-sub").textContent = `${nf.format(N)} archivos · cada color es un objetivo`;
+  $("legend").innerHTML = `<span><i style="background:var(--web)"></i>punto = archivo</span><span><i style="background:var(--live)"></i>arco = import</span><span><i style="background:var(--flag)"></i>pincho = bandera</span>`;
+  const numKey = O.map((o, k) => `<span><i style="background:${OC[k]}"></i>${pad(k + 1, 2)} ${esc(o.slug)}</span>`).join("");
+  for (const id of ["num-keys-1", "num-keys-2", "num-keys-3"]) $(id).innerHTML = numKey;
+  $("foot").innerHTML = `Mapa del ${esc(when)} (hora argentina)${G.commit ? `, commit <code>${esc(G.commit)}</code>` : ""}: ${nf.format(G.resumen.archivos)} archivos, ${G.resumen.objetivos} objetivos, ${G.resumen.tablas} tablas D1, ${G.resumen.secretos} secretos, ${G.resumen.rutas} rutas /api. La araña lee el código sin ejecutarlo: los imports que se arman en tiempo de ejecución no aparecen. En la esfera, los arcos son imports reales y la malla fina que une puntos vecinos es solo adorno. Se regenera con <code>npm run arana -- --vista</code>.`;
 
-  // ── Movimiento de la araña ──
-  function jumpTo(k) {
-    state.view = "objetivo";
-    state.k = k;
-    state.step = -1;
-    state.phase = "idle";
-    state.follow = true;
-    syncFollow();
-    log("pasar", "pasar", `→ ${O[k].slug}`);
-    if (!filesOf[k].length) log("listo", "nota", `${O[k].slug}: transversal, sus reglas valen para todo`);
-    updateHead();
-    updateTabs();
-  }
-  function select(i, mine) {
-    if (F[i].o >= 0 && (F[i].o !== state.k || state.view === "todo")) jumpTo(F[i].o);
-    state.focus = i;
-    renderCard(i, mine);
-    state.follow = true;
-    syncFollow();
-  }
-  function nextStep() {
-    const p = paths[state.k];
-    if (state.step + 1 >= p.length) {
-      if (!doneK[state.k]) {
-        doneK[state.k] = 1;
-        const fl = G.banderas.filter((f) => f.a != null && F[f.a].o === state.k).length;
-        log("listo", "listo", `${O[state.k].slug} · ${filesOf[state.k].length} archivos · ${fl} banderas`);
+  // ── Gráficos con datos del mapa (se redibujan al cambiar el ancho, así el texto no se achica) ──
+  const svgW = (el, min, max) => clamp(Math.round(el.getBoundingClientRect().width) || min, min, max);
+  const mixHex = (a, b, t) => { const x = hexRgb(a), y = hexRgb(b); return `rgb(${x.map((c, j) => Math.round(c + (y[j] - c) * t)).join(",")})`; };
+  const STACK = ["lib", "pantalla", "api", "worker", "script", "estilo", "doc", "otro", "prueba"];
+  function drawBars() {
+    const svg = $("bars"), w = svgW(svg, 240, 900), h = 170;
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const per = O.map((_, k) => { const m = {}; for (const i of filesOf[k]) m[F[i].k] = (m[F[i].k] || 0) + F[i].l; return m; });
+    const maxT = Math.max(1, ...linesOf), top = 8, bot = 22, padX = 4, slot = (w - padX * 2) / NO, bw = Math.min(24, slot * 0.7);
+    let s = `<line x1="0" y1="${h - bot + 0.5}" x2="${w}" y2="${h - bot + 0.5}" stroke="#16241d"/>`;
+    for (let k = 0; k < NO; k++) {
+      const x = padX + slot * k;
+      let y = h - bot;
+      for (const kind of STACK) {
+        const v = per[k][kind] || 0;
+        if (!v) continue;
+        const hh = Math.max(1, (v / maxT) * (h - bot - top));
+        y -= hh;
+        s += `<rect x="${(x + (slot - bw) / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${hh.toFixed(1)}" fill="${KIND_COLOR[kind] || "#7f948a"}" opacity=".88"/>`;
       }
-      let k = state.k;
-      for (let n = 0; n < O.length; n++) { k = (k + 1) % O.length; if (filesOf[k].length) break; }
-      if (state.view !== "todo") state.view = "objetivo";
-      state.k = k;
-      state.step = -1;
-      log("pasar", "pasar", `→ ${O[k].slug}`);
-      updateHead();
-      updateTabs();
-      return nextStep();
+      s += `<text x="${(x + slot / 2).toFixed(1)}" y="${h - 8}" text-anchor="middle" font-size="9" fill="${filesOf[k].length ? OC[k] : "#4d5d55"}">${pad(k + 1, 2)}</text>`;
+      s += `<rect class="mk" data-k="${k}" x="${x.toFixed(1)}" y="${top - 2}" width="${slot.toFixed(1)}" height="${h - top}"><title>${esc(O[k].slug)} · ${nf.format(linesOf[k])} líneas</title></rect>`;
     }
-    state.step += 1;
-    const i = p[state.step];
-    state.from = [...state.pos];
-    state.to = [X[i], Y[i]];
-    state.heading = Math.atan2(state.to[1] - state.from[1], state.to[0] - state.from[0]);
-    state.file = i;
-    state.phase = "walk";
-    state.tPhase = 0;
+    svg.innerHTML = s;
+    $("bars-sub").textContent = `${nf.format(G.resumen.lineas)} líneas`;
+    $("bars-keys").innerHTML = STACK.filter((kind) => F.some((f) => f.k === kind)).map((kind) => `<span><i style="background:${KIND_COLOR[kind]}"></i>${KIND_NAME[kind]}</span>`).join("");
   }
-  function arrive() {
-    const i = state.file;
-    state.phase = "read";
-    state.tPhase = 0;
-    if (!visited[i]) {
-      visited[i] = 1;
-      state.filesRead += 1;
-      state.linesRead += F[i].l;
-      state.readTimes.push(state.t);
+  function drawLace() {
+    const svg = $("lace"), w = svgW(svg, 280, 1000), rot = w >= 560, h = rot ? 210 : 180;
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const y0 = h - (rot ? 62 : 26), x = (k) => 14 + (k * (w - 28)) / Math.max(1, NO - 1), M = G.matriz;
+    const pairs = [];
+    let wmax = 1;
+    for (let a = 0; a < NO; a++) for (let b = a + 1; b < NO; b++) { const ab = M[a * NO + b], ba = M[b * NO + a]; if (ab + ba > 0) { pairs.push([a, b, ab + ba, ab >= ba ? a : b]); wmax = Math.max(wmax, ab + ba); } }
+    pairs.sort((p, q) => q[2] - p[2]);
+    let s = `<line x1="8" y1="${y0}" x2="${w - 8}" y2="${y0}" stroke="#16241d"/>`;
+    for (const [a, b, wt, src] of pairs) {
+      const rx = (x(b) - x(a)) / 2, ry = clamp(rx * 0.8, 8, y0 - 14);
+      s += `<path d="M${x(a).toFixed(1)} ${y0} A${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 1 ${x(b).toFixed(1)} ${y0}" fill="none" stroke="${OC[src]}" stroke-width="${(0.7 + 3.4 * Math.sqrt(wt / wmax)).toFixed(2)}" opacity=".55" stroke-linecap="round"><title>${esc(O[a].slug)} ↔ ${esc(O[b].slug)}: ${wt} imports</title></path>`;
     }
-    log("leer", "leer", `${F[i].p} · ${nf.format(F[i].l)} líneas`);
-    const deps = out[i].slice(0, 2);
-    for (const d of deps) { log("enlace", "enlace", `→ ${base(F[d].p)}`); revealed.add(i + ":" + d); }
-    if (flagsOf[i].length) { state.flags += flagsOf[i].length; log("flag", "⚑", `${base(F[i].p)} · ${flagsOf[i][0].t}`); }
-    if (state.focus < 0) renderCard(i, false);
-    if (state.step % 3 === 0) { updateTabs(); updateHead(); }
+    for (let k = 0; k < NO; k++) {
+      const has = filesOf[k].length > 0;
+      s += `<circle cx="${x(k).toFixed(1)}" cy="${y0}" r="4.4" fill="${has ? OC[k] : "#050b08"}" stroke="${OC[k]}" stroke-width="1.4"/>`;
+      s += rot
+        ? `<text transform="translate(${(x(k) + 3).toFixed(1)} ${y0 + 12}) rotate(55)" font-size="9.5" fill="${has ? "#9fb4a9" : "#4d5d55"}">${esc(O[k].slug)}</text>`
+        : `<text x="${x(k).toFixed(1)}" y="${y0 + 17}" text-anchor="middle" font-size="9" fill="${has ? OC[k] : "#4d5d55"}">${pad(k + 1, 2)}</text>`;
+      s += `<rect class="mk" data-k="${k}" x="${(x(k) - 11).toFixed(1)}" y="${y0 - 14}" width="22" height="${h - y0 + 8}"><title>${esc(O[k].slug)}</title></rect>`;
+    }
+    svg.innerHTML = s;
+    $("num-keys-3").hidden = rot;
+  }
+  const HEAT = [[0, [18, 52, 92]], [0.25, [22, 163, 200]], [0.5, [57, 242, 154]], [0.75, [244, 216, 74]], [1, [255, 77, 77]]];
+  function heat(v) {
+    for (let i = 1; i < HEAT.length; i++) if (v <= HEAT[i][0]) { const [a, ca] = HEAT[i - 1], [b, cb] = HEAT[i], t = (v - a) / (b - a); return `rgb(${ca.map((c, j) => Math.round(c + (cb[j] - c) * t)).join(",")})`; }
+    return "rgb(255,77,77)";
+  }
+  function drawHeat() {
+    const svg = $("heat"), w = svgW(svg, 240, 420), lab = 18, cell = (w - lab) / NO, h = lab + cell * NO, M = G.matriz;
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    let off = 1, diag = 1;
+    for (let a = 0; a < NO; a++) for (let b = 0; b < NO; b++) { const v = M[a * NO + b]; if (a === b) diag = Math.max(diag, v); else off = Math.max(off, v); }
+    let s = "";
+    for (let k = 0; k < NO; k++) {
+      s += `<text x="${(lab + cell * k + cell / 2).toFixed(1)}" y="${lab - 6}" text-anchor="middle" font-size="8" fill="${OC[k]}">${pad(k + 1, 2)}</text>`;
+      s += `<text x="${lab - 4}" y="${(lab + cell * k + cell / 2 + 3).toFixed(1)}" text-anchor="end" font-size="8" fill="${OC[k]}">${pad(k + 1, 2)}</text>`;
+    }
+    for (let a = 0; a < NO; a++) for (let b = 0; b < NO; b++) {
+      const v = M[a * NO + b];
+      let fill = "#0a1410";
+      if (v) fill = a === b ? `rgba(79,216,196,${(0.18 + (0.6 * Math.log1p(v)) / Math.log1p(diag)).toFixed(2)})` : heat(0.1 + 0.9 * Math.pow(Math.log1p(v) / Math.log1p(off), 0.85));
+      s += `<rect class="cell" data-a="${a}" data-b="${b}" x="${(lab + cell * b + 0.5).toFixed(1)}" y="${(lab + cell * a + 0.5).toFixed(1)}" width="${(cell - 1).toFixed(1)}" height="${(cell - 1).toFixed(1)}" fill="${fill}"><title>${esc(O[a].slug)} → ${esc(O[b].slug)}: ${v} imports</title></rect>`;
+    }
+    svg.innerHTML = s;
+  }
+  $("heat").addEventListener("click", (e) => {
+    const c = e.target.closest(".cell");
+    if (!c) return;
+    const a = Number(c.dataset.a), b = Number(c.dataset.b), v = G.matriz[a * NO + b];
+    $("heat-note").textContent = a === b ? `${O[a].slug}: ${nf.format(v)} imports entre sus propios archivos` : `${O[a].slug} → ${O[b].slug}: ${nf.format(v)} ${v === 1 ? "import" : "imports"}`;
+  });
+  function drawHist() {
+    const svg = $("hist"), w = svgW(svg, 240, 420), h = 104;
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    const BINS = [[0, 25, "<25"], [25, 50, "<50"], [50, 100, "<100"], [100, 200, "<200"], [200, 400, "<400"], [400, 800, "<800"], [800, Infinity, "800+"]];
+    const counts = BINS.map(([lo, hi]) => F.filter((f) => f.l >= lo && f.l < hi).length);
+    const mx = Math.max(1, ...counts), top = 14, bot = 16, slot = (w - 8) / BINS.length, bw = slot * 0.66;
+    let s = `<line x1="0" y1="${h - bot + 0.5}" x2="${w}" y2="${h - bot + 0.5}" stroke="#16241d"/>`;
+    counts.forEach((c, j) => {
+      const hh = Math.max(1, (c / mx) * (h - bot - top)), x = 4 + slot * j + (slot - bw) / 2;
+      s += `<rect x="${x.toFixed(1)}" y="${(h - bot - hh).toFixed(1)}" width="${bw.toFixed(1)}" height="${hh.toFixed(1)}" fill="${mixHex("#f4d84a", "#ff4d4d", j / (BINS.length - 1))}" opacity=".9"/>`;
+      s += `<text x="${(x + bw / 2).toFixed(1)}" y="${(h - bot - hh - 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="#c9d7cf">${c}</text>`;
+      s += `<text x="${(x + bw / 2).toFixed(1)}" y="${h - 4}" text-anchor="middle" font-size="8.5" fill="#6f8278">${BINS[j][2]}</text>`;
+    });
+    svg.innerHTML = s;
+    const sorted = F.map((f) => f.l).sort((a, b) => a - b);
+    $("hist-sub").textContent = N ? `mediana ${nf.format(sorted[Math.floor(sorted.length / 2)])} líneas` : "";
+  }
+  function charts() { drawBars(); drawLace(); drawHeat(); drawHist(); markAll(); }
+  const markAll = () => { for (const el of document.querySelectorAll(".mk")) el.classList.toggle("on", Number(el.dataset.k) === state.k); };
+  for (const id of ["bars", "lace"]) $(id).addEventListener("click", (e) => { const m = e.target.closest(".mk"); if (m) jumpTo(Number(m.dataset.k)); });
+
+  // Los más importados
+  {
+    const mx = Math.max(1, ...hubs.map((i) => inn[i].length));
+    $("hubs").innerHTML = hubs.map((i) => `<li><button type="button" data-i="${i}" title="${esc(F[i].p)}"><span style="color:${colorOf(i)}">${esc(base(F[i].p))}</span><i><u style="width:${(100 * inn[i].length) / mx}%"></u></i><b>${inn[i].length}</b></button></li>`).join("");
+    $("hubs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) select(Number(b.dataset.i)); });
   }
 
-  // ── Dibujo ──
-  const cv = $("web");
-  const ctx = cv.getContext("2d");
-  let W = 0, H = 0, dpr = 1;
-  function resize() {
-    dpr = Math.min(2, window.devicePixelRatio || 1);
-    const r = cv.getBoundingClientRect();
-    W = r.width; H = r.height;
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  // ── Controles y marcadores en vivo ──
+  const play = $("b-play");
+  function syncPlay() { play.textContent = state.playing ? "❚❚" : "▶"; play.setAttribute("aria-pressed", String(!state.playing)); }
+  function syncFollow() { $("b-follow").setAttribute("aria-pressed", String(state.follow)); }
+  play.addEventListener("click", () => { state.playing = !state.playing; syncPlay(); wake(); });
+  $("b-speed").addEventListener("click", (e) => { state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : state.speed === 4 ? 8 : 1; e.currentTarget.textContent = `${state.speed}×`; });
+  $("b-follow").addEventListener("click", () => { state.follow = !state.follow; cam.hold = false; cam.goal = null; if (state.follow) state.focus = -1; syncFollow(); wake(); });
+  function updateHud() {
+    $("k-read").textContent = `${nf.format(state.filesRead)}/${nf.format(N)}`;
+    $("k-prog").style.width = `${N ? (100 * state.filesRead) / N : 0}%`;
+    const recent = state.readTimes.filter((x) => x > state.t - 6).length;
+    $("rate").textContent = `${(recent / 6).toFixed(1).replace(".", ",")} archivos/s`;
+    const k = state.k, n = filesOf[k].length;
+    $("st-live").innerHTML = state.playing || state.filesRead ? `<span style="color:${OC[k]}">${state.playing ? "LEYENDO" : "EN PAUSA"} ${esc(O[k].slug)}</span> ${readIn[k]}/${n}` : "";
+    const last = state.lastFile;
+    $("t-file").textContent = last >= 0 ? base(F[last].p) : "—";
+    $("t-file-s").textContent = last >= 0 ? `${KIND_NAME[F[last].k] || F[last].k} · ${nf.format(F[last].l)} líneas` : "todavía no leyó nada";
+    $("t-lines").textContent = nf.format(state.linesRead);
+    $("t-lines-s").textContent = `de ${nf.format(G.resumen.lineas)}`;
+    $("t-obj").textContent = O[k].slug;
+    $("t-obj-s").textContent = `${readIn[k]}/${n} archivos`;
+    $("t-links").textContent = nf.format(state.linksSeen);
+    $("t-links-s").textContent = `de ${nf.format(G.resumen.enlaces)}`;
+    for (let j = 0; j < NO; j++) { const u = $("lb-" + j); if (u) u.style.width = filesOf[j].length ? `${(100 * readIn[j]) / filesOf[j].length}%` : "0"; }
   }
-  window.addEventListener("resize", resize);
-  resize();
-  const sprites = {};
+  function tickClock() {
+    const d = new Date();
+    $("clk-utc").textContent = `${pad(d.getUTCHours(), 2)}:${pad(d.getUTCMinutes(), 2)}:${pad(d.getUTCSeconds(), 2)}`;
+    $("clk-arg").textContent = "ARG " + d.toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  }
+
+  // ── Dibujo de la esfera ──
+  const stage = $("stage"), cv = $("sphere"), coreView = $("coreView"), ctx = cv.getContext("2d");
+  const D = 7;
+  const FLAG = "#ff4d8d";
+  const FLAGGED = F.map((_, i) => i).filter((i) => flagged[i] > 0);
+  const recentFlags = [];
+  let W = 0, H = 0, bx0 = 0, bx1 = 0, by0 = 0, by1 = 0, dpr = 1, cx = 0, cy = 0, R = 100, side = false, visible = true, dirty = true, T = 0;
+  const cam = { yaw: 0.6, pitch: 0.28, vy: 0, vp: 0, goal: null, hold: false, dragging: false, zoom: 1 };
+  const anchors = { inp: [], lead: null };
+  const RX = new Float32Array(N), RY = new Float32Array(N), RZ = new Float32Array(N), SX = new Float32Array(N), SY = new Float32Array(N), SK = new Float32Array(N);
+  const ECX = new Float32Array(NE), ECY = new Float32Array(NE), ESIDE = new Uint8Array(NE);
+  const spider = { sx: 0, sy: 0, heading: 0 };
+  const trail = [];
+  const faceAngles = (v) => [Math.atan2(-v[0], v[2]), clamp(Math.atan2(v[1], Math.hypot(v[0], v[2])), -1.2, 1.2)];
+  const wrapA = (a) => a - 2 * Math.PI * Math.round(a / (2 * Math.PI));
+  function wake() { dirty = true; }
+
+  const sprites = new Map();
   function sprite(color) {
-    if (sprites[color]) return sprites[color];
-    const s = document.createElement("canvas");
+    let s = sprites.get(color);
+    if (s) return s;
+    s = document.createElement("canvas");
     s.width = s.height = 64;
-    const g = s.getContext("2d");
-    const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    const g = s.getContext("2d"), grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
     grd.addColorStop(0, "#ffffff");
-    grd.addColorStop(0.18, color);
-    grd.addColorStop(0.45, color + "55");
+    grd.addColorStop(0.14, "#ffffff");
+    grd.addColorStop(0.24, color);
+    grd.addColorStop(0.46, color + "66");
     grd.addColorStop(1, color + "00");
     g.fillStyle = grd;
     g.fillRect(0, 0, 64, 64);
-    return (sprites[color] = s);
+    sprites.set(color, s);
+    return s;
   }
-  const cam = { x: 0, y: 0, z: 1 };
-  let manual = null;
-  function targetCam() {
-    if (manual) return manual;
-    const pad = 54;
-    if (state.view === "todo" || !state.follow) {
-      const w = maxX - minX, h = maxY - minY;
-      return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 + 10, z: Math.min((W - pad) / w, (H - pad - 60) / h) };
-    }
-    const c = clusters[state.k];
-    const z = Math.min(W, H - 70) / (2 * (c.R + 64));
-    return { x: c.x * 0.55 + state.pos[0] * 0.45, y: c.y * 0.55 + state.pos[1] * 0.45 + 14 / z, z: Math.min(z, 2.4) };
-  }
-  {
-    const t = targetCam();
-    cam.x = t.x; cam.y = t.y; cam.z = t.z;
-  }
-  const toScreen = (x, y) => [(x - cam.x) * cam.z + W / 2, (y - cam.y) * cam.z + H / 2];
 
-  function draw(dt) {
-    const tc = targetCam();
-    const ease = 1 - Math.exp(-dt * (reduce ? 20 : 2.6));
-    cam.x += (tc.x - cam.x) * ease; cam.y += (tc.y - cam.y) * ease; cam.z += (tc.z - cam.z) * ease;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    ctx.setTransform(dpr * cam.z, 0, 0, dpr * cam.z, dpr * (W / 2 - cam.x * cam.z), dpr * (H / 2 - cam.y * cam.z));
-    const z = cam.z;
-    const t = state.t;
-    // polvo
-    ctx.fillStyle = "#7fd9cb";
-    for (let j = 0; j < dust.length; j += 4) {
-      const ph = dust[j + 2];
-      const dx = reduce ? 0 : Math.sin(t * 0.35 + ph) * 2.2;
-      const dy = reduce ? 0 : Math.cos(t * 0.28 + ph) * 2.2;
-      ctx.globalAlpha = dust[j + 3];
-      ctx.fillRect(dust[j] + dx, dust[j + 1] + dy, 1.3 / z, 1.3 / z);
+  function layout() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    side = window.matchMedia("(min-width: 1000px)").matches;
+    const sr = stage.getBoundingClientRect(), vr = coreView.getBoundingClientRect();
+    let x = 0, y = 0, w = sr.width, h = sr.height;
+    if (!side) { x = vr.left - sr.left; y = vr.top - sr.top; w = vr.width; h = vr.height; }
+    cv.style.left = `${x}px`; cv.style.top = `${y}px`; cv.style.width = `${w}px`; cv.style.height = `${h}px`;
+    const pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
+    if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+    W = w; H = h;
+    // los textos de la esfera se quedan dentro de su columna (a los costados están los paneles)
+    bx0 = vr.left - sr.left - x; bx1 = bx0 + vr.width; by0 = vr.top - sr.top - y; by1 = by0 + vr.height;
+    cx = vr.left - sr.left + vr.width / 2 - x;
+    cy = vr.top - sr.top + vr.height * (side ? 0.5 : 0.45) - y;
+    R = Math.min(vr.width, vr.height) * (side ? 0.355 : 0.335);
+    layoutAnchors();
+    wake();
+  }
+  function layoutAnchors() {
+    if (!side) { anchors.inp = []; anchors.lead = null; return; }
+    const cr = cv.getBoundingClientRect();
+    anchors.inp = [...document.querySelectorAll("#inp-list .inp")].map((el) => { const r = el.getBoundingClientRect(); return { x: r.right - cr.left, y: r.top + r.height / 2 - cr.top }; });
+    const b = leadEl.querySelector(`[data-k="${state.k}"]`);
+    if (b) { const r = b.getBoundingClientRect(), lr = leadEl.getBoundingClientRect(); anchors.lead = { x: r.left - cr.left, y: clamp(r.top + r.height / 2, lr.top + 8, lr.bottom - 8) - cr.top }; } else anchors.lead = null;
+  }
+  leadEl.addEventListener("scroll", () => { layoutAnchors(); wake(); }, { passive: true });
+
+  const bez = (u, a, b, c, d) => { const v = 1 - u; return v * v * v * a + 3 * v * v * u * b + 3 * v * u * u * c + u * u * u * d; };
+
+  function draw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const cyw = Math.cos(cam.yaw), syw = Math.sin(cam.yaw), cpt = Math.cos(cam.pitch), spt = Math.sin(cam.pitch);
+    const Rr = R * cam.zoom;
+    const emph = state.pinned ? state.k : -1;
+    const hubNode = state.focus >= 0 ? state.focus : state.phase === "read" ? state.file : -1;
+    const tmp = [0, 0, 0];
+    const rot = (x, y, z) => { const x1 = x * cyw + z * syw, z1 = -x * syw + z * cyw; tmp[0] = x1; tmp[1] = y * cpt - z1 * spt; tmp[2] = y * spt + z1 * cpt; return tmp; };
+    for (let i = 0; i < N; i++) {
+      const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
+      const x1 = x * cyw + z * syw, z1 = -x * syw + z * cyw, y2 = y * cpt - z1 * spt, z2 = y * spt + z1 * cpt;
+      const k = D / (D - z2);
+      RX[i] = x1; RY[i] = y2; RZ[i] = z2; SK[i] = k; SX[i] = cx + x1 * Rr * k; SY[i] = cy - y2 * Rr * k;
     }
-    // imports
-    ctx.globalAlpha = 1;
-    ctx.lineWidth = 1 / z;
-    ctx.strokeStyle = "rgba(79,216,196,0.07)";
-    ctx.beginPath();
-    for (const [a, b] of G.enlaces) { if (a == null || b == null) continue; ctx.moveTo(X[a], Y[a]); ctx.lineTo(X[b], Y[b]); }
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(79,216,196,0.22)";
-    ctx.beginPath();
-    for (const [a, b] of G.enlaces) { if (a == null || b == null || !visited[a]) continue; ctx.moveTo(X[a], Y[a]); ctx.lineTo(X[b], Y[b]); }
-    ctx.stroke();
-    // tentáculos del archivo actual (o del elegido)
-    const hub = state.focus >= 0 ? state.focus : state.phase === "read" ? state.file : -1;
-    const near = hub >= 0 ? [...out[hub], ...inn[hub], ...testsOf[hub]].slice(0, 14) : [];
-    if (hub >= 0) {
-      ctx.setLineDash([3 / z, 4 / z]);
-      ctx.lineDashOffset = reduce ? 0 : -t * 18 / z;
-      ctx.lineWidth = 1.2 / z;
-      ctx.strokeStyle = "rgba(160,245,232,0.85)";
+    for (let e = 0; e < NE; e++) {
+      const x = ECTL[e * 3], y = ECTL[e * 3 + 1], z = ECTL[e * 3 + 2];
+      const x1 = x * cyw + z * syw, z1 = -x * syw + z * cyw, y2 = y * cpt - z1 * spt, z2 = y * spt + z1 * cpt;
+      const k = D / (D - Math.min(z2, 1.6));
+      ECX[e] = cx + x1 * Rr * k; ECY[e] = cy - y2 * Rr * k;
+      const avg = (RZ[EA[e]] + RZ[EB[e]]) / 2;
+      ESIDE[e] = avg > 0.25 ? 2 : avg > -0.04 ? 1 : 0;
+    }
+    ctx.lineCap = "round";
+    // el volumen: un disco apenas iluminado y el borde de la esfera
+    {
+      const g = ctx.createRadialGradient(cx - Rr * 0.3, cy - Rr * 0.34, Rr * 0.05, cx, cy, Rr * 1.02);
+      g.addColorStop(0, "rgba(60,140,120,.20)"); g.addColorStop(0.7, "rgba(18,50,42,.10)"); g.addColorStop(1, "rgba(4,10,8,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, Rr * 1.02, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(120,230,210,.10)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "lighter";
+    // retícula y polvo (adorno)
+    {
+      const gx = new Float32Array(GRATN), gy = new Float32Array(GRATN), gz = new Float32Array(GRATN);
+      for (let i = 0; i < GRATN; i++) {
+        const x = GRATP[i * 3], y = GRATP[i * 3 + 1], z = GRATP[i * 3 + 2];
+        const x1 = x * cyw + z * syw, z1 = -x * syw + z * cyw, y2 = y * cpt - z1 * spt, z2 = y * spt + z1 * cpt, k = D / (D - z2);
+        gx[i] = cx + x1 * Rr * k; gy[i] = cy - y2 * Rr * k; gz[i] = z2;
+      }
+      const gb = [new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+      for (let s2 = 0; s2 < GSEG.length; s2 += 2) {
+        const a = GSEG[s2], b = GSEG[s2 + 1], zz = (gz[a] + gz[b]) / 2, d = zz > 0.5 ? 3 : zz > 0.15 ? 2 : zz > -0.25 ? 1 : 0;
+        gb[d].moveTo(gx[a], gy[a]); gb[d].lineTo(gx[b], gy[b]);
+      }
+      ctx.lineWidth = 0.6;
+      [0.012, 0.03, 0.055, 0.085].forEach((al, d) => { ctx.strokeStyle = `rgba(140,235,215,${al})`; ctx.stroke(gb[d]); });
+      const db = [new Path2D(), new Path2D(), new Path2D()];
+      for (let i = 0; i < DUSTN; i++) {
+        const x = DUST[i * 3], y = DUST[i * 3 + 1], z = DUST[i * 3 + 2];
+        const x1 = x * cyw + z * syw, z1 = -x * syw + z * cyw, y2 = y * cpt - z1 * spt, z2 = y * spt + z1 * cpt, k = D / (D - z2);
+        db[z2 > 0.35 ? 2 : z2 > -0.2 ? 1 : 0].rect(cx + x1 * Rr * k - 0.6, cy - y2 * Rr * k - 0.6, 1.2, 1.2);
+      }
+      [0.12, 0.26, 0.5].forEach((al, d) => { ctx.fillStyle = `rgba(170,245,225,${al})`; ctx.fill(db[d]); });
+    }
+
+    // malla fina (adorno): vecinos en la esfera, más tenue cuanto más lejos
+    {
+      const buckets = [new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+      for (const [a, b] of mesh) {
+        const zz = (RZ[a] + RZ[b]) / 2;
+        const d = zz > 0.45 ? 3 : zz > 0.1 ? 2 : zz > -0.3 ? 1 : 0;
+        const hot = emph >= 0 && F[a].o === emph && F[b].o === emph ? 4 : 0;
+        buckets[d + hot].moveTo(SX[a], SY[a]);
+        buckets[d + hot].lineTo(SX[b], SY[b]);
+      }
+      const alpha = [0.025, 0.05, 0.1, 0.17];
+      ctx.lineWidth = 0.7;
+      for (let b = 0; b < 8; b++) {
+        const hot = b >= 4;
+        ctx.strokeStyle = `rgba(150,235,215,${(alpha[b & 3] * (hot ? 2.4 : emph >= 0 ? 0.45 : 1)).toFixed(3)})`;
+        ctx.stroke(buckets[b]);
+      }
+    }
+
+    // arcos desde los paneles de cobertura hacia el objetivo más flojo, con paquetes que viajan
+    if (side) {
+      for (let j = 0; j < INPUTS.length; j++) {
+        const t = INP_TARGET[j], a = anchors.inp[j];
+        if (t < 0 || !a || !CEN[t]) continue;
+        const r = rot(CEN[t][0], CEN[t][1], CEN[t][2]);
+        const k = D / (D - r[2]);
+        let tx = cx + r[0] * Rr * k, ty = cy - r[1] * Rr * k;
+        if (r[2] < -0.05) { const l = Math.hypot(r[0], r[1]) || 1; tx = cx + (r[0] / l) * Rr * 0.98; ty = cy - (r[1] / l) * Rr * 0.98; }
+        const dx = tx - a.x, c1x = a.x + dx * 0.5, c2x = tx - dx * 0.28, c2y = ty + (a.y - ty) * 0.12;
+        const rgb = hexRgb(INPUTS[j].color);
+        ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${r[2] > -0.05 ? 0.5 : 0.28})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(c1x, a.y, c2x, c2y, tx, ty); ctx.stroke();
+        if (!reduce) for (let m = 0; m < 3; m++) {
+          const u = (T * 0.16 + j * 0.13 + m / 3) % 1, px = bez(u, a.x, c1x, c2x, tx), py = bez(u, a.y, a.y, c2y, ty), s = 5 + Math.sin(u * Math.PI) * 3;
+          ctx.globalAlpha = 0.9; ctx.drawImage(sprite(INPUTS[j].color), px - s, py - s, s * 2, s * 2);
+        }
+        ctx.globalAlpha = 1;
+      }
+      // y del objetivo que se está leyendo hacia su tarjeta en la lista
+      if (anchors.lead && CEN[state.k]) {
+        const c = CEN[state.k], r = rot(c[0], c[1], c[2]), k = D / (D - r[2]);
+        const x0 = cx + r[0] * Rr * k, y0 = cy - r[1] * Rr * k, x3 = anchors.lead.x, y3 = anchors.lead.y;
+        if (r[2] > 0 && x3 > x0) {
+          const dx = x3 - x0, rgb = OCR[state.k];
+          ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.5)`;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.bezierCurveTo(x0 + dx * 0.35, y0 - 30, x3 - dx * 0.3, y3, x3, y3); ctx.stroke();
+          if (!reduce) for (let m = 0; m < 2; m++) { const u = (T * 0.2 + m / 2) % 1, s = 5 + Math.sin(u * Math.PI) * 3; ctx.globalAlpha = 0.9; ctx.drawImage(sprite(OC[state.k]), bez(u, x0, x0 + dx * 0.35, x3 - dx * 0.3, x3) - s, bez(u, y0, y0 - 30, y3, y3) - s, s * 2, s * 2); }
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    // imports: un arco por cada uno, del color del objetivo que importa
+    for (let bi = 0; bi < edgeBucket.length; bi++) {
+      const list = edgeBucket[bi];
+      if (!list.length) continue;
+      const oa = bi >> 1, inter = bi & 1, rgb = oa < NO ? OCR[oa] : [138, 160, 150];
+      const mult = emph < 0 || oa === emph ? 1 : 0.28;
+      for (let sd = 0; sd < 3; sd++) {
+        let any = false;
+        ctx.beginPath();
+        for (const e of list) {
+          if (ESIDE[e] !== sd) continue;
+          any = true;
+          ctx.moveTo(SX[EA[e]], SY[EA[e]]);
+          ctx.quadraticCurveTo(ECX[e], ECY[e], SX[EB[e]], SY[EB[e]]);
+        }
+        if (!any) continue;
+        const a = (sd === 2 ? (inter ? 0.28 : 0.16) : sd === 1 ? (inter ? 0.12 : 0.07) : inter ? 0.045 : 0.025) * mult;
+        ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a.toFixed(3)})`;
+        ctx.lineWidth = inter ? 1 : 0.8;
+        ctx.stroke();
+      }
+    }
+    // los arcos del archivo elegido o el que se está leyendo, con el flujo animado
+    const near = [];
+    if (hubNode >= 0) {
+      ctx.setLineDash([4, 5]);
+      ctx.lineDashOffset = reduce ? 0 : -T * 26;
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = "rgba(190,250,238,0.85)";
       ctx.beginPath();
-      for (const j of near) { ctx.moveTo(X[hub], Y[hub]); ctx.quadraticCurveTo((X[hub] + X[j]) / 2 + (Y[j] - Y[hub]) * 0.12, (Y[hub] + Y[j]) / 2 - (X[j] - X[hub]) * 0.12, X[j], Y[j]); }
+      for (const e of edgesOf[hubNode]) { ctx.moveTo(SX[EA[e]], SY[EA[e]]); ctx.quadraticCurveTo(ECX[e], ECY[e], SX[EB[e]], SY[EB[e]]); near.push(EA[e] === hubNode ? EB[e] : EA[e]); }
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(197,163,255,0.85)";
+      ctx.beginPath();
+      const ctl = [0, 0, 0];
+      for (const t of testsOf[hubNode].slice(0, 8)) {
+        controlOf(t, hubNode, ctl, 0);
+        const r = rot(ctl[0], ctl[1], ctl[2]), k = D / (D - Math.min(r[2], 1.6));
+        ctx.moveTo(SX[t], SY[t]);
+        ctx.quadraticCurveTo(cx + r[0] * Rr * k, cy - r[1] * Rr * k, SX[hubNode], SY[hubNode]);
+        near.push(t);
+      }
       ctx.stroke();
       ctx.setLineDash([]);
     }
+
+    // pinchos: una bandera es un archivo al que hay que mirar
+    for (const i of FLAGGED) {
+      const depth = (RZ[i] + 1) / 2, len = 1 + 0.1 + 0.2 * flagged[i];
+      const k2 = D / (D - RZ[i] * len), x2 = cx + RX[i] * len * Rr * k2, y2 = cy - RY[i] * len * Rr * k2;
+      const a = (0.2 + 0.7 * depth) * (visited[i] ? 1 : 0.6);
+      ctx.strokeStyle = `rgba(255,77,141,${a.toFixed(3)})`;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(SX[i], SY[i]); ctx.lineTo(x2, y2); ctx.stroke();
+      const s = (5 + (reduce ? 0 : Math.sin(T * 3 + i) * 1.2)) * (Rr / 190) * k2;
+      ctx.globalAlpha = Math.min(1, a + 0.1);
+      ctx.drawImage(sprite(FLAG), x2 - s, y2 - s, s * 2, s * 2);
+      ctx.globalAlpha = 1;
+    }
+
     // archivos
-    ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < N; i++) {
-      const f = F[i];
-      const flagged = flagsOf[i].length > 0 && visited[i];
-      const col = flagged ? "#ff4d8d" : COLORS[f.k] || COLORS.otro;
-      const inK = state.view === "todo" || f.o === state.k;
-      const s = (5 + Math.min(14, Math.sqrt(f.l) * 0.55)) / z * (i === hub ? 2.1 : 1);
-      ctx.globalAlpha = visited[i] ? 0.95 : inK ? 0.5 : 0.28;
-      ctx.drawImage(sprite(col), X[i] - s, Y[i] - s, s * 2, s * 2);
+      const depth = (RZ[i] + 1) * 0.5;
+      const pu = Math.exp(-(state.t - lit[i]) * 2.4);
+      const a = (0.26 + 0.74 * depth) * (visited[i] ? 1 : 0.62) * (emph < 0 || F[i].o === emph ? 1 : 0.3) + 0.5 * pu;
+      if (a < 0.03) continue;
+      let s = (4.8 + Math.sqrt(F[i].l) * 0.24) * (Rr / 190) * SK[i] * (0.8 + 0.4 * depth) * (visited[i] ? 1 : 0.82) * (1 + 1.3 * pu);
+      if (i === hubNode) s *= 1.7;
+      ctx.globalAlpha = Math.min(1, a);
+      ctx.drawImage(sprite(flagged[i] ? FLAG : colorOf(i)), SX[i] - s, SY[i] - s, s * 2, s * 2);
     }
-    ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
 
-    // pantalla: etiquetas, araña
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.textBaseline = "alphabetic";
-    // cúmulos
-    clusters.forEach((c) => {
-      const [sx, sy] = toScreen(c.x, c.y - c.R - 10);
-      if (sx < -80 || sx > W + 80 || sy < -30 || sy > H + 40) return;
-      const active = state.view !== "todo" && c.k === state.k;
-      const n = filesOf[c.k].length;
-      const v = filesOf[c.k].reduce((a, i) => a + visited[i], 0);
-      ctx.font = `${active ? 600 : 500} ${active ? 15 : 12}px "Geist Mono", ui-monospace, monospace`;
-      ctx.fillStyle = active ? "#4fd8c4" : doneK[c.k] ? "#39f29a" : "#a7bcb2";
-      ctx.textAlign = "center";
-      ctx.fillText(O[c.k].slug, sx, sy);
-      ctx.font = `10px "Geist Mono", ui-monospace, monospace`;
-      ctx.fillStyle = "#6f8278";
-      ctx.fillText(n ? `${v}/${n} archivos · ${doneK[c.k] ? "listo" : c.k === state.k ? "leyendo" : "en cola"}` : "transversal", sx, sy + 13);
-    });
-    // etiquetas de los tentáculos (sin pisarse entre ellas)
-    ctx.textAlign = "left";
-    const boxes = [];
-    const free = (x, y, w, h) => {
-      if (boxes.some((b) => x < b[0] + b[2] && x + w > b[0] && y < b[1] + b[3] && y + h > b[1])) return false;
-      boxes.push([x, y, w, h]);
-      return true;
-    };
-    if (hub >= 0) {
-      ctx.font = `10.5px "Geist Mono", ui-monospace, monospace`;
-      const labeled = near.slice(0, small ? 5 : 8);
-      for (const j of labeled) {
-        const [sx, sy] = toScreen(X[j], Y[j]);
-        if (sx < 0 || sx > W || sy < 0 || sy > H) continue;
-        const text = base(F[j].p);
-        const w = ctx.measureText(text).width + 10;
-        if (!free(sx + 6, sy - 9, w, 16)) continue;
-        ctx.fillStyle = "rgba(3,6,5,.82)";
-        ctx.strokeStyle = "rgba(79,216,196,.75)";
-        ctx.lineWidth = 1;
-        ctx.fillRect(sx + 6, sy - 9, w, 16);
-        ctx.strokeRect(sx + 6.5, sy - 8.5, w - 1, 15);
-        ctx.fillStyle = "#bff5ec";
-        ctx.fillText(text, sx + 11, sy + 3);
-      }
-    }
-    // banderas visibles cerca
-    const fl = [];
-    for (let i = 0; i < N; i++) if (visited[i] && flagsOf[i].length && (state.view === "todo" || F[i].o === state.k)) fl.push(i);
-    ctx.font = `10.5px "Geist Mono", ui-monospace, monospace`;
-    for (const i of fl.slice(-3)) {
-      const [sx, sy] = toScreen(X[i], Y[i]);
-      if (sx < 0 || sx > W - 40 || sy < 0 || sy > H) continue;
-      const text = `${base(F[i].p)} · ⚑ ${flagsOf[i][0].k === "sin-prueba" ? "sin prueba" : "revisar"}`;
-      const w = ctx.measureText(text).width + 12;
-      if (!free(sx + 8, sy + 6, w, 16)) continue;
-      ctx.fillStyle = "#ff4d8d";
-      ctx.fillRect(sx + 8, sy + 6, w, 16);
-      ctx.fillStyle = "#14030a";
-      ctx.fillText(text, sx + 14, sy + 18);
-    }
-    // la araña
-    const [px, py] = toScreen(state.pos[0], state.pos[1]);
-    const walking = state.phase === "walk" && !reduce;
-    const gait = walking ? state.t * 16 : 0;
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(state.heading);
-    ctx.strokeStyle = "rgba(223,240,234,.9)";
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    for (let l = 0; l < 8; l++) {
-      // Four legs a side, from the front to the back; the walk swings them in alternating pairs.
-      const side = l < 4 ? -1 : 1;
-      const idx = l % 4;
-      const phase = idx * 1.7 + (side > 0 ? Math.PI : 0);
-      const a = side * (0.55 + idx * 0.62) + (walking ? Math.sin(gait + phase) * 0.28 : Math.sin(state.t * 1.5 + l) * 0.03);
-      const ka = a - side * 0.38;
-      ctx.moveTo(Math.cos(a) * 3, Math.sin(a) * 3);
-      ctx.lineTo(Math.cos(ka) * 10, Math.sin(ka) * 10);
-      ctx.lineTo(Math.cos(a) * 18, Math.sin(a) * 18);
-    }
-    ctx.stroke();
-    ctx.shadowColor = "#ff4d8d";
-    ctx.shadowBlur = 14;
-    ctx.fillStyle = "#ff4d8d";
-    ctx.fillRect(-4, -4, 8, 8);
-    ctx.shadowBlur = 0;
-    ctx.restore();
-    ctx.strokeStyle = "rgba(79,216,196,.35)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(px, py, 15 + Math.sin(state.t * 3) * 1.5, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  // ── Tiempo ──
-  const READ_S = 0.5, WALK_S = 0.32;
-  let last = performance.now();
-  let hudTimer = 0;
-  function tick(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    if (!document.hidden) {
-      if (state.playing) {
-        state.t += dt;
-        const step = dt * state.speed;
-        if (state.phase === "idle") nextStep();
-        else if (state.phase === "walk") {
-          state.tPhase += step / WALK_S;
-          const u = Math.min(1, state.tPhase);
-          const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
-          state.pos = [state.from[0] + (state.to[0] - state.from[0]) * e, state.from[1] + (state.to[1] - state.from[1]) * e];
-          if (u >= 1) arrive();
-        } else if (state.phase === "read") {
-          state.tPhase += step / READ_S;
-          if (state.tPhase >= 1) nextStep();
+    // la araña: deja una estela y camina por la superficie
+    {
+      const lp = 1 + state.lift, r = rot(state.pos[0] * lp, state.pos[1] * lp, state.pos[2] * lp), k = D / (D - r[2]);
+      const px = cx + r[0] * Rr * k, py = cy - r[1] * Rr * k, pz = r[2];
+      if (state.phase === "walk") { trail.push(state.pos[0] * lp, state.pos[1] * lp, state.pos[2] * lp); if (trail.length > 3 * 22) trail.splice(0, 3); } else if (trail.length) trail.splice(0, 3);
+      if (trail.length > 6) {
+        ctx.lineWidth = 1.6;
+        let prev = null;
+        for (let j = 0; j < trail.length; j += 3) {
+          const q = rot(trail[j], trail[j + 1], trail[j + 2]), kq = D / (D - q[2]), qx = cx + q[0] * Rr * kq, qy = cy - q[1] * Rr * kq;
+          if (prev) { ctx.strokeStyle = `rgba(190,250,238,${((j / trail.length) * 0.55).toFixed(3)})`; ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(qx, qy); ctx.stroke(); }
+          prev = [qx, qy];
         }
       }
-      state.frame += 1;
-      draw(dt);
-      hudTimer += dt;
-      if (hudTimer > 0.2) {
-        hudTimer = 0;
-        $("c-files").textContent = `${nf.format(state.filesRead)}/${nf.format(N)}`;
-        $("c-lines").textContent = nf.format(state.linesRead);
-        $("c-links").textContent = nf.format(revealed.size);
-        $("c-flags").textContent = nf.format(state.flags);
-        $("c-time").textContent = state.t.toFixed(2).replace(".", ",");
-        $("c-frame").textContent = pad(state.frame % 10000, 4);
-        const recent = state.readTimes.filter((x) => x > state.t - 5).length;
-        $("rate").textContent = `${(recent / 5).toFixed(1).replace(".", ",")} a/s`;
+      if (Math.hypot(px - spider.sx, py - spider.sy) > 0.6) spider.heading = Math.atan2(py - spider.sy, px - spider.sx);
+      spider.sx = px; spider.sy = py;
+      const sc = (Rr / 190) * k * (pz > -0.2 ? 1 : 0.7), walking = state.phase === "walk" && !reduce, gait = walking ? T * 16 : 0;
+      ctx.save();
+      ctx.globalAlpha = pz > -0.25 ? 1 : 0.35;
+      ctx.translate(px, py);
+      ctx.rotate(spider.heading);
+      ctx.scale(sc, sc);
+      ctx.strokeStyle = "rgba(223,240,234,.92)";
+      ctx.lineWidth = 1.2 / Math.max(0.5, sc);
+      ctx.beginPath();
+      for (let l = 0; l < 8; l++) {
+        const sd = l < 4 ? -1 : 1, idx = l % 4, phase = idx * 1.7 + (sd > 0 ? Math.PI : 0);
+        const a = sd * (0.55 + idx * 0.62) + (walking ? Math.sin(gait + phase) * 0.28 : Math.sin(T * 1.5 + l) * 0.03), ka = a - sd * 0.38;
+        ctx.moveTo(Math.cos(a) * 3, Math.sin(a) * 3);
+        ctx.lineTo(Math.cos(ka) * 10, Math.sin(ka) * 10);
+        ctx.lineTo(Math.cos(a) * 18, Math.sin(a) * 18);
+      }
+      ctx.stroke();
+      ctx.shadowColor = FLAG;
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = FLAG;
+      ctx.fillRect(-4, -4, 8, 8);
+      ctx.restore();
+      ctx.strokeStyle = "rgba(79,216,196,.4)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(px, py, (15 + (reduce ? 0 : Math.sin(T * 3) * 1.5)) * Math.max(0.6, sc), 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // textos: sin pisarse entre ellos
+    const boxes = [];
+    const free = (x, y, w, h) => { if (x < bx0 + 2 || y < by0 + 2 || x + w > bx1 - 2 || y + h > by1 - 2) return false; if (boxes.some((b) => x < b[0] + b[2] && x + w > b[0] && y < b[1] + b[3] && y + h > b[1])) return false; boxes.push([x, y, w, h]); return true; };
+    ctx.textBaseline = "alphabetic";
+    const FONT = (px, w = 500) => `${w} ${px}px "Geist Mono", ui-monospace, monospace`;
+    // la tarjeta del objetivo que se lee, con su línea hacia afuera (como los datos de la referencia)
+    if (CEN[state.k]) {
+      const c = CEN[state.k], r = rot(c[0], c[1], c[2]), k = D / (D - r[2]);
+      if (r[2] > 0.08) {
+        const px = cx + r[0] * Rr * k, py = cy - r[1] * Rr * k;
+        let dx = px - cx, dy = py - cy;
+        const l = Math.hypot(dx, dy);
+        if (l < Rr * 0.25) { dx = 0.7; dy = -0.7; } else { dx /= l; dy /= l; }
+        const ex0 = cx + dx * Rr * 1.22, ey = cy + dy * Rr * 1.22, right = dx >= 0;
+        const n = filesOf[state.k].length, text = O[state.k].slug.toUpperCase(), sub = `${readIn[state.k]}/${n} archivos · ${doneK[state.k] ? "listo" : "leyendo"}`;
+        ctx.font = FONT(11, 700);
+        const w = Math.max(ctx.measureText(text).width, (ctx.font = FONT(9.5), ctx.measureText(sub).width));
+        const ex = right ? Math.min(ex0, bx1 - 33 - w) : Math.max(ex0, bx0 + 33 + w), endx = ex + (right ? 26 : -26);
+        const tx = right ? endx + 5 : endx - 5 - w, ty = ey + 4;
+        if ((right ? ex > px + 6 : ex < px - 6) && tx > bx0 + 2 && tx + w < bx1 - 2 && ey > by0 + 14 && ey < by1 - 20) {
+          free(tx - 3, ty - 14, w + 6, 30);
+          const rgb = OCR[state.k];
+          ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},.85)`;
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ex, ey); ctx.lineTo(endx, ey); ctx.stroke();
+          ctx.fillStyle = OC[state.k];
+          ctx.beginPath(); ctx.arc(px, py, 2.6, 0, Math.PI * 2); ctx.fill();
+          ctx.textAlign = right ? "left" : "right";
+          ctx.font = FONT(11, 700); ctx.fillText(text, right ? tx : tx + w, ty - 2);
+          ctx.font = FONT(9.5); ctx.fillStyle = "#9fb4a9"; ctx.fillText(sub, right ? tx : tx + w, ty + 10);
+        }
       }
     }
-    requestAnimationFrame(tick);
+    // nombres de los objetivos que están de frente
+    ctx.textAlign = "center";
+    ctx.font = FONT(10);
+    const order = O.map((_, k) => k).filter((k) => CEN[k] && k !== state.k).sort((a, b) => filesOf[b].length - filesOf[a].length);
+    for (const k of order) {
+      const c = CEN[k], r = rot(c[0], c[1], c[2]);
+      if (r[2] < 0.3) continue;
+      const kk = D / (D - r[2]), px = cx + r[0] * Rr * kk, py = cy - r[1] * Rr * kk;
+      let dx = px - cx, dy = py - cy;
+      const l = Math.hypot(dx, dy);
+      if (l < Rr * 0.2) { dx = 0; dy = -1; } else { dx /= l; dy /= l; }
+      const off = CAP[k] * Rr * kk * 0.85 + 11, lx = px + dx * off, ly = py + dy * off, w = ctx.measureText(O[k].slug).width;
+      if (!free(lx - w / 2 - 2, ly - 10, w + 4, 13)) continue;
+      ctx.lineWidth = 3; ctx.strokeStyle = "rgba(3,6,5,.9)"; ctx.strokeText(O[k].slug, lx, ly);
+      ctx.fillStyle = `rgba(${OCR[k][0]},${OCR[k][1]},${OCR[k][2]},${(0.55 + 0.45 * r[2]).toFixed(2)})`;
+      ctx.fillText(O[k].slug, lx, ly);
+    }
+    // el archivo elegido y sus vecinos
+    ctx.textAlign = "left";
+    ctx.font = FONT(10.5);
+    if (hubNode >= 0 && state.focus >= 0 && RZ[hubNode] > -0.12) {
+      ctx.strokeStyle = "rgba(255,255,255,.9)"; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(SX[hubNode], SY[hubNode], 11 * (Rr / 190) + 4, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (hubNode >= 0) {
+      const labeled = [hubNode, ...near.slice(0, small ? 4 : 7)];
+      labeled.forEach((j, n) => {
+        if (RZ[j] < -0.05) return;
+        const text = base(F[j].p), w = ctx.measureText(text).width + 10, x = SX[j] + 8, y = SY[j] - 8;
+        if (!free(x, y, w, 16)) return;
+        ctx.fillStyle = "rgba(3,6,5,.86)"; ctx.fillRect(x, y, w, 16);
+        ctx.strokeStyle = n === 0 ? "rgba(255,255,255,.85)" : "rgba(79,216,196,.7)"; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 15);
+        ctx.fillStyle = n === 0 ? "#fff" : "#bff5ec"; ctx.fillText(text, x + 5, y + 12);
+      });
+    }
+    // las últimas banderas que encontró la araña
+    for (const i of recentFlags) {
+      if (RZ[i] < 0) continue;
+      const text = `⚑ ${base(F[i].p)} · ${flagsOf[i][0].k === "sin-prueba" ? "sin prueba" : "revisar"}`, w = ctx.measureText(text).width + 12, len = 1.1 + 0.2 * flagged[i];
+      const x = cx + RX[i] * len * Rr + 6, y = cy - RY[i] * len * Rr - 8;
+      if (!free(x, y, w, 16)) continue;
+      ctx.fillStyle = FLAG; ctx.fillRect(x, y, w, 16);
+      ctx.fillStyle = "#14030a"; ctx.fillText(text, x + 6, y + 12);
+    }
   }
 
-  // ── Controles ──
-  const play = $("b-play");
-  function syncPlay() { play.textContent = state.playing ? "❚❚" : "▶"; play.setAttribute("aria-pressed", String(!state.playing)); }
-  play.addEventListener("click", () => { state.playing = !state.playing; syncPlay(); });
-  $("b-speed").addEventListener("click", (e) => { state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : 1; e.currentTarget.textContent = `${state.speed}×`; });
-  function syncFollow() { manual = null; $("b-follow").setAttribute("aria-pressed", String(state.follow)); }
-  $("b-follow").addEventListener("click", () => { state.follow = !state.follow; if (state.follow && state.view === "todo") state.view = "objetivo"; syncFollow(); updateHead(); updateTabs(); });
+  // ── Cámara: sigue a la araña, o gira sola cuando la soltás ──
+  function camStep(dt) {
+    if (cam.dragging) return;
+    let goal = cam.goal;
+    if (!goal && state.follow && hasFiles) {
+      const c = CEN[state.k], p = state.pos;
+      const f = c ? unit([c[0] * 0.65 + p[0] * 0.35, c[1] * 0.65 + p[1] * 0.35, c[2] * 0.65 + p[2] * 0.35]) : p;
+      const g = faceAngles(f);
+      goal = [g[0] + (reduce ? 0 : 0.3 * Math.sin(T * 0.13)), clamp(g[1], -0.75, 0.75) + (reduce ? 0 : 0.07 * Math.sin(T * 0.09))];
+    }
+    if (goal) {
+      const e = 1 - Math.exp(-dt * (reduce ? 20 : 2.2));
+      cam.yaw += wrapA(goal[0] - cam.yaw) * e;
+      cam.pitch += (goal[1] - cam.pitch) * e;
+      cam.vy = 0; cam.vp = 0;
+      if (cam.goal && Math.abs(wrapA(cam.goal[0] - cam.yaw)) < 0.01 && Math.abs(cam.goal[1] - cam.pitch) < 0.01) cam.goal = null;
+    } else {
+      const auto = reduce || cam.hold ? 0 : 0.14;
+      cam.vy += (auto - cam.vy) * (1 - Math.exp(-dt * 0.9));
+      cam.yaw += cam.vy * dt;
+      cam.pitch = clamp(cam.pitch + cam.vp * dt, -1.25, 1.25);
+      cam.vp *= Math.exp(-dt * 3);
+    }
+  }
 
-  // tocar, arrastrar y acercar
+  // ── Tocar, arrastrar y acercar ──
   const ptrs = new Map();
-  let down = null, pinch0 = 0, zoom0 = 1, lastTap = 0;
+  let down = null, pinch0 = 0, zoom0 = 1;
+  const hintEl = $("hint");
+  const quietHint = () => hintEl.classList.add("off");
+  const local = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
   cv.addEventListener("pointerdown", (e) => {
-    cv.setPointerCapture(e.pointerId);
-    ptrs.set(e.pointerId, [e.offsetX, e.offsetY]);
-    if (ptrs.size === 1) down = { x: e.offsetX, y: e.offsetY, t: performance.now(), cx: cam.x, cy: cam.y, moved: false };
-    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); zoom0 = cam.z; }
+    try { cv.setPointerCapture(e.pointerId); } catch { /* sin captura también anda */ }
+    const [x, y] = local(e);
+    ptrs.set(e.pointerId, [x, y]);
+    if (ptrs.size === 1) down = { x, y, yaw: cam.yaw, pitch: cam.pitch, moved: false, lx: x, lt: performance.now(), vx: 0 };
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); zoom0 = cam.zoom; down = null; }
+    quietHint();
   });
   cv.addEventListener("pointermove", (e) => {
     if (!ptrs.has(e.pointerId)) return;
-    ptrs.set(e.pointerId, [e.offsetX, e.offsetY]);
+    const [x, y] = local(e);
+    ptrs.set(e.pointerId, [x, y]);
     if (ptrs.size === 2 && pinch0 > 0) {
       const [a, b] = [...ptrs.values()];
-      manual = { x: cam.x, y: cam.y, z: Math.max(0.15, Math.min(6, zoom0 * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch0)) };
-      state.follow = false; $("b-follow").setAttribute("aria-pressed", "false");
+      cam.zoom = clamp((zoom0 * Math.hypot(a[0] - b[0], a[1] - b[1])) / pinch0, 0.7, 1.7);
+      wake();
       return;
     }
-    if (down && ptrs.size === 1) {
-      const dx = e.offsetX - down.x, dy = e.offsetY - down.y;
-      if (Math.hypot(dx, dy) > 6) down.moved = true;
-      if (down.moved) {
-        cv.classList.add("dragging");
-        manual = { x: down.cx - dx / cam.z, y: down.cy - dy / cam.z, z: cam.z };
-        state.follow = false; $("b-follow").setAttribute("aria-pressed", "false");
-      }
+    if (!down || ptrs.size !== 1) return;
+    const dx = x - down.x, dy = y - down.y;
+    if (!down.moved && Math.hypot(dx, dy) > 6) {
+      down.moved = true;
+      cam.dragging = true; cam.goal = null; cam.hold = false;
+      state.follow = false; syncFollow();
+      cv.classList.add("dragging");
+    }
+    if (down.moved) {
+      cam.yaw = down.yaw + dx * 0.0062;
+      cam.pitch = clamp(down.pitch + dy * 0.0062, -1.25, 1.25);
+      const now = performance.now();
+      down.vx = ((x - down.lx) / Math.max(1, now - down.lt)) * 1000 * 0.0062;
+      down.lx = x; down.lt = now;
+      wake();
     }
   });
-  const up = (e) => {
+  function pointerEnd(e, cancelled) {
     ptrs.delete(e.pointerId);
     cv.classList.remove("dragging");
     if (ptrs.size < 2) pinch0 = 0;
     if (!down || ptrs.size) return;
-    if (!down.moved) {
-      const now = performance.now();
-      if (now - lastTap < 300) { state.follow = true; syncFollow(); state.focus = -1; renderCard(state.file, false); }
-      else {
-        let best = -1, bd = 22;
-        for (let i = 0; i < N; i++) { const [sx, sy] = toScreen(X[i], Y[i]); const d = Math.hypot(sx - down.x, sy - down.y); if (d < bd) { bd = d; best = i; } }
-        if (best >= 0) { state.focus = best; renderCard(best, true); }
-      }
-      lastTap = now;
-    }
+    if (down.moved) cam.vy = clamp(down.vx, -2.5, 2.5);
+    else if (!cancelled) pick(down.x, down.y);
+    cam.dragging = false;
     down = null;
-  };
-  cv.addEventListener("pointerup", up);
-  cv.addEventListener("pointercancel", up);
-  cv.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    const z = Math.max(0.15, Math.min(6, cam.z * Math.exp(-e.deltaY * 0.0015)));
-    manual = { x: cam.x, y: cam.y, z };
-    state.follow = false; $("b-follow").setAttribute("aria-pressed", "false");
-  }, { passive: false });
-
-  // ── Arranque: el primer cuadro ya muestra todo el mapa con sus contadores ──
-  log("pasar", "inicio", `${nf.format(N)} archivos · ${O.length} objetivos · ${nf.format(G.resumen.enlaces)} imports`);
-  log("pasar", "pasar", `→ ${O[state.k].slug}`);
-  syncPlay();
-  updateHead();
-  updateTabs();
-  renderCard(-1, false);
-  if (reduce) {
-    state.playing = false;
-    syncPlay();
   }
+  cv.addEventListener("pointerup", (e) => pointerEnd(e, false));
+  cv.addEventListener("pointercancel", (e) => pointerEnd(e, true));
+  cv.addEventListener("wheel", (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return; // sin Ctrl, la rueda sigue moviendo la página
+    e.preventDefault();
+    cam.zoom = clamp(cam.zoom * Math.exp(-e.deltaY * 0.0025), 0.7, 1.7);
+    wake();
+  }, { passive: false });
+  function pick(x, y) {
+    let best = -1, bd = 22;
+    for (let i = 0; i < N; i++) {
+      if (RZ[i] < -0.12) continue;
+      const d = Math.hypot(SX[i] - x, SY[i] - y);
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (best >= 0) select(best);
+  }
+
+  // ── Tiempo ──
+  let last = performance.now(), hudAcc = 1, clockAcc = 1;
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (!document.hidden && visible) {
+      T += dt;
+      if (state.playing) step(dt);
+      camStep(dt);
+      if (!reduce || dirty || state.playing || cam.dragging || Math.abs(cam.vy) > 0.01 || cam.goal) { draw(); dirty = false; }
+      hudAcc += dt;
+      if (hudAcc > 0.2) { hudAcc = 0; updateHud(); }
+      clockAcc += dt;
+      if (clockAcc >= 1) { clockAcc = 0; tickClock(); }
+    }
+    requestAnimationFrame(tick);
+  }
+  if ("IntersectionObserver" in window) new IntersectionObserver((es) => { visible = es[es.length - 1].isIntersecting; if (visible) { last = performance.now(); wake(); } }, { threshold: 0 }).observe(stage);
+  let rzTimer = 0, chartW = 0;
+  const onResize = () => {
+    clearTimeout(rzTimer);
+    rzTimer = setTimeout(() => {
+      const w = document.documentElement.clientWidth;
+      if (Math.abs(w - chartW) > 2) { chartW = w; charts(); }
+      reserveTape();
+      layout();
+    }, 90);
+  };
+  window.addEventListener("resize", onResize);
+  if ("ResizeObserver" in window) { const ro = new ResizeObserver(onResize); ro.observe(stage); ro.observe(coreView); }
+  document.fonts?.ready?.then(() => { charts(); reserveTape(); layout(); });
+
+  // ── Dentro de la app: le avisa el alto de la página al marco, así no queda un scroll adentro de otro ──
+  if (window.parent !== window) {
+    let sentH = 0;
+    const sendH = () => {
+      const h = Math.ceil($("app").getBoundingClientRect().height);
+      if (h < 200 || Math.abs(h - sentH) < 2) return;
+      sentH = h;
+      try { window.parent.postMessage({ arana: "alto", h }, "*"); } catch (e) { /* sin ventana madre: se ve igual */ }
+    };
+    if ("ResizeObserver" in window) new ResizeObserver(sendH).observe($("app"));
+    window.addEventListener("load", sendH);
+    setTimeout(sendH, 0);
+  }
+
+  // ── Arranque: el primer cuadro ya muestra la esfera con todos sus números ──
+  tapeRow("pasar", { file: `inicio · ${nf.format(N)} archivos · ${NO} objetivos · ${nf.format(G.resumen.enlaces)} imports` });
+  tapeRow("pasar", { file: `→ <span style="color:${OC[state.k]}">${esc(O[state.k].slug)}</span>`, obj: esc(O[state.k].slug) });
+  chartW = document.documentElement.clientWidth;
+  reserveTape();
+  syncPlay();
+  syncFollow();
+  charts();
+  layout();
+  updateAll();
+  updateHud();
+  tickClock();
+  setTimeout(quietHint, 9000);
   requestAnimationFrame(tick);
 })();
 </script>
