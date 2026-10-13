@@ -132,6 +132,27 @@ Ningún cambio sube el profit factor más de 0,05 en las cuatro ventanas. Dos su
 
 Lo que sí es parejo en los tres períodos, pero en muy pocas operaciones: las que van **contra la tendencia diaria** tienen profit factor 0,59, 0,75 y 0,60 (542 de 27.968 puntos), y las que van contra la tendencia de BTC en 4 h, 0,65, 0,90 y 0,88 (`aprendizaje.ts --cortes`). Excluir las de la tendencia diaria («Tendencia diaria no en contra») no cambió el resultado: son pocas.
 
+## Estadística profesional (1 h, reglas v2, medida el 13/10/2026)
+
+Cómo se mide: `node --experimental-strip-types scripts/investigacion/medir.ts 1h --estadistica`. Los cálculos están en `lib/jarvis-stats.ts` (fórmulas de Wilson, Bailey y López de Prado, Van Tharp; probadas contra scipy). IC90 en todo. Profit factor y expectativa, con bootstrap en bloques de operaciones (2.000 repeticiones). Sharpe y SQN por operación, sin anualizar.
+
+| Período | Operaciones | Win rate (IC90) | Profit factor (IC90) | Expectativa (IC90) | Sharpe | SQN | Peor caída real (simulada p95) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2021-01 → 2024-02 | 1.991 | 45% [44%; 47%] | 1,15 [1,01; 1,32] | +0,080 R [+0,007; +0,158] | 0,061 | 2,73 | 66,4 R (56,7 R) |
+| 2024-02 → 2025-06 | 900 | 45% [42%; 48%] | 1,15 [0,97; 1,35] | +0,077 R [−0,016; +0,171] | 0,059 | 1,76 | 46,9 R (47,7 R) |
+| 2025-07 → 2026-09 | 778 | 46% [43%; 48%] | 1,22 [0,95; 1,54] | +0,115 R [−0,030; +0,262] | 0,086 | 2,39 | 50,1 R (37,3 R) |
+| Últimos 180 días | 305 | 44% [39%; 48%] | 1,10 [0,76; 1,58] | +0,058 R [−0,145; +0,282] | 0,044 | 0,76 | 28,3 R (37,8 R) |
+| Los 3 períodos largos | 3.669 | 45% [44%; 47%] | 1,17 [1,05; 1,29] | +0,086 R [+0,028; +0,146] | 0,066 | 3,99 | 66,4 R (60,0 R) |
+
+Lectura:
+
+- En el total de los tres períodos largos, la expectativa es positiva y su IC90 no incluye el cero: entre +0,028 y +0,146 R por operación. PSR (probabilidad de que el Sharpe sea mayor que cero): 100%.
+- En cada tramo corto, el IC90 de la expectativa incluye el cero. La ventaja no se ve sola en cada período: es el dato que más pesa para no prometer nada.
+- Azar por haber probado reglas (Deflated Sharpe): con las 22 reglas de la lista, el Sharpe de azar es 0,014 por operación y el DSR 99,9%. Con 300 reglas, 0,020 y 99,8%. Es optimista: las variantes son parecidas entre sí y la investigación probó más de 22 (varios cientos). Un DSR de 99,9% no es una garantía.
+- Win rate corregido por esas 22 reglas (Bonferroni): [43%; 48%]. Ninguna regla supera el 50% de forma que se distinga del azar en los períodos largos.
+- El 52% de 12 h (47 de 91 operaciones) tiene un IC90 de [43%; 60%]: no se distingue del 50%. Con 91 operaciones, un win rate alto no prueba nada.
+- Diferencia con las tablas de arriba: el primer período tiene 1.991 operaciones hoy y 1.984 en la medición anterior. Vienen de volver a bajar las velas; el resto coincide.
+
 ## Lo que esto no demuestra
 
 - Las reglas se eligieron entre varios cientos de combinaciones mirando los tres períodos: los números de v2 son optimistas por esa selección. Una expectativa razonable es un profit factor de 1,1 a 1,2, no más.

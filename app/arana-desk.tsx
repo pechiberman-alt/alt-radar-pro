@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PanelVivo, useVivo } from "./arana-vivo";
 
 /**
  * La araña dentro de la app. La página la arma el build con el código real
@@ -19,6 +20,12 @@ export default function AranaDesk() {
   const [listo, setListo] = useState(false);
   const [alto, setAlto] = useState<number | null>(null);
   const marco = useRef<HTMLIFrameElement>(null);
+  const vivo = useVivo();
+
+  // La foto de la mesa en vivo también llega al marco: la araña la muestra en su cinta superior.
+  useEffect(() => {
+    if (listo && vivo) marco.current?.contentWindow?.postMessage({ arana: "vivo", vivo }, "*");
+  }, [listo, vivo]);
 
   useEffect(() => {
     const escuchar = (e: MessageEvent) => {
@@ -46,6 +53,7 @@ export default function AranaDesk() {
         Una esfera con cada archivo del proyecto: los colores son los objetivos, los arcos son imports reales y la araña camina por ellos. Tocá un objetivo,
         buscá un tema o copiá una consulta para Claude. Se arma en cada despliegue con el código real, así que siempre es el de esta versión.
       </p>
+      <PanelVivo vivo={vivo} />
       <div className="arana-frame" aria-busy={!listo}>
         {!listo && <span className="arana-wait">DIBUJANDO LA ARAÑA…</span>}
         <iframe
