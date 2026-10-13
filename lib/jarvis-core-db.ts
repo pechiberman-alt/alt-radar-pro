@@ -141,6 +141,12 @@ export async function readCoreStats(db: D1Database) {
   return coreStats(await readCounters(db));
 }
 
+/** Los contadores crudos por fuente (las de sombra llevan «~SOMBRA»): el registro unificado los suma. */
+export async function readCoreCounters(db: D1Database): Promise<Record<string, CoreCounters>> {
+  await ensureCoreSchema(db);
+  return readCounters(db);
+}
+
 /** Records new signals (an id seen before is ignored) and counts them as open, taken or in shadow. */
 export async function recordCoreSignals(db: D1Database, signals: CoreSignal[], now: number): Promise<CoreSignal[]> {
   await ensureCoreSchema(db);

@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 531 · objetivos: 15 · sin objetivo: 0
-- Tablas D1: 46 · secretos: 4 · variables de entorno: 12 · rutas /api: 50 · hosts: 55
-- Código de navegador: 60 archivos con "use client" que alcanzan 171 · problemas: 0
-- Lib sin prueba directa: 20 de 161
+- Archivos: 536 · objetivos: 16 · sin objetivo: 0
+- Tablas D1: 46 · secretos: 4 · variables de entorno: 12 · rutas /api: 51 · hosts: 55
+- Código de navegador: 60 archivos con "use client" que alcanzan 172 · problemas: 0
+- Lib sin prueba directa: 21 de 164
 
 ## Objetivos
 
@@ -359,6 +359,14 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `tests/herramientas.test.ts` — Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada más, `npm run subir` tiene que frenar secretos y archivos protegi
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)
 
+### registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente (5)
+Texto: el único lugar donde la app calcula el acierto, el profit factor y la expectancia. Cada fuente (JARVIS, el bot de papel, el robot) con su muestra y su intervalo; lo que no se pudo leer dice «sin datos», no cero.
+- `app/api/registro/route.ts` — exporta: dynamic, GET
+- `lib/registro-db.ts` — La lectura del registro unificado desde la base (lib/registro.ts hace la cuenta).
+- `lib/registro-run.ts` — El registro para la app y la araña: lo lee el navegador de GET /api/registro como mucho cada 5 minutos, y solo con la pestaña visible.
+- `lib/registro.ts` — El registro unificado de operaciones: el único lugar donde la app calcula el acierto, el profit factor y la expectancia.
+- `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
+
 ### calidad — Pruebas (131)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
@@ -615,10 +623,10 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `jarvis_chat` — crea: lib/jarvis-chat.ts · usa: lib/jarvis-chat.ts, tests/jarvis-chat.test.ts · índices: jarvis_chat_user
 - `jarvis_core_signals` — crea: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · usa: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · índices: jarvis_core_open, jarvis_core_created, jarvis_core_closed, jarvis_core_busy
 - `jarvis_core_state` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts, lib/jarvis-mind-db.ts, lib/jarvis-world.ts, tests/jarvis-mind.test.ts · sin índice visible en el código
-- `jarvis_core_stats` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts · sin índice visible en el código
+- `jarvis_core_stats` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts, tests/registro.test.ts · sin índice visible en el código
 - `jarvis_memory` — crea: lib/jarvis-memory.ts · usa: lib/jarvis-memory.ts · índices: jarvis_memory_user
 - `jarvis_mind` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts, lib/jarvis-mind-db.ts · sin índice visible en el código
-- `jarvis_paper` — crea: lib/jarvis-paper-db.ts · usa: lib/jarvis-paper-db.ts · índices: jarvis_paper_recent
+- `jarvis_paper` — crea: lib/jarvis-paper-db.ts · usa: lib/jarvis-paper-db.ts, lib/registro-db.ts, tests/registro.test.ts · índices: jarvis_paper_recent
 - `jarvis_paper_counts` — crea: lib/jarvis-paper-db.ts · usa: lib/jarvis-paper-db.ts · sin índice visible en el código
 - `jarvis_voice_usage` — crea: lib/jarvis-voice-server.ts · usa: lib/jarvis-voice-server.ts · sin índice visible en el código
 - `journal_fills` — crea: lib/diario-db.ts · usa: lib/diario-db.ts · sin índice visible en el código
@@ -631,7 +639,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `notas` — crea: tests/arana.test.ts · usa: tests/arana.test.ts · índices: notas_id
 - `notes` — crea: examples/d1/db/schema.ts · usa: examples/d1/app/api/notes/route.ts · sin índice visible en el código
 - `push_subscriptions` — crea: lib/web-push.ts, tests/web-push.test.ts · usa: app/api/push/subscribe/route.ts · sin índice visible en el código
-- `robot_senales` — crea: lib/robot-ledger-db.ts · usa: lib/robot-ledger-db.ts · índices: robot_senales_vela
+- `robot_senales` — crea: lib/robot-ledger-db.ts · usa: lib/registro-db.ts, lib/robot-ledger-db.ts, tests/registro.test.ts · índices: robot_senales_vela
 - `sessions` — crea: db/schema.ts, lib/auth.ts · usa: lib/auth.ts · sin índice visible en el código
 - `signal_records` — crea: db/schema.ts, lib/automation.ts, tests/signal-plan-db.test.ts (+1) · usa: app/api/alerts/latest/route.ts, app/api/performance/route.ts, app/api/signals/route.ts, app/api/telegram/webhook/route.ts, lib/automation.ts, lib/scalping-automation.ts (+5) · índices: signal_records_detected_idx, signal_records_symbol_side_idx, signal_records_status_idx
 - `structure_snapshots` — crea: lib/structure-archive.ts · usa: lib/jarvis-mind-db.ts, lib/structure-archive.ts, lib/telegram-ai-server.ts · índices: structure_snapshots_time_idx
@@ -704,6 +712,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/performance` [GET] — app/api/performance/route.ts · riesgo-diario
 - `/api/push/subscribe` [POST, DELETE] — app/api/push/subscribe/route.ts · alertas
 - `/api/radar` [GET] — app/api/radar/route.ts · senales-radar
+- `/api/registro` [GET] — app/api/registro/route.ts · registro
 - `/api/robot/signal` [GET, POST] — app/api/robot/signal/route.ts · robots-papel
 - `/api/rolling` [GET] — app/api/rolling/route.ts · datos-mercado
 - `/api/scalping` [POST] — app/api/scalping/route.ts · senales-radar
@@ -781,4 +790,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

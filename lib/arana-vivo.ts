@@ -11,6 +11,7 @@ import { MIN_SAMPLE, paperStats, type PaperTrade } from "./jarvis-paper.ts";
 import { isApproved, rankApproved, summarize, type ScanResult, type ScanRow } from "./jarvis-scan.ts";
 import type { WatchStatus } from "./jarvis-watch-run.ts";
 import type { ResumenSombra } from "./mesa-sombra.ts";
+import type { Registro } from "./registro.ts";
 import { wilson, type Muestra } from "./jarvis-stats.ts";
 import type { MedicionMesa } from "./mesa-medicion.ts";
 
@@ -54,6 +55,8 @@ export type VivoInput = {
   medido: MedicionMesa;
   /** El laboratorio en sombra; null o ausente si todavía no cargó. */
   sombra?: VivoSombra | null;
+  /** El registro unificado (lib/registro.ts) que la app leyó del servidor; null o ausente si todavía no cargó. */
+  registro?: Registro | null;
 };
 
 export type VivoSnapshot = {
@@ -114,6 +117,8 @@ export type VivoSnapshot = {
   advertencia: string;
   aprendizaje: string;
   sombra: VivoSombra | null;
+  /** El acierto, el profit factor y la expectancia de cada fuente, con su muestra; null si no se leyó. */
+  registro: Registro | null;
 };
 
 const finito = (x: number | null | undefined) => (typeof x === "number" && Number.isFinite(x) ? x : null);
@@ -273,5 +278,6 @@ export function buildVivo(i: VivoInput): VivoSnapshot {
     advertencia: ADVERTENCIA_VIVO,
     aprendizaje: APRENDIZAJE_VIVO,
     sombra: i.sombra ?? null,
+    registro: i.registro ?? null,
   };
 }

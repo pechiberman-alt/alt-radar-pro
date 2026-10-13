@@ -122,6 +122,14 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
 .pie { margin: 12px 0 0; font-size: 9.5px; color: var(--muted); display: grid; gap: 4px; }
 .lab { margin-top: 10px; }
 .lab-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 0 0 10px; }
+.reg-wrap { overflow-x: auto; }
+.reg-tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+.reg-tabla th, .reg-tabla td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; white-space: nowrap; }
+.reg-tabla .sin td { opacity: .55; }
+.reg-tabla .m-min { color: #ffb84d; }
+.reg-tabla .m-ok { color: #4dffad; }
+.reg-tabla small { opacity: .7; }
+.reg-tabla .aparte td { opacity: .7; font-style: italic; }
 .lab-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; }
 .lab h3 { margin: 0 0 6px; font-size: 10px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; font-weight: 600; }
 .lab-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 10.5px; }
@@ -214,6 +222,16 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
     </article>
   </section>
 
+  <section class="panel registro" id="registro" aria-label="Registro de operaciones">
+    <h2>Registro · todas las operaciones, con su muestra</h2>
+    <p class="lab-nota" id="reg-nota"></p>
+    <div class="lab-kpis" id="reg-total"></div>
+    <div class="reg-wrap"><table class="reg-tabla">
+      <thead><tr><th>Fuente</th><th>Cerradas</th><th>Acierto (IC 90 %)</th><th>Profit factor</th><th>R por operación</th><th>Muestra</th></tr></thead>
+      <tbody id="reg-filas"></tbody>
+    </table></div>
+    <p class="lab-nota">Cada número sale del registro: JARVIS es global y tu cuenta aparece solo con sesión. Un porcentaje siempre va con su muestra; menos de 15 cerradas es muestra mínima. Las abiertas no entran en el acierto. No es asesoramiento financiero.</p>
+  </section>
   <section class="panel lab" id="lab" aria-label="Laboratorio en sombra">
     <h2>Laboratorio en sombra · aprende con cada operación cerrada</h2>
     <p class="nota" id="lab-nota">El laboratorio todavía no cargó.</p>
@@ -605,6 +623,42 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
   const Rr = (x) => (OK(x) ? `${x > 0 ? "+" : ""}${x.toFixed(3).replace(".", ",")} R` : "sin dato");
   const medida = (m) => (m ? `${Rr(m.media)} · n=${n0(m.n)}` : "sin dato");
   const MODO = { cuenta: "auditoría en tu cuenta", "sin sesión": "sin sesión: corre en memoria, sin auditoría ni aprobación", error: "sin conexión con tu cuenta", cargando: "cargando" };
+  function pintarRegistro() {
+    const g = foto.registro;
+    if (!g) {
+      $("reg-nota").textContent = "El registro todavía no cargó. Con sesión, ves también tu bot de papel y tu robot.";
+      $("reg-total").innerHTML = "";
+      $("reg-filas").innerHTML = "";
+      return;
+    }
+    const pct = (v) => (v === null || v === undefined ? "sin dato" : `${Math.round(v * 100)} %`);
+    const dec = (v) => (v === null || v === undefined ? "sin dato" : v.toFixed(2).replace(".", ","));
+    const signo = (v) => (v === null || v === undefined ? "sin dato" : `${v > 0 ? "+" : ""}${v.toFixed(2).replace(".", ",")} R`);
+    const iv = (x) => (x ? `${pct(x.low)}–${pct(x.high)}` : "—");
+    const tile = (t, v, sub) => `<div class="tile"><small>${esc(t)}</small><b>${esc(v)}</b><span>${esc(sub)}</span></div>`;
+    const T = g.total;
+    $("reg-nota").textContent = `Total de lo medido: ${n0(T.cerradas)} operaciones cerradas.`;
+    const pfTotal = T.profitFactor !== null ? dec(T.profitFactor) : T.cerradas && !T.perdido ? "sin pérdidas" : "sin dato";
+    $("reg-total").innerHTML = [
+      tile("Acierto total", pct(T.winRate), `IC 90 % ${iv(T.intervalo)} · n=${n0(T.cerradas)}`),
+      tile("Profit factor", pfTotal, "ganado ÷ perdido"),
+      tile("R por operación", signo(T.expectancia), `neto ${signo(T.neto)}`),
+      tile("Sin cerrar", n0(T.abiertas), "todavía corriendo"),
+    ].join("");
+    $("reg-filas").innerHTML = g.fuentes.map((f) => {
+      const nombre = esc(f.nombre) + (f.incompleta ? " <em>(incompleta)</em>" : "");
+      if (!f.disponible) {
+        const pista = f.ambito === "CUENTA" ? " (con sesión)" : "";
+        return `<tr class="sin"><td>${nombre}</td><td colspan="5">sin datos${pista}</td></tr>`;
+      }
+      const aparte = f.enTotal ? "" : " class=\"aparte\"";
+      if (!f.cerradas) return `<tr${aparte}><td>${nombre}</td><td>0</td><td>—</td><td>—</td><td>—</td><td>sin cerradas</td></tr>`;
+      const pf = f.profitFactor !== null ? dec(f.profitFactor) : f.perdido === 0 ? "sin pérdidas" : "sin dato";
+      const muestra = f.muestra === "MINIMA" ? "<span class=\"m-min\">mínima</span>" : "<span class=\"m-ok\">razonable</span>";
+      return `<tr${aparte}><td>${nombre}</td><td>${n0(f.cerradas)}</td><td>${pct(f.winRate)} <small>${esc(iv(f.intervalo))}</small></td><td>${pf}</td><td>${signo(f.expectancia)}</td><td>${muestra}</td></tr>`;
+    }).join("");
+  }
+
   function pintarSombra() {
     const s = foto.sombra;
     if (!s || !s.resumen) {
@@ -676,6 +730,7 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
     pintarCarta();
     pintarVacio();
     pintarSombra();
+    pintarRegistro();
     $("pie-adv").textContent = `${foto.advertencia || ""} ${foto.aprendizaje || ""} No es asesoramiento financiero.`;
     sucio = true;
     enviarAlto();
