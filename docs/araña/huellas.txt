@@ -2,7 +2,7 @@
 85b481b3469d	5	.claude/settings.json
 b531751b31a2	27	.github/workflows/claude.yml
 bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
-cd6df567d84b	0	.gitignore
+bcde9385654a	0	.gitignore
 01d17d57cd3e	9	.mcp.json
 6b5886c6306e	5	.openai/hosting.json
 9f7f9a424c2c	63	CLAUDE.md
@@ -173,8 +173,10 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-35c4782b5196	201	docs/araña/objetivos.md
-c6b935fce079	69	docs/mesa-reglas-v2.md
+0e216727442b	202	docs/araña/objetivos.md
+081dd8a501f7	96	docs/mesa-aprendizaje.md
+bbf611cc1b26	177	docs/mesa-perfiles.md
+0207ee45bc91	144	docs/mesa-reglas-v2.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -353,6 +355,15 @@ fdf534d15afa	0	public/og.png
 aaa393c36db1	0	public/window.svg
 9f6da9fc755a	898	scripts/arana-vista.html
 3efe2c1e59b2	1067	scripts/arana.mjs
+33685c4edfb7	74	scripts/investigacion/README.md
+8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
+abc3c4cc022d	0	scripts/investigacion/datos.py
+59719875059e	183	scripts/investigacion/medir.ts
+2dea6b11e55f	236	scripts/investigacion/modelos.ts
+3d2f8d602cf9	110	scripts/investigacion/perfiles.ts
+7d2ffebb4423	85	scripts/investigacion/precalcular.ts
+831478cc318c	377	scripts/investigacion/simulador.ts
+5f560ffe8331	75	scripts/investigacion/util.ts
 30cfa0e96f19	19	scripts/write-build-info.mjs
 a6bc231bf554	374	tests/account-journal.test.ts
 847dabc14320	44	tests/agentes-mcp.test.ts
@@ -396,6 +407,7 @@ a3b08c3b70ce	282	tests/hands-free.test.ts
 27b5bf9632d2	26	tests/helpers/setups.ts
 adcae854588e	101	tests/inducement.test.ts
 edf787ad8d65	124	tests/institutional-flows.test.ts
+aaee341fbbff	431	tests/investigacion.test.ts
 cf22fb64056e	59	tests/jarvis-analyst.test.ts
 15f8484f64d6	97	tests/jarvis-backtest-run.test.ts
 ed1ff7a11a00	123	tests/jarvis-backtest.test.ts

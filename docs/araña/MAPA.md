@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 481 · objetivos: 15 · sin objetivo: 0
-- Tablas D1: 43 · secretos: 4 · variables de entorno: 8 · rutas /api: 49 · hosts: 54
+- Archivos: 493 · objetivos: 15 · sin objetivo: 0
+- Tablas D1: 43 · secretos: 4 · variables de entorno: 11 · rutas /api: 49 · hosts: 54
 - Código de navegador: 57 archivos con "use client" que alcanzan 155 · problemas: 0
 - Lib sin prueba directa: 20 de 146
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (55)
+### jarvis — JARVIS, la IA propia del software (66)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -31,6 +31,8 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `app/jarvis-watch.tsx` — exporta: JarvisWatcher, WatchBlock
 - `app/jarvis.css` — JARVIS — HUD voice assistant
 - `app/jarvis.tsx` — exporta: Jarvis, default
+- `docs/mesa-aprendizaje.md` — ¿Puede la mesa aprender de sus propias operaciones?
+- `docs/mesa-perfiles.md` — La mesa con otras velas base (15 min a 12 h)
 - `docs/mesa-reglas-v2.md` — La mesa de JARVIS: reglas v2
 - `lib/ai-analyst-server.ts` — exporta: quotaFor, consumeQuota, alternate, askClaude
 - `lib/ai-analyst.ts` — exporta: AI_MODEL, AI_DAILY_LIMIT, AI_MAX_OUTPUT, compactSnapshot, buildSystemPrompt, buildUserMessage (+4)
@@ -69,6 +71,15 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-world.ts` — exporta: WorldNews, World, worldDigest, readWorld, saveWorld
 - `lib/jarvis.ts` — JARVIS: the app's voice assistant.
 - `lib/speech-text.ts` — What JARVIS writes, turned into what a Spanish voice should say.
+- `scripts/investigacion/README.md` — Investigación de la mesa
+- `scripts/investigacion/aprendizaje.ts` — ¿Puede la mesa aprender?
+- `scripts/investigacion/datos.py`
+- `scripts/investigacion/medir.ts` — Mide las reglas de la mesa en tres períodos que no se superponen, con costos más altos y de más de una manera.
+- `scripts/investigacion/modelos.ts` — Modelos chicos y sin dependencias para la investigación del aprendizaje: regresión ridge, regresión logística con L2, árboles potenciados poco profundos y AUC.
+- `scripts/investigacion/perfiles.ts` — La mesa con otras velas base: 15 min, 1 h (la de la app), 2 h, 4 h, 6 h y 12 h, con las dos versiones de reglas y dos niveles de costo.
+- `scripts/investigacion/precalcular.ts` — Precalcula lo que la mesa veía en cada cierre de 4 velas base (solo velas cerradas) para un perfil de velas.
+- `scripts/investigacion/simulador.ts` — Simulador rápido de la mesa sobre lecturas precalculadas (ver precalcular.ts).
+- `scripts/investigacion/util.ts` — Datos y escalas de tiempo de la investigación de la mesa.
 
 ### honestidad — Nunca inventar: probabilidades, precios, noticias (0)
 Texto: transversal a todo el producto. Lo que no se sabe se dice, no se estima a escondidas.
@@ -317,7 +328,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, PAGINA (+45)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (121)
+### calidad — Pruebas (122)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agentes-mcp.test.ts` — pruebas: ruflo is one MCP server run with npx, ruflo is pinned: exact version, cutoff date for its dependencies, no install scr, the project approves ruflo and gives the cold start time to download (+1)
@@ -360,6 +371,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/helpers/setups.ts` — exporta: setupAt
 - `tests/inducement.test.ts` — pruebas: bullish: BOS on the close above the swing high, the first real pullback is the I, swept and then structure failed: a close below the leg origin, not swept yet: pending, no outcome (+1)
 - `tests/institutional-flows.test.ts` — pruebas: parseFlowDays drops rows that are not reported sessions, parseFlowDays returns days oldest first regardless of source order, a holiday does not extend a streak across it (+1)
+- `tests/investigacion.test.ts` — pruebas: auc counts well-ordered pairs, ties count half, and no negatives means nothing t, resolverSPD solves a small symmetric system and cuantil picks order statistics, ridge recovers a linear relation, a huge penalty falls back to the mean, a const (+1)
 - `tests/jarvis-analyst.test.ts` — pruebas: the analyst never reads a candle still forming, on any timeframe (no lookahead), a steady advance reads alcista on every timeframe, with the evidence listed and , a coil under a level is reported as about to break, and too little history gives
 - `tests/jarvis-backtest-run.test.ts` — pruebas: history comes in pages of 1000, contiguous and without repeats, when futures does not answer, spot does, and the source says so, a backtest from the phone: only closed candles, progress to the end, and the res (+1)
 - `tests/jarvis-backtest.test.ts` — pruebas: the backtest trades with the desk and the paper rules, one trade at a time, no lookahead: changing the future after a moment never changes the trades that c, the desk at a past hour only sees candles closed at that hour, and no history it (+1)
@@ -597,8 +609,11 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `cmc_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/market-structure/route.ts · guarda: app/api/admin/settings/route.ts
 - `groq_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/jarvis-mind-db.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
 - `telegram_bot_token` (secreto) — lee: app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts, app/api/robot/signal/route.ts (+4) · guarda: app/api/admin/settings/route.ts
+- variable `ALT_RADAR_DATOS` — en: scripts/investigacion/util.ts
+- variable `ALT_RADAR_SALIDA` — en: scripts/investigacion/util.ts
 - variable `ASSETS` — en: worker/index.ts
 - variable `CODEX_SANDBOX` — en: vite.config.ts
+- variable `COMISION_PCT` — en: scripts/investigacion/simulador.ts
 - variable `ENCRYPTION_KEY` — en: lib/app-settings.ts
 - variable `GITHUB_SHA` — en: scripts/arana.mjs, scripts/write-build-info.mjs
 - variable `IMAGES` — en: worker/index.ts
