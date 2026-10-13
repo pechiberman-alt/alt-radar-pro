@@ -65,9 +65,9 @@ aa86804bf9da	24	app/api/telegram/test/route.ts
 9f8f9a0bdfc4	176	app/api/telegram/webhook/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
-9a6e527917fb	28	app/arana-desk.css
-094704427e3f	73	app/arana-desk.tsx
-2478a897639e	124	app/arana-vivo.tsx
+79d87b1abd11	42	app/arana-desk.css
+3f3f8ce9a63a	113	app/arana-desk.tsx
+75d00da6dbd4	244	app/arana-vivo.tsx
 109c61b2bb44	34	app/asset-flows.css
 866aeee2a3d1	125	app/asset-flows.tsx
 c8f77f7b2422	70	app/assistant-console.css
@@ -176,9 +176,10 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d47617bfb04d	246	docs/araña/objetivos.md
+d4ab8dec35a3	249	docs/araña/objetivos.md
 081dd8a501f7	96	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
+fe0dac1515d7	26	docs/mesa-referencias.md
 ec29d0ad6d0c	166	docs/mesa-reglas-v2.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
@@ -208,7 +209,8 @@ b8e38621b74b	46	lib/ai-numbers.ts
 509da5ba4297	47	lib/alert-bus.ts
 dbd75245f8b8	366	lib/alerts.ts
 374fb7012b3c	155	lib/app-settings.ts
-fc6e267a879e	165	lib/arana-vivo.ts
+b32e56319e6e	45	lib/arana-vivo-auto.ts
+2ac2c3d702ea	262	lib/arana-vivo.ts
 025856e9b96a	181	lib/asset-read.ts
 8b7646335b22	743	lib/assistant/index.ts
 861e6e35ec57	309	lib/assistant/knowledge.ts
@@ -266,8 +268,8 @@ c4b51bfec404	337	lib/jarvis-mind.ts
 1a8d71f669ad	170	lib/jarvis-paper-db.ts
 e883b3e155e8	258	lib/jarvis-paper-run.ts
 cf67397ebde0	654	lib/jarvis-paper.ts
-3222008e4e7b	288	lib/jarvis-scan-run.ts
-2b4292df04cb	285	lib/jarvis-scan.ts
+a616ae6ddc5b	292	lib/jarvis-scan-run.ts
+15102a31a190	295	lib/jarvis-scan.ts
 187b69f4e8e6	367	lib/jarvis-stats.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
 4b677046fbed	39	lib/jarvis-voice.ts
@@ -351,7 +353,7 @@ d0434e2eafe5	81	lib/trade-bubbles.ts
 5fe614a4e7bf	146	lib/web-push.ts
 19e2de71f66e	6	next-env.d.ts
 89327ac52fc9	8	next.config.ts
-6394a346ad50	51	package.json
+5ffc441f4fa9	51	package.json
 8f8be689e9af	8	postcss.config.mjs
 81e071a890a7	0	public/favicon.svg
 43e2751ad2c3	0	public/file.svg
@@ -362,8 +364,9 @@ bc7491d499a6	0	public/globe.svg
 fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
-a3e430f00683	1637	scripts/arana-vista.html
-656a184d7385	1330	scripts/arana.mjs
+dec125f1757e	1624	scripts/arana-vista.html
+5524f38bc923	649	scripts/arana-vivo.html
+eb4f4f4b4dac	1340	scripts/arana.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
 abc3c4cc022d	0	scripts/investigacion/datos.py
@@ -383,8 +386,9 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
-c647e9051547	151	tests/arana-vivo.test.ts
-d5bbd15a601b	434	tests/arana.test.ts
+41f8e61920bb	44	tests/arana-vivo-auto.test.ts
+1e6d88011a1c	247	tests/arana-vivo.test.ts
+72fda45a2ae9	467	tests/arana.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
 8dffdd6b09f6	386	tests/assistant.test.ts
 dff2674006ae	17	tests/auth-pbkdf2.test.ts
@@ -436,7 +440,7 @@ f509b7eb53bb	45	tests/jarvis-local.test.ts
 310a163bc5a2	198	tests/jarvis-paper-run.test.ts
 c977b546798a	414	tests/jarvis-paper.test.ts
 871655c35609	284	tests/jarvis-rules-v2.test.ts
-452b66c923f6	563	tests/jarvis-scan.test.ts
+7f890858d35b	581	tests/jarvis-scan.test.ts
 2275cc0e95f8	173	tests/jarvis-stats.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
 cc263e715076	62	tests/jarvis-watch-run.test.ts

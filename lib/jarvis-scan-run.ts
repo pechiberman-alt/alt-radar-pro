@@ -43,6 +43,8 @@ export type ScanOptions = {
   minVolume?: number;
   signal?: AbortSignal;
   onProgress?: (p: ScanProgress) => void;
+  /** Cada moneda leída, apenas se lee (para verla llegar en vivo). */
+  onRow?: (row: ScanRow) => void;
   /** Para probar sin red ni reloj. */
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -184,6 +186,7 @@ export async function scanMarket(opts: ScanOptions = {}): Promise<ScanOutcome> {
         const out = await readCoin(e);
         if ("row" in out) {
           rows[i] = out.row;
+          opts.onRow?.(out.row);
           done += 1;
           progress("lectura", done, list.length, e.moneda);
           break;
@@ -241,8 +244,9 @@ export async function scanMarket(opts: ScanOptions = {}): Promise<ScanOutcome> {
 
 // ── El escaneo en curso, compartido entre la sección y el chat de JARVIS ──
 
-export type ScanState = { running: boolean; progress: ScanProgress | null; result: ScanResult | null; error: string | null };
-let state: ScanState = { running: false, progress: null, result: null, error: null };
+/** `filas`: las monedas que van llegando del escaneo en curso (lectura rápida); vacío cuando no hay escaneo. */
+export type ScanState = { running: boolean; progress: ScanProgress | null; result: ScanResult | null; error: string | null; filas: ScanRow[] };
+let state: ScanState = { running: false, progress: null, result: null, error: null, filas: [] };
 let controller: AbortController | null = null;
 
 function emit() {
@@ -270,14 +274,14 @@ export function lastScan(): ScanResult | null {
 export function startScan(opts: { minVolume?: number } = {}): Promise<ScanOutcome> {
   if (state.running) return Promise.resolve({ ok: false, error: "Ya hay un escaneo en curso." });
   controller = new AbortController();
-  set({ running: true, error: null, progress: { fase: "monedas", hechas: 0, total: 0, actual: null, restanteMs: null } });
-  return scanMarket({ minVolume: opts.minVolume, signal: controller.signal, onProgress: (p) => set({ progress: p }) })
+  set({ running: true, error: null, filas: [], progress: { fase: "monedas", hechas: 0, total: 0, actual: null, restanteMs: null } });
+  return scanMarket({ minVolume: opts.minVolume, signal: controller.signal, onProgress: (p) => set({ progress: p }), onRow: (r) => set({ filas: [...state.filas, r] }) })
     .then((out) => {
-      set(out.ok ? { running: false, progress: null, result: out.result } : { running: false, progress: null, error: out.error });
+      set(out.ok ? { running: false, progress: null, result: out.result, filas: [] } : { running: false, progress: null, error: out.error, filas: [] });
       return out;
     })
     .catch(() => {
-      set({ running: false, progress: null, error: "El escaneo falló por un error inesperado. Probá de nuevo." });
+      set({ running: false, progress: null, error: "El escaneo falló por un error inesperado. Probá de nuevo.", filas: [] });
       return { ok: false as const, error: "El escaneo falló por un error inesperado." };
     });
 }

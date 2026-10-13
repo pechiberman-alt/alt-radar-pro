@@ -364,6 +364,15 @@ const run = (over: Parameters<typeof scanMarket>[0] & object, series = MARKET, t
   return { fb, tm, out: scanMarket({ fetchImpl: fb.fetchImpl, now: tm.now, sleep: tm.sleep, settings: DEFAULT_DESK_SETTINGS, loadContext: async () => CONTEXT, deep: async () => null, ...over }) };
 };
 
+test("each coin reaches onRow as it is read, so the page can show the scan while it runs", async () => {
+  const seen: string[] = [];
+  const { out } = run({ onRow: (r) => seen.push(r.moneda) });
+  const o = await out;
+  assert.ok(o.ok);
+  assert.deepEqual([...seen].sort(), o.result.filas.map((r) => r.moneda).sort(), "todas las leídas, una vez cada una");
+  assert.equal(new Set(seen).size, seen.length);
+});
+
 test("a full scan reads every coin that passes the filters, three requests each, only from Binance Futures, and never asks the app's server", async () => {
   const { fb, out } = run({});
   const o = await out;
@@ -552,6 +561,15 @@ test("the row of a decision carries what the desk decided, nothing else", () => 
     assert.equal(row.precio, d.precio);
     assert.equal(row.antes, "ESPERAR");
     assert.equal(row.lectura, "completa");
+    // Por dentro: cada especialista con su dato (1 o 0) y las cuatro compuertas, para verlas en la araña.
+    assert.deepEqual(
+      row.agentes!.map((a) => a[0]),
+      d.agentes.map((a) => a.id),
+    );
+    assert.deepEqual(
+      row.compuertas!.map((g) => g.id),
+      ["consenso", "plan", "riesgo", "momento"],
+    );
     if (d.plan && isApproved(row)) {
       assert.equal(row.plan!.entrada, d.plan.entrada);
       assert.equal(row.plan!.stop, d.plan.stop);

@@ -6,7 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "prebuild": "node scripts/write-build-info.mjs && node scripts/arana.mjs --pagina",
+    "prebuild": "node scripts/write-build-info.mjs && node scripts/arana.mjs --pagina && node scripts/arana.mjs --vivo",
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",

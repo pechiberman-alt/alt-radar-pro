@@ -282,7 +282,6 @@ footer code { font: 11.5px var(--display); color: #b9c9c0; }
 
   <div class="tick" aria-hidden="true"><span class="tick-tag">REGLAS</span><div class="tick-view"><div class="tick-track" id="tick"></div></div></div>
 
-  <div id="vivo-cinta" hidden style="margin:0 0 10px;padding:8px 12px;border:1px solid var(--line-2);color:var(--live);font:11px/1.5 ui-monospace,Menlo,monospace;letter-spacing:.6px" aria-live="polite"></div>
 
   <section class="band" aria-label="El proyecto en números">
     <div class="hero">
@@ -382,18 +381,6 @@ footer code { font: 11.5px var(--display); color: #b9c9c0; }
 </div>
 
 <script>
-/* La mesa en vivo: la app le manda su foto a esta página desde el marco de la araña (solo desde la página madre). Se muestra como una cinta, sin guardar nada ni pedir datos. */
-window.addEventListener("message", (e) => {
-  const d = e.data;
-  if (e.source !== window.parent || !d || d.arana !== "vivo" || !d.vivo) return;
-  const v = d.vivo;
-  const cinta = document.getElementById("vivo-cinta");
-  if (!cinta) return;
-  const hace = v.escaneo.haceMin === null ? "sin escaneo" : `escaneo hace ${v.escaneo.haceMin} min`;
-  cinta.textContent = `EN VIVO · ${hace} · aprobadas ${v.escaneo.aprobadas ?? "–"} · papel ${v.papel.cerradas} cerradas · ${v.veredicto.texto}`;
-  cinta.hidden = false;
-});
-
 const G = /*__GRAFO__*/null;
 (function () {
   "use strict";
