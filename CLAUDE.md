@@ -8,20 +8,21 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
 - Un archivo nuevo abre con un comentario de tres líneas o más que diga para qué es: es lo que muestra la búsqueda.
 - docs/araña/objetivos.md dice a qué objetivo pertenece cada archivo, con sus reglas y pendientes. Un archivo sin objetivo hace fallar `npm run test:unit`: agregalo ahí.
 - Después de agregar, mover o borrar archivos, o cambiar código y objetivos: `npm run arana` y commiteá docs/araña/ junto con el cambio. `npm run arana -- --cambios` dice qué cambió desde el último mapa.
-- No leas docs/araña/MAPA.md entero: es el mapa completo; usá las consultas.
+- No leas docs/araña/MAPA.md entero: es el mapa completo; usá las consultas. Un hook frena leer entero cualquier archivo de más de 600 líneas: ficha, Grep o `offset`/`limit`.
 - `npm run arana -- --vista` dibuja la araña recorriendo el proyecto (docs/araña/vista.html, no se commitea): la página que ve Uri, publicada como artifact.
 
 ## Agentes: Ruflo (MCP)
-- `.mcp.json` conecta Ruflo (ruvnet/ruflo, ex Claude-Flow: enjambres de agentes, memoria, 353 herramientas) como servidor MCP `ruflo`. `.claude/settings.json` lo aprueba y le da 2 minutos de arranque: la primera vez baja los paquetes (~1 min); después arranca en menos de 1 s.
-- Está fijado: `@claude-flow/cli@3.48.0` (el paquete `ruflo` apunta a `^3`, no fija nada), `--before=2026-09-29` (ninguna dependencia más nueva que esa fecha) y `--ignore-scripts`. Para subir de versión: revisá el changelog y el `postinstall` del paquete, probá `tools/list` y recién ahí cambiá el pin y la fecha.
+- `.mcp.json` conecta Ruflo (ruvnet/ruflo, ex Claude-Flow: enjambres de agentes y memoria) como MCP `ruflo`, con solo los grupos `swarm,agent,task,memory,workflow` (`CLAUDE_FLOW_MCP_TOOLS`: las 353 herramientas pesan ~66k tokens). `.claude/settings.json` lo aprueba con 2 min de arranque (la primera vez baja los paquetes).
+- Fijado: `@claude-flow/cli@3.48.0` (el paquete `ruflo` apunta a `^3`), `--before=2026-09-29` y `--ignore-scripts`. Para subir de versión: changelog y `postinstall` del paquete, `tools/list`, y recién ahí el pin y la fecha.
 - No correr `npx ruflo init` ni `claude-flow init` en este repo: reescriben CLAUDE.md y agregan hooks. Los agentes de Ruflo trabajan con las reglas de este archivo, igual que cualquier otro.
 - Su estado local (`.swarm/`, `.claude-flow/`, `ruvector.db`) está en .gitignore. Nunca guardarle claves ni datos de usuarios en su memoria.
 
 ## Antes de proponer un cambio
-- `npm ci --no-audit --no-fund`, después `npm run lint`, `npm run test:unit` y `npm run build`. Los tres tienen que pasar. Además `npx tsc --noEmit -p .` (30 s; el CI no lo corre): el único error esperado es el de `vite.config.ts`.
+- `npm ci --no-audit --no-fund` si cambiaron dependencias, y `npm run verificar`: araña, lint, tests, tsc (el CI no lo corre; el único error esperado es el de `vite.config.ts`) y build, con salida corta. Tiene que terminar en ✓. `--rapido` saltea tsc y build mientras iterás.
+- Subir: `npm run subir -- --rama <r> --titulo "…" --mensaje <archivo> --cuerpo <archivo>`: commit, PR, squash a `main` y espera el deploy. Se niega si el árbol cambió desde el último verificar o si ve secretos. Después confirmá producción en `/api/version?nocache=<sha7>`.
 - Todo cambio de lógica lleva tests en `tests/` (node:test). Los de datos de mercado incluyen un test de que no se mira el futuro.
 - Al hacer merge a `main`, el CI despliega solo (lint, tests, build, migraciones D1, deploy).
-- No tocar `.github/workflows/` ni `wrangler*.jsonc` salvo pedido explícito.
+- No tocar `.github/workflows/` ni `wrangler*.jsonc` salvo pedido explícito (un hook pide confirmación).
 
 ## Código
 - Todo texto visible para el usuario va en español rioplatense (vos, "comprá", decimales con coma).

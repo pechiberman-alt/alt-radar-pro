@@ -1,11 +1,11 @@
 # Huellas de la araña: hash corto, líneas y ruta de cada archivo. Lo escribe npm run arana; lo lee --cambios.
-85b481b3469d	5	.claude/settings.json
+f42159e92767	17	.claude/settings.json
 b531751b31a2	27	.github/workflows/claude.yml
 bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
 bcde9385654a	0	.gitignore
-01d17d57cd3e	9	.mcp.json
+fe5716951a62	10	.mcp.json
 6b5886c6306e	5	.openai/hosting.json
-d7268dd9b537	69	CLAUDE.md
+515a20ca4278	70	CLAUDE.md
 8b27e3600b59	64	README.md
 5aac31cab73c	36	THIRD_PARTY_NOTICES.md
 7d7e53d1533b	103	app/account-panel.css
@@ -177,7 +177,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-02897bda4e4b	254	docs/araña/objetivos.md
+9985854d7303	255	docs/araña/objetivos.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -362,7 +362,7 @@ d0434e2eafe5	81	lib/trade-bubbles.ts
 5fe614a4e7bf	146	lib/web-push.ts
 19e2de71f66e	6	next-env.d.ts
 89327ac52fc9	8	next.config.ts
-5ffc441f4fa9	51	package.json
+d0a9b2e42716	53	package.json
 8f8be689e9af	8	postcss.config.mjs
 81e071a890a7	0	public/favicon.svg
 43e2751ad2c3	0	public/file.svg
@@ -376,6 +376,8 @@ aaa393c36db1	0	public/window.svg
 dec125f1757e	1624	scripts/arana-vista.html
 4311eb41e3bb	740	scripts/arana-vivo.html
 eb4f4f4b4dac	1340	scripts/arana.mjs
+d13ecf4702a3	63	scripts/claude-hooks.mjs
+e65a72a07cd2	167	scripts/herramientas.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
 abc3c4cc022d	0	scripts/investigacion/datos.py
@@ -385,9 +387,11 @@ abc3c4cc022d	0	scripts/investigacion/datos.py
 7d2ffebb4423	85	scripts/investigacion/precalcular.ts
 831478cc318c	377	scripts/investigacion/simulador.ts
 5f560ffe8331	75	scripts/investigacion/util.ts
+cbf56ee42e36	134	scripts/subir.mjs
+e7571e9b3d07	66	scripts/verificar.mjs
 30cfa0e96f19	19	scripts/write-build-info.mjs
 a6bc231bf554	374	tests/account-journal.test.ts
-847dabc14320	44	tests/agentes-mcp.test.ts
+beea37118afc	51	tests/agentes-mcp.test.ts
 bc528d50d94b	74	tests/ai-analyst.test.ts
 8236d721ebba	168	tests/ai-brains.test.ts
 57f3eea79cb8	38	tests/ai-numbers.test.ts
@@ -429,6 +433,7 @@ d6031202b073	89	tests/footprint-sweeps.test.ts
 a3b08c3b70ce	282	tests/hands-free.test.ts
 42f4e5fce8fd	17	tests/helpers/fake-d1.ts
 27b5bf9632d2	26	tests/helpers/setups.ts
+03d4202b434a	143	tests/herramientas.test.ts
 adcae854588e	101	tests/inducement.test.ts
 edf787ad8d65	124	tests/institutional-flows.test.ts
 aaee341fbbff	431	tests/investigacion.test.ts

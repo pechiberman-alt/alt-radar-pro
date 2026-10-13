@@ -29,6 +29,13 @@ test("ruflo is pinned: exact version, cutoff date for its dependencies, no insta
   assert.deepEqual(args.slice(-3), ["claude-flow", "mcp", "start"]);
 });
 
+test("ruflo advertises only the tool groups the project uses (all 353 weigh ~66k tokens of schema)", () => {
+  const env = (mcp.mcpServers.ruflo as { env?: Record<string, string> }).env ?? {};
+  const grupos = (env.CLAUDE_FLOW_MCP_TOOLS ?? "").split(",").map((g) => g.trim()).filter(Boolean);
+  assert.ok(grupos.length > 0 && grupos.length <= 8, "a short list of groups, never all");
+  assert.ok(!grupos.includes("all"));
+});
+
 test("the project approves ruflo and gives the cold start time to download", () => {
   assert.deepEqual(settings.enabledMcpjsonServers, ["ruflo"], "approves only the server defined in .mcp.json");
   assert.ok(Number(settings.env?.MCP_TIMEOUT) >= 90_000, "the first start downloads the packages (about a minute)");
