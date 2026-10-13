@@ -271,7 +271,7 @@ export function PaperBlock({ state }: { state: ReturnType<typeof usePaper> }) {
         )}
       </div>
       <p className="jt-note">
-        Reglas fijas: solo cuentan los precios desde que la abrís (a mercado entra al precio del minuto siguiente y, si ahí el R:R ya no llega a 1:1,5, no entra; la límite, al tocar el nivel), un tercio en cada objetivo, stop fijo, si una vela toca stop y objetivo cuenta el stop, comisión 0,05% por lado, cierre a los 7 días. Simulado: no es asesoramiento financiero.
+        Reglas fijas: solo cuentan los precios desde que la abrís (a mercado entra al precio del minuto siguiente y, si ahí el R:R ya no llega a 1:1,5, no entra; la límite, al tocar el nivel), un tercio en cada objetivo, al cobrar el TP1 el stop pasa a la entrada (las abiertas antes de esa regla siguen con el stop fijo), si una vela toca stop y objetivo cuenta el stop (y si la que cobra el TP1 vuelve a la entrada, el resto sale ahí), comisión 0,05% por lado, cierre a los 7 días. Simulado: no es asesoramiento financiero.
       </p>
     </div>
   );

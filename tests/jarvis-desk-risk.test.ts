@@ -138,16 +138,19 @@ function snapshot(h1: SwingCandle[], markPrice: number | null): DeskSnapshot {
 }
 
 const up = path((i) => 100 * 1.0015 ** i + 2 * Math.sin(i / 6), 1000);
+/** A mild advance whose consensus clears the minimum of ±0,30 and whose plan passes the risk manager. */
+const tradeable = path((i) => 100 * 1.0007 ** i + 12 * Math.sin(i / 6), 1000);
 
 test("the ticket has every field of the format, and says when there is no trade", () => {
-  const d = runDesk(snapshot(up, null))!;
+  // A mild advance that clears the v2 consensus minimum, so the desk does give a plan.
+  const d = runDesk(snapshot(tradeable, null))!;
+  assert.ok(d.direccion === "LONG" || d.direccion === "SHORT", `a plan was expected, the desk said ${d.direccion}: ${d.resolucion}`);
   const text = deskTicket(d);
   for (const label of ["ACTIVO: SOL/USDT", "DIRECCIÓN:", "CONFIANZA:", "PRECIO:", "INVALIDACIÓN:", "RAZONAMIENTO:", "ESCENARIO ALTERNATIVO:"]) assert.ok(text.includes(label), `${label} in\n${text}`);
   assert.match(text, /no es probabilidad de acierto/);
   assert.match(text, /precio en vivo: este dato no está disponible actualmente/);
-  if (d.direccion === "LONG" || d.direccion === "SHORT") {
-    for (const label of ["ENTRADA:", "STOP LOSS:", "TAKE PROFIT 1:", "TAKE PROFIT 2:", "TAKE PROFIT 3:", "RIESGO:", "R:R:", "APALANCAMIENTO SUGERIDO:"]) assert.ok(text.includes(label), label);
-  }
+  for (const label of ["ENTRADA:", "STOP LOSS:", "TAKE PROFIT 1:", "TAKE PROFIT 2:", "TAKE PROFIT 3:", "RIESGO:", "R:R:", "GESTIÓN:", "APALANCAMIENTO SUGERIDO:"]) assert.ok(text.includes(label), label);
+  assert.match(text, /GESTIÓN: al cobrarse el TP1, el stop pasa a la entrada/);
   const none: DeskDecision = { ...d, direccion: "NO TRADE", plan: null, riesgo: null, resolucion: "El consenso es alcista, pero el gestor de riesgo lo veta." };
   const t2 = deskTicket(none);
   assert.match(t2, /DIRECCIÓN: ⛔ NO TRADE/);

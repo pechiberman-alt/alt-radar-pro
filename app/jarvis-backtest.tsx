@@ -136,7 +136,7 @@ function BacktestView({ r, d }: { r: BacktestResult; d: DeskDecision | null }) {
       </p>
       {r.equity.length > 0 && <EquityCurve r={r} />}
       <p className="jt-note">
-        La mesa evaluó {r.lecturas.evaluadas} cierres de 4 h: LONG {r.lecturas.long}, SHORT {r.lecturas.short}, ESPERAR {r.lecturas.esperar}, NO TRADE {r.lecturas.noTrade}
+        Reglas v{r.reglas} de la mesa. La mesa evaluó {r.lecturas.evaluadas} cierres de 4 h: LONG {r.lecturas.long}, SHORT {r.lecturas.short}, ESPERAR {r.lecturas.esperar}, NO TRADE {r.lecturas.noTrade}
         {r.lecturas.sinDatos ? `, sin velas suficientes ${r.lecturas.sinDatos}` : ""}. Mientras hay una operación abierta no evalúa otra.
       </p>
       {similar && <p className="jt-record">Setups parecidos al de hoy: {similar.etiqueta}</p>}

@@ -121,6 +121,7 @@ export function manualTicket(d: DeskDecision, settings: DeskSettings, now: numbe
     `TP1: ${px(p.tp[0].price)} · un tercio (reduce-only)`,
     `TP2: ${px(p.tp[1].price)} · un tercio (reduce-only)`,
     `TP3: ${px(p.tp[2].price)} · el resto (reduce-only)`,
+    `Gestión: al cobrarse el TP1, mové el stop a la entrada (${px(p.entrada)}); el resto ya no puede perder, sin contar comisiones ni deslizamiento.`,
     `Cantidad: ${px(r.cantidad)} ${d.moneda} (≈ ${usd(r.posicionUsd)})`,
     `Apalancamiento: ${r.apalancamiento}x aislado · margen ≈ ${usd(r.margenUsd)}`,
     `Riesgo: ${usd(r.riesgoUsd)} (${arNumber(settings.riesgoPct)}% de ${usd(capital)}) · R:R ${rr(r.rrPonderado)}`,

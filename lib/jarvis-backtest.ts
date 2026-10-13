@@ -1,6 +1,6 @@
 import { arNumber } from "./ai-numbers.ts";
 import type { DeskSnapshot } from "./jarvis-desk-data.ts";
-import { DEFAULT_DESK_SETTINGS, runDesk, type DeskSettings, type Side } from "./jarvis-desk.ts";
+import { DEFAULT_DESK_SETTINGS, DESK_RULES, runDesk, type DeskSettings, type Side } from "./jarvis-desk.ts";
 import { canPaper, MIN_SAMPLE, paperFromDesk, paperStats, recordFor, resolvePaper, type PaperTrade } from "./jarvis-paper.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
@@ -8,9 +8,9 @@ import type { SwingCandle } from "./swing-entries.ts";
  * Backtesting de la mesa de JARVIS: la misma mesa y las mismas reglas del paper
  * trading, caminando hacia adelante sobre velas pasadas. En cada cierre de 4 h
  * la mesa lee SOLO lo que ya había cerrado a esa hora; si aprueba un plan, se
- * sigue con las reglas del papel (un tercio por objetivo, stop fijo, peor caso
- * primero, comisiones, 7 días). Una operación a la vez: mientras hay una
- * abierta, no se evalúa otra.
+ * sigue con las reglas del papel (un tercio por objetivo, stop a la entrada
+ * al cobrar el TP1, peor caso primero, comisiones, 7 días). Una operación a
+ * la vez: mientras hay una abierta, no se evalúa otra.
  *
  * Lo que no tiene historial gratuito (funding, interés abierto, ratio
  * largo/corto, noticias, Miedo y Avaricia, calendario y dominancia) no entra:
@@ -69,6 +69,8 @@ export type BacktestResult = {
   /** Qué dijo la mesa en cada cierre evaluado (con o sin operación abierta, solo los evaluados). */
   lecturas: { evaluadas: number; long: number; short: number; esperar: number; noTrade: number; sinDatos: number };
   fuente: string;
+  /** Versión de las reglas de la mesa con las que se corrió (DESK_RULES). */
+  reglas: number;
   limitaciones: string[];
 };
 
@@ -77,6 +79,7 @@ export const BACKTEST_LIMITS = [
   "Sin noticias, Miedo y Avaricia, calendario macro ni dominancia históricos: esos especialistas pesan cero.",
   "Mapa de liquidaciones estimado con las velas de cada momento, no con liquidaciones reales.",
   "Velas de 1 h: dentro de una misma vela no se sabe qué tocó primero, y se cuenta el peor caso.",
+  "Solo comisión de 0,05% por lado: sin deslizamiento (slippage), sin financiamiento de futuros y con ejecución perfecta al precio del plan.",
   "Resultados pasados y simulados: no garantizan rentabilidad futura.",
 ];
 
@@ -220,6 +223,7 @@ export function finishBacktest(input: BacktestInput, state: BacktestState): Back
     metricas,
     lecturas: state.lecturas,
     fuente: input.fuente,
+    reglas: DESK_RULES,
     limitaciones: BACKTEST_LIMITS,
   };
 }

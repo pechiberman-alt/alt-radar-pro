@@ -87,7 +87,7 @@ export async function openPaper(db: D1Database, userId: number, raw: unknown, no
   return { ok: true, trade };
 }
 
-const FROZEN = ["id", "symbol", "lado", "abiertaA", "vela", "tipoEntrada", "entrada", "stop", "tp", "rrPlan", "confianza", "analisis", "decision", "inicio"] as const;
+const FROZEN = ["id", "symbol", "lado", "abiertaA", "vela", "tipoEntrada", "entrada", "stop", "tp", "rrPlan", "confianza", "analisis", "decision", "inicio", "gestion", "reglas"] as const;
 const ORDER: Record<PaperState, number> = { PENDIENTE: 0, ABIERTA: 1, CERRADA: 2, CANCELADA: 2 };
 
 /**
