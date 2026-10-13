@@ -72,7 +72,7 @@ aa86804bf9da	24	app/api/telegram/test/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
 9505382d7d36	44	app/arana-desk.css
-1ec31caf7068	116	app/arana-desk.tsx
+6c81c9774860	122	app/arana-desk.tsx
 1c85572f45c3	376	app/arana-vivo.tsx
 109c61b2bb44	34	app/asset-flows.css
 866aeee2a3d1	125	app/asset-flows.tsx
@@ -391,7 +391,7 @@ bc7491d499a6	0	public/globe.svg
 fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
-dec125f1757e	1624	scripts/arana-vista.html
+28ad537c49c6	1624	scripts/arana-vista.html
 d54b88652bba	795	scripts/arana-vivo.html
 3c7e2c2b834c	1340	scripts/arana.mjs
 d13ecf4702a3	63	scripts/claude-hooks.mjs

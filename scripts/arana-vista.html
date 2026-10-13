@@ -1131,7 +1131,7 @@ const G = /*__GRAFO__*/null;
   }
 
   function layout() {
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    dpr = Math.min(window.innerWidth < 700 ? 1.25 : 2, window.devicePixelRatio || 1); // en el celular, menos píxeles: el marco se caía por memoria
     side = window.matchMedia("(min-width: 1000px)").matches;
     const sr = stage.getBoundingClientRect(), vr = coreView.getBoundingClientRect();
     let x = 0, y = 0, w = sr.width, h = sr.height;

@@ -73,7 +73,10 @@ export default function AranaDesk() {
         <button type="button" role="tab" id="arana-tab-vivo" aria-controls="arana-panel-vivo" aria-selected={pestana === "vivo"} onClick={() => setPestana("vivo")}>
           EN VIVO
         </button>
-        <button type="button" role="tab" id="arana-tab-mapa" aria-controls="arana-panel-mapa" aria-selected={pestana === "mapa"} onClick={() => setPestana("mapa")}>
+        <button type="button" role="tab" id="arana-tab-mapa" aria-controls="arana-panel-mapa" aria-selected={pestana === "mapa"} onClick={() => {
+            setListo((p) => ({ ...p, mapa: false }));
+            setPestana("mapa");
+          }}>
           MAPA DEL PROYECTO
         </button>
       </div>
@@ -98,6 +101,8 @@ export default function AranaDesk() {
       <div id="arana-panel-mapa" role="tabpanel" aria-labelledby="arana-tab-mapa" hidden={pestana !== "mapa"}>
         <div className="arana-frame" aria-busy={!listo.mapa}>
           {!listo.mapa && <span className="arana-wait">DIBUJANDO LA ARAÑA…</span>}
+          {/* Solo montado con la pestaña a la vista: dos páginas pesadas a la vez pueden tirar el marco en un celular (carita triste). */}
+          {pestana === "mapa" && (
           <iframe
             ref={marcoMapa}
             src="/arana/index.html"
@@ -108,6 +113,7 @@ export default function AranaDesk() {
             style={alto.mapa ? { height: alto.mapa } : undefined}
             onLoad={() => setListo((p) => ({ ...p, mapa: true }))}
           />
+          )}
         </div>
       </div>
     </section>
