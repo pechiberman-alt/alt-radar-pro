@@ -224,11 +224,33 @@
 .jt-tape .jt-r.down{color:var(--red)}
 .jt-tape .jt-r.pend{color:var(--amber)}
 .jt-tape time{grid-column:1/-1;font:10px var(--font-mono);color:var(--muted)}
+/* Escáner de todo el mercado. */
+.jt-scan{display:grid;gap:10px}
+.jt-scan p{margin:0}
+.jt-scan-controls{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+.jt-scan-controls label{display:grid;gap:6px;font:11px var(--font-mono);color:var(--muted)}
+.jt-scan-controls select{min-height:46px;background:#0a110d;border:1px solid var(--line);border-radius:6px;color:var(--text);padding:0 10px;font:13px var(--font-mono)}
+.jt-run.stop{border-color:#673238;background:#2a1215;color:var(--red)}
+.jt-scan-result{display:grid;gap:8px}
+.jt-scan-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.jt-scan-row{width:100%;text-align:left;display:grid;gap:5px;padding:10px 12px;min-height:44px;border:1px solid var(--line);border-left:4px solid #3a4a42;border-radius:6px;background:#0c130f;color:var(--text);cursor:pointer;font:inherit}
+.jt-scan-row.long{border-left-color:var(--green)}
+.jt-scan-row.short{border-left-color:var(--red)}
+.jt-scan-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.jt-scan-top b{font:14px var(--font-mono)}
+.jt-scan-top i{font:10px var(--font-mono);font-style:normal;letter-spacing:1px;padding:3px 6px;border-radius:3px;border:1px solid var(--line)}
+.jt-scan-top i.long{color:var(--green);border-color:#1f5a40}
+.jt-scan-top i.short{color:var(--red);border-color:#673238}
+.jt-scan-score{margin-left:auto;font:11px var(--font-mono);color:#cfe0d6}
+.jt-scan-plan{font:12px/1.5 var(--font-mono);color:#d7e0da}
+.jt-scan-meta,.jt-scan-note{font-size:11px;line-height:1.45;color:var(--muted)}
+.jt-scan-note{color:var(--amber)}
 @media(min-width:760px){
   .jt-board-grid{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px}
   .jt-col .jt-facts{grid-template-columns:1fr 1fr}
   .jt-tape li{grid-template-columns:auto 1fr auto}
   .jt-tape time{grid-column:auto}
+  .jt-scan-controls{grid-template-columns:minmax(0,320px) auto;justify-content:start}
 }
 @media(min-width:760px){
   .jt-desk{padding:20px 22px}

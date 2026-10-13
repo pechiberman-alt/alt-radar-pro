@@ -12,6 +12,7 @@ import { SESGO_MINIMO } from "@/lib/jarvis-council";
 import { withRecord } from "@/lib/jarvis-paper";
 import { CommandBoard } from "./jarvis-council";
 import { PaperBlock, PaperFollow, usePaper } from "./jarvis-paper";
+import { ScanBlock } from "./jarvis-scan";
 import { BacktestBlock } from "./jarvis-backtest";
 import { WatchBlock } from "./jarvis-watch";
 import { BACKTEST_EVENT } from "@/lib/jarvis-backtest-run";
@@ -102,6 +103,7 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
   const [paperOpen, setPaperOpen] = useState(false);
   const [backtestOpen, setBacktestOpen] = useState(false);
   const [realOpen, setRealOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [mode, setMode] = useState<DeskMode>("ANALISIS");
   const ctxRef = useRef(getContext);
   useEffect(() => {
@@ -269,6 +271,16 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
           </button>
         ))}
       </div>
+
+      <details className="jt-block" id="jt-scan" open={scanOpen} onToggle={(e) => setScanOpen(e.currentTarget.open)}>
+        <summary>Escanear todo el mercado</summary>
+        <ScanBlock
+          onPick={(c) => {
+            setInput(c);
+            void analyze(c).then(() => document.getElementById("jt-card")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          }}
+        />
+      </details>
 
       {state === "loading" && <p className="jt-muted">Los especialistas leen {coin}: velas de 1 h, 4 h y diarias, derivados, noticias, sentimiento y calendario…</p>}
       {state === "error" && <p className="jt-error">{error}</p>}
