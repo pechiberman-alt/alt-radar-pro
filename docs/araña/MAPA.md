@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 493 · objetivos: 15 · sin objetivo: 0
+- Archivos: 496 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 43 · secretos: 4 · variables de entorno: 11 · rutas /api: 49 · hosts: 54
-- Código de navegador: 57 archivos con "use client" que alcanzan 155 · problemas: 0
-- Lib sin prueba directa: 20 de 146
+- Código de navegador: 58 archivos con "use client" que alcanzan 157 · problemas: 0
+- Lib sin prueba directa: 20 de 147
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (66)
+### jarvis — JARVIS, la IA propia del software (68)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -24,6 +24,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `app/api/telegram/webhook/route.ts` — exporta: dynamic, POST
 - `app/assistant-console.tsx` — exporta: AssistantConsole, default
 - `app/jarvis-backtest.tsx` — exporta: BacktestBlock
+- `app/jarvis-council.tsx` — exporta: CommandBoard
 - `app/jarvis-paper.tsx` — exporta: usePaper, PaperFollow, PaperBlock
 - `app/jarvis-trading.css` — JARVIS TRADING — la mesa de especialistas.
 - `app/jarvis-trading.tsx` — exporta: JarvisTrading, default
@@ -50,10 +51,11 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-chat.ts` — The conversation with JARVIS in the app, kept for each signed-in person, so a reload does not lose the thread.
 - `lib/jarvis-core-db.ts` — exporta: ensureCoreSchema, rowToSignal, readCoreStats, recordCoreSignals, openCoreSignals, isBusy (+12)
 - `lib/jarvis-core.ts` — exporta: CORE_TF, CORE_FRAME, CORE_COINS, CORE_MAGNETS, CYCLE_MIN, CoreTask (+36)
+- `lib/jarvis-council.ts` — exporta: SESGO_MINIMO, signed, fix2, Voto, Pivotal, Consejo (+9)
 - `lib/jarvis-desk-agents.ts` — exporta: AgentId, AgentReport, NOT_AVAILABLE, AGENT_WEIGHTS, pct, px (+19)
 - `lib/jarvis-desk-data.ts` — exporta: DESK_FRAMES, Derivatives, MacroData, DeskSnapshot, DeskProvider, DESK_PROVIDERS (+3)
 - `lib/jarvis-desk-run.ts` — exporta: DESK_SETTINGS_KEY, DESK_SHOW_EVENT, typedNumber, loadDeskSettings, saveDeskSettings, openPaperRiskUsd (+3)
-- `lib/jarvis-desk.ts` — exporta: Side, Direction, Target, Plan, DeskSettings, MAX_OPEN_RISK_PCT (+34)
+- `lib/jarvis-desk.ts` — exporta: Side, Direction, Target, Plan, DeskSettings, MAX_OPEN_RISK_PCT (+35)
 - `lib/jarvis-execution.ts` — exporta: DeskMode, DESK_MODES, REAL_ORDERS_FROM_JARVIS, TICKET_TTL_MS, TICKET_MAX_AGE_MS, MAX_TICKET_RISK_PCT (+3)
 - `lib/jarvis-learn.ts` — exporta: Regime, Features, DIMS, D, ALPHA, MIN_CASES (+37)
 - `lib/jarvis-ledger.ts` — exporta: HORIZON, FEE_PCT, LearnedSource, JarvisSource, JarvisSignal, breakoutSignal (+7)
@@ -328,7 +330,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, PAGINA (+45)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (122)
+### calidad — Pruebas (123)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agentes-mcp.test.ts` — pruebas: ruflo is one MCP server run with npx, ruflo is pinned: exact version, cutoff date for its dependencies, no install scr, the project approves ruflo and gives the cold start time to download (+1)
@@ -377,6 +379,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/jarvis-backtest.test.ts` — pruebas: the backtest trades with the desk and the paper rules, one trade at a time, no lookahead: changing the future after a moment never changes the trades that c, the desk at a past hour only sees candles closed at that hour, and no history it (+1)
 - `tests/jarvis-chat.test.ts` — pruebas: only question and answer turns are kept, trimmed and bounded, the thread comes back in order, and only to its owner, a thread older than six hours starts fresh, as the Telegram thread does (+1)
 - `tests/jarvis-core.test.ts` — pruebas: the 15-minute cycle covers 20 coins, 3 magnets, one resolution and a study minut, live reading: no lookahead, the same 200-candle window as the history walk, grad, magnet sweeps from the stored previous map: swept and closed back = reversal sig (+1)
+- `tests/jarvis-council.test.ts` — pruebas: the weights of the voters add up to 1 and their contributions add up to the desk, who votes, who gives context and who had no data are told apart; the order puts , a consensus just over the minimum names the specialists who tip it, and says so (+1)
 - `tests/jarvis-desk-risk.test.ts` — pruebas: the risk manager judges a market entry at today, no live price: nothing is assumed, the plan stands on its own numbers, a size that does not fit the capital at a safe leverage is NO TRADE; one that fi (+1)
 - `tests/jarvis-desk-run.test.ts` — pruebas: risk settings: nonsense falls back to the safe defaults, never to a bigger risk, risk settings round-trip; leverage is a whole number, nothing cached is nothing, not a made-up decision (+1)
 - `tests/jarvis-desk.test.ts` — pruebas: the desk never reads a candle still forming, on any series (no lookahead), a steady advance is never read as a short; any plan has its stop and targets on , a steady decline is never read as a long (+1)
@@ -732,7 +735,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-paper.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa

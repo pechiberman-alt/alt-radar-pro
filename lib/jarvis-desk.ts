@@ -140,7 +140,7 @@ export const STOP_BUFFER_ATR = 1;
 /** Consenso mínimo (de −1 a +1) para que la mesa tome un lado. */
 export const CONSENSUS_EDGE = 0.3;
 /** Desde acá el consenso ya va en contra de un plan: el gestor de riesgo lo veta. */
-const AGAINST_EDGE = 0.15;
+export const AGAINST_EDGE = 0.15;
 /** Qué hace la mesa con el stop cuando se cobra el TP1 (se repite en la ficha, la orden manual y el papel). */
 export const MANAGEMENT_TEXT = "al cobrarse el TP1, el stop pasa a la entrada: lo que quede ya no puede perder (sin contar comisiones ni deslizamiento)";
 const MMR = 0.005;

@@ -8,7 +8,9 @@ import { DESK_PROVIDERS, type DeskSnapshot } from "@/lib/jarvis-desk-data";
 import { compareDesks, deskTicket, MANAGEMENT_TEXT, macroBrief, type Comparison, type DeskDecision, type DeskSettings, type Plan, type RiskReview } from "@/lib/jarvis-desk";
 import { DESK_MODES, manualTicket, type DeskMode } from "@/lib/jarvis-execution";
 import { cachedDesk, deskFor, DESK_SHOW_EVENT, loadDeskSettings, saveDeskSettings, typedNumber } from "@/lib/jarvis-desk-run";
+import { SESGO_MINIMO } from "@/lib/jarvis-council";
 import { withRecord } from "@/lib/jarvis-paper";
+import { CommandBoard } from "./jarvis-council";
 import { PaperBlock, PaperFollow, usePaper } from "./jarvis-paper";
 import { BacktestBlock } from "./jarvis-backtest";
 import { WatchBlock } from "./jarvis-watch";
@@ -79,9 +81,10 @@ function NumberField(props: { label: string; value: number | null; placeholder?:
   );
 }
 
+/** El mismo umbral que usa la mesa para contar quién empuja a favor o en contra (y el tablero de mando). */
 function bias(v: number, available: boolean) {
   if (!available) return { text: "SIN DATOS", cls: "off" };
-  return v > 0.1 ? { text: "ALCISTA", cls: "up" } : v < -0.1 ? { text: "BAJISTA", cls: "down" } : { text: "NEUTRAL", cls: "flat" };
+  return v >= SESGO_MINIMO ? { text: "ALCISTA", cls: "up" } : v <= -SESGO_MINIMO ? { text: "BAJISTA", cls: "down" } : { text: "NEUTRAL", cls: "flat" };
 }
 
 function Desk({ getContext }: { getContext?: () => AssistantContext }) {
@@ -280,6 +283,7 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
             </button>
           </div>
           <PaperFollow key={`${d.symbol}:${d.vela}:${d.direccion}`} d={d} onOpened={() => setPaperOpen(true)} />
+          <CommandBoard d={d} settings={settings} paper={paper} />
           <details className="jt-block" open>
             <summary>¿Por qué?</summary>
             <p className="jt-lead">{d.resolucion}</p>

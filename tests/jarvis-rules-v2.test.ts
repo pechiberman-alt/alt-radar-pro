@@ -3,7 +3,7 @@ import test from "node:test";
 import { aggregate } from "../lib/asset-read.ts";
 import { analyzeAsset } from "../lib/jarvis-analyst.ts";
 import type { DeskSnapshot } from "../lib/jarvis-desk-data.ts";
-import { buildPlan, CONSENSUS_EDGE, DEFAULT_DESK_SETTINGS, DESK_RULES, MANAGEMENT_TEXT, reviewRisk, STOP_BUFFER_ATR, runDesk, type Plan } from "../lib/jarvis-desk.ts";
+import { AGAINST_EDGE, buildPlan, CONSENSUS_EDGE, DEFAULT_DESK_SETTINGS, DESK_RULES, MANAGEMENT_TEXT, reviewRisk, STOP_BUFFER_ATR, runDesk, type Plan } from "../lib/jarvis-desk.ts";
 import { FEE_PCT } from "../lib/jarvis-ledger.ts";
 import { auditOf, paperCsv, resolvePaper, resultOf, stopNow, validatePaper, type PaperTrade } from "../lib/jarvis-paper.ts";
 import { mergeProgress } from "../lib/jarvis-paper-db.ts";
@@ -226,6 +226,7 @@ test("v2 constants: stop at 1 ATR from the level, minimum consensus ±0,30, rule
   assert.equal(DESK_RULES, 2);
   assert.equal(STOP_BUFFER_ATR, 1);
   assert.equal(CONSENSUS_EDGE, 0.3);
+  assert.equal(AGAINST_EDGE, 0.15, "el veto del gestor de riesgo: el tablero de mando lo muestra con este mismo número");
   assert.match(MANAGEMENT_TEXT, /el stop pasa a la entrada/);
 });
 
