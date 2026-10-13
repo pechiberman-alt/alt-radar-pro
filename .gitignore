@@ -50,3 +50,11 @@ tsconfig.tsbuildinfo
 
 # la araña dibujada: se genera con npm run arana -- --vista
 /docs/araña/vista.html
+
+# la página de la araña la genera el build (npm run arana -- --pagina)
+/public/arana/
+
+# estado local de Ruflo (el MCP de los agentes, ver CLAUDE.md)
+/.swarm/
+/.claude-flow/
+/ruvector.db*

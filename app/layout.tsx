@@ -34,6 +34,7 @@ import "./pressure-desk.css";
 import "./alert-center.css";
 import "./alert-toasts.css";
 import "./trade-journal-desk.css";
+import "./arana-desk.css";
 import "./dca-desk.css";
 import "./portfolio-risk.css";
 import "./futures-desk.css";
