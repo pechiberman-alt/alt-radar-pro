@@ -71,7 +71,7 @@ registro: record, ledger
 
 ## jarvis — JARVIS, la IA propia del software
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
-Archivos: lib/jarvis*.ts, lib/hands-free*.ts, lib/ai-*.ts, lib/assistant/**, lib/speech-text.ts, lib/browser-voice.ts, app/jarvis*, app/assistant-console.tsx, app/api/jarvis/**, app/api/analyst/**, app/api/telegram/webhook/**, docs/mesa-*.md, scripts/investigacion/**
+Archivos: lib/jarvis*.ts, lib/mesa-medicion.ts, lib/hands-free*.ts, lib/ai-*.ts, lib/assistant/**, lib/speech-text.ts, lib/browser-voice.ts, app/jarvis*, app/assistant-console.tsx, app/api/jarvis/**, app/api/analyst/**, app/api/telegram/webhook/**, docs/mesa-*.md, scripts/investigacion/**
 Reglas:
 - Identidad: «JARVIS — ALT RADAR PRO AI». Nunca se presenta como otra IA ni nombra el modelo.
 - El navegador nunca llama a un proveedor de IA: pasa por /api/analyst/ai o /api/jarvis/*. Las claves nunca salen del Worker.
@@ -209,13 +209,15 @@ Pendiente:
 
 ## araña — La araña del proyecto y las instrucciones para trabajar en él
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
-Archivos: scripts/arana.mjs, scripts/arana-vista.html, docs/araña/**, tests/arana.test.ts, CLAUDE.md, .mcp.json, .claude/settings.json
+Archivos: scripts/arana.mjs, scripts/arana-vista.html, docs/araña/**, tests/arana.test.ts, lib/arana-vivo.ts, app/arana-vivo.tsx, app/arana-desk.tsx, app/arana-desk.css, tests/arana-vivo.test.ts, tests/mesa-medicion.test.ts, CLAUDE.md, .mcp.json, .claude/settings.json
 Reglas:
 - Antes de leer archivos enteros: `npm run arana -- --buscar <tema>` o `--archivo <ruta>`.
 - Escalera para gastar poco: `--buscar <tema>` (archivos, la sección de los .md y las reglas que lo mencionan, cortadas a 200 letras) → `--regla <tema>` (el texto completo de esas reglas: muchas veces alcanza) → `--archivo <ruta>` (la ficha) → recién ahí leer. `--objetivo <nombre>` trae todas las reglas de un objetivo y pesa mucho: usarlo solo para ver el panorama.
 - La descripción de cada archivo es el comentario que lo abre o, si no hay, el bloque `/** … */` de tres líneas o más que sigue a los imports (uno de una línea ahí describe a la primera función, no al archivo). Un archivo nuevo lleva ese comentario: sin él la búsqueda solo lo encuentra por su ruta y sus exportaciones.
 - Una regla que se agrega a un objetivo se escribe con lo importante al principio (el nombre y la conclusión): `--buscar` muestra solo sus primeras 200 letras. Las palabras que la gente usa y el código no van como sinónimos arriba en este archivo.
 - Después de agregar, mover o borrar archivos, o cambiar estos objetivos: `npm run arana`. `npm run test:unit` avisa si el mapa quedó viejo.
+- La araña en vivo (lib/arana-vivo.ts, app/arana-vivo.tsx) solo muestra lo que la app leyó en el navegador y lo medido, cada cosa con su muestra y su intervalo. No ejecuta, no propone órdenes y no guarda nada. Si falta un dato, dice «sin datos».
+- Lo medido que muestra la araña (lib/mesa-medicion.ts) tiene que estar escrito en docs/mesa-reglas-v2.md con sus números; tests/mesa-medicion.test.ts lo chequea. Para cambiarlo, volver a medir con `medir.ts 1h --estadistica` y actualizar los dos.
 - La araña lee el código sin ejecutarlo: lo que se arma en tiempo de ejecución no aparece, y el mapa lo dice.
 - La vista (`npm run arana -- --vista`) dibuja el mapa como una esfera de instrumentos: cada punto es un archivo, cada casquete de color un objetivo, los arcos son imports reales, los pinchos rosas banderas y la araña camina por los imports de cada objetivo. Alrededor, paneles con datos del mapa: cobertura, objetivos, cinta de lectura, líneas por objetivo, más importados, encaje y densidad de imports, radar, banderas, tablas/rutas/secretos (solo nombres) y consultas para Claude. Se genera, no se commitea (docs/araña/vista.html está en .gitignore).
 - Honestidad de la vista: todo panel sale del mapa; lo que es adorno (malla fina entre vecinos, retícula, polvo) lo dice la leyenda y el pie. La posición de cada punto la calcula `esferaDe` en scripts/arana.mjs y es siempre la misma para el mismo proyecto (hay prueba). Un porcentaje lleva su n y menos de 15 es «muestra mínima»; lo que no se puede medir se muestra como «sin datos», no como cero.

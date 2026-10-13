@@ -8,6 +8,7 @@
  *   node --experimental-strip-types scripts/investigacion/medir.ts [perfil] --detalle       # por lado, año, moneda y tipo de salida
  *   node --experimental-strip-types scripts/investigacion/medir.ts [perfil] --variantes     # reglas que se probaron y no se adoptaron
  *   node --experimental-strip-types scripts/investigacion/medir.ts [perfil] --fases         # el mismo resultado empezando en otro momento
+ *   node --experimental-strip-types scripts/investigacion/medir.ts [perfil] --estadistica   # intervalos, Sharpe, caída y DSR (lib/jarvis-stats.ts)
  *   node --experimental-strip-types scripts/investigacion/medir.ts 1h --real BTCUSDT        # valida el simulador contra el backtest real de la app
  *
  * Antes: datos.py (velas) y precalcular.ts (lecturas del perfil).
@@ -15,6 +16,7 @@
 import { runBacktest } from "../../lib/jarvis-backtest.ts";
 import { etiquetarTodas, fmt, lecturas, metricas, simulate, V1, V2, type Metricas, type Operacion, type Params, type Plan } from "./simulador.ts";
 import { aReal, aVirtual, dia, H, MONEDAS, perfilDe, velasAltas, velasBase, velasMedias, type Perfil } from "./util.ts";
+import { evaluarEstrategia, momentos, psr, sharpeDeAzar, sharpePorOperacion } from "../../lib/jarvis-stats.ts";
 
 export type Ventana = { nombre: string; desde: number; hasta: number };
 
@@ -168,6 +170,44 @@ function real(sym: string) {
   }
 }
 
+/**
+ * Estadística de v2 con lib/jarvis-stats.ts: intervalos (Wilson, bootstrap en
+ * bloques), Sharpe, SQN, caída real y simulada, y PSR/DSR contra el azar de
+ * haber probado todas las variantes de arriba. Las variantes son el mínimo
+ * probado: la investigación probó más, así que el DSR es optimista.
+ */
+function estadistica(p: Perfil) {
+  const ws = ventanas(p);
+  const largas = ws.slice(0, -1);
+  const enOrden = (ts: Operacion[]) => [...ts].sort((a, b) => a.fin - b.fin).map((t) => t.r);
+  const pct = (x: number | null) => (x === null ? "sin dato" : `${(x * 100).toFixed(0)}%`);
+  const num = (x: number | null, d = 2) => (x === null ? "sin dato" : x.toFixed(d).replace(".", ","));
+  const linea = (nombre: string, xs: number[], variantesSr: number[] = []) => {
+    const e = evaluarEstrategia(xs, variantesSr);
+    const ic = (i: { low: number; high: number } | null, f: (v: number) => string) => (i ? `[${f(i.low)}; ${f(i.high)}]` : "sin dato");
+    console.log(
+      `${nombre.padEnd(22)} n=${String(e.n).padEnd(5)} ${e.muestra.padEnd(18)} WR ${pct(e.winRate?.p ?? null)} IC90 ${e.winRate ? `[${pct(e.winRate.low)}; ${pct(e.winRate.high)}]` : "sin dato"} | PF ${num(e.profitFactor)} IC90 ${ic(e.profitFactorIC90, (v) => num(v))} | exp ${num(e.expectativaR, 3)}R IC90 ${ic(e.expectativaIC90, (v) => num(v, 3))} | Sharpe ${num(e.sharpe, 3)} SQN ${num(e.sqn)} | caída ${num(e.caida?.maxR ?? null, 1)}R, p95 simulada ${num(e.caidaSimulada?.p95 ?? null, 1)}R`,
+    );
+    return e;
+  };
+  console.log(`\nEstadística de v2, perfil ${p.id} (IC90; PF e IC con bootstrap en bloques de operaciones)`);
+  for (const w of ws) linea(w.nombre, enOrden(correr(V2, p, w)));
+  const reglas = [V2, ...VARIANTES.map(([, c]) => ({ ...V2, ...c }))];
+  const srs = reglas.map((P) => sharpePorOperacion(enOrden(largas.flatMap((w) => correr(P, p, w))))).filter((s): s is number => s !== null);
+  const totalV2 = enOrden(largas.flatMap((w) => correr(V2, p, w)));
+  const e = linea("períodos largos (v2)", totalV2, srs);
+  // La investigación probó más reglas que las de la lista: el número real de pruebas es mayor que 22. Por eso también va 300.
+  const m = momentos(totalV2);
+  const sr = e.sharpe;
+  const cota = (pruebas: number) => {
+    const azar = sharpeDeAzar(srs, pruebas);
+    const dsr = m && sr !== null && azar !== null ? psr(sr, m.n, m.asimetria, m.curtosis, azar) : null;
+    return `${azar === null ? "sin dato" : azar.toFixed(3).replace(".", ",")} → DSR ${dsr === null ? "sin dato" : `${(dsr * 100).toFixed(1).replace(".", ",")}%`}`;
+  };
+  console.log(`\nSharpe de v2 por operación ${num(sr, 3)} · PSR (Sharpe > 0) ${num(e.psr0 === null ? null : e.psr0 * 100, 1)}% · WR corregido por ${srs.length} reglas ${e.winRateCorregido ? `[${pct(e.winRateCorregido.low)}; ${pct(e.winRateCorregido.high)}]` : "sin dato"}`);
+  console.log(`Sharpe de azar, por número de reglas probadas: ${srs.length} (las de la lista) ${cota(srs.length)} · 300 ${cota(300)}`);
+}
+
 if (process.argv[1]?.endsWith("medir.ts")) {
   const args = process.argv.slice(2);
   const real_ = args.indexOf("--real");
@@ -178,5 +218,6 @@ if (process.argv[1]?.endsWith("medir.ts")) {
   else if (args.includes("--detalle")) detalle(p);
   else if (args.includes("--variantes")) variantes(p);
   else if (args.includes("--fases")) fases(p);
+  else if (args.includes("--estadistica")) estadistica(p);
   else tablaPeriodos(p);
 }
