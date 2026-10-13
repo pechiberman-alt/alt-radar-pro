@@ -1,3 +1,8 @@
+/**
+ * Lo que comparten las rutas de Telegram: el esquema de la tabla, el nombre del bot y el
+ * registro del webhook (solo se vuelve a registrar cuando Telegram tiene otra URL, así que
+ * vincular nunca pide un paso manual).
+ */
 import { tg, TELEGRAM_SCHEMA, webhookSecret } from "./telegram.ts";
 
 /** Shared by the routes: schema, bot username and webhook registration. */

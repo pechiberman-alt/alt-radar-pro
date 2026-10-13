@@ -1,3 +1,9 @@
+/**
+ * Los perfiles de trading (TRADING_PRO, HEDGE_VALUE_PRO y SPOT_TRADER) con su riesgo por
+ * operación, su apalancamiento máximo y su R:R, y la calculadora de tamaño de posición
+ * (`calculateRisk`): el tamaño sale del stop y no del apalancamiento, y la liquidación es una
+ * estimación. La usan app/radar-app.tsx y app/risk-desk.tsx.
+ */
 export type ProfileId = "TRADING_PRO" | "HEDGE_VALUE_PRO" | "SPOT_TRADER";
 
 export type Horizon = "CORTO" | "MEDIANO" | "LARGO";

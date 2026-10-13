@@ -1,3 +1,8 @@
+/**
+ * El archivo del libro de órdenes: guarda instantáneas de la profundidad de BTC, ETH y SOL
+ * con lib/liquidity-history.ts. Si un venue público no responde prueba el siguiente y nunca
+ * inventa una instantánea. Lo llama el cron del Worker (worker/index.ts).
+ */
 import { storeLiquiditySnapshot } from "./liquidity-history";
 
 const CORE_MARKETS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"] as const;

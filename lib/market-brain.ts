@@ -1,3 +1,9 @@
+/**
+ * El cerebro de mercado: lee velas de 5 min a 1 d, analiza cada marco (`analyzeCandles`), arma el
+ * consenso entre marcos (`buildConsensus`) y las zonas de liquidación teóricas, y define las
+ * velas y el payload de /api/brain. Lo usan /api/brain, /api/scalping, app/market-brain.tsx,
+ * lib/scalping-engine.ts y lib/scalping-automation.ts.
+ */
 export const BRAIN_TIMEFRAMES = ["5m", "15m", "1h", "4h", "1d"] as const;
 
 export type BrainTimeframe = (typeof BRAIN_TIMEFRAMES)[number];

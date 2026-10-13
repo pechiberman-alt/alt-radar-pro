@@ -1,3 +1,8 @@
+/**
+ * El historial de liquidez del libro de órdenes en D1: instantáneas (precio medio, bids y asks)
+ * por símbolo y por mercado (spot o futuros), con los niveles validados y acotados antes de
+ * guardarlos. Lo escribe lib/liquidity-archive.ts y lo lee /api/liquidity-history.
+ */
 export type LiquidityLevel = [number, number];
 
 export type LiquiditySnapshot = {

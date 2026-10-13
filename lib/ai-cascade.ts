@@ -1,3 +1,9 @@
+/**
+ * La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el
+ * cupo de la persona), después por Groq (si hay clave gratis) y después por el modelo gratis
+ * de Cloudflare, y la respuesta dice cuál habló. Cada cerebro está en lib/ai-brains.ts.
+ * La usan /api/analyst/ai y el bot de Telegram.
+ */
 import type { ChatTurn } from "./ai-analyst.ts";
 import { askClaude, consumeQuota, quotaFor } from "./ai-analyst-server.ts";
 import {

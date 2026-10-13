@@ -1,3 +1,9 @@
+/**
+ * La cadena de auditoría del cerebro de mercado: cada observación y cada resultado se guarda
+ * en D1 encadenado con hashes, y la cadena se verifica (INTEGRIDAD VERIFICADA, CADENA DEGRADADA
+ * o MEMORIA NO DISPONIBLE). Versión del modelo: `secure-quant-brain-v3`. La usan /api/brain,
+ * /api/scalping, lib/market-brain.ts y lib/scalping-automation.ts.
+ */
 export const BRAIN_MODEL_VERSION = "secure-quant-brain-v3";
 
 const GENESIS_HASH = "0".repeat(64);

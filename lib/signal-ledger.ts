@@ -1,3 +1,8 @@
+/**
+ * Los tipos del libro de señales: cada señal registrada con su plan (stop, objetivos y cómo
+ * terminó), las estadísticas del libro (`LedgerStats`) y el payload (`LedgerPayload`).
+ * Solo tipos: no hay lógica acá.
+ */
 import type { ScoreReason } from "./radar";
 
 import type { KindStats } from "./signal-plan.ts";

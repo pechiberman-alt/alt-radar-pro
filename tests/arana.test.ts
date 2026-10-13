@@ -9,8 +9,10 @@ import {
   buscar,
   chequear,
   cargarIndice,
+  comentarioInicial,
   construirIndice,
   ejecutar,
+  encabezadosMarkdown,
   globToRegExp,
   grafoDe,
   MAPA,
@@ -21,7 +23,10 @@ import {
   renderHuellas,
   renderMapa,
   ROOT,
+  textoBusqueda,
   textoCambios,
+  textoPendientes,
+  textoReglas,
   VISTA_PLANTILLA,
   vistaHtml,
 } from "../scripts/arana.mjs";
@@ -165,6 +170,74 @@ test("--buscar finds code in English through the synonyms, and stopwords alone f
   const index = construirIndice(extra, parseObjetivos(FIXTURE_MD));
   assert.equal(buscar(index, "voz").resultados[0].f.path, "lib/voice-engine.ts");
   assert.equal(buscar(index, "de la").resultados.length, 0);
+});
+
+test("the description of a file is the comment that opens it, or the header of three lines or more right after its imports", () => {
+  assert.equal(comentarioInicial('/**\n * Calcula el riesgo.\n */\nimport a from "./a.ts";\n'), "Calcula el riesgo.");
+  assert.equal(comentarioInicial('#!/usr/bin/env node\n/**\n * La araña: el mapa.\n */\nimport a from "./a.ts";\n'), "La araña: el mapa.", "the shebang line is not code");
+  assert.equal(comentarioInicial("/* eslint-disable */\n/**\n * Hace cosas.\n */\nexport const c = 1;\n"), "Hace cosas.", "tooling directives are skipped");
+  // Most files here start with their imports (multi-line ones, "use client", side-effect ones) and put the header after.
+  const cabecera = '"use client";\n\nimport { useState } from "react";\nimport {\n  uno,\n  dos,\n} from "@/lib/x";\nimport type { Tipo } from "./tipos.ts";\nimport "./estilos.css";\n\n/**\n * El escáner del mercado.\n * Lee todo.\n * No opera.\n */\nexport const a = 1;\n';
+  assert.equal(comentarioInicial(cabecera), "El escáner del mercado.\nLee todo.\nNo opera.");
+  // A short doc after the imports belongs to the first function: describing the file with it would mislead.
+  assert.equal(comentarioInicial('import a from "./a.ts";\n\n/** Suma dos números. */\nexport function sumar() {}\n'), "");
+  assert.equal(comentarioInicial('import a from "./a.ts";\n\n/**\n * Suma.\n * Dos números.\n */\nexport function sumar() {}\n'), "", "two lines are not a header");
+  // A // note after the imports is not a header either, and code between the imports and the comment ends the search.
+  assert.equal(comentarioInicial('import a from "./a.ts";\n// eslint-disable-next-line x\nexport const b = 1;\n'), "");
+  assert.equal(comentarioInicial('import a from "./a.ts";\nconst x = 1;\n/**\n * Uno.\n * Dos.\n * Tres.\n */\n'), "");
+  // A // note between two imports is skipped with them.
+  assert.equal(comentarioInicial('import a from "./a.ts";\n// Con la extensión para que Node lo corra.\nimport b from "./b.ts";\n\n/**\n * Un asistente.\n * Sin modelo.\n * No inventa.\n */\nexport const c = 1;\n'), "Un asistente.\nSin modelo.\nNo inventa.");
+});
+
+test("the real project: the files whose header comes after the imports are described", () => {
+  const index = cargarIndice(ROOT);
+  for (const p of ["scripts/arana.mjs", "lib/jarvis-scan.ts", "lib/jarvis-council.ts", "app/jarvis-scan.tsx"]) {
+    assert.ok(index.mapa.get(p).resumen, `${p} no tiene descripción: abrilo con un comentario de tres líneas o más`);
+  }
+});
+
+test("the headings of a Markdown file: ## to ####, never the ones inside a code block", () => {
+  const md = "# Título\n\ntexto\n\n## Resultados (10 monedas)\n\n```sh\n## no es un título\n```\n\n### Costos `más` altos\n\n##### Demasiado hondo\n";
+  assert.deepEqual(encabezadosMarkdown(md), ["Resultados (10 monedas)", "Costos más altos"]);
+});
+
+test("--buscar finds a Markdown file by its headings and says which section to read", () => {
+  const md = archivo("docs/notas.md", "# Notas de prueba\n\n## Reglas de redondeo\n\nTexto.\n\n## Otra cosa\n");
+  const index = construirIndice([...FILES, md], parseObjetivos(FIXTURE_MD));
+  const hallado = buscar(index, "redondeo").resultados.find((x: { f: { path: string } }) => x.f.path === "docs/notas.md");
+  assert.equal(hallado.seccion, "Reglas de redondeo");
+  assert.match(textoBusqueda(index, "redondeo"), /docs\/notas\.md .*§ Reglas de redondeo/);
+});
+
+test("--buscar also brings the rules and pending items that talk about the topic, and --regla brings them whole", () => {
+  const index = construirIndice(FILES, parseObjetivos(FIXTURE_MD));
+  assert.deepEqual(buscar(index, "redondea").reglas.map((x: { slug: string; tipo: string; texto: string }) => [x.slug, x.tipo, x.texto]), [["cuentas", "regla", "Nunca se redondea hacia arriba."]]);
+  assert.deepEqual(buscar(index, "redondeo").reglas.map((x: { tipo: string }) => x.tipo), ["pendiente"]);
+  assert.equal(buscar(index, "redondea voz").reglas.length, 0, "with two words both have to be there: «redondea» alone is not «redondea voz»");
+  // A rule found with no file for it is still an answer.
+  const sinArchivos = textoBusqueda(index, "arriba");
+  assert.match(sinArchivos, /Reglas y pendientes que lo mencionan/);
+  assert.match(sinArchivos, /\[cuentas\] Nunca se redondea hacia arriba\./);
+  assert.doesNotMatch(sinArchivos, /Nada\./);
+  assert.match(textoBusqueda(index, "zzzzz"), /Nada\./);
+  // --buscar cuts a long rule; --regla gives it whole.
+  const larga = `Nunca se redondea hacia arriba ${"palabra ".repeat(60).trim()}.`;
+  const conLarga = construirIndice(FILES, parseObjetivos(FIXTURE_MD.replace("- Nunca se redondea hacia arriba.", `- ${larga}`)));
+  const corta = textoBusqueda(conLarga, "redondea").split("\n").find((l: string) => l.includes("[cuentas]")) ?? "";
+  assert.ok(corta.endsWith("…") && corta.length < 240, corta);
+  assert.equal(textoReglas(conLarga, "redondea"), `[cuentas] ${larga}`);
+  assert.equal(ejecutar(["--regla", "redondeo"], index).salida, "[cuentas] pendiente: Revisar el redondeo de LIMITE.");
+  assert.equal(ejecutar(["--regla"], index).codigo, 2);
+  assert.match(ejecutar(["--regla", "zzzzz"], index).salida, /Ninguna regla/);
+  assert.match(ejecutar(["--regla", "de la"], index).salida, /Decime qué buscás/);
+});
+
+test("--pendientes gathers what is left to do, by objective, and says when there is nothing", () => {
+  const index = construirIndice(FILES, parseObjetivos(FIXTURE_MD));
+  assert.equal(textoPendientes(index), "[cuentas]\n- Revisar el redondeo de LIMITE.");
+  assert.equal(ejecutar(["--pendientes"], index).codigo, 0);
+  const sin = construirIndice(FILES, parseObjetivos(FIXTURE_MD.replace("Pendiente:\n- Revisar el redondeo de LIMITE.\n", "")));
+  assert.match(textoPendientes(sin), /nada pendiente/);
 });
 
 test("--cambios names the files that changed, grouped by objective", () => {
