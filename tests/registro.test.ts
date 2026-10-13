@@ -53,7 +53,7 @@ test("nothing closed means no rate and no factor, never zero pretending to be a 
 test("no losses: the profit factor is not divided by zero", () => {
   const s = estadistica(contar(R(1, 2)));
   assert.equal(s.profitFactor, null);
-  assert.match(lineaFuente({ ...s, id: "PAPEL", nombre: "x", ambito: "CUENTA", enTotal: true, disponible: true, incompleta: false }), /sin pérdidas/);
+  assert.match(lineaFuente({ ...s, id: "PAPEL", nombre: "x", ambito: "CUENTA", enTotal: true, disponible: true, incompleta: false, capital: null }), /sin pérdidas/);
 });
 
 test("sample: under 15 closed is 'muestra mínima'; from 15 on, 'razonable'", () => {

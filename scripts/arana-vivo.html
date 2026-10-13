@@ -126,7 +126,8 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
 .reg-tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .reg-tabla th, .reg-tabla td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; white-space: nowrap; }
 .reg-tabla .sin td { opacity: .55; }
-.reg-tabla .m-min { color: #ffb84d; }
+.reg-tabla .c-gana { color: #3fd68f; } .c-pierde { color: #ff6b6b; }
+  .m-min { color: #ffb84d; }
 .reg-tabla .m-ok { color: #4dffad; }
 .reg-tabla small { opacity: .7; }
 .reg-tabla .aparte td { opacity: .7; font-style: italic; }
@@ -226,11 +227,13 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
     <h2>Registro · todas las operaciones, con su muestra</h2>
     <p class="lab-nota" id="reg-nota"></p>
     <div class="lab-kpis" id="reg-total"></div>
+    <h3>Capital simulado de cada bot · USD 1.000 virtuales, 1 % por operación</h3>
+    <div class="lab-kpis" id="reg-capital"></div>
     <div class="reg-wrap"><table class="reg-tabla">
-      <thead><tr><th>Fuente</th><th>Cerradas</th><th>Acierto (IC 90 %)</th><th>Profit factor</th><th>R por operación</th><th>Muestra</th></tr></thead>
+      <thead><tr><th>Fuente</th><th>Cerradas</th><th>Acierto (IC 90 %)</th><th>Profit factor</th><th>R por operación</th><th>Capital simulado</th><th>Muestra</th></tr></thead>
       <tbody id="reg-filas"></tbody>
     </table></div>
-    <p class="lab-nota">Cada número sale del registro: JARVIS es global y tu cuenta aparece solo con sesión. Un porcentaje siempre va con su muestra; menos de 15 cerradas es muestra mínima. Las abiertas no entran en el acierto. No es asesoramiento financiero.</p>
+    <p class="lab-nota">Cada número sale del registro: JARVIS es global y tu cuenta aparece solo con sesión. Un porcentaje siempre va con su muestra; menos de 15 cerradas es muestra mínima. Las abiertas no entran en el acierto. Capital simulado: cada bot arranca con USD 1.000 virtuales y arriesga 1 % fijo por operación (USD 10 por cada R), desde su primera operación registrada; es dinero de simulación, no real. No es asesoramiento financiero.</p>
   </section>
   <section class="panel lab" id="lab" aria-label="Laboratorio en sombra">
     <h2>Laboratorio en sombra · aprende con cada operación cerrada</h2>
@@ -629,12 +632,24 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
       $("reg-nota").textContent = "El registro todavía no cargó. Con sesión, ves también tu bot de papel y tu robot.";
       $("reg-total").innerHTML = "";
       $("reg-filas").innerHTML = "";
+      $("reg-capital").innerHTML = "";
       return;
     }
     const pct = (v) => (v === null || v === undefined ? "sin dato" : `${Math.round(v * 100)} %`);
     const dec = (v) => (v === null || v === undefined ? "sin dato" : v.toFixed(2).replace(".", ","));
     const signo = (v) => (v === null || v === undefined ? "sin dato" : `${v > 0 ? "+" : ""}${v.toFixed(2).replace(".", ",")} R`);
     const iv = (x) => (x ? `${pct(x.low)}–${pct(x.high)}` : "—");
+    const usd = (v) => `USD ${Math.round(v).toLocaleString("es-AR")}`;
+    const dia = (ms) => new Date(ms).toISOString().slice(0, 10).split("-").reverse().join("/");
+    // El capital simulado de cada bot (lib/registro.ts): USD 1.000 virtuales, 1 % fijo por operación, desde su primera operación.
+    const capital = (c) => {
+      if (!c) return "sin dato";
+      const ret = `${c.retornoPct > 0 ? "+" : ""}${c.retornoPct.toFixed(1).replace(".", ",")} %`;
+      const caida = c.maxCaidaUsd !== null ? `caída máx ${usd(c.maxCaidaUsd)}${c.serieCompleta ? "" : " (parcial)"}` : "caída sin dato";
+      const desde = c.desde !== null ? ` · desde ${dia(c.desde)}` : "";
+      const quiebra = c.quebrado ? " · sin capital" : "";
+      return `<b class="${c.netoUsd > 0 ? "c-gana" : c.netoUsd < 0 ? "c-pierde" : ""}">${esc(usd(c.actualUsd))}</b> ${esc(ret)}<br><small>${esc(caida + desde + quiebra)}</small>`;
+    };
     const tile = (t, v, sub) => `<div class="tile"><small>${esc(t)}</small><b>${esc(v)}</b><span>${esc(sub)}</span></div>`;
     const T = g.total;
     $("reg-nota").textContent = `Total de lo medido: ${n0(T.cerradas)} operaciones cerradas.`;
@@ -645,17 +660,27 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
       tile("R por operación", signo(T.expectancia), `neto ${signo(T.neto)}`),
       tile("Sin cerrar", n0(T.abiertas), "todavía corriendo"),
     ].join("");
+    const conCapital = g.fuentes.filter((f) => f.disponible && f.capital);
+    $("reg-capital").innerHTML = conCapital.length
+      ? conCapital.map((f) => {
+          const c = f.capital;
+          const ret = `${c.retornoPct > 0 ? "+" : ""}${c.retornoPct.toFixed(1).replace(".", ",")} %`;
+          const caida = c.maxCaidaUsd !== null ? `caída máx ${usd(c.maxCaidaUsd)}${c.serieCompleta ? "" : " (parcial)"}` : "caída sin dato";
+          const desde = c.desde !== null ? ` · desde ${dia(c.desde)}` : "";
+          return tile(f.nombre, usd(c.actualUsd), `${ret} · ${n0(f.cerradas)} cerradas · ${caida}${desde}${c.quebrado ? " · sin capital" : ""}`);
+        }).join("")
+      : "<p class=\"nota\">Todavía no hay bots con datos.</p>";
     $("reg-filas").innerHTML = g.fuentes.map((f) => {
       const nombre = esc(f.nombre) + (f.incompleta ? " <em>(incompleta)</em>" : "");
       if (!f.disponible) {
         const pista = f.ambito === "CUENTA" ? " (con sesión)" : "";
-        return `<tr class="sin"><td>${nombre}</td><td colspan="5">sin datos${pista}</td></tr>`;
+        return `<tr class="sin"><td>${nombre}</td><td colspan="6">sin datos${pista}</td></tr>`;
       }
       const aparte = f.enTotal ? "" : " class=\"aparte\"";
-      if (!f.cerradas) return `<tr${aparte}><td>${nombre}</td><td>0</td><td>—</td><td>—</td><td>—</td><td>sin cerradas</td></tr>`;
+      if (!f.cerradas) return `<tr${aparte}><td>${nombre}</td><td>0</td><td>—</td><td>—</td><td>—</td><td>${capital(f.capital)}</td><td>sin cerradas</td></tr>`;
       const pf = f.profitFactor !== null ? dec(f.profitFactor) : f.perdido === 0 ? "sin pérdidas" : "sin dato";
       const muestra = f.muestra === "MINIMA" ? "<span class=\"m-min\">mínima</span>" : "<span class=\"m-ok\">razonable</span>";
-      return `<tr${aparte}><td>${nombre}</td><td>${n0(f.cerradas)}</td><td>${pct(f.winRate)} <small>${esc(iv(f.intervalo))}</small></td><td>${pf}</td><td>${signo(f.expectancia)}</td><td>${muestra}</td></tr>`;
+      return `<tr${aparte}><td>${nombre}</td><td>${n0(f.cerradas)}</td><td>${pct(f.winRate)} <small>${esc(iv(f.intervalo))}</small></td><td>${pf}</td><td>${signo(f.expectancia)}</td><td>${capital(f.capital)}</td><td>${muestra}</td></tr>`;
     }).join("");
   }
 

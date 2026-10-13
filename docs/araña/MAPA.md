@@ -4,7 +4,7 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 554 · objetivos: 17 · sin objetivo: 0
+- Archivos: 555 · objetivos: 17 · sin objetivo: 0
 - Tablas D1: 48 · secretos: 4 · variables de entorno: 12 · rutas /api: 53 · hosts: 56
 - Código de navegador: 61 archivos con "use client" que alcanzan 182 · problemas: 0
 - Lib sin prueba directa: 23 de 174
@@ -388,7 +388,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/lab.ts` — AI TRADING LAB: la foto del laboratorio armada con lo que la app ya tiene (la araña en vivo, el backtest, el papel, el registro y el gestor de riesgo).
 - `tests/lab.test.ts` — AI TRADING LAB: el gestor de riesgo central frena lo que pasa los límites y nadie lo afloja más allá de los topes; la evaluación del backtest respeta la cronología; el centro de la
 
-### calidad — Pruebas (131)
+### calidad — Pruebas (132)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agentes-mcp.test.ts` — Ruflo (el MCP de los agentes) arranca código de terceros con `npx`.
@@ -489,6 +489,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/pump-pressure.test.ts` — pruebas: a market that tightened reads as compressed, a market with a constant range shows no pressure, pressure is direction-free — it never moves with the bias (+1)
 - `tests/pump-radar.test.ts` — pruebas: screener ignores assets without a 5m window, screener enforces the liquidity floor, screener rewards acceleration over a slow grind (+1)
 - `tests/radar.test.ts` — pruebas: global risk reports unavailable rather than zero without events, unconfirmed events are discounted, never actioned, an extreme confirmed event raises the advisory flag (+1)
+- `tests/registro-capital.test.ts` — pruebas: capital: USD 1.000 con 1 % fijo por operación; el final sale del neto en R, capital: la curva sigue el orden en que cerraron, no el orden en que llegan, capital: no mira el futuro; cada punto de la curva usa solo los cierres anterior (+1)
 - `tests/rendered-html.test.mjs` — pruebas: server-renders the branded Spanish application shell, keeps persistent signal history and automation wired, contains the requested ownership and safety language (+1)
 - `tests/risk-calc.test.ts` — pruebas: size is the risk budget over the loss per unit at the stop, fees and slippage in, liquidation is estimated per side and the stop, targets pay R times the distance, less fees and slippage both ways (+1)
 - `tests/risk.test.ts` — pruebas: sizes the position from the stop distance, losing the stop distance costs exactly the risk budget, or says why not, a capped position is always reported, never silent (+1)
@@ -644,7 +645,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `dca_schedules` — crea: lib/dca-tracker.ts · usa: app/api/dca/schedule/route.ts, lib/telegram-dispatch.ts · sin índice visible en el código
 - `flujo_senales` — crea: lib/flujo-db.ts · usa: lib/flujo-db.ts · índices: flujo_senales_reciente
 - `jarvis_chat` — crea: lib/jarvis-chat.ts · usa: lib/jarvis-chat.ts, tests/jarvis-chat.test.ts · índices: jarvis_chat_user
-- `jarvis_core_signals` — crea: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · usa: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · índices: jarvis_core_open, jarvis_core_created, jarvis_core_closed, jarvis_core_busy
+- `jarvis_core_signals` — crea: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · usa: lib/jarvis-core-db.ts, lib/registro-db.ts, tests/jarvis-core.test.ts · índices: jarvis_core_open, jarvis_core_created, jarvis_core_closed, jarvis_core_busy
 - `jarvis_core_state` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts, lib/jarvis-mind-db.ts, lib/jarvis-world.ts, tests/jarvis-mind.test.ts · sin índice visible en el código
 - `jarvis_core_stats` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts, tests/registro.test.ts · sin índice visible en el código
 - `jarvis_memory` — crea: lib/jarvis-memory.ts · usa: lib/jarvis-memory.ts · índices: jarvis_memory_user

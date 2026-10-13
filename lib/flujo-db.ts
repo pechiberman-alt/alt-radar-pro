@@ -107,8 +107,8 @@ export async function resultadosFlujo(db: D1Database, userId: number, limite: nu
   await ensureFlujo(db);
   return (
     await db
-      .prepare("SELECT r, desenlace FROM flujo_senales WHERE user_id = ?1 ORDER BY detectada DESC LIMIT ?2")
+      .prepare("SELECT r, desenlace, cerrada, detectada FROM flujo_senales WHERE user_id = ?1 ORDER BY detectada DESC LIMIT ?2")
       .bind(userId, limite)
-      .all<{ r: number | null; desenlace: string }>()
+      .all<{ r: number | null; desenlace: string; cerrada: number | null; detectada: number | null }>()
   ).results;
 }
