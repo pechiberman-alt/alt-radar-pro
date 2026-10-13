@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FUTURES_WS, futuresStreamUrl } from "@/lib/binance-ws";
+import { planDeFlujo } from "@/lib/flujo";
+import { iniciarEvaluacionFlujo, registrarLecturaFlujo } from "@/lib/flujo-run";
 import type { BrainTimeframe } from "@/lib/market-brain";
 import type { DerivativesSnapshot } from "@/lib/market-brain";
 import type { LiquiditySnapshot } from "@/lib/liquidity-history";
@@ -1939,6 +1941,17 @@ export default function LiveBookmap({
     structureLevelsRef.current = structureLevels;
     institutionalRef.current = institutional;
   }, [structureLevels, institutional]);
+
+  // Cada lectura de presión con dirección y plan completo queda como operación medida (PLAN_FLUJO_1, lib/flujo.ts).
+  // Una misma media hora, símbolo y lado se registra una sola vez.
+  useEffect(() => {
+    if (brainMid <= 0) return;
+    const plan = planDeFlujo(squeeze, brainMid, structureLevels);
+    if (plan) void registrarLecturaFlujo(symbol, plan);
+  }, [squeeze, structureLevels, brainMid, symbol]);
+
+  // Mide las abiertas con las velas que ya cerraron, con la pestaña visible y con sesión.
+  useEffect(() => iniciarEvaluacionFlujo(), []);
 
   // Publish the reading upward, deferred so the parent is never updated while
   // this component is still rendering.

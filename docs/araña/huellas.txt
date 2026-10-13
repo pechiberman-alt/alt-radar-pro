@@ -5,7 +5,7 @@ bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
 bcde9385654a	0	.gitignore
 fe5716951a62	10	.mcp.json
 6b5886c6306e	5	.openai/hosting.json
-44bceb7e9100	71	CLAUDE.md
+5e01ffe2ee04	72	CLAUDE.md
 8b27e3600b59	64	README.md
 5aac31cab73c	36	THIRD_PARTY_NOTICES.md
 7d7e53d1533b	103	app/account-panel.css
@@ -55,6 +55,7 @@ bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
 258c46b07f01	70	app/api/radar/route.ts
+c8ef66672964	47	app/api/registro/flujo/route.ts
 4700fca70f5c	19	app/api/registro/route.ts
 a99ad37e5d45	96	app/api/robot/signal/route.ts
 1d6f0811ce3f	94	app/api/rolling/route.ts
@@ -128,7 +129,7 @@ aa4d7c876c20	51	app/laptop.css
 30198b3908f1	131	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
 541dc714c4e8	4227	app/liquidation-heatmap-desk.tsx
-94022510ca41	3132	app/live-bookmap.tsx
+39b0534ede8e	3145	app/live-bookmap.tsx
 4fb2595a8caa	4	app/market-brain.css
 db0be99a3f89	499	app/market-brain.tsx
 89b25149b415	141	app/market-structure-panel.tsx
@@ -178,7 +179,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-dc95da8f11db	265	docs/araña/objetivos.md
+69bb22c96046	266	docs/araña/objetivos.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -243,6 +244,9 @@ da42f6c9e464	311	lib/fair-value-gaps.ts
 484df63263f5	69	lib/fear-greed.ts
 6671236724d5	224	lib/fib-backtest.ts
 3738e2191067	114	lib/fib-zone.ts
+73fb4ed836ef	115	lib/flujo-db.ts
+7a92c06ed2a2	114	lib/flujo-run.ts
+1b363e3e8689	158	lib/flujo.ts
 0b2d1bf961da	295	lib/footprint.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
@@ -319,9 +323,9 @@ f2ad043c6c3a	431	lib/paper-bot.ts
 357bfd64bf54	170	lib/pump-pressure.ts
 067ef991f873	300	lib/pump-radar.ts
 519f91b497f6	533	lib/radar.ts
-25e4f9cee7a3	106	lib/registro-db.ts
+3c76cfab7225	114	lib/registro-db.ts
 62a90a1d0b2d	43	lib/registro-run.ts
-bdb811520d07	161	lib/registro.ts
+95bebc31e43a	162	lib/registro.ts
 efc446c0f3ed	90	lib/reversal-zones.ts
 bc992c13bd28	130	lib/risk-calc.ts
 00e3d377935b	129	lib/robot-ledger-db.ts
@@ -429,6 +433,7 @@ b0ba998c8335	119	tests/etf-flows-multi.test.ts
 eac12ecfb8fb	248	tests/fair-value-gaps.test.ts
 bcdc181f93e6	227	tests/fib-backtest.test.ts
 bc048058d368	97	tests/fib-zone.test.ts
+e4d91c94aa3c	124	tests/flujo.test.ts
 70e30489d116	109	tests/footprint-signals.test.ts
 d6031202b073	89	tests/footprint-sweeps.test.ts
 79b36d34e65f	119	tests/footprint-verdict.test.ts
