@@ -4,8 +4,8 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 526 · objetivos: 15 · sin objetivo: 0
-- Tablas D1: 46 · secretos: 4 · variables de entorno: 11 · rutas /api: 50 · hosts: 54
+- Archivos: 531 · objetivos: 15 · sin objetivo: 0
+- Tablas D1: 46 · secretos: 4 · variables de entorno: 12 · rutas /api: 50 · hosts: 55
 - Código de navegador: 60 archivos con "use client" que alcanzan 171 · problemas: 0
 - Lib sin prueba directa: 20 de 161
 
@@ -335,7 +335,7 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/auth.ts` — Per-client authentication: email + password, isolated by user_id.
 - `lib/secret-box.ts` — AES-GCM with a base64 32-byte key: iv (12 bytes) + ciphertext, base64.
 
-### araña — La araña del proyecto y las instrucciones para trabajar en él (16)
+### araña — La araña del proyecto y las instrucciones para trabajar en él (21)
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
 - `.claude/settings.json`
 - `.mcp.json`
@@ -349,9 +349,14 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana-vista.html`
 - `scripts/arana-vivo.html`
 - `scripts/arana.mjs` — La araña: the project map of ALT RADAR PRO.
+- `scripts/claude-hooks.mjs` — Hooks de Claude Code de este repo (los registra .claude/settings.json).
+- `scripts/herramientas.mjs` — Herramientas para trabajar en el repo gastando pocos tokens: el resumen corto de lint, tests, tsc y build que imprime `npm run verificar`, el control de secretos y archivos protegi
+- `scripts/subir.mjs` — npm run subir: lleva a producción el cambio que pasó `npm run verificar`, en un paso y con salida corta: rama, commit, PR, squash a main y espera el deploy del CI.
+- `scripts/verificar.mjs` — npm run verificar: todo lo que tiene que pasar antes de subir un cambio, con salida corta (una línea por paso y solo el detalle de lo que falla): mapa de la araña, lint, tests, tsc
 - `tests/arana-vivo-auto.test.ts` — pruebas: la primera vez, con la araña a la vista, escanea enseguida, fuera de vista nunca escanea en segundo plano, aunque ya toque, pausado no escanea solo, y con un escaneo en curso no se empieza otro (+1)
 - `tests/arana-vivo.test.ts` — pruebas: sin escaneo, sin papel y sin backtest: todo dice «sin datos», nada se inventa, el escaneo al día muestra las mejores aprobadas, ordenadas por puntaje, sin los , un escaneo viejo avisa que ya no es de ahora, y uno parcial dice por qué se cort (+1)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
+- `tests/herramientas.test.ts` — Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada más, `npm run subir` tiene que frenar secretos y archivos protegi
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)
 
 ### calidad — Pruebas (131)
@@ -648,6 +653,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - variable `ALT_RADAR_DATOS` — en: scripts/investigacion/util.ts
 - variable `ALT_RADAR_SALIDA` — en: scripts/investigacion/util.ts
 - variable `ASSETS` — en: worker/index.ts
+- variable `CLAUDE_PROJECT_DIR` — en: scripts/claude-hooks.mjs
 - variable `CODEX_SANDBOX` — en: vite.config.ts
 - variable `COMISION_PCT` — en: scripts/investigacion/simulador.ts
 - variable `ENCRYPTION_KEY` — en: lib/app-settings.ts
@@ -751,6 +757,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `feeds.bbci.co.uk` — lib/news-intelligence.ts
 - `feeds.content.dowjones.io` — lib/news-intelligence.ts
 - `feeds.skynews.com` — lib/news-intelligence.ts
+- `github.com` — tests/herramientas.test.ts
 - `news.un.org` — lib/news-intelligence.ts
 - `nextjs.org` — next-env.d.ts
 - `nfs.faireconomy.media` — app/api/calendar/route.ts, lib/econ-calendar.ts

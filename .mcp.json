@@ -2,7 +2,8 @@
   "mcpServers": {
     "ruflo": {
       "command": "npx",
-      "args": ["-y", "--ignore-scripts", "--before=2026-09-29", "-p", "@claude-flow/cli@3.48.0", "claude-flow", "mcp", "start"]
+      "args": ["-y", "--ignore-scripts", "--before=2026-09-29", "-p", "@claude-flow/cli@3.48.0", "claude-flow", "mcp", "start"],
+      "env": { "CLAUDE_FLOW_MCP_TOOLS": "swarm,agent,task,memory,workflow" }
     }
   }
 }

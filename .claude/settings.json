@@ -1,4 +1,16 @@
 {
   "env": { "MCP_TIMEOUT": "120000" },
-  "enabledMcpjsonServers": ["ruflo"]
+  "enabledMcpjsonServers": ["ruflo"],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/scripts/claude-hooks.mjs\" lectura", "timeout": 10 }]
+      },
+      {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit",
+        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/scripts/claude-hooks.mjs\" edicion", "timeout": 10 }]
+      }
+    ]
+  }
 }
