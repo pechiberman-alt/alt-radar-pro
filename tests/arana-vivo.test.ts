@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { BacktestResult } from "../lib/jarvis-backtest.ts";
-import { buildVivo, ESCANEO_VIEJO_MIN, type VivoInput } from "../lib/arana-vivo.ts";
+import { APRENDIZAJE_VIVO, buildVivo, ESCANEO_VIEJO_MIN, type VivoInput } from "../lib/arana-vivo.ts";
 import type { PaperTrade } from "../lib/jarvis-paper.ts";
-import type { ScanResult } from "../lib/jarvis-scan.ts";
+import type { ScanResult, ScanRow } from "../lib/jarvis-scan.ts";
 import type { WatchStatus } from "../lib/jarvis-watch-run.ts";
 import type { MedicionMesa } from "../lib/mesa-medicion.ts";
 
@@ -32,6 +32,7 @@ const base = (extra: Partial<VivoInput> = {}): VivoInput => ({
   now: AHORA,
   escaneo: null,
   escaneando: null,
+  llegando: [],
   papel: [],
   backtest: null,
   vigilancia: null,
@@ -39,7 +40,7 @@ const base = (extra: Partial<VivoInput> = {}): VivoInput => ({
   ...extra,
 });
 
-const cerrada = (r: number) => ({ estado: "CERRADA", resultadoR: r, decision: { riesgoUsd: null }, cerradaA: 1, llenadaA: 0 }) as unknown as PaperTrade;
+const cerrada = (r: number) => ({ symbol: "BTCUSDT", lado: "LONG", estado: "CERRADA", resultadoR: r, decision: { riesgoUsd: null }, cerradaA: 1, llenadaA: 0 }) as unknown as PaperTrade;
 const papel = (ganadas: number, perdidas: number) => [...Array(ganadas).fill(1), ...Array(perdidas).fill(-1)].map(cerrada);
 
 const escaneo = (haceMin: number, parcial = false): ScanResult =>
@@ -111,6 +112,23 @@ test("el papel con menos de 15 operaciones cerradas es muestra mínima y no se c
   assert.equal(v.papel.cerradas, 10);
   assert.equal(v.papel.muestra, "MUESTRA MÍNIMA");
   assert.equal(v.veredicto.estado, "sin muestra");
+  // Ni acierto ni intervalo: con una sola operación un 0% o un 100% sería un número sin sentido.
+  assert.equal(v.papel.winRate, null);
+});
+
+test("con una sola operación cerrada no hay porcentaje de acierto, aunque haya operaciones abiertas", () => {
+  const v = buildVivo(base({ papel: [...papel(0, 1), abierta("ETHUSDT", 5)] }));
+  assert.equal(v.papel.cerradas, 1);
+  assert.equal(v.papel.abiertas, 1);
+  assert.equal(v.papel.winRate, null);
+  assert.equal(v.veredicto.estado, "sin muestra");
+});
+
+test("sin operaciones cerradas el veredicto dice «sin datos», no «muestra mínima»", () => {
+  const v = buildVivo(base({ papel: [abierta("ETHUSDT", 5)] }));
+  assert.equal(v.papel.cerradas, 0);
+  assert.equal(v.papel.winRate, null);
+  assert.equal(v.veredicto.estado, "sin datos");
 });
 
 test("con muestra suficiente, el papel se compara con el intervalo de lo medido", () => {
@@ -147,4 +165,82 @@ test("la misma entrada da la misma foto (función pura) y siempre trae la advert
   const entrada = base({ escaneo: escaneo(3), papel: papel(18, 22) });
   assert.deepEqual(buildVivo(entrada), buildVivo(entrada));
   assert.ok(buildVivo(entrada).advertencia.includes("No es asesoramiento financiero"));
+});
+
+const fila = (symbol: string, direccion: string, puntaje: number | null, extra: Record<string, unknown> = {}) =>
+  ({ symbol, moneda: symbol.replace(/USDT$/, ""), volumenUsd: 1, lectura: "rápida", direccion, puntaje, consenso: 0.2, cobertura: null, precio: 1, plan: null, frenoEn: null, motivo: null, antes: null, nota: null, ...extra }) as unknown as ScanRow;
+
+const abierta = (symbol: string, riesgoUsd: number | null, lado = "LONG") =>
+  ({ id: symbol, symbol, lado, estado: "ABIERTA", abiertaA: 1, llenadaA: 1, cerradaA: null, resultadoR: null, entrada: 100, decision: { riesgoNivel: "BAJO", apalancamiento: 1, riesgoUsd, posicionUsd: null, stopPct: 1 } }) as unknown as PaperTrade;
+
+test("mientras escanea, la esfera muestra lo que va llegando y el resumen sale de eso, contra el total del escaneo", () => {
+  const llegando = [fila("ETHUSDT", "LONG", 70), fila("XRPUSDT", "ESPERAR", 40, { frenoEn: "consenso" })];
+  const v = buildVivo(base({ escaneo: escaneo(120), escaneando: { hechas: 2, total: 10 }, llegando }));
+  assert.equal(v.filas.length, 2, "lo que va llegando, no el escaneo de hace dos horas");
+  assert.equal(v.escaneo.total, 10);
+  assert.equal(v.escaneo.leidas, 2);
+  assert.equal(v.escaneo.aprobadas, 1);
+  assert.equal(v.escaneo.sinLado, 1, "la que frenó el consenso se cuenta en su compuerta");
+  assert.deepEqual(
+    v.escaneo.mejores.map((m) => m.symbol),
+    ["ETHUSDT"],
+  );
+});
+
+test("el histograma cuenta cada moneda leída en su tramo de 10 puntos, y no cuenta las que no tienen datos", () => {
+  const filas = [fila("AAAUSDT", "ESPERAR", 5), fila("BBBUSDT", "ESPERAR", 15), fila("CCCUSDT", "LONG", 15), fila("DDDUSDT", "SHORT", 100), fila("EEEUSDT", "SIN DATOS", null)];
+  const v = buildVivo(base({ escaneo: { ...escaneo(1), filas } as ScanResult }));
+  assert.equal(v.histograma.length, 10);
+  assert.equal(v.histograma[0].n, 1);
+  assert.equal(v.histograma[1].n, 2);
+  assert.equal(v.histograma[1].aprobadas, 1);
+  assert.equal(v.histograma[9].n, 1, "100 cae en el último tramo, 90 a 100");
+  assert.equal(v.histograma.reduce((p, t) => p + t.n, 0), 4, "la que no tiene datos no entra");
+});
+
+test("la cobertura media promedia solo las aprobadas que la tienen; los especialistas cuentan en cuántas monedas tuvieron datos", () => {
+  const agentes = (datos: boolean) => [
+    ["tecnico", datos ? 1 : 0, 0.4, 0.2],
+    ["macro", 0, 0, 0.1],
+  ];
+  const filas = [
+    fila("AAAUSDT", "LONG", 80, { cobertura: 0.8, agentes: agentes(true) }),
+    fila("BBBUSDT", "SHORT", 70, { cobertura: 0.6, agentes: agentes(true) }),
+    fila("CCCUSDT", "LONG", 60, { cobertura: null, agentes: agentes(false) }),
+    fila("DDDUSDT", "ESPERAR", 30, { cobertura: 0.1, agentes: agentes(true) }),
+  ];
+  const v = buildVivo(base({ escaneo: { ...escaneo(1), filas } as ScanResult }));
+  assert.equal(v.coberturaMedia.n, 2, "la aprobada sin cobertura no entra, y la que espera tampoco");
+  assert.ok(v.coberturaMedia.valor !== null && Math.abs(v.coberturaMedia.valor - 0.7) < 1e-9);
+  assert.deepEqual(
+    v.especialistas.find((x) => x.id === "tecnico"),
+    { id: "tecnico", disponibles: 3, de: 4 },
+  );
+  assert.deepEqual(
+    v.especialistas.find((x) => x.id === "macro"),
+    { id: "macro", disponibles: 0, de: 4 },
+  );
+});
+
+test("el riesgo abierto suma solo lo que se conoce, dice cuántas no lo traen y los arcos son solo las abiertas", () => {
+  const closed = { ...cerrada(1), symbol: "ZZZUSDT", lado: "SHORT" } as unknown as PaperTrade;
+  const v = buildVivo(base({ papel: [abierta("AUSDT", 10), abierta("BUSDT", null), abierta("CUSDT", 5), closed] }));
+  assert.deepEqual(v.riesgoAbierto, { usd: 15, abiertas: 3, sinDato: 1 });
+  assert.deepEqual(
+    v.arcos.map((a) => a.symbol),
+    ["AUSDT", "BUSDT", "CUSDT"],
+  );
+  const sin = buildVivo(base({ papel: [abierta("AUSDT", null)] }));
+  assert.deepEqual(sin.riesgoAbierto, { usd: null, abiertas: 1, sinDato: 1 }, "ninguna trae el dato: null, no cero");
+});
+
+test("la cinta cuenta lo último primero, con la R con coma y como máximo doce; la foto sigue siendo solo números finitos", () => {
+  const cerradas = Array.from({ length: 15 }, (_, k) => ({ ...cerrada(k % 2 ? 1.5 : -0.5), id: `t${k}`, symbol: "BTCUSDT", lado: "LONG", entrada: 100, llenadaA: 1000 + k, cerradaA: 2000 + k }));
+  const v = buildVivo(base({ escaneo: escaneo(5), papel: cerradas as unknown as PaperTrade[] }));
+  assert.equal(v.cinta.length, 12);
+  assert.ok(v.cinta.every((x, k) => k === 0 || v.cinta[k - 1].cuando >= x.cuando), "lo más nuevo primero");
+  assert.ok(v.cinta.some((x) => /[+-]\d,\d{2} R neto/.test(x.texto)), "la R sale con coma");
+  assert.ok(v.cinta.some((x) => x.tono === "ok") && v.cinta.some((x) => x.tono === "malo"));
+  soloFinitos(buildVivo(base({ escaneo: { ...escaneo(1), filas: [fila("AAAUSDT", "LONG", 80, { cobertura: 0.8, agentes: [["tecnico", 1, 0.4, 0.2]] })] } as ScanResult, papel: [abierta("AUSDT", 3)] })));
+  assert.ok(buildVivo(base()).aprendizaje === APRENDIZAJE_VIVO && APRENDIZAJE_VIVO.includes("no aprende sola"));
 });

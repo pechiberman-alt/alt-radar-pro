@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 507 · objetivos: 15 · sin objetivo: 0
+- Archivos: 511 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 43 · secretos: 4 · variables de entorno: 11 · rutas /api: 49 · hosts: 54
-- Código de navegador: 60 archivos con "use client" que alcanzan 164 · problemas: 0
-- Lib sin prueba directa: 20 de 152
+- Código de navegador: 60 archivos con "use client" que alcanzan 165 · problemas: 0
+- Lib sin prueba directa: 20 de 153
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (73)
+### jarvis — JARVIS, la IA propia del software (74)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -35,6 +35,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `app/jarvis.tsx` — JARVIS: a voice assistant over the whole app.
 - `docs/mesa-aprendizaje.md` — ¿Puede la mesa aprender de sus propias operaciones?
 - `docs/mesa-perfiles.md` — La mesa con otras velas base (15 min a 12 h)
+- `docs/mesa-referencias.md` — Referencias de GitHub para la mesa y la araña
 - `docs/mesa-reglas-v2.md` — La mesa de JARVIS: reglas v2
 - `lib/ai-analyst-server.ts` — The Anthropic call and the daily quota, shared by the app's ANALISTA and the Telegram bot.
 - `lib/ai-analyst.ts` — AI mode for the ANALISTA panel: Claude, instructed with ALT RADAR's own methodology and fed the live snapshot on every question.
@@ -325,18 +326,21 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/auth.ts` — Per-client authentication: email + password, isolated by user_id.
 - `lib/secret-box.ts` — AES-GCM with a base64 32-byte key: iv (12 bytes) + ciphertext, base64.
 
-### araña — La araña del proyecto y las instrucciones para trabajar en él (13)
+### araña — La araña del proyecto y las instrucciones para trabajar en él (16)
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
 - `.claude/settings.json`
 - `.mcp.json`
 - `CLAUDE.md` — ALT RADAR PRO — reglas del proyecto
 - `app/arana-desk.css`
-- `app/arana-desk.tsx` — La araña dentro de la app.
-- `app/arana-vivo.tsx` — La mesa en vivo, para la araña: lo que la app leyó ahora mismo (escaneo, papel, último backtest y vigilancia) junto con lo medido en el pasado, cada cosa con su muestra.
+- `app/arana-desk.tsx` — La araña dentro de la app, en dos pestañas.
+- `app/arana-vivo.tsx` — La mesa en vivo, para la araña: lo que la app leyó ahora mismo (el escaneo que va llegando o el último completo, el papel, el último backtest y la vigilancia) junto con lo medido e
 - `docs/araña/objetivos.md` — Objetivos de ALT RADAR PRO
-- `lib/arana-vivo.ts` — La araña en vivo: junta lo que la app ya tiene en el navegador (el último escaneo, las operaciones de papel, el último backtest y la vigilancia) en una foto con su muestra, su inte
+- `lib/arana-vivo-auto.ts` — El escaneo automático de la araña en vivo: como mucho cada 15 minutos, solo mientras la araña está a la vista, nunca en paralelo con otro escaneo y con un botón para pausarlo.
+- `lib/arana-vivo.ts` — La araña en vivo: junta lo que la app ya tiene en el navegador (el escaneo que va llegando o el último completo, las operaciones de papel, el último backtest y la vigilancia) en un
 - `scripts/arana-vista.html`
+- `scripts/arana-vivo.html`
 - `scripts/arana.mjs` — La araña: the project map of ALT RADAR PRO.
+- `tests/arana-vivo-auto.test.ts` — pruebas: la primera vez, con la araña a la vista, escanea enseguida, fuera de vista nunca escanea en segundo plano, aunque ya toque, pausado no escanea solo, y con un escaneo en curso no se empieza otro (+1)
 - `tests/arana-vivo.test.ts` — pruebas: sin escaneo, sin papel y sin backtest: todo dice «sin datos», nada se inventa, el escaneo al día muestra las mejores aprobadas, ordenadas por puntaje, sin los , un escaneo viejo avisa que ya no es de ahora, y uno parcial dice por qué se cort (+1)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)

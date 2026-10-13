@@ -1,6 +1,7 @@
 import { arNumber } from "./ai-numbers.ts";
 import { gates, signed, type Compuerta } from "./jarvis-council.ts";
 import { assembleSnapshot, closedCandles, type DeskSnapshot, type MarketContext } from "./jarvis-desk-data.ts";
+import type { AgentId } from "./jarvis-desk-agents.ts";
 import { runDesk, type DeskDecision, type DeskSettings, type Direction, type RiskLevel, type Side } from "./jarvis-desk.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
@@ -121,6 +122,10 @@ export type ScanRow = {
   antes: ScanDirection | null;
   /** Algo que la persona tiene que saber de esta fila (por ejemplo, que no se pudo releer completa). */
   nota: string | null;
+  /** Los especialistas de la mesa: [id, 1 si tuvo datos o 0 si no, sesgo de −1 a +1, peso en el consenso]. Así se ve cada moneda por dentro. */
+  agentes?: [AgentId, number, number, number][];
+  /** Las cuatro compuertas de la mesa y cómo quedaron (OK, FALLA o NO EVALUADA). */
+  compuertas?: { id: Compuerta["id"]; estado: Compuerta["estado"] }[];
 };
 
 export const isApproved = (r: Pick<ScanRow, "direccion">) => r.direccion === "LONG" || r.direccion === "SHORT";
@@ -130,9 +135,12 @@ export function rowWithoutData(e: Eligible, motivo: string): ScanRow {
   return { symbol: e.symbol, moneda: e.moneda, volumenUsd: e.volumenUsd, lectura: "rápida", direccion: "SIN DATOS", puntaje: null, consenso: null, cobertura: null, precio: null, plan: null, frenoEn: null, motivo: `${motivo} Este dato no está disponible actualmente.`, antes: null, nota: null };
 }
 
+const redondo = (x: number) => Math.round(x * 100) / 100;
+
 /** La fila de una decisión de la mesa. `antes` es la dirección de la lectura rápida cuando esta es la completa. */
 export function rowFrom(e: Eligible, d: DeskDecision, lectura: ScanLectura, antes: ScanDirection | null = null): ScanRow {
-  const failed = gates(d).find((g) => g.estado === "FALLA") ?? null;
+  const gs = gates(d);
+  const failed = gs.find((g) => g.estado === "FALLA") ?? null;
   const approved = d.direccion === "LONG" || d.direccion === "SHORT";
   const plan: ScanPlan | null = approved && d.plan && d.riesgo ? { lado: d.plan.lado, entrada: d.plan.entrada, tipoEntrada: d.plan.tipoEntrada, stop: d.plan.stop, tp1: d.plan.tp[0].price, rr: d.riesgo.rrPonderado, riesgo: d.riesgo.nivel, stopPct: d.riesgo.stopPct } : null;
   return {
@@ -150,6 +158,8 @@ export function rowFrom(e: Eligible, d: DeskDecision, lectura: ScanLectura, ante
     motivo: approved ? null : (failed?.detalle ?? d.resolucion),
     antes,
     nota: null,
+    agentes: d.agentes.map((a) => [a.id, a.disponible ? 1 : 0, redondo(a.sesgo), redondo(a.peso)]),
+    compuertas: gs.map((g) => ({ id: g.id, estado: g.estado })),
   };
 }
 

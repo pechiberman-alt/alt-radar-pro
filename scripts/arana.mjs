@@ -12,7 +12,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,6 +23,9 @@ export const MAPA = `${DOCS}/MAPA.md`;
 export const HUELLAS = `${DOCS}/huellas.txt`;
 /** La página que sirve la app (la genera el build; no se commitea). */
 export const PAGINA = "public/arana/index.html";
+/** La mesa en vivo (todas las monedas que la app leyó): una página fija, que recibe sus datos por postMessage. */
+export const VIVO_PLANTILLA = "scripts/arana-vivo.html";
+export const VIVO_PAGINA = "public/arana/vivo.html";
 
 // Generated or heavy files: never indexed.
 const NO_INDEXAR = new Set(["lib/build-info.ts", "worker-configuration.d.ts", "tsconfig.tsbuildinfo", "package-lock.json", MAPA, HUELLAS, PAGINA]);
@@ -1231,6 +1234,7 @@ const AYUDA = `La araña: el mapa de ALT RADAR PRO para consultar sin leer todo 
   npm run arana -- --check             falla si el mapa está viejo, si hay archivos sin objetivo o si el navegador toca secretos
   npm run arana -- --vista [salida]    dibuja la araña recorriendo el proyecto en docs/araña/vista.html (no se commitea)
   npm run arana -- --pagina [salida]   la misma vista como página suelta en public/arana/index.html: la genera el build y la app la muestra en LA ARAÑA
+  npm run arana -- --vivo [salida]     la mesa en vivo de la araña (scripts/arana-vivo.html) en public/arana/vivo.html: la copia el build
   npm run arana -- --ayuda
 
 La lectura es estática: los imports que se arman en tiempo de ejecución no aparecen.`;
@@ -1307,7 +1311,13 @@ function regenerar(index) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  if (args[0] === "--pagina") {
+  if (args[0] === "--vivo") {
+    // Es una página fija (sin datos del proyecto adentro): se copia tal cual. Si falta, el build falla y se ve.
+    const destino = resolve(ROOT, args[1] || VIVO_PAGINA);
+    mkdirSync(dirname(destino), { recursive: true });
+    copyFileSync(join(ROOT, VIVO_PLANTILLA), destino);
+    process.stdout.write(`Página en vivo de la araña: ${args[1] || VIVO_PAGINA}\n`);
+  } else if (args[0] === "--pagina") {
     // Corre en el build de la app: si algo falla, deja una página que avisa y el build sigue.
     try {
       process.stdout.write(`${ejecutar(args, cargarIndice(ROOT)).salida}\n`);

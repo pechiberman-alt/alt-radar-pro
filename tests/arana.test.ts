@@ -424,10 +424,43 @@ test("the frame stays sandboxed apart from the app and only trusts its own heigh
   const sandbox = /sandbox="([^"]*)"/.exec(desk)?.[1] ?? "";
   assert.ok(sandbox.includes("allow-scripts"), "the page needs its script");
   assert.ok(!sandbox.includes("allow-same-origin"), "with scripts plus same-origin the page could lift its own sandbox");
-  assert.ok(desk.includes("e.source !== marco.current.contentWindow"), "only the frame's own messages count");
+  assert.ok(desk.includes("e.source === marcoVivo.current.contentWindow") && desk.includes("e.source === marcoMapa.current.contentWindow"), "only the messages of each frame count, and the height goes to that frame");
   assert.ok(desk.includes('d.arana !== "alto"') && desk.includes("Number.isFinite(d.h)"), "only a finite number under the agreed key");
   assert.ok(desk.includes("ALTO_MAX"), "the height is clamped");
   const page = readFileSync(join(ROOT, "scripts", "arana-vista.html"), "utf8");
   assert.ok(page.includes('postMessage({ arana: "alto", h }'), "the page reports its height under the same key");
   assert.ok(!/localStorage|sessionStorage|fetch\(|XMLHttpRequest|document\.cookie/.test(page), "the page keeps no storage and makes no requests");
+});
+
+test("the live page is a fixed file: no storage, no requests, only the parent's data, and it reports its height", () => {
+  const page = readFileSync(join(ROOT, "scripts", "arana-vivo.html"), "utf8");
+  assert.ok(!/localStorage|sessionStorage|fetch\(|XMLHttpRequest|document\.cookie|indexedDB|WebSocket/.test(page), "no storage and no requests: the data comes from the app");
+  assert.ok(page.includes("e.source !== window.parent") && page.includes('d.arana !== "vivo"'), "only the parent's live data counts");
+  assert.ok(page.includes('postMessage({ arana: "alto", h }'), "it reports its height under the key the frame expects");
+  assert.ok(page.includes("const esc = (s)") && page.includes("esc(moneda(r.symbol))"), "text from the scan is escaped before it reaches the page");
+  assert.ok(page.includes("Cómo leer esta pantalla") && page.includes("No es asesoramiento financiero"), "it explains itself to a beginner and says what it is not");
+});
+
+test("the live page is built as a plain copy, the build makes it, and the app shows it in its own tab", () => {
+  const dir = mkdtempSync(join(tmpdir(), "arana-vivo-"));
+  try {
+    const destino = join(dir, "vivo.html");
+    const r = spawnSync(process.execPath, [join(ROOT, "scripts", "arana.mjs"), "--vivo", destino], { encoding: "utf8" });
+    assert.equal(r.status, 0);
+    assert.equal(readFileSync(destino, "utf8"), readFileSync(join(ROOT, "scripts", "arana-vivo.html"), "utf8"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  assert.ok(String(pkg.scripts.prebuild).includes("arana.mjs --vivo"), "the build copies the live page");
+  const desk = readFileSync(join(ROOT, "app", "arana-desk.tsx"), "utf8");
+  assert.ok(desk.includes('src="/arana/vivo.html"') && desk.includes('role="tab"') && desk.includes("MAPA DEL PROYECTO"), "two tabs: EN VIVO and the map");
+});
+
+test("the automatic scan looks at the screen, respects the pause, and never stacks two scans", () => {
+  const vivo = readFileSync(join(ROOT, "app", "arana-vivo.tsx"), "utf8");
+  assert.ok(vivo.includes("IntersectionObserver") && vivo.includes("visibilitychange"), "it looks at whether the table is on screen");
+  assert.ok(vivo.includes("decidirAuto(") && vivo.includes("if (scanState().running) return;"), "the rule lives in one pure function, and a manual scan does not stack");
+  const auto = readFileSync(join(ROOT, "lib", "arana-vivo-auto.ts"), "utf8");
+  assert.ok(auto.includes("AUTO_CADA_MIN = 15"), "every 15 minutes at most");
 });
