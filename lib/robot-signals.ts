@@ -1,3 +1,4 @@
+import { enR, escaleraHacia, type Escalera } from "./escalera.ts";
 import { flushSeries, type LvStats } from "./liq-vol-signals.ts";
 import { mmEvents, runMm, type LiveLevel, type MmFilter, type MmTrade } from "./mm-robot.ts";
 import { px } from "./price-alerts.ts";
@@ -48,6 +49,8 @@ export type RobotSignal = {
   time: number;
   variant: string;
   validation: { trades: number; profitFactor: number | null; positive: number; tested: number };
+  /** SL, TP1, TP2 y TP3 fijados al detectarla: TP3 es el objetivo que el robot validó (lib/escalera.ts). */
+  escalera: Escalera;
 };
 
 /** What the browser sends is checked before anything goes to Telegram. */
@@ -65,8 +68,11 @@ export function validateRobotSignal(raw: unknown, now: number): RobotSignal | nu
   if (side === "LONG" ? !(stop < entry && target > entry) : !(stop > entry && target < entry)) return null;
   // A day old at most, and not from the future.
   if (time > now + 60_000 || now - time > 86_400_000) return null;
+  // Every signal carries its whole ladder: the validated target is TP3.
+  const escalera = escaleraHacia(side, entry, stop, target);
+  if (!escalera) return null;
   return {
-    symbol, timeframe, side, entry, stop, target, time, variant,
+    symbol, timeframe, side, entry, stop, target, time, variant, escalera,
     validation: {
       trades: Math.max(0, Math.floor(num(v.trades) || 0)),
       profitFactor: Number.isFinite(num(v.profitFactor)) ? num(v.profitFactor) : null,
@@ -81,16 +87,22 @@ export const robotSignalKey = (s: RobotSignal) => `mm:${s.symbol}:${s.timeframe}
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const pct = (a: number, b: number) => `${b >= a ? "+" : ""}${(((b - a) / a) * 100).toFixed(2).replace(".", ",")}%`;
 
+const enRText = (s: RobotSignal, p: number) => `${enR(s.entry, s.stop, p).toFixed(1).replace(".", ",")}R`;
+
 export function robotSignalText(s: RobotSignal): string {
   const long = s.side === "LONG";
-  const r = Math.abs(s.target - s.entry) / Math.abs(s.entry - s.stop);
+  const e = s.escalera;
   const pf = s.validation.profitFactor === null ? "—" : s.validation.profitFactor === Infinity ? "∞" : s.validation.profitFactor.toFixed(2).replace(".", ",");
+  const tp = (n: number, p: number) => `🎯 TP${n} ${px(p)} (${pct(s.entry, p)} · ${enRText(s, p)})`;
   return [
     `🤖 <b>ROBOT MM · ${esc(s.symbol.replace(/USDT$/, ""))} · ${long ? "🟢 LONG" : "🔴 SHORT"}</b> · ${esc(s.timeframe)}`,
     `Barrió ${long ? "un mínimo" : "un máximo"} y volvió adentro; objetivo en la liquidez del otro lado.`,
     `Entrada ${px(s.entry)}`,
-    `🛑 SL ${px(s.stop)} (${pct(s.entry, s.stop)})`,
-    `🎯 TP ${px(s.target)} (${pct(s.entry, s.target)} · ${r.toFixed(1).replace(".", ",")}R)`,
+    `🛑 SL ${px(e.stop)} (${pct(s.entry, e.stop)})`,
+    tp(1, e.tp1),
+    tp(2, e.tp2),
+    `${tp(3, e.tp3)} · el objetivo validado`,
+    "TP1 y TP2 quedan a un tercio y dos tercios del camino, para parciales. Queda registrada con la hora de cada nivel.",
     `Variante: ${esc(s.variant)} · validación PF ${pf} en ${s.validation.trades} operaciones, gana en ${s.validation.positive} de ${s.validation.tested} monedas.`,
     "<i>Del robot en papel, no es una orden. No es asesoramiento financiero.</i>",
   ].join("\n");

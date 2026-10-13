@@ -26,12 +26,22 @@ test("one key per coin, timeframe, candle and side: the same signal is never sen
   assert.equal(robotSignalKey(s), `mm:SOLUSDT:15m:${NOW - 900_000}:LONG`);
 });
 
-test("the Telegram text carries entry, stop, target with R, the variant and its validation, escaped", () => {
+test("every signal carries its whole ladder: the validated target is TP3, TP1 and TP2 at a third and two thirds", () => {
+  const s = validateRobotSignal(ok, NOW)!;
+  assert.deepEqual(s.escalera, { stop: 147, tp1: 152, tp2: 154, tp3: 156 });
+  const corto = validateRobotSignal({ ...ok, side: "SHORT", stop: 153, target: 144 }, NOW)!;
+  assert.deepEqual(corto.escalera, { stop: 153, tp1: 148, tp2: 146, tp3: 144 });
+});
+
+test("the Telegram text carries entry, SL, TP1, TP2 and TP3 with % and R, the variant and its validation, escaped", () => {
   const t = robotSignalText(validateRobotSignal({ ...ok, variant: "volumen <x>" }, NOW)!);
   assert.match(t, /ROBOT MM · SOL · 🟢 LONG/);
   assert.match(t, /Entrada 150/);
   assert.match(t, /SL 147 \(-2,00%\)/);
-  assert.match(t, /TP 156 \(\+4,00% · 2,0R\)/);
+  assert.match(t, /TP1 152 \(\+1,33% · 0,7R\)/);
+  assert.match(t, /TP2 154 \(\+2,67% · 1,3R\)/);
+  assert.match(t, /TP3 156 \(\+4,00% · 2,0R\) · el objetivo validado/);
+  assert.match(t, /Queda registrada con la hora de cada nivel/);
   assert.match(t, /volumen &lt;x&gt;/);
   assert.match(t, /gana en 7 de 11 monedas/);
   assert.match(t, /no es una orden/);

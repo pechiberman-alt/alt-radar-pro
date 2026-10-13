@@ -63,7 +63,7 @@ function RowButton({ r, onPick }: { r: ScanRow; onPick: (coin: string) => void }
         {p && (
           <span className="jt-scan-plan">
             entrada {px(p.entrada)}
-            {p.tipoEntrada === "LÍMITE" ? " (límite)" : ""} · stop {px(p.stop)} · TP1 {px(p.tp1)} · R:R 1:{arNumber(Number(p.rr.toFixed(2)))} · riesgo {p.riesgo}
+            {p.tipoEntrada === "LÍMITE" ? " (límite)" : ""} · stop {px(p.stop)} · TP1 {px(p.tp1)} · TP2 {px(p.tp2)} · TP3 {px(p.tp3)} · R:R 1:{arNumber(Number(p.rr.toFixed(2)))} · riesgo {p.riesgo}
           </span>
         )}
         <span className="jt-scan-meta">

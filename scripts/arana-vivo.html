@@ -61,7 +61,8 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--web); out
 .carta .x { position: absolute; right: 8px; top: 8px; width: 30px; height: 30px; border: 1px solid var(--line-2); border-radius: 3px; color: var(--soft); }
 .carta p { margin: 0; color: var(--soft); font-size: 10.5px; }
 .carta .det { color: var(--muted); font-size: 10px; }
-.plan { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.plan { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.plan dd small { display: block; font-weight: 400; font-size: 9px; color: var(--muted); }
 .plan div { border: 1px solid var(--line); padding: 5px 7px; border-radius: 3px; min-width: 0; }
 .plan dt { font-size: 9px; color: var(--muted); text-transform: uppercase; }
 .plan dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -542,8 +543,12 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
       ESPERAR: `La mesa no aprueba un plan: la frenó ${COMPUERTA[r.frenoEn] ? `la compuerta de ${COMPUERTA[r.frenoEn]}` : "la lectura, sin un motivo informado"}.`,
       "SIN DATOS": "No hay velas suficientes para leer esta moneda. Este dato no está disponible actualmente.",
     };
+    // La escalera completa: SL y los tres objetivos, cada uno con su distancia en R (múltiplos del riesgo).
+    const riesgo = r.plan && OK(r.plan.entrada) && OK(r.plan.stop) ? Math.abs(r.plan.entrada - r.plan.stop) : 0;
+    const enR = (p) => (riesgo > 0 && OK(p) ? `${(Math.abs(p - r.plan.entrada) / riesgo).toFixed(1).replace(".", ",")}R` : "");
+    const celda = (t, v, extra) => `<div><dt>${esc(t)}</dt><dd>${esc(v)}${extra ? `<small>${esc(extra)}</small>` : ""}</dd></div>`;
     const plan = r.plan
-      ? `<dl class="plan"><div><dt>Entrada</dt><dd>${esc(pr(r.plan.entrada))}</dd></div><div><dt>Stop</dt><dd>${esc(pr(r.plan.stop))}</dd></div><div><dt>Objetivo 1</dt><dd>${esc(pr(r.plan.tp1))}</dd></div><div><dt>R:R</dt><dd>1:${esc(d2(r.plan.rr))}</dd></div></dl>`
+      ? `<dl class="plan">${celda("Entrada", pr(r.plan.entrada), r.plan.tipoEntrada === "LÍMITE" ? "orden límite" : "")}${celda("SL", pr(r.plan.stop), "−1R")}${celda("TP1", pr(r.plan.tp1), enR(r.plan.tp1))}${celda("TP2", pr(r.plan.tp2), enR(r.plan.tp2))}${celda("TP3", pr(r.plan.tp3), enR(r.plan.tp3))}${celda("R:R ponderado", `1:${d2(r.plan.rr)}`, "un tercio en cada TP")}</dl>`
       : "";
     const comp = (r.compuertas || []).map((g) => `<li class="g-${clave(g.estado)}"><span>${esc(COMPUERTA[g.id] || g.id)}</span><b>${esc(g.estado.toLowerCase())}</b></li>`).join("");
     const esp = (r.agentes || [])
