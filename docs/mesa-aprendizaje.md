@@ -77,6 +77,25 @@ Todo esto es observación medida, con su muestra; **nada modifica las reglas de 
 - **Papel hacia adelante** (`lib/jarvis-paper.ts`): cada operación de papel guarda por qué se tomó y cómo terminó. `statsBy` las agrupa por lado, tramo de confluencia, volatilidad y especialista a favor; `recordFor` muestra el acierto medido de operaciones parecidas al lado del puntaje (menos de 15 cerradas = «muestra mínima»). Es la única prueba que no mira el pasado.
 - **JARVIS CORE** (`lib/jarvis-learn.ts`): para las rupturas y las barridas de imán, una regresión ridge sobre sus propias señales resueltas califica cada señal nueva como «aprendiendo» (menos de 30 casos), «favorable», «desfavorable» o «neutra». Las desfavorables quedan «en sombra» (se registran y se resuelven igual) y el registro muestra las tomadas contra las de sombra, así que se mide si el aprendizaje ayuda. Con poca evidencia asume que no hay ventaja.
 - **La MENTE** (`lib/jarvis-mind.ts`): sus tesis son señales con fuente «IA» que se resuelven como cualquier otra; su historial vuelve al prompt.
+- **Laboratorio en sombra** (`lib/mesa-sombra.ts`, en la araña, pestaña EN VIVO): ver abajo.
+
+## Laboratorio en sombra: aprende solo, cambia solo con vos
+
+Aprende de forma continua sin tocar las reglas. Con cada operación cerrada nueva (papel y el último backtest) evoluciona variantes de **filtro** sobre lo que la mesa sabía al abrir: confluencia, consenso a favor, cobertura, R:R, distancia del stop, lado y volatilidad. Los valores salen de una lista fija de 14.400 combinaciones: no es código, y la IA no escribe ni ejecuta reglas. La evolución es un algoritmo genético con semilla fija: la misma entrada da siempre el mismo resultado.
+
+**El criterio, fijado antes de mirar:**
+
+1. **Desarrollo** (los primeros 2/3 de las operaciones por hora de apertura, sin las que cerraron después de que empieza la validación): la evolución elige solo con esto, por la cota inferior al 90% del R medio.
+2. **Validación** (el tercio final): pasa la que tiene 15 operaciones o más y rinde más que cero y más que la mesa tal cual. Queda **en observación**.
+3. **Hacia adelante** (solo operaciones abiertas después de descubrirla, que nunca se usaron para elegir): con 15 o más es **apta** si rinde más que cero y más que la mesa en ese mismo tramo, con PSR (Sharpe > 0) de 0,95 corregido por cuántas candidatas se miran a la vez, y si la búsqueda no está sobreajustada (PBO < 50%, medido en 16 tramos de tiempo). Se **descarta** si rinde menos, o si con 60 operaciones no se distingue del azar. Una apta que con más datos deja de cumplir **vuelve a observación**: no queda apta por inercia. El DSR de la búsqueda se informa en la auditoría.
+
+**Nada cambia solo.** Una variante apta queda para revisión. Pasa a filtrar el papel nuevo solo si la aprobás (con confirmación), y la sacás cuando quieras. Ni aprobar ni revocar lo hace el laboratorio: si una aprobada empeora, lo avisa. Nunca toca la ejecución real.
+
+**Auditoría.** Cada evolución, candidata, apta, vuelta a observación, descartada, aprobación y revocación queda en D1 encadenada con SHA-256: cada evento lleva el hash del anterior. Si alguien edita, borra o reordena uno, la araña muestra la cadena rota. El servidor decide aprobar y revocar sobre lo guardado, y solo aprueba una variante cuyo último estado registrado en la auditoría sea apta (no alcanza con que lo haya sido alguna vez).
+
+**Cuándo corre.** En tu navegador, mientras la araña está abierta: al cargarla, cuando llega papel o un backtest nuevo, y cada 10 minutos con la pestaña visible. Con la araña cerrada no corre, pero no pierde nada: la próxima vez aprende de todo lo que cerró mientras tanto, y lo que es «hacia adelante» se decide por la hora de apertura de cada operación, no por cuándo se procesó. Para cuidar la cuota de D1, que es una sola para toda la app, la auditoría registra como mucho una evolución cada 20 minutos y una corrida cada 30 segundos; lo que no se registra no cuenta y se repite sola en la vuelta siguiente. Límite honesto: los cálculos corren en tu navegador, así que la auditoría prueba qué se registró y cuándo, no que la cuenta esté bien hecha; para eso están las pruebas (`tests/mesa-sombra*.test.ts`, con una que comprueba que no se mira el futuro).
+
+Sin sesión corre en memoria: no queda auditoría ni se puede aprobar. Con poco papel cerrado no evoluciona: pide 15 operaciones en desarrollo y 15 en validación.
 
 ## Qué haría falta para adoptar un modelo
 

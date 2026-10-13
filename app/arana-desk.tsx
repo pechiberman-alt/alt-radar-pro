@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ControlesVivo, PanelVivo, useAutoEscaneo, useVivo } from "./arana-vivo";
+import { ControlesSombra, ControlesVivo, PanelVivo, useAutoEscaneo, useSombra, useVivo } from "./arana-vivo";
 
 /**
  * La araña dentro de la app, en dos pestañas. EN VIVO: todas las monedas que la
@@ -26,13 +26,14 @@ export default function AranaDesk() {
   const marcoMapa = useRef<HTMLIFrameElement>(null);
   const zonaVivo = useRef<HTMLDivElement>(null);
   const vivo = useVivo();
+  useSombra();
   const { auto, estado, pausado, alternarPausa, escanearAhora, cancelar } = useAutoEscaneo(zonaVivo);
 
   // La foto y el estado del escaneo automático van al marco de la mesa en vivo.
   useEffect(() => {
     if (!listo.vivo || !vivo) return;
-    const auto2 = auto ? { estado, proximoEnMin: auto.proximoEnMin, motivo: auto.motivo } : null;
-    marcoVivo.current?.contentWindow?.postMessage({ arana: "vivo", vivo, auto: auto2 }, "*");
+    const autoFoto = auto ? { estado, proximoEnMin: auto.proximoEnMin, motivo: auto.motivo } : null;
+    marcoVivo.current?.contentWindow?.postMessage({ arana: "vivo", vivo, auto: autoFoto }, "*");
   }, [listo.vivo, vivo, auto, estado]);
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function AranaDesk() {
       </div>
       <div id="arana-panel-vivo" role="tabpanel" aria-labelledby="arana-tab-vivo" hidden={pestana !== "vivo"} ref={zonaVivo}>
         <ControlesVivo auto={auto} estado={estado} pausado={pausado} onPausa={alternarPausa} onEscanear={escanearAhora} onCancelar={cancelar} />
+        <ControlesSombra sombra={vivo?.sombra ?? null} />
         <PanelVivo vivo={vivo} />
         <div className="arana-frame" aria-busy={!listo.vivo}>
           {!listo.vivo && <span className="arana-wait">ARMANDO LA MESA EN VIVO…</span>}

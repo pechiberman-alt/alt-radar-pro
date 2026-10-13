@@ -119,6 +119,24 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
 .guia { margin: 8px 0 0; padding-left: 16px; display: grid; gap: 6px; font-size: 10.5px; color: var(--soft); }
 .guia b { color: var(--ink); font-weight: 600; }
 .pie { margin: 12px 0 0; font-size: 9.5px; color: var(--muted); display: grid; gap: 4px; }
+.lab { margin-top: 10px; }
+.lab-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 0 0 10px; }
+.lab-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; }
+.lab h3 { margin: 0 0 6px; font-size: 10px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; font-weight: 600; }
+.lab-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 10.5px; }
+.lab-lista li { border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; display: grid; gap: 2px; min-width: 0; }
+.lab-lista b { color: var(--ink); }
+.lab-lista span { color: var(--soft); overflow-wrap: anywhere; }
+.lab-lista small { color: var(--muted); font-size: 9.5px; overflow-wrap: anywhere; }
+.lab-lista em { font-style: normal; font-weight: 500; }
+.e-APTA { color: var(--live); }
+.e-EN-OBSERVACI-N { color: var(--web); }
+.e-DESCARTADA { color: var(--gris); }
+.lab-aprobada { margin: 10px 0 0; padding: 8px 10px; border: 1px solid #2d6a4d; border-radius: 3px; color: var(--ink); font-size: 10.5px; }
+.lab-aprobada[hidden] { display: none; }
+.lab-aprobada.mal { border-color: var(--flag); }
+.cadena-ok { color: var(--live); font-weight: 500; }
+.cadena-mal { color: var(--flag); font-weight: 700; }
 @media (max-width: 900px) { .cuerpo { grid-template-columns: minmax(0, 1fr); } .lista { max-height: 460px; } }
 @media (max-width: 600px) { .plan { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fila { grid-template-columns: minmax(0, 1fr) 56px minmax(30px, 1.5fr) 30px; } #raiz { padding: 10px; } }
 @media (prefers-reduced-motion: reduce) { .barra i { transition: none; } }
@@ -188,10 +206,23 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
           <li><b>IC90:</b> el rango donde probablemente cae el valor real con ese tamaño de muestra. Con pocas operaciones, el rango es ancho.</li>
           <li><b>R:</b> ganancia o pérdida dividida por el riesgo fijado al entrar. +1,00 R: se ganó lo mismo que se arriesgaba, neto de comisiones.</li>
           <li><b>Papel:</b> operaciones simuladas. No hay dinero real ni órdenes.</li>
-          <li><b>Aprendizaje:</b> la mesa no aprende sola ni cambia sus reglas mientras la mirás.</li>
+          <li><b>Laboratorio en sombra:</b> con cada operación cerrada prueba variantes de filtro (de una lista fija, no código). Las elige con el pasado (desarrollo), las comprueba con datos que no usó (validación) y las mide hacia adelante. Ninguna cambia nada sin tu aprobación.</li>
+          <li><b>Auditoría:</b> cada paso del laboratorio queda encadenado con un hash. Si alguien edita o borra un paso, la cadena se rompe y se ve acá.</li>
         </ul>
       </details>
     </article>
+  </section>
+
+  <section class="panel lab" id="lab" aria-label="Laboratorio en sombra">
+    <h2>Laboratorio en sombra · aprende con cada operación cerrada</h2>
+    <p class="nota" id="lab-nota">El laboratorio todavía no cargó.</p>
+    <div class="lab-kpis" id="lab-kpis"></div>
+    <div class="lab-cols">
+      <div><h3>Mejores en desarrollo</h3><p class="nota">Elegidas con estos mismos datos: su número es optimista. Lo que cuenta es validación y hacia adelante.</p><ol id="lab-mejores" class="lab-lista"></ol></div>
+      <div><h3>Candidatas</h3><ol id="lab-cand" class="lab-lista"></ol></div>
+      <div><h3>Auditoría (hora UTC) <span id="lab-cadena"></span></h3><ol id="lab-audit" class="cinta"></ol></div>
+    </div>
+    <p id="lab-aprobada" class="lab-aprobada" hidden></p>
   </section>
 
   <footer class="pie">
@@ -566,6 +597,60 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
     $("vacio").textContent = txt;
   }
 
+  const Rr = (x) => (OK(x) ? `${x > 0 ? "+" : ""}${x.toFixed(3).replace(".", ",")} R` : "sin dato");
+  const medida = (m) => (m ? `${Rr(m.media)} · n=${n0(m.n)}` : "sin dato");
+  const MODO = { cuenta: "auditoría en tu cuenta", "sin sesión": "sin sesión: corre en memoria, sin auditoría ni aprobación", error: "sin conexión con tu cuenta", cargando: "cargando" };
+  function pintarSombra() {
+    const s = foto.sombra;
+    if (!s || !s.resumen) {
+      $("lab-nota").textContent = "El laboratorio todavía no cargó.";
+      ["lab-kpis", "lab-mejores", "lab-cand", "lab-audit", "lab-cadena"].forEach((id) => { $(id).innerHTML = ""; });
+      $("lab-aprobada").hidden = true;
+      return;
+    }
+    const r = s.resumen;
+    $("lab-nota").textContent = `${r.nota} ${s.error || s.aviso || ""}`.trim();
+    const tile = (t, v, sub) => `<div class="tile"><small>${esc(t)}</small><b>${esc(v)}</b><span>${esc(sub)}</span></div>`;
+    $("lab-kpis").innerHTML = [
+      tile("Generación", n0(r.generacion), s.corriendo ? "evolucionando…" : MODO[s.modo] || s.modo),
+      tile("Variantes probadas", n0(r.probadas), `de ${n0(r.espacio)} posibles · lista fija, no código`),
+      tile("Operaciones cerradas", n0(r.datos.casos), `${n0(r.datos.papel)} de papel · ${n0(r.datos.backtest)} de backtest`),
+      tile("La mesa tal cual", Rr(r.mesa.desarrollo.media), `desarrollo n=${n0(r.mesa.desarrollo.n)} · validación ${medida(r.mesa.validacion)}`),
+    ].join("");
+    $("lab-mejores").innerHTML = r.mejores.length
+      ? r.mejores.map((m) => `<li><b>${esc(m.variante)}</b><span>${esc(m.descripcion)}</span><small>desarrollo ${esc(medida(m.desarrollo))} · validación ${esc(medida(m.validacion))}</small></li>`).join("")
+      : `<li class="vacio">Hace falta muestra para evolucionar.</li>`;
+    $("lab-cand").innerHTML = r.candidatas.length
+      ? r.candidatas
+          .map((c) => {
+            // Con menos de 15 hacia adelante no hay resultado que mostrar: solo cuánto falta.
+            const ad = c.falta
+              ? `hacia adelante: ${n0(c.adelante.n)} de 15 operaciones (faltan ${n0(c.falta)})`
+              : `hacia adelante ${Rr(c.adelante.media)} contra la mesa ${Rr(c.adelante.mesa)} · n=${n0(c.adelante.n)}`;
+            return `<li><b>${esc(c.variante)} · <em class="e-${clave(c.estado)}">${esc(c.estado.toLowerCase())}</em></b><span>${esc(c.descripcion)}</span><small>${esc(ad)}</small><small>${esc(c.motivo)}</small></li>`;
+          })
+          .join("")
+      : `<li class="vacio">Ninguna todavía: una variante tiene que ganarle a la mesa en desarrollo y en validación.</li>`;
+    const cad = s.cadena;
+    $("lab-cadena").innerHTML = !cad ? "· sin registro" : cad.ok ? `<span class="cadena-ok">· cadena íntegra (${esc(n0(cad.revisados))})</span>` : `<span class="cadena-mal">· CADENA ROTA: ${esc(cad.motivo)}</span>`;
+    $("lab-audit").innerHTML = s.eventos.length
+      ? s.eventos.map((e) => `<li class="t-${e.tipo === "DESCARTADA" ? "malo" : e.tipo === "APTA" || e.tipo === "APROBACION" ? "ok" : "info"}"><time>${esc(hora(e.at))}</time>#${esc(n0(e.seq))} ${esc(e.texto)} <small>${esc(e.hash)}</small></li>`).join("")
+      : `<li class="vacio">${s.modo === "cuenta" ? "Sin eventos todavía." : "Sin sesión no queda registro."}</li>`;
+    const a = r.aprobada;
+    $("lab-aprobada").hidden = !a;
+    if (a) {
+      $("lab-aprobada").className = `lab-aprobada${a.aviso ? " mal" : ""}`;
+      // Igual que con las candidatas: con menos de 15 operaciones no se muestra un resultado, solo cuántas van.
+      const n = a.adelante.n;
+      const desde = !n
+        ? "Desde que la aprobaste todavía no cerró ninguna operación nueva que tome."
+        : n < 15
+          ? `Desde que la aprobaste cerraron ${n0(n)} de 15 operaciones que toma: todavía es muestra mínima.`
+          : `Desde que la aprobaste: ${medida(a.adelante)} contra la mesa ${Rr(a.adelante.mesa)}.`;
+      $("lab-aprobada").textContent = `Variante aprobada ${a.variante}: ${a.descripcion}. Filtra solo el papel nuevo, nunca la ejecución real. ${desde} ${a.aviso || ""}`.trim();
+    }
+  }
+
   function enviarAlto() {
     const h = Math.ceil($("raiz").getBoundingClientRect().height);
     if (h === ultimoAlto || !h) return;
@@ -585,6 +670,7 @@ details summary { cursor: pointer; color: var(--web); font-size: 10.5px; }
     pintarCinta();
     pintarCarta();
     pintarVacio();
+    pintarSombra();
     $("pie-adv").textContent = `${foto.advertencia || ""} ${foto.aprendizaje || ""} No es asesoramiento financiero.`;
     sucio = true;
     enviarAlto();

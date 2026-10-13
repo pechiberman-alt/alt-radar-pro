@@ -4,22 +4,23 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 511 · objetivos: 15 · sin objetivo: 0
-- Tablas D1: 43 · secretos: 4 · variables de entorno: 11 · rutas /api: 49 · hosts: 54
-- Código de navegador: 60 archivos con "use client" que alcanzan 165 · problemas: 0
-- Lib sin prueba directa: 20 de 153
+- Archivos: 521 · objetivos: 15 · sin objetivo: 0
+- Tablas D1: 45 · secretos: 4 · variables de entorno: 11 · rutas /api: 50 · hosts: 54
+- Código de navegador: 60 archivos con "use client" que alcanzan 169 · problemas: 0
+- Lib sin prueba directa: 20 de 158
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (74)
+### jarvis — JARVIS, la IA propia del software (80)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
-Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
+Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía. · Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/alert/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/chat/route.ts` — exporta: dynamic, GET, POST, DELETE
 - `app/api/jarvis/core/route.ts` — exporta: dynamic, GET
 - `app/api/jarvis/memory/route.ts` — exporta: dynamic, GET, POST, DELETE
 - `app/api/jarvis/paper/route.ts` — exporta: dynamic, GET, POST, PUT
+- `app/api/jarvis/sombra/route.ts` — exporta: dynamic, GET, POST
 - `app/api/jarvis/voice/route.ts` — exporta: dynamic, GET, POST
 - `app/api/telegram/webhook/route.ts` — exporta: dynamic, POST
 - `app/assistant-console.tsx` — exporta: AssistantConsole, default
@@ -78,6 +79,11 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-world.ts` — What the world says, for JARVIS's 24/7 mind: the Fear & Greed index and the headlines that matter.
 - `lib/jarvis.ts` — JARVIS: the app's voice assistant.
 - `lib/mesa-medicion.ts` — Lo medido de la mesa de JARVIS, con su procedencia: los números que la araña en vivo pone al lado de lo que la app lee hoy.
+- `lib/mesa-sombra-auditoria.ts` — La auditoría del laboratorio en sombra: cada evento (una evolución, una candidata, una aprobación…) lleva el hash SHA-256 del anterior.
+- `lib/mesa-sombra-db.ts` — El laboratorio en sombra por cuenta, en D1: una fila de estado por persona y la auditoría encadenada (lib/mesa-sombra-auditoria.ts), que nunca se edita.
+- `lib/mesa-sombra-filtro.ts` — La compuerta de la variante aprobada en el papel: si la persona aprobó una variante del laboratorio en sombra, las operaciones de papel nuevas que esa variante no tomaría no se abr
+- `lib/mesa-sombra-run.ts` — Corre el laboratorio en sombra en el navegador (la CPU del Worker no alcanza y Binance no le responde a los crons): junta el papel cerrado y el último backtest, evoluciona si hay d
+- `lib/mesa-sombra.ts` — Laboratorio en sombra de la mesa: busca, sin parar, variantes de filtro que habrían rendido mejor que la mesa tal cual, y las mide hacia adelante.
 - `lib/speech-text.ts` — What JARVIS writes, turned into what a Spanish voice should say.
 - `scripts/investigacion/README.md` — Investigación de la mesa
 - `scripts/investigacion/aprendizaje.ts` — ¿Puede la mesa aprender?
@@ -345,7 +351,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)
 
-### calidad — Pruebas (125)
+### calidad — Pruebas (129)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agentes-mcp.test.ts` — Ruflo (el MCP de los agentes) arranca código de terceros con `npx`.
@@ -426,6 +432,10 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/magnet-watch.test.ts` — pruebas: strongest magnet each side, by density, within range, CERCA: a strong magnet within half an ATR (at least 0,4%), BARRIDA: the last candle trades through a magnet of the previous map; rejection  (+1)
 - `tests/market-providers.test.ts` — pruebas: each exchange, Bybit: funding per 8 h whatever the contract, OKX: funding brought to 8 h, OI in dollars and its 24 h change, accounts ratio a (+1)
 - `tests/market-structure-cmc.test.ts` — pruebas: CoinMarketCap: dominance, totals and the stablecoin shares from the server, CoinMarketCap: a missing stablecoin answer is unknown, never zero; a broken answ
+- `tests/mesa-sombra-auditoria.test.ts` — pruebas: el JSON canónico no depende del orden de las claves, una cadena intacta se verifica, en cualquier orden, editar, borrar o reordenar un evento rompe la cadena y dice dónde (+1)
+- `tests/mesa-sombra-db.test.ts` — pruebas: guarda corridas encadenadas, limita una evolución cada 20 minutos y la cadena se, el navegador no puede aprobar, ni registrar aprobaciones, ni volver atrás, aprobar exige una APTA guardada y registrada como APTA en la auditoría; revocar  (+1)
+- `tests/mesa-sombra-run.test.ts` — pruebas: avisa sus cambios con su propio evento, sin sesión corre en memoria: no manda nada al servidor y no deja aprobar, con sesión guarda la corrida (sin evolución si falta muestra) y respeta el límit (+1)
+- `tests/mesa-sombra.test.ts` — pruebas: el espacio de variantes es fijo y cada variante va y vuelve de su número, los rasgos son lo que la mesa sabía al abrir: el consenso se mide a favor del la, una variante dice qué la deja afuera, gen por gen (+1)
 - `tests/mm-robot.test.ts` — pruebas: liquidity at a moment: only levels formed by then and not yet taken, within rang, target: the pool when it is 1R–4R away, otherwise 2R, filters: volume, flushed liquidations, liquidity on the target side, trend (+1)
 - `tests/mtf-zones.test.ts` — pruebas: a level present on two timeframes is reported with both, one level is one row, not one row per timeframe, price inside a zone is reported as standing in it (+1)
 - `tests/news-sentiment.test.ts` — pruebas: headlines are classified by fundamental type, security incidents outrank everything else in the same headline, a strong verb in a fundamental category is high impact (+1)
@@ -606,6 +616,8 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `journal_notes` — crea: lib/diario-db.ts · usa: lib/diario-db.ts · sin índice visible en el código
 - `journal_notes_counts` — crea: lib/diario-db.ts · usa: lib/diario-db.ts, tests/diario-db.test.ts · sin índice visible en el código
 - `liquidity_snapshots` — crea: db/schema.ts, lib/liquidity-history.ts · usa: lib/liquidity-history.ts · índices: liquidity_snapshots_market_time_idx, liquidity_snapshots_captured_idx
+- `mesa_sombra` — crea: lib/mesa-sombra-db.ts · usa: lib/mesa-sombra-db.ts · sin índice visible en el código
+- `mesa_sombra_eventos` — crea: lib/mesa-sombra-db.ts · usa: lib/mesa-sombra-db.ts · índices: mesa_sombra_eventos_tipo
 - `notas` — crea: tests/arana.test.ts · usa: tests/arana.test.ts · índices: notas_id
 - `notes` — crea: examples/d1/db/schema.ts · usa: examples/d1/app/api/notes/route.ts · sin índice visible en el código
 - `push_subscriptions` — crea: lib/web-push.ts, tests/web-push.test.ts · usa: app/api/push/subscribe/route.ts · sin índice visible en el código
@@ -669,6 +681,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/jarvis/core` [GET] — app/api/jarvis/core/route.ts · jarvis
 - `/api/jarvis/memory` [GET, POST, DELETE] — app/api/jarvis/memory/route.ts · jarvis
 - `/api/jarvis/paper` [GET, POST, PUT] — app/api/jarvis/paper/route.ts · jarvis
+- `/api/jarvis/sombra` [GET, POST] — app/api/jarvis/sombra/route.ts · jarvis
 - `/api/jarvis/voice` [GET, POST] — app/api/jarvis/voice/route.ts · jarvis
 - `/api/journal` [GET, POST, DELETE] — app/api/journal/route.ts · riesgo-diario
 - `/api/klines` [POST, GET] — app/api/klines/route.ts · datos-mercado
