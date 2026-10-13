@@ -5,7 +5,7 @@
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
 - Archivos: 554 · objetivos: 17 · sin objetivo: 0
-- Tablas D1: 48 · secretos: 4 · variables de entorno: 12 · rutas /api: 53 · hosts: 55
+- Tablas D1: 48 · secretos: 4 · variables de entorno: 12 · rutas /api: 53 · hosts: 56
 - Código de navegador: 61 archivos con "use client" que alcanzan 182 · problemas: 0
 - Lib sin prueba directa: 23 de 174
 
@@ -791,6 +791,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `feeds.bbci.co.uk` — lib/news-intelligence.ts
 - `feeds.content.dowjones.io` — lib/news-intelligence.ts
 - `feeds.skynews.com` — lib/news-intelligence.ts
+- `futures.kraken.com` — lib/market-providers.ts
 - `github.com` — tests/herramientas.test.ts
 - `news.un.org` — lib/news-intelligence.ts
 - `nextjs.org` — next-env.d.ts

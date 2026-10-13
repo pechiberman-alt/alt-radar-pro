@@ -53,7 +53,7 @@ a6e8db10b2ee	57	app/api/jarvis/sombra/route.ts
 ef3e2bf85432	160	app/api/klines/route.ts
 c1dc8c2ca83f	93	app/api/liquidity-history/route.ts
 a9e76218b723	216	app/api/market-structure/route.ts
-cfd124d61648	49	app/api/market/derivatives/route.ts
+3356888e120f	49	app/api/market/derivatives/route.ts
 bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
@@ -182,7 +182,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-1c7e6d87db07	276	docs/araña/objetivos.md
+b850f690025f	276	docs/araña/objetivos.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -267,7 +267,7 @@ f61124d7437f	79	lib/jarvis-chat.ts
 5a9f14b0e859	477	lib/jarvis-core.ts
 7b2813e75f44	352	lib/jarvis-council.ts
 cb4645381ac1	582	lib/jarvis-desk-agents.ts
-98cd644e2ca6	249	lib/jarvis-desk-data.ts
+18a6e5b9304d	250	lib/jarvis-desk-data.ts
 d29490ffe116	101	lib/jarvis-desk-run.ts
 fa37d4a7b3d9	743	lib/jarvis-desk.ts
 7490f7cc5ddc	134	lib/jarvis-execution.ts
@@ -310,7 +310,7 @@ ce35aedc59de	144	lib/live-market.ts
 da795f0e150a	194	lib/magnet-watch.ts
 08266ef48c1d	445	lib/market-brain.ts
 c5ba3f905dda	317	lib/market-fetch.ts
-f0be46251006	395	lib/market-providers.ts
+92529383cd86	434	lib/market-providers.ts
 dca52626b743	252	lib/market-structure.ts
 dd7f989876a5	57	lib/mesa-medicion.ts
 8de6a64346cf	57	lib/mesa-sombra-auditoria.ts
@@ -494,7 +494,7 @@ ce39bedad0f5	142	tests/liquidation-tiers.test.ts
 6977f95176f6	218	tests/live-feed.test.ts
 c90b4a2a66b4	70	tests/live-market.test.ts
 3679ba6f5014	114	tests/magnet-watch.test.ts
-3b55b01f226c	202	tests/market-providers.test.ts
+e46e93dda3df	226	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
 4fec70e5eb48	37	tests/mesa-medicion.test.ts
 ea96d2b2093d	44	tests/mesa-sombra-auditoria.test.ts

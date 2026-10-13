@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 // Measured in production (oct 2026): OKX answers the Worker with every field; Bybit refuses it (region block)
 // and Binance refuses the crons. Hyperliquid has no 24 h open-interest change or long/short ratio.
-const ORDER: ProviderId[] = ["okx", "hyperliquid", "bybit", "binance"];
+const ORDER: ProviderId[] = ["okx", "hyperliquid", "bybit", "binance", "kraken"];
 const TTL_MS = 60_000;
 const STALE_MS = 10 * 60_000;
 

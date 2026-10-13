@@ -199,3 +199,27 @@ test("from the browser: Binance, then Bybit, and only then the server's fallback
     globalThis.fetch = original;
   }
 });
+
+test("Kraken Futures: precio de marca e interés abierto por par, y el funding queda sin datos", async () => {
+  const { krakenDerivatives, loadKrakenDerivatives, derivativesWithFallback } = await import("../lib/market-providers.ts");
+  const raw = {
+    result: "success",
+    tickers: [
+      { symbol: "PF_ETHUSD", pair: "ETH:USD", tag: "perpetual", markPrice: 2500, openInterest: 10, fundingRate: 0.5 },
+      { symbol: "PF_XBTUSD", pair: "XBT:USD", tag: "perpetual", markPrice: 62000, openInterest: 1234.5, fundingRate: 0.1 },
+      { symbol: "FF_XBTUSD_261225", pair: "XBT:USD", tag: "month", markPrice: 63000, openInterest: 5 },
+    ],
+  };
+  const btc = krakenDerivatives(raw, "BTC");
+  assert.equal(btc?.markPrice, 62000, "BTC figura como XBT y se toma el perpetuo, no el trimestral");
+  assert.equal(btc?.openInterest, 1234.5);
+  assert.equal(btc?.fundingPct, null, "sin período documentado no se estima el funding");
+  assert.equal(krakenDerivatives(raw, "DOGE"), null, "moneda sin perpetuo: sin datos");
+  assert.equal(krakenDerivatives({ result: "error" }, "BTC"), null);
+  assert.equal(krakenDerivatives(null, "BTC"), null);
+  const f = async () => new Response(JSON.stringify(raw), { status: 200 });
+  assert.equal((await loadKrakenDerivatives("ETHUSDT", null, f))?.markPrice, 2500);
+  const r = await derivativesWithFallback("BTCUSDT", null, ["bybit", "kraken"], async (url) => (url.includes("kraken") ? new Response(JSON.stringify(raw)) : new Response("no", { status: 403 })));
+  assert.equal(r.provider, "kraken");
+  assert.equal(r.tried[0].ok, false);
+});
