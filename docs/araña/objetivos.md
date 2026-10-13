@@ -235,13 +235,14 @@ Reglas:
 
 ## registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente
 Texto: el único lugar donde la app calcula el acierto, el profit factor y la expectancia. Cada fuente (JARVIS, el bot de papel, el robot) con su muestra y su intervalo; lo que no se pudo leer dice «sin datos», no cero.
-Archivos: lib/registro.ts, lib/registro-db.ts, lib/registro-run.ts, app/api/registro/**, tests/registro.test.ts
+Archivos: lib/registro.ts, lib/registro-db.ts, lib/registro-run.ts, app/api/registro/**, lib/flujo.ts, lib/flujo-db.ts, lib/flujo-run.ts, tests/registro.test.ts, tests/flujo.test.ts
 Reglas:
 - Un resultado cuenta una sola vez: R mayor que 0 gana, menor que 0 pierde, igual a 0 empata. Las abiertas no entran al acierto. Una cerrada sin resultado conocido no cuenta ni como acierto ni como cero.
 - Todo porcentaje va con su muestra y su intervalo de Wilson al 90 %; menos de 15 cerradas se marca «muestra mínima». El profit factor no se divide por cero: sin pérdidas dice «sin pérdidas».
 - Nada fuera de este registro calcula aciertos. La araña y la app muestran estos números tal cual; el diario del bot es una copia del papel y no se cuenta dos veces. Las señales del radar (signal_records) no entran hasta definir qué es un acierto para un plan sin R.
 - Las lecturas son acotadas: por fuente se leen las últimas 1.000 operaciones y, si hay más o filas ilegibles, la fuente dice «incompleta». JARVIS usa sus contadores globales; la base no hace COUNT(*) sobre tablas que crecen.
 - El laboratorio en sombra (JARVIS · señales en sombra) se muestra aparte y no entra en el total: no son operaciones.
+- Flujo de órdenes (lib/flujo.ts, PLAN_FLUJO_1): una lectura de presión con dirección y puntaje de 60 o más es operación solo con plan completo de los niveles que ya calcula el libro (stop en el piso o techo más cercano del lado contrario, objetivo en el más cercano del lado de la dirección). Se mide con velas de 5 minutos, 48 velas, comisión de 0,05 % por lado; una lectura por símbolo, lado y media hora. La regla se fijó antes de medirla: cambiarla es un PR revisado, no un ajuste a los números.
 
 ## calidad — Pruebas
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.

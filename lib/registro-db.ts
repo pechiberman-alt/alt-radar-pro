@@ -10,6 +10,7 @@ import { readCoreCounters } from "./jarvis-core-db.ts";
 import type { PaperTrade } from "./jarvis-paper.ts";
 import { ensurePaperSchema } from "./jarvis-paper-db.ts";
 import { ensureRobotLedger } from "./robot-ledger-db.ts";
+import { resultadosFlujo } from "./flujo-db.ts";
 import { armarRegistro, CONTEO_CERO, contar, type Conteo, type EntradaRegistro, type OperacionLeida, type Registro, sumarConteos } from "./registro.ts";
 
 /** Cuántas operaciones por fuente se leen como mucho. Si la cuenta llega a este tope, la fuente queda incompleta. */
@@ -48,7 +49,7 @@ export function operacionesDePapel(filas: { data: string }[]): { ops: OperacionL
   return { ops, ilegibles };
 }
 
-/** Del robot MM: las que siguen abiertas, y las cerradas con su R. */
+/** Del robot MM y del flujo de órdenes: las que siguen abiertas, y las cerradas con su R. */
 export function operacionesDeRobot(filas: { r: number | null; desenlace: string }[]): OperacionLeida[] {
   return filas.map((f) => (f.desenlace === "ABIERTA" ? { r: null, abierta: true } : { r: f.r, abierta: false }));
 }
@@ -72,6 +73,11 @@ async function leerPapel(db: D1Database, userId: number): Promise<{ conteo: Cont
   return { conteo: contar(ops), incompleta: filas.length >= LIMITE_HISTORIA || ilegibles > 0 };
 }
 
+async function leerFlujo(db: D1Database, userId: number): Promise<{ conteo: Conteo; incompleta: boolean }> {
+  const filas = await resultadosFlujo(db, userId, LIMITE_HISTORIA);
+  return { conteo: contar(operacionesDeRobot(filas)), incompleta: filas.length >= LIMITE_HISTORIA };
+}
+
 async function leerRobot(db: D1Database, userId: number): Promise<{ conteo: Conteo; incompleta: boolean }> {
   await ensureRobotLedger(db);
   const filas = (
@@ -88,6 +94,7 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
   const nucleo = await seguro("núcleo", () => readCoreCounters(db));
   const cuenta = userId === null ? null : await seguro("papel", () => leerPapel(db, userId));
   const robot = userId === null ? null : await seguro("robot", () => leerRobot(db, userId));
+  const flujo = userId === null ? null : await seguro("flujo", () => leerFlujo(db, userId));
 
   const sombra = nucleo
     ? sumarConteos(["ROMPE~SOMBRA", "IMÁN~SOMBRA", "IA~SOMBRA"].map((k) => conteoDeNucleo(nucleo[k])))
@@ -100,6 +107,7 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
     { id: "NUCLEO_SOMBRA", conteo: sombra },
     { id: "PAPEL", conteo: cuenta?.conteo ?? null, incompleta: cuenta?.incompleta },
     { id: "ROBOT", conteo: robot?.conteo ?? null, incompleta: robot?.incompleta },
+    { id: "FLUJO", conteo: flujo?.conteo ?? null, incompleta: flujo?.incompleta },
   ];
   return armarRegistro(entradas, ahora);
 }

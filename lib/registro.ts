@@ -9,7 +9,7 @@ import { wilson } from "./jarvis-stats.ts";
 /** Por debajo de esta cantidad de operaciones cerradas el porcentaje sigue visible, pero marcado como muestra mínima. */
 export const MUESTRA_MINIMA = 15;
 
-export type FuenteId = "NUCLEO_ROMPE" | "NUCLEO_IMAN" | "NUCLEO_IA" | "NUCLEO_SOMBRA" | "PAPEL" | "ROBOT";
+export type FuenteId = "NUCLEO_ROMPE" | "NUCLEO_IMAN" | "NUCLEO_IA" | "NUCLEO_SOMBRA" | "PAPEL" | "ROBOT" | "FLUJO";
 
 export type Conteo = {
   abiertas: number;
@@ -103,6 +103,7 @@ export const FUENTES: Record<FuenteId, { nombre: string; ambito: Ambito; enTotal
   NUCLEO_SOMBRA: { nombre: "JARVIS · señales en sombra (no se operan)", ambito: "GLOBAL", enTotal: false },
   PAPEL: { nombre: "Bot de papel · tu cuenta", ambito: "CUENTA", enTotal: true },
   ROBOT: { nombre: "Robot MM · tu cuenta", ambito: "CUENTA", enTotal: true },
+  FLUJO: { nombre: "Flujo de órdenes · tu cuenta", ambito: "CUENTA", enTotal: true },
 };
 
 export type EntradaRegistro = {

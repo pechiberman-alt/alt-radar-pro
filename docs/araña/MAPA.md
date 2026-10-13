@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 536 · objetivos: 16 · sin objetivo: 0
-- Tablas D1: 46 · secretos: 4 · variables de entorno: 12 · rutas /api: 51 · hosts: 55
-- Código de navegador: 60 archivos con "use client" que alcanzan 172 · problemas: 0
-- Lib sin prueba directa: 21 de 164
+- Archivos: 541 · objetivos: 16 · sin objetivo: 0
+- Tablas D1: 47 · secretos: 4 · variables de entorno: 12 · rutas /api: 52 · hosts: 55
+- Código de navegador: 60 archivos con "use client" que alcanzan 174 · problemas: 0
+- Lib sin prueba directa: 22 de 167
 
 ## Objetivos
 
@@ -359,12 +359,17 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `tests/herramientas.test.ts` — Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada más, `npm run subir` tiene que frenar secretos y archivos protegi
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)
 
-### registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente (5)
+### registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente (10)
 Texto: el único lugar donde la app calcula el acierto, el profit factor y la expectancia. Cada fuente (JARVIS, el bot de papel, el robot) con su muestra y su intervalo; lo que no se pudo leer dice «sin datos», no cero.
+- `app/api/registro/flujo/route.ts` — exporta: dynamic, GET, POST
 - `app/api/registro/route.ts` — exporta: dynamic, GET
+- `lib/flujo-db.ts` — Las operaciones del flujo de órdenes, por cuenta: una fila por lectura (clave única por símbolo, lado y media hora), con su plan fijado al detectarla y su resultado cuando el naveg
+- `lib/flujo-run.ts` — El flujo de órdenes para tu cuenta, desde el navegador.
+- `lib/flujo.ts` — Las lecturas del flujo de órdenes como operaciones medidas.
 - `lib/registro-db.ts` — La lectura del registro unificado desde la base (lib/registro.ts hace la cuenta).
 - `lib/registro-run.ts` — El registro para la app y la araña: lo lee el navegador de GET /api/registro como mucho cada 5 minutos, y solo con la pestaña visible.
 - `lib/registro.ts` — El registro unificado de operaciones: el único lugar donde la app calcula el acierto, el profit factor y la expectancia.
+- `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
 
 ### calidad — Pruebas (131)
@@ -620,6 +625,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `brain_security_events` — crea: db/schema.ts, lib/brain-security.ts · usa: lib/brain-security.ts · índices: brain_security_events_time_idx, brain_security_events_symbol_idx
 - `dca_purchases` — crea: lib/dca-tracker.ts · usa: app/api/dca/route.ts · índices: dca_purchases_user_idx
 - `dca_schedules` — crea: lib/dca-tracker.ts · usa: app/api/dca/schedule/route.ts, lib/telegram-dispatch.ts · sin índice visible en el código
+- `flujo_senales` — crea: lib/flujo-db.ts · usa: lib/flujo-db.ts · índices: flujo_senales_reciente
 - `jarvis_chat` — crea: lib/jarvis-chat.ts · usa: lib/jarvis-chat.ts, tests/jarvis-chat.test.ts · índices: jarvis_chat_user
 - `jarvis_core_signals` — crea: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · usa: lib/jarvis-core-db.ts, tests/jarvis-core.test.ts · índices: jarvis_core_open, jarvis_core_created, jarvis_core_closed, jarvis_core_busy
 - `jarvis_core_state` — crea: lib/jarvis-core-db.ts · usa: lib/jarvis-core-db.ts, lib/jarvis-mind-db.ts, lib/jarvis-world.ts, tests/jarvis-mind.test.ts · sin índice visible en el código
@@ -713,6 +719,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/push/subscribe` [POST, DELETE] — app/api/push/subscribe/route.ts · alertas
 - `/api/radar` [GET] — app/api/radar/route.ts · senales-radar
 - `/api/registro` [GET] — app/api/registro/route.ts · registro
+- `/api/registro/flujo` [GET, POST] — app/api/registro/flujo/route.ts · registro
 - `/api/robot/signal` [GET, POST] — app/api/robot/signal/route.ts · robots-papel
 - `/api/rolling` [GET] — app/api/rolling/route.ts · datos-mercado
 - `/api/scalping` [POST] — app/api/scalping/route.ts · senales-radar
@@ -790,4 +797,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
