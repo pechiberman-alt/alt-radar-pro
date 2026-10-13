@@ -88,6 +88,7 @@ export const DESK_PROVIDERS: DeskProvider[] = [
   { id: "bybit", label: "Bybit v5 (API pública, desde tu navegador; al servidor no le responde)", serves: ["derivados"], ready: true },
   { id: "okx", label: "OKX v5 (API pública, desde el servidor)", serves: ["derivados", "liquidaciones"], ready: true },
   { id: "hyperliquid", label: "Hyperliquid (API pública, desde el servidor)", serves: ["derivados"], ready: true },
+  { id: "kraken", label: "Kraken Futures (API pública, desde el servidor; solo precio de marca e interés abierto, último respaldo)", serves: ["derivados"], ready: true },
   { id: "binance-ws", label: "Binance · liquidaciones en vivo (WebSocket)", serves: ["liquidaciones"], ready: true },
   { id: "alt-radar", label: "Servidor ALT RADAR (noticias cripto, Miedo y Avaricia)", serves: ["noticias", "sentimiento"], ready: true },
   { id: "forex-factory", label: "Calendario económico (Forex Factory)", serves: ["macro"], ready: true },

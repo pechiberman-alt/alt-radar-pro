@@ -1,6 +1,8 @@
 import type { DeskDecision } from "./jarvis-desk.ts";
 import { closeManually, cursorOf, MINUTE, needsMinutes, paperFromDesk, resolvePaper, type PaperTrade } from "./jarvis-paper.ts";
 import { BROWSER_BASES, FUTURES_BASES } from "./market-fetch.ts";
+import { evaluarPropuesta, operacionDePapel, propuestaDePapel } from "./lab-riesgo.ts";
+import { limitesGuardados, registrarActividad } from "./lab-run.ts";
 import { rechazoDeVariante } from "./mesa-sombra-filtro.ts";
 import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
 
@@ -123,11 +125,21 @@ export async function openFromDesk(d: DeskDecision, now = Date.now()): Promise<O
   const t = paperFromDesk(d, now);
   if (!t) return { ok: false, error: "Este plan no se puede seguir en papel: el gestor de riesgo no lo aprobó." };
   if (now - t.vela > STALE_PLAN_MS) return { ok: false, error: "Ese plan ya es viejo: volvé a analizar el activo." };
+  // El gestor de riesgo central del laboratorio (lib/lab-riesgo.ts): toda operación simulada pasa por él.
+  // Se importa al usarlo porque jarvis-desk-run.ts ya importa este archivo.
+  const { loadDeskSettings } = await import("./jarvis-desk-run.ts");
+  const riesgoPct = loadDeskSettings().riesgoPct;
+  const limites = limitesGuardados();
+  const veredicto = evaluarPropuesta(propuestaDePapel(t, riesgoPct), store.trades.map((x) => operacionDePapel(x)), limites, now);
+  if (!veredicto.ok) {
+    registrarActividad(`Riesgo frenó ${t.lado} ${t.symbol}: ${veredicto.motivos.join(" ")}`, "aviso", now);
+    return { ok: false, error: `El gestor de riesgo del laboratorio no la deja abrir. ${veredicto.motivos.join(" ")}` };
+  }
   if (s.mode === "cuenta") {
     // La variante que la persona aprobó en el laboratorio en sombra filtra el papel nuevo.
     const rechazo = await rechazoDeVariante(t);
     if (rechazo) return { ok: false, error: rechazo };
-    const r = await fetch("/api/jarvis/paper", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trade: t }) });
+    const r = await fetch("/api/jarvis/paper", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trade: t, riesgoPct, limites }) });
     const body = (await r.json().catch(() => ({}))) as { trade?: PaperTrade; error?: string };
     if (!r.ok || !body.trade) return { ok: false, error: body.error ?? "No se pudo abrir la operación de papel." };
     store = { ...store, trades: sortTrades([body.trade, ...store.trades]) };

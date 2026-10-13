@@ -141,6 +141,22 @@ export function decidirEdicion(rel) {
   return null;
 }
 
+/**
+ * Los archivos nuevos sin seguimiento que `subir` sumaría con `git add -A` (salida de `git ls-files --others
+ * --exclude-standard`). Sin `incluir`, frena y los lista: nada entra al commit sin que se vea. Pura.
+ */
+export function revisarArchivosNuevos(salidaGit, incluir = false) {
+  const nuevos = String(salidaGit).split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!nuevos.length || incluir) return { nuevos, error: null };
+  const cuantos = nuevos.length === 1 ? "hay 1 archivo nuevo sin seguimiento" : `hay ${nuevos.length} archivos nuevos sin seguimiento`;
+  const muestra = nuevos.slice(0, 15).join(", ");
+  const resto = nuevos.length > 15 ? ` y ${nuevos.length - 15} más` : "";
+  return {
+    nuevos,
+    error: `${cuantos}: ${muestra}${resto}. Si son parte del cambio, repetí con --incluir-nuevos; si no, sacalos o agregalos a .gitignore.`,
+  };
+}
+
 /** «dueño/repo» del remoto, sea https, ssh o detrás de un proxy. */
 export function repoDesdeRemoto(url) {
   const m = String(url).trim().match(/[/:]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/);

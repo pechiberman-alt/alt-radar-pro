@@ -181,6 +181,8 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
     return { kind: "PAPER_OPEN", symbol: findCoins(text, known)[0] ?? null };
   if (/\b(paper( trading)?|de papel|en papel|simulad[ao]s|simulaciones)\b/.test(text)) return { kind: "PAPER" };
   if (/\b(nucleo|estado del nucleo|que hiciste|mientras no estaba|que paso mientras|que estuviste haciendo|estas activo|estas despierto)\b/.test(text)) return { kind: "CORE" };
+  // Preguntas del AI TRADING LAB que comparan estrategias: van al chat, que las responde con el laboratorio (lib/lab-jarvis.ts).
+  if (/\b(mejor (rendimiento|estrategia)|cual (rinde|funciona|anda) mejor)\b/.test(text)) return { kind: "AI", question: raw.trim().replace(/^(oye |hey |ok )?jarvis[,:]?\s*/i, "") };
   if (/\b(rendimiento|estadisticas|tus senales|tu registro|registro de senales|win ?rate|profit factor|como (te )?(va|fue|vienen?)( con)? (las|tus) senales|cuanto acertaste|aciertos)\b/.test(text)) return { kind: "STATS" };
   // El escáner de todo el mercado (lib/jarvis-scan.ts): «escaneá el mercado», «¿cómo va el escaneo?», «cancelá el escaneo».
   if (/\b(?:escane(?:a|ar|ame|o|os)|scane(?:a|ar|ame|o|os)|scan)\b/.test(text)) {

@@ -22,7 +22,7 @@ import type { Derivatives } from "./jarvis-desk-data.ts";
  * mercado, no el total, y así se dice.
  */
 
-export type ProviderId = "binance" | "bybit" | "okx" | "hyperliquid";
+export type ProviderId = "binance" | "bybit" | "okx" | "hyperliquid" | "kraken";
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export type Attempt = { provider: ProviderId; ok: boolean; why?: string };
 
@@ -31,6 +31,7 @@ export const PROVIDER_LABEL: Record<ProviderId, string> = {
   bybit: "Bybit (perpetuo USDT)",
   okx: "OKX (perpetuo USDT)",
   hyperliquid: "Hyperliquid (perpetuo)",
+  kraken: "Kraken Futures (solo precio de marca e interés abierto)",
 };
 
 const H = 3_600_000;
@@ -39,6 +40,7 @@ export const BINANCE_FUTURES = ["https://fapi.binance.com", "https://fapi1.binan
 export const BYBIT = "https://api.bybit.com";
 export const OKX = "https://www.okx.com";
 export const HYPERLIQUID = "https://api.hyperliquid.xyz/info";
+export const KRAKEN_FUTURES_TICKERS = "https://futures.kraken.com/derivatives/api/v3/tickers";
 
 const num = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
@@ -53,6 +55,7 @@ export function venueSymbol(symbol: string, venue: ProviderId): string | null {
   const thousand = /^1000(?=[A-Z])/.test(base) ? base.slice(4) : null;
   if (venue === "binance" || venue === "bybit") return symbol;
   if (venue === "okx") return `${thousand ?? base}-USDT-SWAP`;
+  if (venue === "kraken") return thousand ?? base;
   return thousand ? `k${thousand}` : base;
 }
 
@@ -195,6 +198,35 @@ export function hyperliquidDerivatives(raw: unknown, coin: string, price: number
   return any(out) ? out : null;
 }
 
+// ── Kraken Futures ──
+
+/**
+ * Kraken Futures (API pública, sin clave): precio de marca e interés abierto del perpetuo. El funding NO se toma: la
+ * documentación no dice en qué período está (por hora o por 8 h) y una escala equivocada daría un número falso; queda
+ * «sin datos». El contrato se busca por su par (BTC figura como XBT:USD), no por un símbolo armado a mano.
+ */
+export function krakenDerivatives(raw: unknown, base: string): Derivatives | null {
+  const r = raw as { result?: unknown; tickers?: unknown } | null;
+  if (!r || r.result !== "success" || !Array.isArray(r.tickers)) return null;
+  const pares = (base === "BTC" ? ["BTC", "XBT"] : [base]).map((b) => `${b}:USD`);
+  const t = (r.tickers as { pair?: unknown; tag?: unknown; markPrice?: unknown; openInterest?: unknown }[]).find(
+    (x) => x?.tag === "perpetual" && typeof x.pair === "string" && pares.includes(x.pair),
+  );
+  if (!t) return null;
+  const out: Derivatives = {
+    fundingPct: null,
+    nextFundingAt: null,
+    markPrice: num(t.markPrice),
+    openInterest: num(t.openInterest),
+    openInterestUsd: null,
+    oiChange24hPct: null,
+    longShortRatio: null,
+    takerBuySell: null,
+    source: PROVIDER_LABEL.kraken,
+  };
+  return any(out) ? out : null;
+}
+
 // ── Fetching ──
 
 const defaultFetcher: Fetcher = (url, init) => fetch(url, init);
@@ -265,11 +297,18 @@ export async function loadHyperliquidDerivatives(symbol: string, price: number |
   return hyperliquidDerivatives(raw, coin, price);
 }
 
+export async function loadKrakenDerivatives(symbol: string, _price: number | null, f: Fetcher = defaultFetcher, signal?: AbortSignal): Promise<Derivatives | null> {
+  const base = venueSymbol(symbol, "kraken");
+  if (!base) return null;
+  return krakenDerivatives(await getJson(f, KRAKEN_FUTURES_TICKERS, signal), base);
+}
+
 const LOADERS: Record<ProviderId, typeof loadBinanceDerivatives> = {
   binance: loadBinanceDerivatives,
   bybit: loadBybitDerivatives,
   okx: loadOkxDerivatives,
   hyperliquid: loadHyperliquidDerivatives,
+  kraken: loadKrakenDerivatives,
 };
 
 /** El primer proveedor que da derivados, en el orden pedido, y qué pasó con cada uno. */
@@ -290,6 +329,14 @@ export async function derivativesWithFallback(
     tried.push({ provider, ok: false, why: "sin respuesta o sin datos para esta moneda" });
   }
   return { derivatives: null, provider: null, tried };
+}
+
+/**
+ * Lo que el servidor guarda en caché de un resultado de derivados: nada si ningún proveedor respondió. Así el caché
+ * (lib/upstream-cache.ts) sirve la última lectura buena mientras dure, en vez de pisarla con un vacío durante 60 s.
+ */
+export function parteDerivados<D>(r: { derivatives: D | null; provider: ProviderId | null; tried: Attempt[] }): { data: D; provider: ProviderId | null; tried: Attempt[] } | null {
+  return r.derivatives ? { data: r.derivatives, provider: r.provider, tried: r.tried } : null;
 }
 
 // ── Liquidaciones reales (OKX) ──

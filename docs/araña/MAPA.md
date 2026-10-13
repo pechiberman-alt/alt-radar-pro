@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 541 · objetivos: 16 · sin objetivo: 0
-- Tablas D1: 47 · secretos: 4 · variables de entorno: 12 · rutas /api: 52 · hosts: 55
-- Código de navegador: 60 archivos con "use client" que alcanzan 174 · problemas: 0
-- Lib sin prueba directa: 22 de 167
+- Archivos: 554 · objetivos: 17 · sin objetivo: 0
+- Tablas D1: 48 · secretos: 4 · variables de entorno: 12 · rutas /api: 53 · hosts: 56
+- Código de navegador: 61 archivos con "use client" que alcanzan 182 · problemas: 0
+- Lib sin prueba directa: 23 de 174
 
 ## Objetivos
 
@@ -41,7 +41,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `lib/ai-analyst-server.ts` — The Anthropic call and the daily quota, shared by the app's ANALISTA and the Telegram bot.
 - `lib/ai-analyst.ts` — AI mode for the ANALISTA panel: Claude, instructed with ALT RADAR's own methodology and fed the live snapshot on every question.
 - `lib/ai-brains.ts` — JARVIS's brains, in the order they answer a free question:
-- `lib/ai-cascade.ts` — La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el cupo de la persona), después por Groq (si hay clave gratis) y después por el modelo gratis de 
+- `lib/ai-cascade.ts` — La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el cupo de la persona), después por Groq (si hay clave gratis) y después por el modelo gratis de
 - `lib/ai-numbers.ts` — Numbers for the AIs, already written the Argentine way ("82.920", "11,066", "0,7042", "-2,99").
 - `lib/ai-probe.ts` — Once per deploy, the minute cron asks the free brain (Cloudflare Workers AI) a one-word question and keeps what happened, so the settings screen — and whoever deployed — can see th
 - `lib/assistant/index.ts` — Deterministic terminal assistant.
@@ -170,7 +170,7 @@ Pendiente: Alertas de volumen siguen silenciosas desde el 30/09: Binance solo. F
 - `lib/trendlines.ts` — Trendlines and breakouts, found mechanically.
 - `lib/volume-spike.ts` — Unusual volume: the latest candle's volume against the average of the 20 candles before it, on the same timeframe.
 
-### datos-mercado — Velas, precios, noticias y frescura (29)
+### datos-mercado — Velas, precios, noticias y frescura (30)
 Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden tardar. Siempre se dice la fuente.
 - `app/api/calendar/route.ts` — exporta: dynamic, GET
 - `app/api/etf-flows/route.ts` — exporta: dynamic, GET
@@ -201,6 +201,7 @@ Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden 
 - `lib/shared-cache.ts` — Shared, short-lived cache for database-backed JSON that is the same for everyone (signal ledger, performance totals).
 - `lib/token-unlocks.ts` — Supply overhang: how much of each token still has to reach the market.
 - `lib/upstream-cache.ts` — Shared in-Worker cache for upstream market data.
+- `tests/derivados-cache.test.ts` — pruebas: sin ningún proveedor que responda, la parte de derivados es null (no un objeto v, con datos, la parte lleva la moneda, el proveedor y los intentos, si los proveedores fallan, el caché sirve la última lectura buena y no la pisa c
 
 ### binance-usuario — Cuenta de Binance del usuario (12)
 Texto: lectura de la cuenta y operaciones con claves del usuario, siempre desde su navegador.
@@ -335,15 +336,18 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/auth.ts` — Per-client authentication: email + password, isolated by user_id.
 - `lib/secret-box.ts` — AES-GCM with a base64 32-byte key: iv (12 bytes) + ciphertext, base64.
 
-### araña — La araña del proyecto y las instrucciones para trabajar en él (21)
+### araña — La araña del proyecto y las instrucciones para trabajar en él (25)
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
 - `.claude/settings.json`
 - `.mcp.json`
 - `CLAUDE.md` — ALT RADAR PRO — reglas del proyecto
+- `app/api/arana/ultimo/route.ts` — exporta: dynamic, GET, PUT
 - `app/arana-desk.css`
 - `app/arana-desk.tsx` — La araña dentro de la app, en dos pestañas.
 - `app/arana-vivo.tsx` — La mesa en vivo, para la araña: lo que la app leyó ahora mismo (el escaneo que va llegando o el último completo, el papel, el último backtest y la vigilancia) junto con lo medido e
 - `docs/araña/objetivos.md` — Objetivos de ALT RADAR PRO
+- `lib/arana-ultimo-db.ts` — La tabla del último escaneo de la araña: una fila por cuenta, leída y escrita por clave primaria (una lectura de D1 al entrar, una escritura por escaneo completo).
+- `lib/arana-ultimo.ts` — El último escaneo completo de la araña, guardado por cuenta para que al entrar a la app no empiece de cero.
 - `lib/arana-vivo-auto.ts` — El escaneo automático de la araña en vivo: como mucho cada 15 minutos, solo mientras la araña está a la vista, nunca en paralelo con otro escaneo y con un botón para pausarlo.
 - `lib/arana-vivo.ts` — La araña en vivo: junta lo que la app ya tiene en el navegador (el escaneo que va llegando o el último completo, las operaciones de papel, el último backtest y la vigilancia) en un
 - `scripts/arana-vista.html`
@@ -353,10 +357,11 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/herramientas.mjs` — Herramientas para trabajar en el repo gastando pocos tokens: el resumen corto de lint, tests, tsc y build que imprime `npm run verificar`, el control de secretos y archivos protegi
 - `scripts/subir.mjs` — npm run subir: lleva a producción el cambio que pasó `npm run verificar`, en un paso y con salida corta: rama, commit, PR, squash a main y espera el deploy del CI.
 - `scripts/verificar.mjs` — npm run verificar: todo lo que tiene que pasar antes de subir un cambio, con salida corta (una línea por paso y solo el detalle de lo que falla): mapa de la araña, lint, tests, tsc
+- `tests/arana-ultimo.test.ts` — pruebas: acepta un escaneo con la forma correcta y lo devuelve tal cual, rechaza lo que no tiene forma de escaneo, no acepta más filas que el tope del escáner (+1)
 - `tests/arana-vivo-auto.test.ts` — pruebas: la primera vez, con la araña a la vista, escanea enseguida, fuera de vista nunca escanea en segundo plano, aunque ya toque, pausado no escanea solo, y con un escaneo en curso no se empieza otro (+1)
 - `tests/arana-vivo.test.ts` — pruebas: sin escaneo, sin papel y sin backtest: todo dice «sin datos», nada se inventa, el escaneo al día muestra las mejores aprobadas, ordenadas por puntaje, sin los , un escaneo viejo avisa que ya no es de ahora, y uno parcial dice por qué se cort (+1)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
-- `tests/herramientas.test.ts` — Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada más, `npm run subir` tiene que frenar secretos y archivos protegi
+- `tests/herramientas.test.ts` — Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada más, `npm run subir` tiene que frenar secretos, archivos protegid
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)
 
 ### registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente (10)
@@ -371,6 +376,17 @@ Texto: el único lugar donde la app calcula el acierto, el profit factor y la ex
 - `lib/registro.ts` — El registro unificado de operaciones: el único lugar donde la app calcula el acierto, el profit factor y la expectancia.
 - `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
+
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (8)
+Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
+- `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
+- `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
+- `lib/lab-evaluacion.ts` — La evaluación del AI TRADING LAB sobre un backtest de la mesa (lib/jarvis-backtest.ts): parte el período en DESARROLLO y EVALUACIÓN por fecha (corte fijado antes de mirar), y en ca
+- `lib/lab-jarvis.ts` — JARVIS sobre el AI TRADING LAB: contesta con los datos reales de la foto del laboratorio (lib/lab.ts) qué hace la araña, qué encontró, qué estrategias se evalúan, cuál rinde mejor
+- `lib/lab-riesgo.ts` — El gestor de riesgo central del AI TRADING LAB: una sola compuerta para toda operación simulada, en el motor de papel del navegador y en la API del servidor (no solo en la pantalla
+- `lib/lab-run.ts` — El AI TRADING LAB en el navegador: guarda los límites de riesgo que eligió la persona (dentro de los topes de lib/lab-riesgo.ts) y anota la actividad del laboratorio con su hora (r
+- `lib/lab.ts` — AI TRADING LAB: la foto del laboratorio armada con lo que la app ya tiene (la araña en vivo, el backtest, el papel, el registro y el gestor de riesgo).
+- `tests/lab.test.ts` — AI TRADING LAB: el gestor de riesgo central frena lo que pasa los límites y nadie lo afloja más allá de los topes; la evaluación del backtest respeta la cronología; el centro de la
 
 ### calidad — Pruebas (131)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
@@ -614,6 +630,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `ai_probe` — crea: lib/ai-probe.ts · usa: lib/ai-probe.ts · sin índice visible en el código
 - `ai_usage` — crea: lib/ai-analyst-server.ts · usa: lib/ai-analyst-server.ts, tests/ai-brains.test.ts · sin índice visible en el código
 - `app_settings` — crea: lib/app-settings.ts · usa: lib/app-settings.ts, tests/app-settings.test.ts, tests/binance-account.test.ts · sin índice visible en el código
+- `arana_ultimo` — crea: lib/arana-ultimo-db.ts · usa: lib/arana-ultimo-db.ts · sin índice visible en el código
 - `automation_state` — crea: db/schema.ts, lib/automation.ts, tests/signal-plan-db.test.ts (+1) · usa: app/api/signals/route.ts, lib/automation.ts, lib/scalping-automation.ts, lib/signal-plan-db.ts, tests/signal-plan-db.test.ts, tests/telegram-signals.test.ts · sin índice visible en el código
 - `binance_credentials` — crea: db/schema.ts, lib/auth.ts · usa: app/api/binance/credentials/route.ts, app/api/binance/link/route.ts · sin índice visible en el código
 - `binance_debug_log` — crea: lib/binance-debug-log.ts · usa: lib/binance-debug-log.ts, tests/binance-debug-log.test.ts · sin índice visible en el código
@@ -683,6 +700,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/alerts/latest` [GET] — app/api/alerts/latest/route.ts · alertas
 - `/api/alerts/prebreak` [POST] — app/api/alerts/prebreak/route.ts · alertas
 - `/api/analyst/ai` [POST] — app/api/analyst/ai/route.ts · jarvis
+- `/api/arana/ultimo` [GET, PUT] — app/api/arana/ultimo/route.ts · araña
 - `/api/auth/login` [POST] — app/api/auth/login/route.ts · seguridad
 - `/api/auth/logout` [POST] — app/api/auth/logout/route.ts · seguridad
 - `/api/auth/me` [GET] — app/api/auth/me/route.ts · seguridad
@@ -773,6 +791,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `feeds.bbci.co.uk` — lib/news-intelligence.ts
 - `feeds.content.dowjones.io` — lib/news-intelligence.ts
 - `feeds.skynews.com` — lib/news-intelligence.ts
+- `futures.kraken.com` — lib/market-providers.ts
 - `github.com` — tests/herramientas.test.ts
 - `news.un.org` — lib/news-intelligence.ts
 - `nextjs.org` — next-env.d.ts
@@ -792,9 +811,9 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

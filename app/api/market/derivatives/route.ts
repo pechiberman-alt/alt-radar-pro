@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { derivativesWithFallback, loadOkxLiquidations, type Attempt, type LiquidationTape, type ProviderId } from "@/lib/market-providers";
+import { derivativesWithFallback, loadOkxLiquidations, parteDerivados, type Attempt, type LiquidationTape, type ProviderId } from "@/lib/market-providers";
 import type { Derivatives } from "@/lib/jarvis-desk-data";
 import { cached } from "@/lib/upstream-cache";
 
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 // Measured in production (oct 2026): OKX answers the Worker with every field; Bybit refuses it (region block)
 // and Binance refuses the crons. Hyperliquid has no 24 h open-interest change or long/short ratio.
-const ORDER: ProviderId[] = ["okx", "hyperliquid", "bybit", "binance"];
+const ORDER: ProviderId[] = ["okx", "hyperliquid", "bybit", "binance", "kraken"];
 const TTL_MS = 60_000;
 const STALE_MS = 10 * 60_000;
 
@@ -30,10 +30,7 @@ export async function GET(request: NextRequest) {
   const now = Date.now();
   const [deriv, liq] = await Promise.all([
     parts.has("derivados")
-      ? cached<DerivPart>(`deriv:${symbol}`, TTL_MS, async () => {
-          const r = await derivativesWithFallback(symbol, ref, ORDER);
-          return { data: r.derivatives, provider: r.provider, tried: r.tried };
-        }, STALE_MS)
+      ? cached<DerivPart>(`deriv:${symbol}`, TTL_MS, async () => parteDerivados(await derivativesWithFallback(symbol, ref, ORDER)), STALE_MS)
       : null,
     parts.has("liquidaciones") ? cached<LiquidationTape>(`liq:${symbol}`, TTL_MS, () => loadOkxLiquidations(symbol, now), STALE_MS) : null,
   ]);

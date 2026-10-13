@@ -251,7 +251,7 @@ export function comentarioInicial(t) {
 export function primeraFrase(texto) {
   const parrafo = texto.split(/\n\s*\n/)[0].replace(/\s+/g, " ").trim();
   const frase = parrafo.match(/^.*?[.!?](?=\s|$)/);
-  return (frase ? frase[0] : parrafo).slice(0, 180);
+  return (frase ? frase[0] : parrafo).slice(0, 180).trimEnd();
 }
 
 function resumenMarkdown(t) {
