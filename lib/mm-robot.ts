@@ -131,10 +131,14 @@ export function targetFor(e: MmEvent): number {
   return long ? e.entry + 2 * e.risk : e.entry - 2 * e.risk;
 }
 
+/** Candles a trade is held before leaving on time, and the fee per side (%). The signal record (lib/robot-ledger.ts) measures with these same values. */
+export const MM_HORIZON = 48;
+export const MM_FEE_PCT = 0.05;
+
 /** Trades the events like a robot: one position at a time, worst case first, fees on both sides. */
 export function runMm(candles: SwingCandle[], events: MmEvent[], f: MmFilter, opts: { horizon?: number; feePct?: number; from?: number; to?: number } = {}): MmTrade[] {
-  const horizon = opts.horizon ?? 48;
-  const feePct = opts.feePct ?? 0.05;
+  const horizon = opts.horizon ?? MM_HORIZON;
+  const feePct = opts.feePct ?? MM_FEE_PCT;
   const from = opts.from ?? 0;
   const to = opts.to ?? candles.length;
   const out: MmTrade[] = [];

@@ -296,7 +296,7 @@ test("the chat says how the scan is going and how old the last one is, and warns
 test("a copied line uses the Argentine comma and says which read it comes from", () => {
   const row = quickRead(eligible("SOL"), candlesOf(LONG), SHARED, NOW, DEFAULT_DESK_SETTINGS);
   const line = scanLine(row);
-  assert.match(line, /^SOL LONG · confluencia \d+ · consenso \+0,\d+ · entrada \d+,\d+ · stop \d+,\d+ · TP1 \d+,\d+ · R:R 1:\d(,\d+)? · riesgo (BAJO|MEDIO|ALTO) · lectura rápida$/);
+  assert.match(line, /^SOL LONG · confluencia \d+ · consenso \+0,\d+ · entrada \d+,\d+ · stop \d+,\d+ · TP1 \d+,\d+ · TP2 \d+,\d+ · TP3 \d+,\d+ · R:R 1:\d(,\d+)? · riesgo (BAJO|MEDIO|ALTO) · lectura rápida$/);
   assert.equal(scanLine(quickRead(eligible("W"), candlesOf(WAIT), SHARED, NOW, DEFAULT_DESK_SETTINGS)), "W: ESPERAR");
 });
 
@@ -574,6 +574,8 @@ test("the row of a decision carries what the desk decided, nothing else", () => 
       assert.equal(row.plan!.entrada, d.plan.entrada);
       assert.equal(row.plan!.stop, d.plan.stop);
       assert.equal(row.plan!.tp1, d.plan.tp[0].price);
+      assert.equal(row.plan!.tp2, d.plan.tp[1].price, "la escalera completa: TP2");
+      assert.equal(row.plan!.tp3, d.plan.tp[2].price, "la escalera completa: TP3");
       assert.equal(row.plan!.rr, d.riesgo!.rrPonderado);
     }
   }

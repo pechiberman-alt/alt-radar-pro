@@ -5,7 +5,7 @@ bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
 bcde9385654a	0	.gitignore
 01d17d57cd3e	9	.mcp.json
 6b5886c6306e	5	.openai/hosting.json
-af06f3aa762b	67	CLAUDE.md
+d7268dd9b537	69	CLAUDE.md
 8b27e3600b59	64	README.md
 5aac31cab73c	36	THIRD_PARTY_NOTICES.md
 7d7e53d1533b	103	app/account-panel.css
@@ -55,7 +55,7 @@ bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
 258c46b07f01	70	app/api/radar/route.ts
-dbbc58356a83	50	app/api/robot/signal/route.ts
+a99ad37e5d45	96	app/api/robot/signal/route.ts
 1d6f0811ce3f	94	app/api/rolling/route.ts
 67ac76c459c7	194	app/api/scalping/route.ts
 251b8971fa50	48	app/api/sentiment/route.ts
@@ -116,7 +116,7 @@ def492abf855	146	app/install-panel.tsx
 674a9d7b1cd9	246	app/jarvis-backtest.tsx
 e7261e72c9f7	299	app/jarvis-council.tsx
 5954976b79de	279	app/jarvis-paper.tsx
-52c42b680523	219	app/jarvis-scan.tsx
+ac3849ea9817	219	app/jarvis-scan.tsx
 e4aeb9c38840	264	app/jarvis-trading.css
 876be9affd6b	734	app/jarvis-trading.tsx
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
@@ -150,8 +150,8 @@ f58412c957a0	53	app/pwa-register.tsx
 72da20719972	274	app/responsive-fixes.css
 119930fcab22	76	app/risk-desk.css
 57216ff5dacb	344	app/risk-desk.tsx
-415db5df5a9b	13	app/robot-signals-desk.css
-0758301a67f2	178	app/robot-signals-desk.tsx
+712a705a7619	25	app/robot-signals-desk.css
+bb570d5787dc	402	app/robot-signals-desk.tsx
 1db656ad7025	174	app/scalping-desk.css
 d180ba5315c4	324	app/scalping-desk.tsx
 12f05e090902	80	app/secure-brain.css
@@ -177,7 +177,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-fbc03a380a70	251	docs/araña/objetivos.md
+99646a5d709d	252	docs/araña/objetivos.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -235,6 +235,7 @@ ed5b22c91c14	157	lib/dca-tracker.ts
 c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
+d6b360bf5203	104	lib/escalera.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
 450b470bb8bd	173	lib/exchange-reserves.ts
 da42f6c9e464	311	lib/fair-value-gaps.ts
@@ -270,7 +271,7 @@ c4b51bfec404	337	lib/jarvis-mind.ts
 b2251683fc99	262	lib/jarvis-paper-run.ts
 cf67397ebde0	654	lib/jarvis-paper.ts
 a616ae6ddc5b	292	lib/jarvis-scan-run.ts
-15102a31a190	295	lib/jarvis-scan.ts
+1f2ad361d4f7	296	lib/jarvis-scan.ts
 187b69f4e8e6	367	lib/jarvis-stats.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
 4b677046fbed	39	lib/jarvis-voice.ts
@@ -302,7 +303,7 @@ dd7f989876a5	57	lib/mesa-medicion.ts
 5fb36682c20d	52	lib/mesa-sombra-filtro.ts
 496f9d21c5f3	146	lib/mesa-sombra-run.ts
 c8b7add6b81c	621	lib/mesa-sombra.ts
-780aee5014b9	238	lib/mm-robot.ts
+617b5248112d	242	lib/mm-robot.ts
 fd19498c8d8b	115	lib/mtf-zones.ts
 1cbbe9f25773	380	lib/news-intelligence.ts
 780c578e3481	522	lib/order-blocks.ts
@@ -319,7 +320,9 @@ fe173d15015d	227	lib/oscillators.ts
 519f91b497f6	533	lib/radar.ts
 efc446c0f3ed	90	lib/reversal-zones.ts
 bc992c13bd28	130	lib/risk-calc.ts
-c126f65f9008	98	lib/robot-signals.ts
+00e3d377935b	129	lib/robot-ledger-db.ts
+c5570578ba7f	168	lib/robot-ledger.ts
+363e11137178	110	lib/robot-signals.ts
 66040c1d1b7d	247	lib/scalp-signals.ts
 a7ad48f51d99	173	lib/scalping-automation.ts
 6a20982b6e4d	253	lib/scalping-engine.ts
@@ -371,7 +374,7 @@ fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
 dec125f1757e	1624	scripts/arana-vista.html
-cd221e9d9011	735	scripts/arana-vivo.html
+4311eb41e3bb	740	scripts/arana-vivo.html
 eb4f4f4b4dac	1340	scripts/arana.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
@@ -412,6 +415,7 @@ e954e10a7eec	85	tests/cost-basis.test.ts
 3bfb5918410f	140	tests/decoupling.test.ts
 bb85a3e6fff1	57	tests/diario-db.test.ts
 d8e87b00e33b	126	tests/econ-calendar.test.ts
+da9a710f9c0b	110	tests/escalera.test.ts
 b0ba998c8335	119	tests/etf-flows-multi.test.ts
 9ed4f49289ed	92	tests/exchange-reserves.test.ts
 eac12ecfb8fb	248	tests/fair-value-gaps.test.ts
@@ -446,7 +450,7 @@ f509b7eb53bb	45	tests/jarvis-local.test.ts
 310a163bc5a2	198	tests/jarvis-paper-run.test.ts
 c977b546798a	414	tests/jarvis-paper.test.ts
 871655c35609	284	tests/jarvis-rules-v2.test.ts
-7f890858d35b	581	tests/jarvis-scan.test.ts
+40e3c48ab0e9	583	tests/jarvis-scan.test.ts
 2275cc0e95f8	173	tests/jarvis-stats.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
 cc263e715076	62	tests/jarvis-watch-run.test.ts
@@ -488,7 +492,8 @@ d6fc96889cbf	52	tests/pump-plan.test.ts
 0d8e570a96dc	366	tests/rendered-html.test.mjs
 1e25d45e3800	108	tests/risk-calc.test.ts
 eb269257bf27	211	tests/risk.test.ts
-753b5dbc072c	57	tests/robot-signals.test.ts
+be9108096ae0	127	tests/robot-ledger.test.ts
+86312ffaffac	67	tests/robot-signals.test.ts
 cb2709dad5d1	228	tests/scalp-signals.test.ts
 de58453ca449	139	tests/scenario-analysis.test.ts
 297d3e2bfa7c	17	tests/shared-cache.test.ts

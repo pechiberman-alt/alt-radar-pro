@@ -119,9 +119,9 @@ Reglas:
 
 ## senales-radar — Radar de señales, a punto de romper, imanes y estructura
 Texto: lo que el software detecta en el mercado: señales, presión antes de romper, zonas de liquidación, estructura y niveles.
-Archivos: lib/radar*.ts, lib/signal*.ts, lib/pre-breakout*.ts, lib/pump-*.ts, lib/scalp*.ts, lib/liquidation-*.ts, lib/magnet-*.ts, lib/liq-vol-*.ts, lib/order-*.ts, lib/footprint*.ts, lib/key-levels*.ts, lib/level-engine*.ts, lib/structure-*.ts, lib/market-structure*.ts, lib/fair-value-gaps*.ts, lib/inducement*.ts, lib/liquidity-*.ts, lib/mtf-zones*.ts, lib/fib-*.ts, lib/chart-patterns*.ts, lib/oscillators*.ts, lib/big-trades*.ts, lib/trade-bubbles*.ts, lib/decoupling*.ts, lib/institutional*.ts, lib/scenario-*.ts, lib/swing-*.ts, lib/asset-read*.ts, lib/automation*.ts, lib/brain-security*.ts, lib/reversal-zones*.ts, lib/spot-*.ts, lib/squeeze*.ts, lib/supply-demand*.ts, lib/trading-profiles*.ts, lib/trendlines*.ts, lib/volume-spike*.ts, app/radar*.tsx, app/liquidation*.tsx, app/prebreak*.tsx, app/pump*.tsx, app/scalp*.tsx, app/futures-desk*.tsx, app/market-brain*.tsx, app/api/signals/**, app/api/radar/**, app/api/liquidity-history/**, app/api/scalping/**, app/api/backtest/**, app/api/brain/**
+Archivos: lib/radar*.ts, lib/signal*.ts, lib/escalera*.ts, lib/pre-breakout*.ts, lib/pump-*.ts, lib/scalp*.ts, lib/liquidation-*.ts, lib/magnet-*.ts, lib/liq-vol-*.ts, lib/order-*.ts, lib/footprint*.ts, lib/key-levels*.ts, lib/level-engine*.ts, lib/structure-*.ts, lib/market-structure*.ts, lib/fair-value-gaps*.ts, lib/inducement*.ts, lib/liquidity-*.ts, lib/mtf-zones*.ts, lib/fib-*.ts, lib/chart-patterns*.ts, lib/oscillators*.ts, lib/big-trades*.ts, lib/trade-bubbles*.ts, lib/decoupling*.ts, lib/institutional*.ts, lib/scenario-*.ts, lib/swing-*.ts, lib/asset-read*.ts, lib/automation*.ts, lib/brain-security*.ts, lib/reversal-zones*.ts, lib/spot-*.ts, lib/squeeze*.ts, lib/supply-demand*.ts, lib/trading-profiles*.ts, lib/trendlines*.ts, lib/volume-spike*.ts, app/radar*.tsx, app/liquidation*.tsx, app/prebreak*.tsx, app/pump*.tsx, app/scalp*.tsx, app/futures-desk*.tsx, app/market-brain*.tsx, app/api/signals/**, app/api/radar/**, app/api/liquidity-history/**, app/api/scalping/**, app/api/backtest/**, app/api/brain/**
 Reglas:
-- Una señal lleva entrada, stop y objetivo fijados al detectarla; se mide sola contra el precio (resolveSignal).
+- Toda operación lleva SL, TP1, TP2 y TP3 fijados al detectarla (lib/escalera.ts): si nace con un solo objetivo, ese es el TP3 (el que se midió) y TP1/TP2 van a un tercio y dos tercios del camino. Se recorre solo con velas cerradas posteriores; si una vela toca SL y objetivo, cuenta el SL. Cada nivel queda con su hora.
 - El mapa de liquidaciones es un modelo sobre apalancamiento asumido: se dice que es estimado.
 Pendiente:
 - Alertas de volumen siguen silenciosas desde el 30/09: Binance solo. Falta la decisión de Uri (Coinbase/Kraken con aviso).
@@ -177,6 +177,7 @@ Archivos: lib/robot*.ts, lib/paper-bot*.ts, lib/mm-robot*.ts, app/robot*.tsx, ap
 Reglas:
 - Ninguna operación real sin autorización explícita. Las herramientas que actúan piden permiso; las que leen no.
 - Todo resultado de papel se marca como simulado.
+- Registro del ROBOT MM (lib/robot-ledger*.ts, tabla robot_senales, por cuenta): cada señal queda con su escalera aunque Telegram no esté vinculado, y se resuelve con las reglas de runMm (48 velas, 0,05% por lado; un test lo compara operación por operación). La resuelve el navegador con velas de Binance; el servidor revisa la coherencia, no deja reescribir lo cerrado y calcula el R.
 
 ## d1-presupuesto — Base D1 y presupuesto gratis
 Texto: transversal. Plan gratuito: 5 millones de filas leídas por día, ya superado más de una vez.

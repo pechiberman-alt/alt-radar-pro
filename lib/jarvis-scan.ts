@@ -98,7 +98,8 @@ export function quickSnapshot(symbol: string, candles: ScanCandles, shared: Scan
 export type ScanLectura = "rápida" | "completa";
 export type ScanDirection = Direction | "SIN DATOS";
 
-export type ScanPlan = { lado: Side; entrada: number; tipoEntrada: "MERCADO" | "LÍMITE"; stop: number; tp1: number; rr: number; riesgo: RiskLevel; stopPct: number };
+/** El plan aprobado con su escalera completa: SL y los tres objetivos de la mesa (sale un tercio en cada uno). */
+export type ScanPlan = { lado: Side; entrada: number; tipoEntrada: "MERCADO" | "LÍMITE"; stop: number; tp1: number; tp2: number; tp3: number; rr: number; riesgo: RiskLevel; stopPct: number };
 
 export type ScanRow = {
   symbol: string;
@@ -142,7 +143,7 @@ export function rowFrom(e: Eligible, d: DeskDecision, lectura: ScanLectura, ante
   const gs = gates(d);
   const failed = gs.find((g) => g.estado === "FALLA") ?? null;
   const approved = d.direccion === "LONG" || d.direccion === "SHORT";
-  const plan: ScanPlan | null = approved && d.plan && d.riesgo ? { lado: d.plan.lado, entrada: d.plan.entrada, tipoEntrada: d.plan.tipoEntrada, stop: d.plan.stop, tp1: d.plan.tp[0].price, rr: d.riesgo.rrPonderado, riesgo: d.riesgo.nivel, stopPct: d.riesgo.stopPct } : null;
+  const plan: ScanPlan | null = approved && d.plan && d.riesgo ? { lado: d.plan.lado, entrada: d.plan.entrada, tipoEntrada: d.plan.tipoEntrada, stop: d.plan.stop, tp1: d.plan.tp[0].price, tp2: d.plan.tp[1].price, tp3: d.plan.tp[2].price, rr: d.riesgo.rrPonderado, riesgo: d.riesgo.nivel, stopPct: d.riesgo.stopPct } : null;
   return {
     symbol: e.symbol,
     moneda: e.moneda,
@@ -290,5 +291,5 @@ export function scanAgeSpeech(r: ScanResult, now: number): string {
 export function scanLine(r: ScanRow): string {
   const p = r.plan;
   if (!p) return `${r.moneda}: ${r.direccion}`;
-  return `${r.moneda} ${p.lado} · confluencia ${r.puntaje} · consenso ${signed(r.consenso ?? 0)} · entrada ${arNumber(p.entrada)} · stop ${arNumber(p.stop)} · TP1 ${arNumber(p.tp1)} · R:R 1:${arNumber(Number(p.rr.toFixed(2)))} · riesgo ${p.riesgo} · lectura ${r.lectura}`;
+  return `${r.moneda} ${p.lado} · confluencia ${r.puntaje} · consenso ${signed(r.consenso ?? 0)} · entrada ${arNumber(p.entrada)} · stop ${arNumber(p.stop)} · TP1 ${arNumber(p.tp1)} · TP2 ${arNumber(p.tp2)} · TP3 ${arNumber(p.tp3)} · R:R 1:${arNumber(Number(p.rr.toFixed(2)))} · riesgo ${p.riesgo} · lectura ${r.lectura}`;
 }

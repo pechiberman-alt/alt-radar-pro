@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 521 · objetivos: 15 · sin objetivo: 0
-- Tablas D1: 45 · secretos: 4 · variables de entorno: 11 · rutas /api: 50 · hosts: 54
-- Código de navegador: 60 archivos con "use client" que alcanzan 169 · problemas: 0
-- Lib sin prueba directa: 20 de 158
+- Archivos: 526 · objetivos: 15 · sin objetivo: 0
+- Tablas D1: 46 · secretos: 4 · variables de entorno: 11 · rutas /api: 50 · hosts: 54
+- Código de navegador: 60 archivos con "use client" que alcanzan 171 · problemas: 0
+- Lib sin prueba directa: 20 de 161
 
 ## Objetivos
 
@@ -98,7 +98,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 ### honestidad — Nunca inventar: probabilidades, precios, noticias (0)
 Texto: transversal a todo el producto. Lo que no se sabe se dice, no se estima a escondidas.
 
-### senales-radar — Radar de señales, a punto de romper, imanes y estructura (67)
+### senales-radar — Radar de señales, a punto de romper, imanes y estructura (68)
 Texto: lo que el software detecta en el mercado: señales, presión antes de romper, zonas de liquidación, estructura y niveles.
 Pendiente: Alertas de volumen siguen silenciosas desde el 30/09: Binance solo. Falta la decisión de Uri (Coinbase/Kraken con aviso).
 - `app/api/backtest/fibonacci/route.ts` — exporta: dynamic, GET
@@ -120,6 +120,7 @@ Pendiente: Alertas de volumen siguen silenciosas desde el 30/09: Binance solo. F
 - `lib/brain-security.ts` — La cadena de auditoría del cerebro de mercado: cada observación y cada resultado se guarda en D1 encadenado con hashes, y la cadena se verifica (INTEGRIDAD VERIFICADA, CADENA DEGRA
 - `lib/chart-patterns.ts` — Flags and Wyckoff events, detected mechanically.
 - `lib/decoupling.ts` — "Suben solas": coins rising on their own while BTC and ETH don't.
+- `lib/escalera.ts` — La escalera de toda operación: SL, TP1, TP2 y TP3, fijados al abrirla, y su recorrido vela por vela.
 - `lib/fair-value-gaps.ts` — Fair value gaps and their inversions.
 - `lib/fib-backtest.ts` — Fibonacci retracement backtest.
 - `lib/fib-zone.ts` — Whether price is sitting in the Fibonacci retracement band right now.
@@ -270,12 +271,14 @@ Texto: calculadoras y registros de la persona: cuánto arriesga, qué compró, a
 - `lib/risk-calc.ts` — Position-size and risk calculator.
 - `lib/trade-journal.ts` — A manual trade journal, and the win-rate math it feeds.
 
-### robots-papel — Robots y bots de papel (simulación) (5)
+### robots-papel — Robots y bots de papel (simulación) (7)
 Texto: operaciones simuladas para medir ideas. No mueven dinero real.
-- `app/api/robot/signal/route.ts` — exporta: dynamic, POST
+- `app/api/robot/signal/route.ts` — exporta: dynamic, GET, POST
 - `app/robot-signals-desk.tsx` — exporta: RobotSignalsDesk, default
 - `lib/mm-robot.ts` — ROBOT MM: trades the way liquidity gets hunted, and studies itself first.
 - `lib/paper-bot.ts` — A paper-trading futures bot: the same decisions a live one would make, with fictional money, so its record can be read before anything real depends on it.
+- `lib/robot-ledger-db.ts` — El registro del ROBOT MM en D1, por cuenta: una fila por señal (user_id + clave) con su escalera fijada al detectarla y su recorrido.
+- `lib/robot-ledger.ts` — El registro de las señales del ROBOT MM, por cuenta: cada señal con su SL, TP1, TP2 y TP3 fijados al detectarla, la hora en que tocó cada nivel, cómo terminó y su resultado en R.
 - `lib/robot-signals.ts` — ROBOT MM signals: the only signals the app sends.
 
 ### d1-presupuesto — Base D1 y presupuesto gratis (0)
@@ -351,7 +354,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)
 
-### calidad — Pruebas (129)
+### calidad — Pruebas (131)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agentes-mcp.test.ts` — Ruflo (el MCP de los agentes) arranca código de terceros con `npx`.
@@ -379,6 +382,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/decoupling.test.ts` — pruebas: a coin up 3% in 4 hours on volume while BTC and ETH sit flat rises on its own, when BTC itself is up, rising with it is not rising alone, beta comes from the hours before the window: a high-beta coin (+1)
 - `tests/diario-db.test.ts` — pruebas: fills are stored once, per user, listed oldest first, and counted without scanni, a note is replaced on save, kept per user, and new ones are counted against the , trade keys are strictly shaped
 - `tests/econ-calendar.test.ts` — pruebas: parses the feed: offsets become UTC, holidays and malformed rows are dropped, anything that isn, only the currencies and impacts asked for create blackouts — USD high by default (+1)
+- `tests/escalera.test.ts` — pruebas: escalera hacia un objetivo: TP3 es ese objetivo, TP1 y TP2 a un tercio y a dos t, recorre: cada objetivo queda con su hora, al TP3 termina, y el R es neto de comi, si una vela toca el SL y un objetivo, cuenta el SL y ese objetivo no queda regis (+1)
 - `tests/etf-flows-multi.test.ts` — pruebas: cells parse millions, parentheses as negatives, and dashes as no data, only dated rows are read; header and summary rows are skipped, rows come back oldest first regardless of page order (+1)
 - `tests/exchange-reserves.test.ts` — pruebas: median handles both odd and even counts, parseVenues keeps only exchanges with real reserves, a market-wide drop is not reported as coins leaving (+1)
 - `tests/fair-value-gaps.test.ts` — pruebas: a bullish gap is found between the first and third candle, the mirror case produces a bearish gap, overlapping candles leave no gap at all (+1)
@@ -454,6 +458,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/rendered-html.test.mjs` — pruebas: server-renders the branded Spanish application shell, keeps persistent signal history and automation wired, contains the requested ownership and safety language (+1)
 - `tests/risk-calc.test.ts` — pruebas: size is the risk budget over the loss per unit at the stop, fees and slippage in, liquidation is estimated per side and the stop, targets pay R times the distance, less fees and slippage both ways (+1)
 - `tests/risk.test.ts` — pruebas: sizes the position from the stop distance, losing the stop distance costs exactly the risk budget, or says why not, a capped position is always reported, never silent (+1)
+- `tests/robot-ledger.test.ts` — pruebas: lo que resuelve el navegador pasa la revisión, y el R lo calcula el servidor, no, rechaza lo imposible: horas fuera de lugar, objetivos salteados, el SL de la mis, lo registrado no se reescribe: una hora ya guardada no cambia y una señal cerrad (+1)
 - `tests/robot-signals.test.ts` — pruebas: a well-formed signal passes and keeps its numbers, inconsistent or hostile input is rejected, one key per coin, timeframe, candle and side: the same signal is never sent twic (+1)
 - `tests/scalp-signals.test.ts` — pruebas: every signal obeys the setup, NO LOOKAHEAD: adding later candles never changes or removes an earlier signal, deterministic: the same series always yields the same signals (+1)
 - `tests/scenario-analysis.test.ts` — pruebas: with a level above and below, both directional scenarios are built, neither directional scenario is favoured over the other, the target is the next level far enough away to be distinct from the trigger (+1)
@@ -621,6 +626,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `notas` — crea: tests/arana.test.ts · usa: tests/arana.test.ts · índices: notas_id
 - `notes` — crea: examples/d1/db/schema.ts · usa: examples/d1/app/api/notes/route.ts · sin índice visible en el código
 - `push_subscriptions` — crea: lib/web-push.ts, tests/web-push.test.ts · usa: app/api/push/subscribe/route.ts · sin índice visible en el código
+- `robot_senales` — crea: lib/robot-ledger-db.ts · usa: lib/robot-ledger-db.ts · índices: robot_senales_vela
 - `sessions` — crea: db/schema.ts, lib/auth.ts · usa: lib/auth.ts · sin índice visible en el código
 - `signal_records` — crea: db/schema.ts, lib/automation.ts, tests/signal-plan-db.test.ts (+1) · usa: app/api/alerts/latest/route.ts, app/api/performance/route.ts, app/api/signals/route.ts, app/api/telegram/webhook/route.ts, lib/automation.ts, lib/scalping-automation.ts (+5) · índices: signal_records_detected_idx, signal_records_symbol_side_idx, signal_records_status_idx
 - `structure_snapshots` — crea: lib/structure-archive.ts · usa: lib/jarvis-mind-db.ts, lib/structure-archive.ts, lib/telegram-ai-server.ts · índices: structure_snapshots_time_idx
@@ -692,7 +698,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/performance` [GET] — app/api/performance/route.ts · riesgo-diario
 - `/api/push/subscribe` [POST, DELETE] — app/api/push/subscribe/route.ts · alertas
 - `/api/radar` [GET] — app/api/radar/route.ts · senales-radar
-- `/api/robot/signal` [POST] — app/api/robot/signal/route.ts · robots-papel
+- `/api/robot/signal` [GET, POST] — app/api/robot/signal/route.ts · robots-papel
 - `/api/rolling` [GET] — app/api/rolling/route.ts · datos-mercado
 - `/api/scalping` [POST] — app/api/scalping/route.ts · senales-radar
 - `/api/sentiment` [GET] — app/api/sentiment/route.ts · datos-mercado
