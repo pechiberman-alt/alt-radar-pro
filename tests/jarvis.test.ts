@@ -132,6 +132,39 @@ test("prices said the Argentine way; timeframes and percentages are not prices",
   assert.equal(spokenLevel("si pierde el soporte"), null);
 });
 
+test("the market scanner is asked for, followed and cut by chat or voice; nothing else starts it", () => {
+  for (const q of ["escaneá el mercado", "Jarvis, escaneá todo el mercado", "hacé un escaneo de todo el mercado", "scaneá todas las monedas", "escaneame los futuros", "escaneá de nuevo", "volvé a escanear otra vez"]) {
+    assert.deepEqual(parseCommand(q), { kind: "SCAN", what: "start" }, q);
+  }
+  for (const q of ["¿qué dio el último escaneo?", "decime qué dio el escaneo", "¿cómo va el escaneo?", "cuánto falta para que termine el escaneo", "resultado del escaneo"]) {
+    assert.deepEqual(parseCommand(q), { kind: "SCAN", what: "last" }, q);
+  }
+  // The verb comes first: «para» in «falta para que termine» is not «pará».
+  for (const q of ["cancelá el escaneo", "pará el escaneo", "frená el escaneo", "por favor cortá el escaneo del mercado", "basta de escaneos", "pará de escanear"]) {
+    assert.deepEqual(parseCommand(q), { kind: "SCAN", what: "cancel" }, q);
+  }
+  // Silencing the voice is not cutting the scan, and a phrase that only mentions the word does not start one.
+  for (const q of ["pará", "silencio", "basta", "cancelar"]) assert.deepEqual(parseCommand(q), { kind: "STOP" }, q);
+  assert.equal(parseCommand("¿qué es un escaneo?").kind, "AI");
+  assert.equal(parseCommand("dame una lectura corta del escaneo").kind, "AI");
+  assert.equal(parseCommand("hubo una barrida de liquidez en todo el mercado").kind, "AI");
+  // The other intents keep their phrases: the old scanner section, the breakouts, the briefing, a single coin.
+  assert.deepEqual(parseCommand("abrí el escáner"), { kind: "SECTION", section: "scanner", label: "ESCÁNER" });
+  assert.deepEqual(parseCommand("¿qué está por romper?"), { kind: "BREAKOUTS", timeframe: "1h" });
+  assert.deepEqual(parseCommand("informe del mercado"), { kind: "BRIEFING" });
+  assert.equal(parseCommand("escaneá BTC", new Set(["BTC"])).kind, "MAP");
+});
+
+test("«decime…» is a name only when the name is all that follows; a question stays a question", () => {
+  for (const q of ["llamame Uri", "mi nombre es Uri", "me llamo Uri", "decime Uri", "por favor decime Uri", "dime Uri"]) {
+    assert.deepEqual(parseCommand(q), { kind: "NAME", name: "Uri" }, q);
+  }
+  assert.deepEqual(parseCommand("decime cómo está el mercado"), { kind: "BRIEFING" });
+  assert.equal(parseCommand("dime qué opinás de bitcoin").kind, "AI");
+  assert.equal(parseCommand("decime algo").kind, "AI");
+  assert.equal(parseCommand("decime hola").kind, "AI");
+});
+
 test("real money is asked for in many ways and always lands on the manual ticket, never on an order", () => {
   const known = new Set(["BTC", "ETH", "SOL", "BNB"]);
   for (const [q, symbol] of [

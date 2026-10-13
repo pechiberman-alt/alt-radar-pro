@@ -33,6 +33,7 @@ export type JarvisIntent =
   | { kind: "MACRO"; question: string }
   | { kind: "PAPER" }
   | { kind: "BACKTEST"; symbol: string | null; days: number }
+  | { kind: "SCAN"; what: "start" | "last" | "cancel" }
   | { kind: "ALERT"; symbol: string | null; level: number }
   | { kind: "PAPER_OPEN"; symbol: string | null }
   | { kind: "REAL"; symbol: string | null }
@@ -152,6 +153,9 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   // A leading wake word is not part of the command.
   const text = normalize(raw).replace(/^(oye |hey |ok )?jarvis\b ?/, "");
   if (!text) return { kind: "HELP" };
+  // «Cancelá el escaneo», «pará el escaneo»: corta el escáner y no solo la voz. Va antes de STOP, que también empieza con «pará».
+  // El verbo va primero: en «cuánto falta para que termine el escaneo» el «para» es otra cosa.
+  if (/^(?:(?:por favor|podes|puedes) )?(?:cancela|cancelar|frena|frenar|para|parar|detene|detener|corta|cortar|basta)\b.*\b(?:escane\w*|scane\w*|scan)\b/.test(text)) return { kind: "SCAN", what: "cancel" };
   if (/^(silencio|callate|basta|para|stop|cancelar)\b/.test(text)) return { kind: "STOP" };
   if (/\b(ayuda|que podes hacer|que puedes hacer|comandos)\b/.test(text)) return { kind: "HELP" };
   // Memory: "recordá que…", "olvidá lo de…", "¿qué recordás?" (lib/jarvis-memory.ts).
@@ -178,7 +182,16 @@ export function parseCommand(raw: string, known: Set<string> = new Set()): Jarvi
   if (/\b(paper( trading)?|de papel|en papel|simulad[ao]s|simulaciones)\b/.test(text)) return { kind: "PAPER" };
   if (/\b(nucleo|estado del nucleo|que hiciste|mientras no estaba|que paso mientras|que estuviste haciendo|estas activo|estas despierto)\b/.test(text)) return { kind: "CORE" };
   if (/\b(rendimiento|estadisticas|tus senales|tu registro|registro de senales|win ?rate|profit factor|como (te )?(va|fue|vienen?)( con)? (las|tus) senales|cuanto acertaste|aciertos)\b/.test(text)) return { kind: "STATS" };
-  const name = text.match(/\b(?:llamame|decime|dime|mi nombre es|me llamo)\s+([a-zñ]{2,20})\b/);
+  // El escáner de todo el mercado (lib/jarvis-scan.ts): «escaneá el mercado», «¿cómo va el escaneo?», «cancelá el escaneo».
+  if (/\b(?:escane(?:a|ar|ame|o|os)|scane(?:a|ar|ame|o|os)|scan)\b/.test(text)) {
+    if (/\b(?:ultimo|anterior|resultados?|avance|progreso|como va|cuanto falta|que (?:dio|salio|encontro|encontraste|hallaste|arrojo))\b/.test(text)) return { kind: "SCAN", what: "last" };
+    if (/\b(?:mercado|monedas|todo|toda|todas|todos|futuros|altcoins?|alts|criptos?|de nuevo|otra vez|nuevamente)\b/.test(text)) return { kind: "SCAN", what: "start" };
+  }
+  // «Llamame Uri», «mi nombre es Uri», «decime Uri». Pero «decime cómo está el mercado» es una pregunta, no un nombre:
+  // con «decime» o «dime» el nombre tiene que ser la última palabra y no una de las que abren una pregunta.
+  const name =
+    text.match(/\b(?:llamame|mi nombre es|me llamo)\s+([a-zñ]{2,20})\b/) ??
+    text.match(/\b(?:decime|dime)\s+(?!(?:como|que|quien|quienes|cual|cuales|cuanto|cuantos|donde|cuando|por|algo|todo|hola|ahora|hoy|si|no)\b)([a-zñ]{2,20})$/);
   if (name) return { kind: "NAME", name: name[1][0].toUpperCase() + name[1].slice(1) };
   if (/\b(informe|briefing|reporte|como esta el mercado|como viene el mercado|estado del mercado|buen dia|buenos dias|buenas tardes|buenas noches|ponme al dia|poneme al dia)\b/.test(text))
     return { kind: "BRIEFING" };
@@ -278,6 +291,6 @@ export const HELP_TEXT =
   "Podés decirme: informe del mercado. Precio de Bitcoin. Abrí el mapa de Solana en 15 minutos. ¿Qué está por romper? ¿Qué está subiendo? " +
   "Abrí señales, diario o alertas. ¿Cómo vienen tus señales? ¿Qué aprendiste? Estado del núcleo. Llamame por tu nombre. " +
   "Recordá que… y lo tengo en cuenta en cada respuesta; ¿qué recordás?; olvidá lo de… Analizá Solana, o analizalo para lo que tenés en pantalla. Tu lectura del mercado. " +
-  "Trading: analizame Bitcoin, ¿dónde entrarías?, ¿qué pasa si pierde 110.000?, comparame Bitcoin contra Ethereum, ¿hay riesgo de liquidaciones?, ¿qué pasa si sale un CPI peor de lo esperado? " +
+  "Trading: analizame Bitcoin, ¿dónde entrarías?, ¿qué pasa si pierde 110.000?, comparame Bitcoin contra Ethereum, ¿hay riesgo de liquidaciones?, ¿qué pasa si sale un CPI peor de lo esperado?, escaneá todo el mercado. " +
   "Papel, sin plata real: simulá la operación, ¿cómo va mi paper trading? Backtest de Solana de 6 meses. Avisame si Bitcoin pierde 110.000. " +
   "No opero en tu cuenta: para plata real te armo un ticket manual con controles y la orden la cargás vos. O preguntame lo que quieras sobre el mercado.";

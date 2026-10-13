@@ -205,7 +205,7 @@ test("--buscar finds a Markdown file by its headings and says which section to r
   const md = archivo("docs/notas.md", "# Notas de prueba\n\n## Reglas de redondeo\n\nTexto.\n\n## Otra cosa\n");
   const index = construirIndice([...FILES, md], parseObjetivos(FIXTURE_MD));
   const hallado = buscar(index, "redondeo").resultados.find((x: { f: { path: string } }) => x.f.path === "docs/notas.md");
-  assert.equal(hallado.seccion, "Reglas de redondeo");
+  assert.equal(hallado?.seccion, "Reglas de redondeo");
   assert.match(textoBusqueda(index, "redondeo"), /docs\/notas\.md .*§ Reglas de redondeo/);
 });
 

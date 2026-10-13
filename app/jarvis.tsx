@@ -11,6 +11,8 @@ import { loadPaper, openFromDesk, paperTrades, refreshPaper } from "@/lib/jarvis
 import { arNumber } from "@/lib/ai-numbers";
 import { backtestForAi, backtestSpeech } from "@/lib/jarvis-backtest";
 import { lastBacktest, runBacktestFor } from "@/lib/jarvis-backtest-run";
+import { scanAgeSpeech, scanProgressSpeech, scanSpeech } from "@/lib/jarvis-scan";
+import { cancelScan, lastScan, scanState, startScan } from "@/lib/jarvis-scan-run";
 import { loadCalendar } from "@/lib/econ-calendar";
 import { compactSnapshot } from "@/lib/ai-analyst";
 import type { AssistantContext } from "@/lib/assistant/index";
@@ -393,6 +395,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
   /** The last thing JARVIS was asked came by voice (for the follow-up turn). */
   const lastVoiceRef = useRef(false);
   const listenRef = useRef<(() => void) | null>(null);
+  /** The newest `speak`, for what finishes minutes after it was asked (the market scan says its result when it ends). */
+  const speakRef = useRef<((text: string, tag?: string) => void) | null>(null);
   const neural = useSyncExternalStore(onNeural, neuralSnapshot, neuralServer);
   const known = useRef<Set<string>>(new Set());
   /** The coin JARVIS last opened or talked about, so "analizalo" knows what "lo" is. */
@@ -597,6 +601,9 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
     },
     [prefs.voice, prefs.engine, prefs.neuralVoice, prefs.rate, prefs.followUp, sayDevice],
   );
+  useEffect(() => {
+    speakRef.current = speak;
+  }, [speak]);
 
   // The radar's live context (market structure for the desk); a failing panel never breaks an answer.
   const deskContext = useCallback((): AssistantContext | null => {
@@ -808,6 +815,29 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
             setLines((l) => [...l, { who: "jarvis" as const, text: `Corro el backtest de ${coin} en ${intent.days} días con la misma mesa y las reglas del papel: tarda unos segundos…` }].slice(-40));
             const r = await runBacktestFor(sym, intent.days);
             return speak(r.ok ? `${backtestSpeech(r.result)}${r.nota ? ` ${r.nota}` : ""}` : r.error, "backtest");
+          }
+          case "SCAN": {
+            // El escáner corre en el navegador, de a poco, y lo comparten la mesa y este chat: uno por vez (lib/jarvis-scan-run.ts).
+            const st = scanState();
+            if (intent.what === "cancel") {
+              if (!st.running) return speak("No hay ningún escaneo en curso.", "escáner");
+              cancelScan();
+              return speak("Corto el escaneo. Lo que alcancé a leer queda en la mesa.", "escáner");
+            }
+            screenRef.current = "JARVIS TRADING";
+            showSection("jarvis-trading");
+            if (st.running) return speak(`Ya estoy escaneando. ${scanProgressSpeech(st.progress)} Lo ves avanzar en la mesa.`, "escáner");
+            if (intent.what === "last") {
+              const last = lastScan();
+              if (!last) return speak("Todavía no escaneé el mercado desde que abriste la app. Decime «escaneá el mercado» y lo hago.", "escáner");
+              return speak(`${scanAgeSpeech(last, Date.now())}${scanSpeech(last)}`, "escáner");
+            }
+            // Tarda minutos: se contesta ya y el resultado se dice cuando termine, sin dejar a JARVIS ocupado.
+            void startScan().then((out) => speakRef.current?.(out.ok ? scanSpeech(out.result) : out.error, "escáner"));
+            return speak(
+              "Escaneo todo el mercado de futuros con la misma mesa, moneda por moneda. Tarda unos minutos: lo ves avanzar en la mesa y te aviso cuando termine. Si querés cortarlo, decime «cancelá el escaneo». Es solo análisis, no opero nada.",
+              "escáner",
+            );
           }
           case "REAL": {
             // Real money is the person's own action: JARVIS never sends an order (lib/jarvis-execution.ts).

@@ -16,6 +16,7 @@ import { ScanBlock } from "./jarvis-scan";
 import { BacktestBlock } from "./jarvis-backtest";
 import { WatchBlock } from "./jarvis-watch";
 import { BACKTEST_EVENT } from "@/lib/jarvis-backtest-run";
+import { SCAN_EVENT, scanState } from "@/lib/jarvis-scan-run";
 
 /**
  * JARVIS TRADING: la mesa de especialistas de JARVIS sobre un activo, pensada
@@ -103,7 +104,8 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
   const [paperOpen, setPaperOpen] = useState(false);
   const [backtestOpen, setBacktestOpen] = useState(false);
   const [realOpen, setRealOpen] = useState(false);
-  const [scanOpen, setScanOpen] = useState(false);
+  // Abierto si ya hay un escaneo corriendo cuando se abre la mesa (lo arrancó JARVIS desde el chat).
+  const [scanOpen, setScanOpen] = useState(() => scanState().running);
   const [mode, setMode] = useState<DeskMode>("ANALISIS");
   const ctxRef = useRef(getContext);
   useEffect(() => {
@@ -188,10 +190,19 @@ function Desk({ getContext }: { getContext?: () => AssistantContext }) {
     // A backtest JARVIS ran from the chat shows up opened.
     const onBacktest = () => setBacktestOpen(true);
     window.addEventListener(BACKTEST_EVENT, onBacktest);
+    // Un escaneo que arranca JARVIS desde el chat se ve abierto. Solo al empezar: si lo cerrás mientras corre, queda cerrado.
+    let scanning = scanState().running;
+    const onScan = () => {
+      const now = scanState().running;
+      if (now && !scanning) setScanOpen(true);
+      scanning = now;
+    };
+    window.addEventListener(SCAN_EVENT, onScan);
     return () => {
       live = false;
       window.removeEventListener(DESK_SHOW_EVENT, onShow);
       window.removeEventListener(BACKTEST_EVENT, onBacktest);
+      window.removeEventListener(SCAN_EVENT, onScan);
     };
   }, [analyze, runCompare]);
 
