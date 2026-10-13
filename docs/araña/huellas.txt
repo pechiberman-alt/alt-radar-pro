@@ -182,7 +182,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-b850f690025f	276	docs/araña/objetivos.md
+3f39e14706c0	277	docs/araña/objetivos.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -249,7 +249,7 @@ da42f6c9e464	311	lib/fair-value-gaps.ts
 484df63263f5	69	lib/fear-greed.ts
 6671236724d5	224	lib/fib-backtest.ts
 3738e2191067	114	lib/fib-zone.ts
-73fb4ed836ef	115	lib/flujo-db.ts
+79444f1d6966	115	lib/flujo-db.ts
 7a92c06ed2a2	114	lib/flujo-run.ts
 1b363e3e8689	158	lib/flujo.ts
 0b2d1bf961da	295	lib/footprint.ts
@@ -333,9 +333,9 @@ f2ad043c6c3a	431	lib/paper-bot.ts
 357bfd64bf54	170	lib/pump-pressure.ts
 067ef991f873	300	lib/pump-radar.ts
 519f91b497f6	533	lib/radar.ts
-3c76cfab7225	114	lib/registro-db.ts
+22110be7e698	178	lib/registro-db.ts
 62a90a1d0b2d	43	lib/registro-run.ts
-95bebc31e43a	162	lib/registro.ts
+cc686cbed880	269	lib/registro.ts
 efc446c0f3ed	90	lib/reversal-zones.ts
 bc992c13bd28	130	lib/risk-calc.ts
 00e3d377935b	129	lib/robot-ledger-db.ts
@@ -392,7 +392,7 @@ fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
 28ad537c49c6	1624	scripts/arana-vista.html
-d54b88652bba	795	scripts/arana-vivo.html
+1ab15708d01b	820	scripts/arana-vivo.html
 3c7e2c2b834c	1340	scripts/arana.mjs
 d13ecf4702a3	63	scripts/claude-hooks.mjs
 b36fd1c34b30	183	scripts/herramientas.mjs
@@ -516,7 +516,8 @@ d6fc96889cbf	52	tests/pump-plan.test.ts
 6046eb825968	96	tests/pump-pressure.test.ts
 1727ab858d8f	239	tests/pump-radar.test.ts
 016ee14324bf	304	tests/radar.test.ts
-11db531a9580	165	tests/registro.test.ts
+d8bedfb9e744	101	tests/registro-capital.test.ts
+14b3c4a8a9ca	165	tests/registro.test.ts
 0d8e570a96dc	366	tests/rendered-html.test.mjs
 1e25d45e3800	108	tests/risk-calc.test.ts
 eb269257bf27	211	tests/risk.test.ts
