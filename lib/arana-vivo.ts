@@ -10,6 +10,7 @@ import type { BacktestResult } from "./jarvis-backtest.ts";
 import { MIN_SAMPLE, paperStats, type PaperTrade } from "./jarvis-paper.ts";
 import { isApproved, rankApproved, summarize, type ScanResult, type ScanRow } from "./jarvis-scan.ts";
 import type { WatchStatus } from "./jarvis-watch-run.ts";
+import type { ResumenSombra } from "./mesa-sombra.ts";
 import { wilson, type Muestra } from "./jarvis-stats.ts";
 import type { MedicionMesa } from "./mesa-medicion.ts";
 
@@ -21,9 +22,20 @@ export const HISTOGRAMA_TRAMOS = 10;
 
 export const ADVERTENCIA_VIVO =
   "Describe lo que pasó y lo medido en el pasado. No es asesoramiento financiero, no garantiza resultados futuros y no ejecuta ni propone órdenes.";
-/** Lo que la araña dice del aprendizaje: la mesa no cambia sus reglas por su cuenta. */
+/** Lo que la araña dice del aprendizaje: aprende en sombra, y nada cambia sin la persona. */
 export const APRENDIZAJE_VIVO =
-  "La mesa no aprende sola ni cambia sus reglas mientras la mirás. Lo que se aprende se estudia fuera de la app y entra solo por un cambio revisado (docs/mesa-aprendizaje.md).";
+  "Aprende sola, en sombra: el laboratorio evoluciona variantes con cada operación cerrada y las mide hacia adelante, con auditoría encadenada. Ninguna filtra el papel sin tu aprobación y nada toca la ejecución real (docs/mesa-aprendizaje.md).";
+
+/** El laboratorio en sombra tal como lo muestra la araña (lib/mesa-sombra-run.ts lo arma). */
+export type VivoSombra = {
+  resumen: ResumenSombra;
+  modo: "cargando" | "cuenta" | "sin sesión" | "error";
+  corriendo: boolean;
+  aviso: string | null;
+  error: string | null;
+  cadena: { ok: boolean; revisados: number; motivo: string } | null;
+  eventos: { seq: number; at: number; tipo: string; texto: string; hash: string }[];
+};
 
 export type Intervalo = { p: number; low: number; high: number };
 export type Veredicto = "sin datos" | "sin muestra" | "compatible" | "distinto";
@@ -40,6 +52,8 @@ export type VivoInput = {
   backtest: BacktestResult | null;
   vigilancia: WatchStatus | null;
   medido: MedicionMesa;
+  /** El laboratorio en sombra; null o ausente si todavía no cargó. */
+  sombra?: VivoSombra | null;
 };
 
 export type VivoSnapshot = {
@@ -99,6 +113,7 @@ export type VivoSnapshot = {
   avisos: string[];
   advertencia: string;
   aprendizaje: string;
+  sombra: VivoSombra | null;
 };
 
 const finito = (x: number | null | undefined) => (typeof x === "number" && Number.isFinite(x) ? x : null);
@@ -257,5 +272,6 @@ export function buildVivo(i: VivoInput): VivoSnapshot {
     avisos,
     advertencia: ADVERTENCIA_VIVO,
     aprendizaje: APRENDIZAJE_VIVO,
+    sombra: i.sombra ?? null,
   };
 }

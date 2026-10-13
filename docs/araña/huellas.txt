@@ -5,7 +5,7 @@ bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
 bcde9385654a	0	.gitignore
 01d17d57cd3e	9	.mcp.json
 6b5886c6306e	5	.openai/hosting.json
-e88df9e1cab3	64	CLAUDE.md
+af06f3aa762b	67	CLAUDE.md
 8b27e3600b59	64	README.md
 5aac31cab73c	36	THIRD_PARTY_NOTICES.md
 7d7e53d1533b	103	app/account-panel.css
@@ -44,6 +44,7 @@ ca07248c2d46	37	app/api/jarvis/chat/route.ts
 e3ef06d45c39	23	app/api/jarvis/core/route.ts
 ec39df2aab15	38	app/api/jarvis/memory/route.ts
 a6895ac618b8	60	app/api/jarvis/paper/route.ts
+a6e8db10b2ee	57	app/api/jarvis/sombra/route.ts
 25a268c2dab7	54	app/api/jarvis/voice/route.ts
 2837b6f7cd81	139	app/api/journal/route.ts
 ef3e2bf85432	160	app/api/klines/route.ts
@@ -65,9 +66,9 @@ aa86804bf9da	24	app/api/telegram/test/route.ts
 9f8f9a0bdfc4	176	app/api/telegram/webhook/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
-79d87b1abd11	42	app/arana-desk.css
-3f3f8ce9a63a	113	app/arana-desk.tsx
-75d00da6dbd4	244	app/arana-vivo.tsx
+9505382d7d36	44	app/arana-desk.css
+55b44c48caec	115	app/arana-desk.tsx
+f65b5c38ea5d	350	app/arana-vivo.tsx
 109c61b2bb44	34	app/asset-flows.css
 866aeee2a3d1	125	app/asset-flows.tsx
 c8f77f7b2422	70	app/assistant-console.css
@@ -176,8 +177,8 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d4ab8dec35a3	249	docs/araña/objetivos.md
-081dd8a501f7	96	docs/mesa-aprendizaje.md
+fbc03a380a70	251	docs/araña/objetivos.md
+e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
 ec29d0ad6d0c	166	docs/mesa-reglas-v2.md
@@ -210,7 +211,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 dbd75245f8b8	366	lib/alerts.ts
 374fb7012b3c	155	lib/app-settings.ts
 b32e56319e6e	45	lib/arana-vivo-auto.ts
-2ac2c3d702ea	262	lib/arana-vivo.ts
+399462931886	278	lib/arana-vivo.ts
 025856e9b96a	181	lib/asset-read.ts
 8b7646335b22	743	lib/assistant/index.ts
 861e6e35ec57	309	lib/assistant/knowledge.ts
@@ -266,7 +267,7 @@ a3cb05342414	82	lib/jarvis-memory.ts
 ec2fc7019671	204	lib/jarvis-mind-db.ts
 c4b51bfec404	337	lib/jarvis-mind.ts
 1a8d71f669ad	170	lib/jarvis-paper-db.ts
-e883b3e155e8	258	lib/jarvis-paper-run.ts
+b2251683fc99	262	lib/jarvis-paper-run.ts
 cf67397ebde0	654	lib/jarvis-paper.ts
 a616ae6ddc5b	292	lib/jarvis-scan-run.ts
 15102a31a190	295	lib/jarvis-scan.ts
@@ -296,6 +297,11 @@ c5ba3f905dda	317	lib/market-fetch.ts
 69447ca24760	387	lib/market-providers.ts
 dca52626b743	252	lib/market-structure.ts
 dd7f989876a5	57	lib/mesa-medicion.ts
+8de6a64346cf	57	lib/mesa-sombra-auditoria.ts
+9c00475bf5c6	164	lib/mesa-sombra-db.ts
+5fb36682c20d	52	lib/mesa-sombra-filtro.ts
+496f9d21c5f3	146	lib/mesa-sombra-run.ts
+c8b7add6b81c	621	lib/mesa-sombra.ts
 780aee5014b9	238	lib/mm-robot.ts
 fd19498c8d8b	115	lib/mtf-zones.ts
 1cbbe9f25773	380	lib/news-intelligence.ts
@@ -365,7 +371,7 @@ fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
 dec125f1757e	1624	scripts/arana-vista.html
-5524f38bc923	649	scripts/arana-vivo.html
+cd221e9d9011	735	scripts/arana-vivo.html
 eb4f4f4b4dac	1340	scripts/arana.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
@@ -387,7 +393,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
 41f8e61920bb	44	tests/arana-vivo-auto.test.ts
-1e6d88011a1c	247	tests/arana-vivo.test.ts
+b9e32500d850	247	tests/arana-vivo.test.ts
 72fda45a2ae9	467	tests/arana.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
 8dffdd6b09f6	386	tests/assistant.test.ts
@@ -460,6 +466,10 @@ c90b4a2a66b4	70	tests/live-market.test.ts
 3b55b01f226c	202	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
 4fec70e5eb48	37	tests/mesa-medicion.test.ts
+ea96d2b2093d	44	tests/mesa-sombra-auditoria.test.ts
+21cf8ab702fe	99	tests/mesa-sombra-db.test.ts
+331a92e7980c	109	tests/mesa-sombra-run.test.ts
+a9cc32e63faf	283	tests/mesa-sombra.test.ts
 1c697054fe3b	153	tests/mm-robot.test.ts
 6ab801ccfb7e	104	tests/mtf-zones.test.ts
 40823676548f	84	tests/news-sentiment.test.ts

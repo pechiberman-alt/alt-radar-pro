@@ -242,5 +242,5 @@ test("la cinta cuenta lo último primero, con la R con coma y como máximo doce;
   assert.ok(v.cinta.some((x) => /[+-]\d,\d{2} R neto/.test(x.texto)), "la R sale con coma");
   assert.ok(v.cinta.some((x) => x.tono === "ok") && v.cinta.some((x) => x.tono === "malo"));
   soloFinitos(buildVivo(base({ escaneo: { ...escaneo(1), filas: [fila("AAAUSDT", "LONG", 80, { cobertura: 0.8, agentes: [["tecnico", 1, 0.4, 0.2]] })] } as ScanResult, papel: [abierta("AUSDT", 3)] })));
-  assert.ok(buildVivo(base()).aprendizaje === APRENDIZAJE_VIVO && APRENDIZAJE_VIVO.includes("no aprende sola"));
+  assert.ok(buildVivo(base()).aprendizaje === APRENDIZAJE_VIVO && APRENDIZAJE_VIVO.includes("en sombra") && APRENDIZAJE_VIVO.includes("sin tu aprobación") && APRENDIZAJE_VIVO.includes("nada toca la ejecución real"));
 });
