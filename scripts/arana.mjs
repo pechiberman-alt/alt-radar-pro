@@ -996,10 +996,125 @@ function tipoDe(f) {
   return "otro";
 }
 
+const ANGULO_ORO = Math.PI * (3 - Math.sqrt(5));
+const r3 = (v) => Math.round(v * 1000) / 1000;
+const punto3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cruz3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const unidad3 = (v) => {
+  const n = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / n, v[1] / n, v[2] / n];
+};
+
+/** Un punto de la esfera movido `delta` radianes hacia otro (con delta negativo, alejándose). */
+function girarHacia(a, b, delta) {
+  const c = punto3(a, b);
+  let t = [b[0] - c * a[0], b[1] - c * a[1], b[2] - c * a[2]];
+  if (Math.hypot(t[0], t[1], t[2]) < 1e-9) t = cruz3(a, Math.abs(a[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]); // empalmados u opuestos: cualquier lado sirve
+  t = unidad3(t);
+  return unidad3([a[0] + t[0] * delta, a[1] + t[1] * delta, a[2] + t[2] * delta]);
+}
+
+/**
+ * Dónde va cada archivo en la esfera de la vista: cada objetivo es un casquete
+ * de la esfera, con los archivos más conectados en el centro, y los objetivos
+ * que más se importan entre sí quedan vecinos. Es geometría pura, sin azar: el
+ * mismo proyecto da siempre la misma esfera. `p` lleva x,y,z de cada archivo
+ * (en el orden de index.archivos), `c` el centro de cada objetivo y `r` el
+ * ángulo de su casquete en radianes (0 si no tiene archivos propios).
+ * @param {any} index
+ */
+export function esferaDe(index) {
+  const nObj = index.objetivos.length;
+  const objDe = new Map(index.objetivos.map((o, i) => [o.slug, i]));
+  const pos = new Map(index.archivos.map((f, i) => [f.path, i]));
+  const grupoDe = index.archivos.map((f) => (f.objetivo && objDe.has(f.objetivo) ? objDe.get(f.objetivo) : nObj)); // los sueltos van a un grupo más
+  const nG = nObj + 1;
+  const miembros = Array.from({ length: nG }, () => []);
+  grupoDe.forEach((g, i) => miembros[g].push(i));
+  const grado = new Array(index.archivos.length).fill(0);
+  const acople = Array.from({ length: nG }, () => new Array(nG).fill(0));
+  for (const f of index.archivos) {
+    const a = pos.get(f.path);
+    for (const dep of f.importa) {
+      const b = pos.get(dep);
+      if (b === undefined) continue;
+      grado[a] += 1;
+      grado[b] += 1;
+      if (!f.esPrueba && grupoDe[a] !== grupoDe[b]) {
+        acople[grupoDe[a]][grupoDe[b]] += 1;
+        acople[grupoDe[b]][grupoDe[a]] += 1;
+      }
+    }
+  }
+  const vivos = [];
+  for (let g = 0; g < nG; g++) if (miembros[g].length) vivos.push(g);
+  const orden = [...vivos].sort((a, b) => miembros[b].length - miembros[a].length || a - b);
+  const tam = (g) => Math.sqrt(miembros[g].length);
+  // Ángulo del casquete = escala × √archivos; la escala deja los casquetes cubriendo ~58 % de la esfera.
+  const cubierta = (s) => vivos.reduce((a, g) => a + 2 * Math.PI * (1 - Math.cos(Math.min(Math.PI, s * tam(g)))), 0);
+  let lo = 0;
+  let hi = 2;
+  for (let it = 0; it < 60; it++) {
+    const mid = (lo + hi) / 2;
+    if (cubierta(mid) < 0.58 * 4 * Math.PI) lo = mid;
+    else hi = mid;
+  }
+  const theta = (g) => lo * tam(g);
+  // Centros: una espiral de Fibonacci (los más grandes primero, bien separados) y después se acomodan.
+  const centro = new Array(nG).fill(null);
+  orden.forEach((g, i) => {
+    const y = 1 - (2 * (i + 0.5)) / orden.length;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    centro[g] = [r * Math.cos(i * ANGULO_ORO), y, r * Math.sin(i * ANGULO_ORO)];
+  });
+  const maxAcople = Math.max(1, ...acople.flat());
+  const HUECO = 0.05;
+  const separar = (conAtraccion) => {
+    for (let i = 0; i < orden.length; i++) {
+      for (let j = i + 1; j < orden.length; j++) {
+        const a = orden[i];
+        const b = orden[j];
+        const A = centro[a];
+        const B = centro[b];
+        const d = Math.acos(Math.max(-1, Math.min(1, punto3(A, B))));
+        const minimo = theta(a) + theta(b) + HUECO;
+        let paso = 0;
+        if (d < minimo) paso = -(minimo - d) / 2;
+        else if (conAtraccion && acople[a][b] > 0) paso = Math.min((d - minimo) / 2, (0.03 * acople[a][b]) / maxAcople);
+        if (paso === 0) continue;
+        centro[a] = girarHacia(A, B, paso);
+        centro[b] = girarHacia(B, A, paso);
+      }
+    }
+  };
+  for (let it = 0; it < 400; it++) separar(true);
+  for (let it = 0; it < 200; it++) separar(false);
+  // Archivos: espiral de girasol dentro del casquete, los más conectados al centro.
+  const p = new Array(index.archivos.length * 3).fill(0);
+  for (const g of vivos) {
+    const A = centro[g];
+    const u = unidad3(cruz3(A, Math.abs(A[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]));
+    const v = cruz3(A, u);
+    const lista = [...miembros[g]].sort((i, j) => grado[j] - grado[i] || index.archivos[j].lineas - index.archivos[i].lineas || (index.archivos[i].path < index.archivos[j].path ? -1 : 1));
+    lista.forEach((i, k) => {
+      const r = theta(g) * 0.92 * Math.sqrt((k + 0.5) / lista.length);
+      const fi = k * ANGULO_ORO + g * 0.7;
+      for (let e = 0; e < 3; e++) p[i * 3 + e] = r3(A[e] * Math.cos(r) + (u[e] * Math.cos(fi) + v[e] * Math.sin(fi)) * Math.sin(r));
+    });
+  }
+  return {
+    p,
+    c: index.objetivos.flatMap((_, g) => (centro[g] ? centro[g].map(r3) : [0, 0, 0])),
+    r: index.objetivos.map((_, g) => (miembros[g].length ? r3(theta(g)) : 0)),
+  };
+}
+
 /**
  * Todo lo que muestra la vista, compacto: objetivos con sus reglas y
  * pendientes, archivos (índice = posición), imports entre archivos, qué prueba
- * cada test, tablas, secretos, rutas y las banderas que hay que atender.
+ * cada test, tablas, secretos, rutas y las banderas que hay que atender; más
+ * la esfera (dónde va cada archivo) y la matriz de imports entre objetivos
+ * (`matriz[a * objetivos + b]`: cuántos imports van de un archivo de a a uno de b).
  * @param {any} index
  * @param {{ generado?: string, commit?: string | null }} [opciones]
  */
@@ -1030,8 +1145,15 @@ export function grafoDe(index, { generado = new Date().toISOString(), commit = n
     ...index.sinObjetivo.map((p) => ({ k: "sin-objetivo", a: at(p), t: "sin objetivo en objetivos.md" })),
     ...index.cliente.problemas.map((pr) => ({ k: pr.tipo === "secreto" ? "secreto" : "api", a: at(pr.archivo), t: pr.detalle })),
   ];
+  const nObj = index.objetivos.length;
+  const matriz = new Array(nObj * nObj).fill(0);
+  for (const [a, b] of enlaces) {
+    const oa = a === undefined ? -1 : archivos[a].o;
+    const ob = b === undefined ? -1 : archivos[b].o;
+    if (oa >= 0 && ob >= 0) matriz[oa * nObj + ob] += 1;
+  }
   return {
-    v: 1,
+    v: 2,
     generado,
     commit,
     resumen: {
@@ -1047,6 +1169,8 @@ export function grafoDe(index, { generado = new Date().toISOString(), commit = n
     },
     objetivos: index.objetivos.map((o) => ({ slug: o.slug, titulo: o.titulo, texto: o.texto, reglas: o.reglas, pendiente: o.pendiente, transversal: o.transversal })),
     archivos,
+    esfera: esferaDe(index),
+    matriz,
     enlaces,
     pruebas,
     banderas,

@@ -13,6 +13,7 @@ import {
   construirIndice,
   ejecutar,
   encabezadosMarkdown,
+  esferaDe,
   globToRegExp,
   grafoDe,
   MAPA,
@@ -291,6 +292,61 @@ test("the view's graph: every file once, imports and tests as edges between them
   assert.ok(g.sinonimos.voz.includes("voice"));
 });
 
+type Vec = number[];
+const angulo = (a: Vec, b: Vec) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
+
+test("the view's sphere: every file a unit point inside the cap of its objective, caps apart, same project same sphere", () => {
+  const index = cargarIndice(ROOT);
+  const e = esferaDe(index);
+  const n = index.objetivos.length;
+  assert.equal(e.p.length, index.archivos.length * 3);
+  assert.equal(e.c.length, n * 3);
+  assert.equal(e.r.length, n);
+  const centro = (g: number) => e.c.slice(g * 3, g * 3 + 3);
+  index.archivos.forEach((f: { path: string; objetivo?: string | null }, i: number) => {
+    const P = e.p.slice(i * 3, i * 3 + 3);
+    assert.ok(Math.abs(Math.hypot(P[0], P[1], P[2]) - 1) < 0.01, `${f.path} is on the sphere`);
+    if (!f.objetivo) return;
+    const g = index.objetivos.findIndex((o: { slug: string }) => o.slug === f.objetivo);
+    assert.ok(angulo(P, centro(g)) <= e.r[g] + 0.005, `${f.path} stays inside the cap of ${f.objetivo}`);
+  });
+  for (let a = 0; a < n; a++) {
+    for (let b = a + 1; b < n; b++) {
+      if (!e.r[a] || !e.r[b]) continue;
+      assert.ok(angulo(centro(a), centro(b)) >= e.r[a] + e.r[b], `the caps of ${index.objetivos[a].slug} and ${index.objetivos[b].slug} do not overlap`);
+    }
+  }
+  assert.deepEqual(esferaDe(index), e, "no randomness: the same project draws the same sphere");
+});
+
+test("the view's sphere keeps objectives with no files of their own out of it, and puts loose files in a cap of their own", () => {
+  const index = construirIndice(FILES, parseObjetivos(FIXTURE_MD));
+  const e = esferaDe(index);
+  const g = (slug: string) => index.objetivos.findIndex((o: { slug: string }) => o.slug === slug);
+  assert.equal(e.r[g("honestidad")], 0, "transversal: no cap");
+  assert.deepEqual(e.c.slice(g("honestidad") * 3, g("honestidad") * 3 + 3), [0, 0, 0]);
+  assert.ok(e.r[g("cuentas")] > 0);
+  const suelto = index.archivos.findIndex((f: { path: string }) => f.path === "misc/zz.ts");
+  assert.ok(suelto >= 0 && Math.abs(Math.hypot(e.p[suelto * 3], e.p[suelto * 3 + 1], e.p[suelto * 3 + 2]) - 1) < 0.01);
+  const vacio = esferaDe(construirIndice([], parseObjetivos(FIXTURE_MD)));
+  assert.deepEqual(vacio.p, [], "an empty project draws an empty sphere without failing");
+});
+
+test("the view's matrix counts the imports that go from each objective to each objective", () => {
+  const index = construirIndice(FILES, parseObjetivos(FIXTURE_MD));
+  const g = grafoDe(index);
+  const n = g.objetivos.length;
+  const k = (slug: string) => g.objetivos.findIndex((o: { slug: string }) => o.slug === slug);
+  assert.equal(g.matriz.length, n * n);
+  assert.equal(g.matriz[k("interfaz") * n + k("datos")], 1, "app/chico.tsx → lib/c.ts");
+  assert.equal(g.matriz[k("interfaz") * n + k("cuentas")], 1, "app/page.tsx → lib/a.ts");
+  assert.equal(g.matriz[k("interfaz") * n + k("interfaz")], 1, "app/cliente-api.tsx → the route, in the same objective");
+  assert.equal(g.matriz[k("cuentas") * n + k("cuentas")], 1, "lib/a.ts → lib/b.ts");
+  assert.equal(g.matriz[k("datos") * n + k("interfaz")], 0, "imports have a direction");
+  assert.equal(g.matriz.reduce((a: number, v: number) => a + v, 0), 4, "tests are not counted: they are edges of their own kind");
+  assert.equal(g.esfera.p.length, g.archivos.length * 3, "the sphere travels with the graph");
+});
+
 test("the view: the graph goes inside the page once, and nothing in it can close the script", () => {
   const plantilla = readFileSync(join(ROOT, VISTA_PLANTILLA), "utf8");
   const g = grafoDe(construirIndice([...FILES, archivo("lib/raro.ts", "/** Cierra </script> a propósito. */\nexport const x = 1;\n")], parseObjetivos(FIXTURE_MD)));
@@ -309,7 +365,8 @@ test("the page for the app: a whole document around the view, with the graph ins
   assert.ok(pagina.startsWith("<!doctype html>"), "without a doctype the browser renders in quirks mode");
   assert.ok(pagina.includes('<meta charset="utf-8">') && pagina.includes('name="viewport"'));
   assert.ok(pagina.includes(vista), "the view goes in untouched");
-  assert.equal(pagina.split("<title>").length, 2, "one title");
+  // the page's own title: the SVG tooltips built inside the script are text there, not a second title
+  assert.equal(pagina.replace(/<script[\s\S]*?<\/script>/g, "").split("<title>").length, 2, "one title");
   assert.ok(pagina.includes("abc1234"));
   assert.ok(!pagina.includes("/*__GRAFO__*/null"));
 });
@@ -360,4 +417,17 @@ test("the app wires the page: build step, ignored output, the frame and its sect
   assert.ok(desk.includes('src="/arana/index.html"') && desk.includes("sandbox="), "the frame loads the page, sandboxed");
   const app = readFileSync(join(ROOT, "app", "radar-app.tsx"), "utf8");
   assert.ok(app.includes('<Collapsible id="arana"') && app.includes('id: "arana"'), "section and nav entry");
+});
+
+test("the frame stays sandboxed apart from the app and only trusts its own height message", () => {
+  const desk = readFileSync(join(ROOT, "app", "arana-desk.tsx"), "utf8");
+  const sandbox = /sandbox="([^"]*)"/.exec(desk)?.[1] ?? "";
+  assert.ok(sandbox.includes("allow-scripts"), "the page needs its script");
+  assert.ok(!sandbox.includes("allow-same-origin"), "with scripts plus same-origin the page could lift its own sandbox");
+  assert.ok(desk.includes("e.source !== marco.current.contentWindow"), "only the frame's own messages count");
+  assert.ok(desk.includes('d.arana !== "alto"') && desk.includes("Number.isFinite(d.h)"), "only a finite number under the agreed key");
+  assert.ok(desk.includes("ALTO_MAX"), "the height is clamped");
+  const page = readFileSync(join(ROOT, "scripts", "arana-vista.html"), "utf8");
+  assert.ok(page.includes('postMessage({ arana: "alto", h }'), "the page reports its height under the same key");
+  assert.ok(!/localStorage|sessionStorage|fetch\(|XMLHttpRequest|document\.cookie/.test(page), "the page keeps no storage and makes no requests");
 });

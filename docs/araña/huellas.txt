@@ -66,7 +66,7 @@ aa86804bf9da	24	app/api/telegram/test/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
 8dd957053b0c	9	app/arana-desk.css
-cbea45dd3ba2	42	app/arana-desk.tsx
+ab6efc750d7e	65	app/arana-desk.tsx
 109c61b2bb44	34	app/asset-flows.css
 866aeee2a3d1	125	app/asset-flows.tsx
 c8f77f7b2422	70	app/assistant-console.css
@@ -175,7 +175,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-e7656382564f	243	docs/araña/objetivos.md
+5aecd91ffca5	244	docs/araña/objetivos.md
 081dd8a501f7	96	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 0207ee45bc91	144	docs/mesa-reglas-v2.md
@@ -358,8 +358,8 @@ bc7491d499a6	0	public/globe.svg
 fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
-9f6da9fc755a	898	scripts/arana-vista.html
-d1b2250ec167	1206	scripts/arana.mjs
+4155489ecf46	1623	scripts/arana-vista.html
+656a184d7385	1330	scripts/arana.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
 abc3c4cc022d	0	scripts/investigacion/datos.py
@@ -379,7 +379,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
-eb292a711759	364	tests/arana.test.ts
+e86e1df464e5	433	tests/arana.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
 8dffdd6b09f6	386	tests/assistant.test.ts
 dff2674006ae	17	tests/auth-pbkdf2.test.ts
