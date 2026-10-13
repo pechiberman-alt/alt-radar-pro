@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Blackout } from "../lib/econ-calendar.ts";
 import {
-  botStats, DEFAULT_BOT_CONFIG, newBotState, parseBotKlines, resumeBot, stepBot,
+  botStats, DEFAULT_BOT_CONFIG, escaleraBotTexto, newBotState, parseBotKlines, resumeBot, stepBot,
   type BotCandle, type BotConfig, type BotContext, type BotState, type PaperTrade,
 } from "../lib/paper-bot.ts";
 import type { ScalpSignal } from "../lib/scalp-signals.ts";
@@ -80,6 +80,20 @@ test("stop hit is a loss", () => {
 test("a candle spanning both stop and target counts as the stop", () => {
   const s = run([...flat(4), candle(4, 100, 102, 98, 100)], { 3: {} });
   assert.equal(s.trades[0].status, "loss");
+  assert.equal(s.trades[0].tp1At, undefined, "the stop's candle does not count its targets");
+});
+
+test("the ladder: TP1 and TP2 keep the time they were reached, and exits stay exactly the same", () => {
+  // Entry 100, stop 99, target 101,5 → TP1 100,5 · TP2 101.
+  const s = run([...flat(4), candle(4, 100, 100.6, 99.9, 100.4), candle(5, 100.4, 101.1, 100, 100.8), candle(6, 100.8, 100.9, 98.9, 99)], { 3: {} });
+  const t = s.trades[0];
+  assert.equal(t.status, "loss");
+  assert.deepEqual([t.tp1At, t.tp2At], [T0 + 5 * F, T0 + 6 * F]);
+  close(t.pnl!, -10 - (100 + 99) * 10 * 0.0005);
+  assert.equal(escaleraBotTexto(t, (v) => String(v).replace(".", ",")), "SL 99 ✗ 12:35 UTC · TP1 100,5 ✓ 12:25 UTC · TP2 101 ✓ 12:30 UTC · TP3 101,5");
+  const win = run([...flat(4), candle(4, 100, 101.6, 99.9, 101)], { 3: {} }).trades[0];
+  assert.equal(win.status, "win");
+  assert.deepEqual([win.tp1At, win.tp2At], [T0 + 5 * F, T0 + 5 * F], "one candle to the target passes TP1 and TP2 on the way");
 });
 
 test("a gap through the stop fills at the open, not at the stop", () => {

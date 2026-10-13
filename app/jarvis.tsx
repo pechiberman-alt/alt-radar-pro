@@ -22,7 +22,7 @@ import { readingSpeech } from "@/lib/jarvis-mind";
 import { BRAIN_LABEL } from "@/lib/ai-brains";
 import { FUTURES_BASES, loadRows, loadTopSymbols, timeframeConfig } from "@/lib/market-fetch";
 import { readPreBreak } from "@/lib/pre-breakout";
-import { addSignals, breakoutSignal, ledgerCsv, ledgerStats, magnetSignal, resolveSignal, statsSpeech, type JarvisSignal } from "@/lib/jarvis-ledger";
+import { addSignals, breakoutSignal, escaleraDe, escaleraLinea, ledgerCsv, ledgerStats, magnetSignal, resolveSignal, statsSpeech, type JarvisSignal } from "@/lib/jarvis-ledger";
 import { buildLiquidationHeatmap } from "@/lib/liquidation-heatmap";
 import { magnetEvents, strongestMagnets } from "@/lib/magnet-watch";
 import { parseSwingKlines } from "@/lib/swing-entries";
@@ -123,8 +123,11 @@ async function scanMagnetSignals(): Promise<JarvisSignal[]> {
 }
 
 const fmtPx = (v: number) => v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : v >= 1 ? 3 : 6 });
-const signalSpeech = (s: JarvisSignal) =>
-  `Señal registrada: ${s.symbol.replace(/USDT$/, "")} ${s.side === "LONG" ? "largo" : "corto"} en ${s.timeframe}, entrada ${fmtPx(s.entry)}, stop ${fmtPx(s.stop)}, objetivo ${fmtPx(s.target)}.`;
+const signalSpeech = (s: JarvisSignal) => {
+  const e = escaleraDe(s);
+  const niveles = e ? `stop ${fmtPx(e.stop)}, TP1 ${fmtPx(e.tp1)}, TP2 ${fmtPx(e.tp2)}, TP3 ${fmtPx(e.tp3)}` : `stop ${fmtPx(s.stop)}, objetivo ${fmtPx(s.target)}`;
+  return `Señal registrada: ${s.symbol.replace(/USDT$/, "")} ${s.side === "LONG" ? "largo" : "corto"} en ${s.timeframe}, entrada ${fmtPx(s.entry)}, ${niveles}.`;
+};
 
 const PREFS_KEY = "alt-radar-pro:jarvis:v1";
 // Device voices load asynchronously ("voiceschanged"); keep one list for the picker.
@@ -1381,7 +1384,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                         <ul>
                           {iaOpen.map((s) => (
                             <li key={s.id}>
-                              {coin(s.symbol)} {s.side === "LONG" ? "▲" : "▼"} abierta · entrada {px(s.entry)} · objetivo {px(s.target)} · invalidación {px(s.stop)}
+                              {coin(s.symbol)} {s.side === "LONG" ? "▲" : "▼"} abierta · entrada {px(s.entry)} · {escaleraLinea(s, px)}
                               {s.why ? ` · ${s.why}` : ""}
                             </li>
                           ))}
@@ -1488,7 +1491,7 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                     list.slice(0, 12).map((x) => (
                       <p key={x.id} className={`${x.r === null ? "" : x.r > 0 ? "up" : "down"}${x.taken === false ? " shadow" : ""}`}>
                         <b>{x.symbol.replace(/USDT$/, "")} {x.side === "LONG" ? "▲" : "▼"} {x.timeframe}</b>
-                        <span>{fmtPx(x.entry)} → stop {fmtPx(x.stop)} · obj {fmtPx(x.target)}</span>
+                        <span>{fmtPx(x.entry)} → {escaleraLinea(x, fmtPx)}</span>
                         <em>{x.result === "ABIERTA" ? "abierta" : `${x.result.toLowerCase()} ${x.r !== null ? `${x.r >= 0 ? "+" : ""}${x.r.toFixed(2).replace(".", ",")}R` : ""}`}</em>
                         {x.grade && (
                           <i className={`jv-grade g-${x.taken === false ? "sombra" : x.grade.toLowerCase()}`}>

@@ -1,4 +1,5 @@
 import { activeBlackout, type Blackout } from "./econ-calendar.ts";
+import { escaleraHacia, escaleraTexto } from "./escalera.ts";
 import { flowVerdict } from "./footprint.ts";
 import { timeframeConfig } from "./market-fetch.ts";
 import { findScalpSignals, type ScalpSignal } from "./scalp-signals.ts";
@@ -103,7 +104,29 @@ export type PaperTrade = {
   note?: string;
   /** Timeframe the signal came from, so the record stays right if the setting changes later. */
   timeframe?: string;
+  /** Close time of the candle that reached TP1 / TP2 (its ladder, lib/escalera.ts) before the stop. */
+  tp1At?: number;
+  tp2At?: number;
 };
+
+/** SL, TP1, TP2 and TP3 of a bot trade: TP3 is its target; TP1 and TP2 a third and two thirds of the way. */
+export const escaleraBot = (t: Pick<PaperTrade, "side" | "entry" | "stop" | "target">) => escaleraHacia(t.side === "COMPRA" ? "LONG" : "SHORT", t.entry, t.stop, t.target);
+
+/** The ladder in one line, with ✓ and the UTC time on what was reached, ✗ and the time if it ended at the stop. */
+export function escaleraBotTexto(t: PaperTrade, px: (v: number) => string): string | null {
+  const e = escaleraBot(t);
+  return e ? escaleraTexto(e, px, { sl: t.status === "loss" ? t.exitTime : null, tp1: t.tp1At, tp2: t.tp2At, tp3: t.status === "win" ? t.exitTime : null }) : null;
+}
+
+/** Marks the targets a candle reached while the trade is still on (never on a candle that touched the stop). */
+function markLadder(trade: PaperTrade, c: BotCandle, at: number) {
+  const e = escaleraBot(trade);
+  if (!e) return;
+  const long = trade.side === "COMPRA";
+  const reached = (p: number) => (long ? c.high >= p : c.low <= p);
+  if (trade.tp1At === undefined && reached(e.tp1)) trade.tp1At = at;
+  if (trade.tp2At === undefined && reached(e.tp2)) trade.tp2At = at;
+}
 
 export type Skips = { flow: number; news: number; calendar: number; capacity: number; halted: number; liquidation: number };
 
@@ -198,6 +221,8 @@ function manage(state: BotState, trade: PaperTrade, c: BotCandle, frameMs: numbe
 
   const stopHit = long ? c.low <= trade.stop : c.high >= trade.stop;
   const targetHit = long ? c.high >= trade.target : c.low <= trade.target;
+  // The ladder is recorded, never acted on: exits stay exactly as they were.
+  if (!stopHit) markLadder(trade, c, closedAt);
   if (stopHit) {
     // Both in one candle: the stop. A gap through it fills at the open.
     const raw = long ? Math.min(trade.stop, c.open) : Math.max(trade.stop, c.open);

@@ -263,7 +263,7 @@ Texto: calculadoras y registros de la persona: cuánto arriesga, qué compró, a
 - `app/trade-journal-desk.tsx` — exporta: TradeJournalDesk, default
 - `lib/account-journal.ts` — The account journal: turns the raw executions of a real Binance account (futures and spot) into TRADES — a position from opening to closing — and measures them.
 - `lib/bot-journal-db.ts` — The bot record, stored per account.
-- `lib/bot-journal.ts` — The permanent record of the futures bot: one row per closed trade.
+- `lib/bot-journal.ts` — exporta: JournalStatus, JournalRow, journalKey, journalRowFrom, validateJournalRow, mergeJournal (+5)
 - `lib/cost-basis.ts` — Weighted-average cost basis and the risk numbers built on top of it, for a spot portfolio pulled from Binance.
 - `lib/dca-tracker.ts` — A record of DCA purchases the person made themselves, and the arithmetic that turns it into a position.
 - `lib/diario-db.ts` — Storage for the account journal: the spot fills read from Binance and the rows imported from Binance's files (futures fills recorded live stay in binance_futures_log), plus the per

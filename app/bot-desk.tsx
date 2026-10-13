@@ -9,7 +9,7 @@ import { journalRowFrom, mergeJournal, type JournalRow } from "@/lib/bot-journal
 import { loadRows, timeframeConfig } from "@/lib/market-fetch";
 import BotJournal from "./bot-journal";
 import {
-  botStats, DEFAULT_BOT_CONFIG, newBotState, parseBotKlines, resumeBot, stepBot, type BotConfig, type BotState,
+  botStats, DEFAULT_BOT_CONFIG, escaleraBotTexto, newBotState, parseBotKlines, resumeBot, stepBot, type BotConfig, type BotState,
 } from "@/lib/paper-bot";
 
 const STORAGE = "alt-radar-bot-v1";
@@ -319,7 +319,7 @@ function BotInner({ news }: { news: HeadlineLike[] }) {
             return (
               <div key={t.id} className={t.side === "COMPRA" ? "up" : "down"}>
                 <b>{t.symbol.replace("USDT", "")} · {t.side} {t.leverage}x</b>
-                <span>entrada {px(t.entry)} · stop {px(t.stop)} · objetivo {px(t.target)} · liquidación {px(t.liqPrice)}</span>
+                <span>entrada {px(t.entry)} · {escaleraBotTexto(t, px) ?? `stop ${px(t.stop)} · objetivo ${px(t.target)}`} · liquidación {px(t.liqPrice)}</span>
                 <em className={pnl === null ? "" : pnl >= 0 ? "up" : "down"}>{pnl === null ? "…" : `${usd(pnl)} (${(pnl / t.riskUsd >= 0 ? "+" : "")}${(pnl / t.riskUsd).toLocaleString("es-AR", { maximumFractionDigits: 2 })}R)`}</em>
               </div>
             );

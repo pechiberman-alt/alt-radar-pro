@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { comisionEnR, escaleraHacia, recorrer, type Desenlace } from "../lib/escalera.ts";
+import { comisionEnR, escaleraHacia, escaleraTexto, recorrer, type Desenlace } from "../lib/escalera.ts";
 import { generadorAzar } from "../lib/jarvis-stats.ts";
 import { MM_FEE_PCT, MM_HORIZON, runMm, type MmEvent } from "../lib/mm-robot.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
@@ -106,4 +106,10 @@ test("mide exactamente lo mismo que el robot (runMm): mismo desenlace y mismo R,
     vistos.add(rec.desenlace);
   }
   assert.deepEqual([...vistos].sort(), ["ABIERTA", "SL", "TIEMPO", "TP3"], "la prueba pasa por los cuatro desenlaces");
+});
+
+test("la escalera en una línea: ✓ y la hora UTC en lo alcanzado, ✗ y la hora en el SL", () => {
+  const e = escaleraHacia("LONG", 100, 97, 106)!;
+  assert.equal(escaleraTexto(e, String, { tp1: T + 2 * M, sl: T + 3 * M }), "SL 97 ✗ 00:45 UTC · TP1 102 ✓ 00:30 UTC · TP2 104 · TP3 106");
+  assert.equal(escaleraTexto(e, String), "SL 97 · TP1 102 · TP2 104 · TP3 106");
 });

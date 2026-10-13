@@ -20,7 +20,10 @@ test("a closed trade becomes a row carrying everything the report needs; an open
   assert.equal(r.runStartedAt, 5);
   assert.equal(r.timeframe, "5m");
   assert.equal(r.pnl, 13.99);
-  assert.equal(r.note, null);
+  assert.equal(r.note, "SL 99 · TP1 100,5 · TP2 101 · TP3 101,5 ✓ 12:15 UTC", "la nota lleva su escalera y lo que alcanzó");
+  assert.equal(journalRowFrom(trade({ stop: 100 }), 5)!.note, null, "sin escalera coherente no se inventa una");
+  const perdida = journalRowFrom(trade({ status: "loss", exit: 99, tp1At: T + 300_000, note: "x" }), 5)!;
+  assert.equal(perdida.note, "x · SL 99 ✗ 12:15 UTC · TP1 100,5 ✓ 12:05 UTC · TP2 101 · TP3 101,5");
   assert.equal(journalRowFrom(trade({ status: "open", exit: undefined, exitTime: undefined, pnl: undefined }), 5), null);
   assert.equal(journalRowFrom(trade({ timeframe: undefined }), 5)!.timeframe, null, "trades from before the field existed");
 });

@@ -162,5 +162,6 @@ test("the dossier and the record the AI sees", () => {
 
 test("what JARVIS says about its reading", () => {
   const r: MindReading = { at: 0, brain: "groq", model: "m", sesgo: "NEUTRAL", sesgoAnterior: null, resumen: "Rango.", activos: [], riesgos: [], vigilar: ["BTC en 94.500"], tesis: [{ id: "x", moneda: "SOL", lado: "LONG", entrada: 180, objetivo: 189, invalidacion: 174, confianza: "BAJA", porque: "" }], descartadas: [] };
-  assert.equal(readingSpeech(r, 5 * 60_000), "Mi lectura de hace 5 minutos: mercado sin dirección clara. Rango. Tesis nuevas: SOL alcista, objetivo 189, invalidación 174. A vigilar: BTC en 94.500. No es asesoramiento financiero.");
+  // Cada tesis con su escalera: el objetivo es el TP3 y TP1/TP2 van a un tercio y dos tercios (180 → 189: 183 y 186).
+  assert.equal(readingSpeech(r, 5 * 60_000), "Mi lectura de hace 5 minutos: mercado sin dirección clara. Rango. Tesis nuevas: SOL alcista: TP1 183, TP2 186, TP3 189, invalidación 174. A vigilar: BTC en 94.500. No es asesoramiento financiero.");
 });

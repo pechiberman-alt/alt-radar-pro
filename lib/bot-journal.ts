@@ -1,4 +1,15 @@
+import { escaleraHacia, escaleraTexto } from "./escalera.ts";
 import type { PaperTrade } from "./paper-bot.ts";
+
+const numero = (v: number) => String(Number(v.toPrecision(6))).replace(".", ",");
+
+/** The trade's own note plus its ladder (what it reached and when), within the 200 characters a row keeps. */
+function noteWithLadder(t: PaperTrade): string | null {
+  const e = escaleraHacia(t.side === "COMPRA" ? "LONG" : "SHORT", t.entry, t.stop, t.target);
+  const ladder = e ? escaleraTexto(e, numero, { sl: t.status === "loss" ? t.exitTime : null, tp1: t.tp1At, tp2: t.tp2At, tp3: t.status === "win" ? t.exitTime : null }) : null;
+  const parts = [t.note, ladder].filter((x): x is string => Boolean(x));
+  return parts.length ? parts.join(" · ").slice(0, 200) : null;
+}
 
 /**
  * The permanent record of the futures bot: one row per closed trade.
@@ -59,7 +70,7 @@ export function journalRowFrom(trade: PaperTrade, runStartedAt: number): Journal
     r: trade.r ?? 0,
     fees: trade.fees ?? 0,
     status: trade.status,
-    note: trade.note ?? null,
+    note: noteWithLadder(trade),
   };
 }
 

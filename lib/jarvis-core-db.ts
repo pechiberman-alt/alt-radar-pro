@@ -60,7 +60,7 @@ const SCHEMA = [
   "CREATE TABLE IF NOT EXISTS jarvis_core_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
 ];
 /** Columns added after the first version of the table (kept for databases created then). */
-const ADDED = ["taken INTEGER NOT NULL DEFAULT 1", "grade TEXT", "expect_r REAL", "expect_se REAL", "features TEXT", "why TEXT"];
+const ADDED = ["taken INTEGER NOT NULL DEFAULT 1", "grade TEXT", "expect_r REAL", "expect_se REAL", "features TEXT", "why TEXT", "tp1_at INTEGER", "tp2_at INTEGER"];
 
 // Once per database per isolate: the cron runs every minute and these never change.
 const ready = new WeakSet<object>();
@@ -81,8 +81,11 @@ type Row = {
   id: string; source: string; symbol: string; timeframe: string; side: string; time: number; entry: number; stop: number; target: number;
   note: string; result: string; r: number | null; closed_at: number | null; created_at: number;
   taken: number | null; grade: string | null; expect_r: number | null; expect_se: number | null; features: string | null; why: string | null;
+  tp1_at: number | null; tp2_at: number | null;
 };
-const COLS = "id, source, symbol, timeframe, side, time, entry, stop, target, note, result, r, closed_at, created_at, taken, grade, expect_r, expect_se, features, why";
+/** The columns a new signal is inserted with; TP1/TP2 times are written later, when reached. */
+const COLS_NEW = "id, source, symbol, timeframe, side, time, entry, stop, target, note, result, r, closed_at, created_at, taken, grade, expect_r, expect_se, features, why";
+const COLS = `${COLS_NEW}, tp1_at, tp2_at`;
 
 function parseFeatures(raw: string | null): Features | null {
   if (!raw) return null;
@@ -114,6 +117,8 @@ export function rowToSignal(r: Row): CoreSignal {
     expectSe: r.expect_se,
     features: parseFeatures(r.features),
     why: r.why,
+    tp1At: r.tp1_at ?? null,
+    tp2At: r.tp2_at ?? null,
   };
 }
 
@@ -143,7 +148,7 @@ export async function recordCoreSignals(db: D1Database, signals: CoreSignal[], n
   for (const s of signals) {
     const res = await db
       .prepare(
-        `INSERT OR IGNORE INTO jarvis_core_signals (${COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'ABIERTA', NULL, NULL, ?11, ?12, ?13, ?14, ?15, ?16, ?17)`,
+        `INSERT OR IGNORE INTO jarvis_core_signals (${COLS_NEW}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'ABIERTA', NULL, NULL, ?11, ?12, ?13, ?14, ?15, ?16, ?17)`,
       )
       .bind(s.id, s.source, s.symbol, s.timeframe, s.side, s.time, s.entry, s.stop, s.target, s.note, now, s.taken ? 1 : 0, s.grade, s.expectR, s.expectSe, s.features ? JSON.stringify(s.features) : null, s.why)
       .run();
@@ -178,8 +183,8 @@ export async function closeCoreSignals(db: D1Database, updated: CoreSignal[]): P
   for (const s of updated) {
     if (s.result === "ABIERTA" || s.r === null) continue;
     const res = await db
-      .prepare("UPDATE jarvis_core_signals SET result = ?2, r = ?3, closed_at = ?4 WHERE id = ?1 AND result = 'ABIERTA'")
-      .bind(s.id, s.result, s.r, s.closedAt)
+      .prepare("UPDATE jarvis_core_signals SET result = ?2, r = ?3, closed_at = ?4, tp1_at = COALESCE(tp1_at, ?5), tp2_at = COALESCE(tp2_at, ?6) WHERE id = ?1 AND result = 'ABIERTA'")
+      .bind(s.id, s.result, s.r, s.closedAt, s.tp1At ?? null, s.tp2At ?? null)
       .run();
     if (res.meta.changes) closed.push(s);
   }
@@ -192,6 +197,23 @@ export async function closeCoreSignals(db: D1Database, updated: CoreSignal[]): P
     }
   }
   return closed;
+}
+
+/** Records when an open signal reached TP1 or TP2, once: a time already written is kept (at most two writes per signal). */
+export async function markCoreHits(db: D1Database, before: CoreSignal[], after: CoreSignal[]): Promise<number> {
+  const prev = new Map(before.map((s) => [s.id, s]));
+  let written = 0;
+  for (const s of after) {
+    if (s.result !== "ABIERTA") continue;
+    const p = prev.get(s.id);
+    if ((s.tp1At ?? null) === (p?.tp1At ?? null) && (s.tp2At ?? null) === (p?.tp2At ?? null)) continue;
+    const res = await db
+      .prepare("UPDATE jarvis_core_signals SET tp1_at = COALESCE(tp1_at, ?2), tp2_at = COALESCE(tp2_at, ?3) WHERE id = ?1 AND result = 'ABIERTA'")
+      .bind(s.id, s.tp1At ?? null, s.tp2At ?? null)
+      .run();
+    if (res.meta.changes) written += 1;
+  }
+  return written;
 }
 
 // ── State rows: heartbeat, model, mind ─────────────────────────────────────
@@ -440,6 +462,8 @@ async function resolveJob(db: D1Database, now: number): Promise<JobResult> {
     }
   }
   const closedNow = await closeCoreSignals(db, updated);
+  // TP1 and TP2 of the ones still open: each time is written once, when it happens.
+  const reached = await markCoreHits(db, open, updated);
   // Magnet sweeps learn from live results (taken and shadow alike: the choice must not bias what it learns).
   const lessons = closedNow.filter((s) => s.source === "IMÁN" && s.features && s.r !== null);
   let learned = "";
@@ -450,7 +474,7 @@ async function resolveJob(db: D1Database, now: number): Promise<JobResult> {
     const saved = await saveModel(db, loaded.model, { rev: loaded.model.rev, exists: loaded.exists }, now);
     learned = saved ? `, aprendió de ${lessons.length} ${lessons.length === 1 ? "barrida" : "barridas"}` : ", modelo ocupado";
   }
-  return { ok: true, note: `${open.length} abiertas, ${closedNow.length} cerradas ahora${learned}`, feed };
+  return { ok: true, note: `${open.length} abiertas, ${closedNow.length} cerradas ahora${reached ? `, ${reached} con TP1 o TP2 nuevo` : ""}${learned}`, feed };
 }
 
 /** Extra study for the coin with the most history left (BTC first while its series is missing). */

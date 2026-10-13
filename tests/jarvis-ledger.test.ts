@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addSignals, breakoutSignal, HORIZON, ledgerCsv, ledgerStats, magnetSignal, resolveSignal, statsSpeech, type JarvisSignal } from "../lib/jarvis-ledger.ts";
+import { addSignals, breakoutSignal, escaleraLinea, HORIZON, ledgerCsv, ledgerStats, magnetSignal, resolveSignal, statsSpeech, type JarvisSignal } from "../lib/jarvis-ledger.ts";
+import { generadorAzar } from "../lib/jarvis-stats.ts";
 import type { PreBreak } from "../lib/pre-breakout.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
 
@@ -74,4 +75,69 @@ test("ledger: no duplicates, sorted, capped; stats by source; speech and CSV", (
   assert.ok(csv.startsWith("﻿fecha;fuente;moneda"));
   assert.equal(csv.trim().split("\r\n").length, 4);
   assert.match(csv, /;OBJETIVO;1,900;/);
+});
+
+/** The resolution exactly as it was before the ladder: what the new one has to match, result by result. */
+function resolveBefore(s: JarvisSignal, candles: SwingCandle[], frameMs: number): JarvisSignal {
+  if (s.result !== "ABIERTA") return s;
+  const after = candles.filter((x) => x.openTime > s.time).sort((a, b) => a.openTime - b.openTime);
+  const risk = Math.abs(s.entry - s.stop);
+  if (!(risk > 0)) return s;
+  const fee = ((0.05 / 100) * 2 * s.entry) / risk;
+  const long = s.side === "LONG";
+  for (let i = 0; i < after.length && i < HORIZON; i += 1) {
+    const x = after[i];
+    if (long ? x.low <= s.stop : x.high >= s.stop) return { ...s, result: "STOP", r: -1 - fee, closedAt: x.openTime + frameMs };
+    if (long ? x.high >= s.target : x.low <= s.target) return { ...s, result: "OBJETIVO", r: Math.abs(s.target - s.entry) / risk - fee, closedAt: x.openTime + frameMs };
+    if (i === HORIZON - 1) return { ...s, result: "TIEMPO", r: (long ? x.close - s.entry : s.entry - x.close) / risk - fee, closedAt: x.openTime + frameMs };
+  }
+  return s;
+}
+
+test("the ladder changes no result: same outcome, R and close time as the rules always were (300 random signals)", () => {
+  const az = generadorAzar(7);
+  const normal = () => Math.sqrt(-2 * Math.log(Math.max(az(), 1e-12))) * Math.cos(2 * Math.PI * az());
+  const seen = new Set<string>();
+  for (let n = 0; n < 300; n += 1) {
+    const sigma = 0.002 + az() * 0.01;
+    let p = 100;
+    const candles = Array.from({ length: 80 }, (_, k) => {
+      const open = p;
+      const cl = open * (1 + normal() * sigma);
+      p = cl;
+      return c(11 + k, open, Math.max(open, cl) * (1 + Math.abs(normal()) * sigma * 0.5), Math.min(open, cl) * (1 - Math.abs(normal()) * sigma * 0.5), cl);
+    });
+    const side = az() < 0.5 ? "LONG" : "SHORT";
+    const risk = 0.5 + az() * 3;
+    const reward = risk * (1 + az() * 3);
+    const s = sig({ side, stop: side === "LONG" ? 100 - risk : 100 + risk, target: side === "LONG" ? 100 + reward : 100 - reward });
+    const now = resolveSignal(s, candles, H);
+    const before = resolveBefore(s, candles, H);
+    assert.equal(now.result, before.result, `signal ${n}`);
+    assert.equal(now.closedAt, before.closedAt);
+    if (before.r === null) assert.equal(now.r, null);
+    else assert.ok(Math.abs((now.r as number) - before.r) < 1e-9);
+    if (now.tp2At) assert.ok(now.tp1At && now.tp1At <= now.tp2At, "TP2 is never reached before TP1");
+    if (now.result === "STOP" && now.tp1At) assert.ok(now.tp1At < (now.closedAt as number), "a target of the stop's candle does not count");
+    seen.add(now.result);
+  }
+  assert.deepEqual([...seen].sort(), ["OBJETIVO", "STOP", "TIEMPO"]);
+});
+
+test("TP1 and TP2 keep their time; on the stop's candle they don't count; a time already recorded is never lost", () => {
+  // Long at 100, stop 98, target 104 → TP1 101,33…, TP2 102,66…
+  const a = resolveSignal(sig(), [c(11, 100, 101.5, 99.5, 101)], H);
+  assert.equal(a.result, "ABIERTA");
+  assert.deepEqual([a.tp1At, a.tp2At], [12 * H, null]);
+  const b = resolveSignal(a, [c(11, 100, 101.5, 99.5, 101), c(12, 101, 103, 100, 102.8), c(13, 102, 102.5, 97.5, 98)], H);
+  assert.equal(b.result, "STOP");
+  assert.deepEqual([b.tp1At, b.tp2At, b.closedAt], [12 * H, 13 * H, 14 * H]);
+  const sameCandle = resolveSignal(sig(), [c(11, 100, 103, 97.5, 98)], H);
+  assert.equal(sameCandle.result, "STOP");
+  assert.equal(sameCandle.tp1At, null, "the stop's candle does not count its targets");
+  assert.equal(resolveSignal(sig({ tp1At: 12 * H }), [c(14, 100, 100.5, 99.5, 100)], H).tp1At, 12 * H, "kept even without those candles");
+  assert.equal(escaleraLinea(b, (v) => v.toLocaleString("es-AR", { maximumFractionDigits: 2 })), "SL 98 ✗ · TP1 101,33 ✓ · TP2 102,67 ✓ · TP3 104");
+  const csv = ledgerCsv([b]);
+  assert.ok(csv.startsWith("﻿fecha;fuente;moneda;marco;lado;entrada;stop;tp1;tp2;tp3_objetivo;resultado;R;tp1_alcanzado;tp2_alcanzado;nota"));
+  assert.match(csv, /;101,3333333;102,6666667;104;STOP;/);
 });
