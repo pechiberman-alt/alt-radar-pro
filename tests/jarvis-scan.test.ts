@@ -8,6 +8,7 @@ import {
   DEFAULT_SCAN_VOLUME,
   SCAN_DEEP_MAX,
   SCAN_LIMITS,
+  SCAN_STALE_MS,
   eligibleSymbols,
   isApproved,
   quickRead,
@@ -15,8 +16,10 @@ import {
   rankApproved,
   rowFrom,
   rowWithoutData,
+  scanAgeSpeech,
   scanCandles,
   scanLine,
+  scanProgressSpeech,
   scanSpeech,
   scanSummaryText,
   summarize,
@@ -265,6 +268,29 @@ test("the texts say what was read and count it, with no probability and no perce
   assert.ok(SCAN_LIMITS.some((x) => /10 monedas grandes/.test(x)));
   assert.ok(SCAN_LIMITS.some((x) => /no la probabilidad de acertar/.test(x)));
   assert.ok(SCAN_LIMITS.some((x) => /No es asesoramiento financiero/.test(x)));
+});
+
+test("the chat says how the scan is going and how old the last one is, and warns when it is too old to read plans from", () => {
+  assert.match(scanProgressSpeech(null), /empezando/);
+  assert.match(scanProgressSpeech({ fase: "monedas", hechas: 0, total: 0, restanteMs: null }), /lista de monedas/);
+  assert.match(scanProgressSpeech({ fase: "datos", hechas: 0, total: 0, restanteMs: null }), /BTC, ETH, calendario, noticias y sentimiento/);
+  // The wait is only said when there is a pace to estimate it from; an unknown time is not made up.
+  assert.equal(scanProgressSpeech({ fase: "lectura", hechas: 40, total: 180, restanteMs: null }), "Voy por la moneda 40 de 180.");
+  assert.equal(scanProgressSpeech({ fase: "lectura", hechas: 40, total: 180, restanteMs: 45_000 }), "Voy por la moneda 40 de 180. Tiempo restante estimado: 45 segundos.");
+  assert.match(scanProgressSpeech({ fase: "lectura", hechas: 40, total: 180, restanteMs: 100_000 }), /Tiempo restante estimado: 2 minutos\.$/);
+  assert.equal(scanProgressSpeech({ fase: "completa", hechas: 3, total: 10, restanteMs: null }), "Estoy releyendo completas las aprobadas: 3 de 10.");
+
+  const rows = rowsOf();
+  const result: ScanResult = { at: NOW, minVolumen: 5_000_000, universo: { elegibles: 6, contratos: 9, noMonedas: 2, sinVolumen: 1, recortadas: 0 }, filas: rows, resumen: summarize(rows), parcial: false, motivoParcial: null, duracionMs: 1000 };
+  assert.equal(scanAgeSpeech(result, NOW + 20_000), "El último escaneo es de hace menos de un minuto. ");
+  assert.equal(scanAgeSpeech(result, NOW + 1 * 60_000), "El último escaneo es de hace 1 minuto. ");
+  assert.equal(scanAgeSpeech(result, NOW + 12 * 60_000), "El último escaneo es de hace 12 minutos. ");
+  // Right at the limit it is still fresh; one minute past it, the plans are no longer to be read.
+  assert.doesNotMatch(scanAgeSpeech(result, NOW + SCAN_STALE_MS), /viejo/);
+  const old = scanAgeSpeech(result, NOW + SCAN_STALE_MS + 60_000);
+  assert.match(old, /de hace 31 minutos y ya está viejo: el mercado cambió, volvé a escanear antes de mirar los planes\. $/);
+  assert.match(scanAgeSpeech(result, NOW + 2 * 3_600_000), /de hace 2 horas y ya está viejo/);
+  assert.match(scanAgeSpeech(result, NOW - 5 * 60_000), /de hace menos de un minuto/, "a clock that went back is not a negative age");
 });
 
 test("a copied line uses the Argentine comma and says which read it comes from", () => {

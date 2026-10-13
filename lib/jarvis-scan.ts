@@ -254,6 +254,28 @@ export function scanSpeech(r: ScanResult, n = 4): string {
   return `${scanSummaryText(r)}${lista} La confluencia mide cuánto coinciden los especialistas, no la probabilidad de acertar. No es asesoramiento financiero.`;
 }
 
+/** Cuánto falta, dicho para la voz: segundos hasta un minuto y medio, después minutos. */
+const spokenWait = (ms: number) => {
+  const s = Math.max(1, Math.round(ms / 1000));
+  return s < 90 ? plural(s, "segundo", "segundos") : plural(Math.round(s / 60), "minuto", "minutos");
+};
+
+/** Cómo va el escaneo en curso, para la voz y el chat de JARVIS. */
+export function scanProgressSpeech(p: { fase: string; hechas: number; total: number; restanteMs: number | null } | null): string {
+  if (!p) return "Estoy empezando a escanear el mercado.";
+  if (p.fase === "monedas") return "Estoy pidiéndole a Binance la lista de monedas.";
+  if (p.fase === "datos") return "Estoy bajando lo que comparten todas las monedas: BTC, ETH, calendario, noticias y sentimiento.";
+  const falta = p.restanteMs ? ` Tiempo restante estimado: ${spokenWait(p.restanteMs)}.` : "";
+  return p.fase === "lectura" ? `Voy por la moneda ${p.hechas} de ${p.total}.${falta}` : `Estoy releyendo completas las aprobadas: ${p.hechas} de ${p.total}.${falta}`;
+}
+
+/** De cuándo es el último escaneo, para la voz; avisa si ya está viejo y no sirve para mirar planes. */
+export function scanAgeSpeech(r: ScanResult, now: number): string {
+  const min = Math.max(0, Math.round((now - r.at) / 60_000));
+  const cuando = min < 1 ? "de hace menos de un minuto" : min < 60 ? `de hace ${plural(min, "minuto", "minutos")}` : `de hace ${plural(Math.floor(min / 60), "hora", "horas")}`;
+  return now - r.at > SCAN_STALE_MS ? `El último escaneo es ${cuando} y ya está viejo: el mercado cambió, volvé a escanear antes de mirar los planes. ` : `El último escaneo es ${cuando}. `;
+}
+
 /** Una línea por fila aprobada, para copiar. */
 export function scanLine(r: ScanRow): string {
   const p = r.plan;

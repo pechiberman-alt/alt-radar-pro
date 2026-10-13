@@ -18,7 +18,7 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
 - Su estado local (`.swarm/`, `.claude-flow/`, `ruvector.db`) está en .gitignore. Nunca guardarle claves ni datos de usuarios en su memoria.
 
 ## Antes de proponer un cambio
-- `npm ci --no-audit --no-fund`, después `npm run lint`, `npm run test:unit` y `npm run build`. Los tres tienen que pasar.
+- `npm ci --no-audit --no-fund`, después `npm run lint`, `npm run test:unit` y `npm run build`. Los tres tienen que pasar. Además `npx tsc --noEmit -p .` (30 s; el CI no lo corre): el único error esperado es el de `vite.config.ts`.
 - Todo cambio de lógica lleva tests en `tests/` (node:test). Los de datos de mercado incluyen un test de que no se mira el futuro.
 - Al hacer merge a `main`, el CI despliega solo (lint, tests, build, migraciones D1, deploy).
 - No tocar `.github/workflows/` ni `wrangler*.jsonc` salvo pedido explícito.
