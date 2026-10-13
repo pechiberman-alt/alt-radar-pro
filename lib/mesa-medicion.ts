@@ -33,6 +33,8 @@ export type MedicionMesa = {
   dsr: number;
   /** Lo mismo suponiendo 300 reglas probadas. */
   dsr300: number;
+  /** Probabilidad de sobreajuste al elegir la mejor de esas reglas (PBO): 0,5 es tirar una moneda. */
+  pbo: number;
 };
 
 export const MEDICION: MedicionMesa = {
@@ -50,4 +52,5 @@ export const MEDICION: MedicionMesa = {
   reglasProbadas: 22,
   dsr: 0.999,
   dsr300: 0.998,
+  pbo: 0.51,
 };

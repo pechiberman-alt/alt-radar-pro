@@ -23,6 +23,10 @@ test("el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc
   assert.ok(doc.includes("PSR (probabilidad de que el Sharpe sea mayor que cero): 100%"));
 });
 
+test("el PBO está en la doc con el mismo número que muestra la araña", () => {
+  assert.ok(doc.includes(`PBO, CSCV de Bailey, Borwein, López de Prado y Zhu): ${Math.round(MEDICION.pbo * 100)}%`));
+});
+
 test("el win rate corregido, el 12 h y las 22 reglas están en la doc", () => {
   assert.equal(MEDICION.reglasProbadas, 22);
   assert.ok(doc.includes("22 reglas de la lista"));

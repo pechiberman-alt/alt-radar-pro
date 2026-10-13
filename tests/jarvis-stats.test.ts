@@ -11,6 +11,7 @@ import {
   momentos,
   normCdf,
   normInv,
+  probabilidadDeSobreajuste,
   profitFactor,
   psr,
   sharpeDeAzar,
@@ -99,6 +100,31 @@ test("si se probaron más reglas de las que se ven, el azar sube (con la misma v
   const cientos = sharpeDeAzar(VARIANTES, 300)!;
   assert.ok(cientos > vistas, "300 reglas tienen que subir el umbral");
   assert.equal(sharpeDeAzar(VARIANTES, 3), sharpeDeAzar(VARIANTES), "menos que las vistas no cambia nada");
+});
+
+test("el PBO: una regla que gana en todos los tramos no se sobreajusta; el ruido puro queda cerca de la mitad", () => {
+  const azar = generadorAzar(5);
+  const normal = () => azar() + azar() + azar() + azar() + azar() + azar() - 3; // aproximación de N(0; 0,7)
+  const T = 64;
+  const dominante = Array.from({ length: T }, () => [1, normal() * 0.3, normal() * 0.3, normal() * 0.3, normal() * 0.3]);
+  assert.equal(probabilidadDeSobreajuste(dominante, 8)?.pbo, 0);
+  // Con una sola muestra de ruido el PBO varía mucho (de 0,14 a 0,9 según la semilla): se promedian 12.
+  const pbos = Array.from({ length: 12 }, (_, s) => {
+    const otro = generadorAzar(1000 + s * 7919);
+    const n = () => otro() + otro() + otro() + otro() + otro() + otro() - 3;
+    const ruido = Array.from({ length: T }, () => Array.from({ length: 20 }, () => n()));
+    const r = probabilidadDeSobreajuste(ruido, 8);
+    assert.ok(r && r.combinaciones === 70);
+    return r.pbo;
+  });
+  const media = pbos.reduce((s, x) => s + x, 0) / pbos.length;
+  assert.ok(media > 0.35 && media < 0.65, `PBO medio del ruido: ${media}`);
+});
+
+test("el PBO no dice nada sin reglas distintas, con bloques impares o con pocos períodos", () => {
+  assert.equal(probabilidadDeSobreajuste(Array.from({ length: 16 }, () => [1, 1, 1]), 8), null, "reglas idénticas");
+  assert.equal(probabilidadDeSobreajuste([[1, 2], [2, 1], [3, 0]], 3), null, "bloques impares");
+  assert.equal(probabilidadDeSobreajuste([[1, 2], [2, 1]], 8), null, "menos períodos que bloques");
 });
 
 test("con pocas variantes el azar no se puede calcular: null, no cero", () => {
