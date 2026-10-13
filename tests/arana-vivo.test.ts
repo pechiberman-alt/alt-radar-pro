@@ -25,6 +25,7 @@ const MEDIDO: MedicionMesa = {
   reglasProbadas: 22,
   dsr: 0.5,
   dsr300: 0.4,
+  pbo: 0.5,
 };
 
 const base = (extra: Partial<VivoInput> = {}): VivoInput => ({

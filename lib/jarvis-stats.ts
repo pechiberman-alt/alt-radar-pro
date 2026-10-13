@@ -241,6 +241,67 @@ export function sharpeDeAzar(srVariantes: number[], pruebas = srVariantes.length
   return Math.sqrt(varianza) * ((1 - EULER) * normInv(1 - 1 / N) + EULER * normInv(1 - 1 / (N * Math.E)));
 }
 
+/** Todas las combinaciones de k índices entre 0 y n-1. */
+function combinaciones(n: number, k: number): number[][] {
+  const out: number[][] = [];
+  const cur: number[] = [];
+  const rec = (desde: number) => {
+    if (cur.length === k) {
+      out.push([...cur]);
+      return;
+    }
+    for (let i = desde; i <= n - (k - cur.length); i += 1) {
+      cur.push(i);
+      rec(i + 1);
+      cur.pop();
+    }
+  };
+  rec(0);
+  return out;
+}
+
+/**
+ * Probabilidad de sobreajuste (PBO, Bailey, Borwein, López de Prado y Zhu, 2014),
+ * por CSCV. `matriz`: una fila por período de tiempo (por ejemplo, el mes) y una
+ * columna por regla probada, con el resultado de la regla en ese período. La
+ * historia se parte en `bloques` tramos seguidos; en cada mitad de tramos se
+ * elige la regla mejor en esa mitad y se mira en qué puesto queda en la otra
+ * mitad. PBO = proporción de casos en que la elegida queda en la mitad de abajo.
+ * Un PBO de 50% o más dice que elegir la mejor no sirve más que tirar una moneda.
+ * Las combinaciones sin ninguna diferencia entre reglas no cuentan (no dicen nada).
+ */
+export function probabilidadDeSobreajuste(matriz: number[][], bloques = 8): { pbo: number; combinaciones: number; bloques: number; reglas: number } | null {
+  const T = matriz.length;
+  const N = T ? matriz[0].length : 0;
+  if (N < 2 || bloques < 2 || bloques % 2 !== 0 || T < bloques) return null;
+  const largo = Math.floor(T / bloques);
+  const suma: number[][] = [];
+  for (let b = 0; b < bloques; b += 1) {
+    const fila = new Array<number>(N).fill(0);
+    for (let t = b * largo; t < (b + 1) * largo; t += 1) for (let j = 0; j < N; j += 1) fila[j] += matriz[t][j];
+    suma.push(fila);
+  }
+  let usadas = 0;
+  let sobre = 0;
+  for (const dentro of combinaciones(bloques, bloques / 2)) {
+    const enDentro = new Set(dentro);
+    const fuera = Array.from({ length: bloques }, (_, b) => b).filter((b) => !enDentro.has(b));
+    const rendDentro = Array.from({ length: N }, (_, j) => dentro.reduce((s, b) => s + suma[b][j], 0));
+    const rendFuera = Array.from({ length: N }, (_, j) => fuera.reduce((s, b) => s + suma[b][j], 0));
+    if (Math.max(...rendFuera) === Math.min(...rendFuera)) continue;
+    let mejor = 0;
+    for (let j = 1; j < N; j += 1) if (rendDentro[j] > rendDentro[mejor]) mejor = j;
+    const v = rendFuera[mejor];
+    const menor = rendFuera.filter((x) => x < v).length;
+    const igual = rendFuera.filter((x) => x === v).length;
+    const omega = (menor + (igual + 1) / 2) / (N + 1);
+    usadas += 1;
+    if (omega <= 0.5) sobre += 1;
+  }
+  if (!usadas) return null;
+  return { pbo: sobre / usadas, combinaciones: usadas, bloques, reglas: N };
+}
+
 export type EvaluacionEstrategia = {
   n: number;
   ganadas: number;

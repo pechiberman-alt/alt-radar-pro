@@ -16,7 +16,7 @@
 import { runBacktest } from "../../lib/jarvis-backtest.ts";
 import { etiquetarTodas, fmt, lecturas, metricas, simulate, V1, V2, type Metricas, type Operacion, type Params, type Plan } from "./simulador.ts";
 import { aReal, aVirtual, dia, H, MONEDAS, perfilDe, velasAltas, velasBase, velasMedias, type Perfil } from "./util.ts";
-import { evaluarEstrategia, momentos, psr, sharpeDeAzar, sharpePorOperacion } from "../../lib/jarvis-stats.ts";
+import { evaluarEstrategia, momentos, probabilidadDeSobreajuste, psr, sharpeDeAzar, sharpePorOperacion } from "../../lib/jarvis-stats.ts";
 
 export type Ventana = { nombre: string; desde: number; hasta: number };
 
@@ -193,9 +193,22 @@ function estadistica(p: Perfil) {
   console.log(`\nEstadística de v2, perfil ${p.id} (IC90; PF e IC con bootstrap en bloques de operaciones)`);
   for (const w of ws) linea(w.nombre, enOrden(correr(V2, p, w)));
   const reglas = [V2, ...VARIANTES.map(([, c]) => ({ ...V2, ...c }))];
-  const srs = reglas.map((P) => sharpePorOperacion(enOrden(largas.flatMap((w) => correr(P, p, w))))).filter((s): s is number => s !== null);
-  const totalV2 = enOrden(largas.flatMap((w) => correr(V2, p, w)));
+  const porRegla = reglas.map((P) => largas.flatMap((w) => correr(P, p, w)));
+  const srs = porRegla.map((ts) => sharpePorOperacion(enOrden(ts))).filter((s): s is number => s !== null);
+  const totalV2 = enOrden(porRegla[0]);
   const e = linea("períodos largos (v2)", totalV2, srs);
+  // PBO: por mes, el resultado en R de cada regla (sumado entre monedas). Si la regla que gana en una mitad de los meses pierde en la otra, hay sobreajuste.
+  const mes = (t: number) => new Date(t).getUTCFullYear() * 12 + new Date(t).getUTCMonth();
+  const meses = new Map<number, number[]>();
+  porRegla.forEach((ts, j) => {
+    for (const t of ts) {
+      const k = mes(t.fin);
+      if (!meses.has(k)) meses.set(k, new Array<number>(reglas.length).fill(0));
+      meses.get(k)![j] += t.r;
+    }
+  });
+  const matriz = [...meses.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+  const sobre = probabilidadDeSobreajuste(matriz, 8);
   // La investigación probó más reglas que las de la lista: el número real de pruebas es mayor que 22. Por eso también va 300.
   const m = momentos(totalV2);
   const sr = e.sharpe;
@@ -206,6 +219,7 @@ function estadistica(p: Perfil) {
   };
   console.log(`\nSharpe de v2 por operación ${num(sr, 3)} · PSR (Sharpe > 0) ${num(e.psr0 === null ? null : e.psr0 * 100, 1)}% · WR corregido por ${srs.length} reglas ${e.winRateCorregido ? `[${pct(e.winRateCorregido.low)}; ${pct(e.winRateCorregido.high)}]` : "sin dato"}`);
   console.log(`Sharpe de azar, por número de reglas probadas: ${srs.length} (las de la lista) ${cota(srs.length)} · 300 ${cota(300)}`);
+  console.log(`Sobreajuste al elegir la mejor de ${reglas.length} reglas (PBO, 8 bloques sobre ${matriz.length} meses, ${sobre?.combinaciones ?? 0} combinaciones): ${sobre ? pct(sobre.pbo) : "sin dato"}`);
 }
 
 if (process.argv[1]?.endsWith("medir.ts")) {
