@@ -114,8 +114,9 @@ def492abf855	146	app/install-panel.tsx
 674a9d7b1cd9	246	app/jarvis-backtest.tsx
 e7261e72c9f7	299	app/jarvis-council.tsx
 5954976b79de	279	app/jarvis-paper.tsx
-76315385a19a	242	app/jarvis-trading.css
-7584988b98ae	711	app/jarvis-trading.tsx
+52c42b680523	219	app/jarvis-scan.tsx
+e4aeb9c38840	264	app/jarvis-trading.css
+0aabc3c8bf40	723	app/jarvis-trading.tsx
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
 719061eef9e9	192	app/jarvis-watch.tsx
 39c4819ab1a5	121	app/jarvis.css
@@ -174,7 +175,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-de441ccb97c5	203	docs/araña/objetivos.md
+ea49eb4d1cbe	204	docs/araña/objetivos.md
 081dd8a501f7	96	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 0207ee45bc91	144	docs/mesa-reglas-v2.md
@@ -250,7 +251,7 @@ f61124d7437f	79	lib/jarvis-chat.ts
 104f734141fd	467	lib/jarvis-core.ts
 7b2813e75f44	352	lib/jarvis-council.ts
 cb4645381ac1	582	lib/jarvis-desk-agents.ts
-ed58663ee313	208	lib/jarvis-desk-data.ts
+98cd644e2ca6	249	lib/jarvis-desk-data.ts
 d29490ffe116	101	lib/jarvis-desk-run.ts
 fa37d4a7b3d9	743	lib/jarvis-desk.ts
 7490f7cc5ddc	134	lib/jarvis-execution.ts
@@ -263,6 +264,8 @@ c4b51bfec404	337	lib/jarvis-mind.ts
 1a8d71f669ad	170	lib/jarvis-paper-db.ts
 e883b3e155e8	258	lib/jarvis-paper-run.ts
 cf67397ebde0	654	lib/jarvis-paper.ts
+3222008e4e7b	288	lib/jarvis-scan-run.ts
+db3374fa3289	263	lib/jarvis-scan.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
 4b677046fbed	39	lib/jarvis-voice.ts
 53060301e170	160	lib/jarvis-watch-run.ts
@@ -428,6 +431,7 @@ f509b7eb53bb	45	tests/jarvis-local.test.ts
 310a163bc5a2	198	tests/jarvis-paper-run.test.ts
 c977b546798a	414	tests/jarvis-paper.test.ts
 871655c35609	284	tests/jarvis-rules-v2.test.ts
+37bc8ae38a60	537	tests/jarvis-scan.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
 cc263e715076	62	tests/jarvis-watch-run.test.ts
 503532a31b9f	186	tests/jarvis-watch.test.ts

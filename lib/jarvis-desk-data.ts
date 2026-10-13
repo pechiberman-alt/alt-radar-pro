@@ -1,5 +1,5 @@
 import type { CryptoNewsItem } from "./crypto-news.ts";
-import { loadCalendar, type MacroEvent } from "./econ-calendar.ts";
+import { loadCalendar, type CalendarLoad, type MacroEvent } from "./econ-calendar.ts";
 import type { FearGreed } from "./fear-greed.ts";
 import { closedOnly } from "./jarvis-core.ts";
 import { loadRows } from "./market-fetch.ts";
@@ -130,16 +130,96 @@ export async function loadDerivatives(symbol: string, price: number | null, sign
   return { derivatives: server?.derivados?.data ?? null, viaServer: true };
 }
 
+/** Las velas crudas de Binance como la mesa las lee: solo las cerradas a esta hora (la que se está formando cambiaría la lectura cada minuto); null si no queda ninguna. */
+export function closedCandles(rows: unknown, tf: "1h" | "4h" | "1d", now: number): SwingCandle[] | null {
+  const c = closedOnly(parseSwingKlines(rows), DESK_FRAMES[tf === "1h" ? "h1" : tf === "4h" ? "h4" : "d1"], now);
+  return c.length ? c : null;
+}
+
 async function candlesOf(symbol: string, tf: "1h" | "4h" | "1d", limit: number, now: number, signal: AbortSignal, venues?: Set<string>): Promise<SwingCandle[] | null> {
   try {
     const meta: { venue?: string } = {};
     const rows = await loadRows(symbol, tf, limit, signal, meta);
     if (meta.venue && venues) venues.add(meta.venue);
-    const c = closedOnly(parseSwingKlines(rows), DESK_FRAMES[tf === "1h" ? "h1" : tf === "4h" ? "h4" : "d1"], now);
-    return c.length ? c : null;
+    return closedCandles(rows, tf, now);
   } catch {
     return null;
   }
+}
+
+/** Lo que no depende de la moneda: Miedo y Avaricia con las noticias, el calendario y la dominancia. Cada parte puede faltar sola. */
+export type MarketContext = {
+  sentiment: { fearGreed?: FearGreed | null; news?: CryptoNewsItem[] } | null;
+  calendar: CalendarLoad;
+  structure: MarketStructure | null;
+};
+
+export async function loadMarketContext(signal: AbortSignal, structure?: MarketStructure | null): Promise<MarketContext> {
+  const [sentiment, calendar, found] = await Promise.all([
+    fetch("/api/sentiment", { cache: "no-store", signal })
+      .then((r) => (r.ok ? (r.json() as Promise<{ fearGreed?: FearGreed | null; news?: CryptoNewsItem[] }>) : null))
+      .catch(() => null),
+    loadCalendar().catch(() => null),
+    structure !== undefined && structure !== null
+      ? Promise.resolve(structure)
+      : fetch("/api/market-structure", { cache: "no-store", signal })
+          .then((r) => (r.ok ? (r.json() as Promise<MarketStructure | null>) : null))
+          .catch(() => null),
+  ]);
+  return { sentiment, calendar, structure: found };
+}
+
+/** Las partes ya leídas de una moneda, juntas en el objeto que lee la mesa. Una sola forma de armarlo: la lectura completa y la del escáner no pueden diferir en lo que dicen de dónde salió cada dato. */
+export type SnapshotParts = {
+  symbol: string;
+  now: number;
+  venues: Iterable<string>;
+  h1: SwingCandle[] | null;
+  h4: SwingCandle[] | null;
+  d1: SwingCandle[] | null;
+  btc: SwingCandle[] | null;
+  eth: SwingCandle[] | null;
+  deriv: { derivatives: Derivatives | null; viaServer: boolean } | null;
+  liquidations: LiquidationTape | null;
+  context: MarketContext;
+};
+
+export function assembleSnapshot(p: SnapshotParts): DeskSnapshot {
+  const { sentiment, calendar, structure } = p.context;
+  const isBtc = p.symbol === "BTCUSDT";
+  const isEth = p.symbol === "ETHUSDT";
+  const derivatives = p.deriv?.derivatives ?? null;
+  const venues = [...p.venues];
+  // The venue that actually answered: futures first, spot or the server's copy when futures does not.
+  const sources = [`Velas: ${venues.length ? venues.join(" + ") : "sin respuesta"} (1h, 4h y 1d, solo cerradas)`];
+  if (derivatives) {
+    const fields = [derivatives.fundingPct !== null && "funding", derivatives.oiChange24hPct !== null && "interés abierto", derivatives.longShortRatio !== null && "ratio largo/corto", derivatives.takerBuySell !== null && "flujo agresor"].filter(Boolean).join(", ");
+    sources.push(`Derivados: ${derivatives.source}${p.deriv?.viaServer ? " (desde el servidor: Binance no respondió)" : ""} · ${fields}`);
+  }
+  if (p.liquidations) sources.push(`Liquidaciones reales: ${p.liquidations.fuente}`);
+  if (sentiment?.news) sources.push("Noticias: CoinDesk, Cointelegraph, Decrypt, The Block, Bitcoin Magazine (titulares)");
+  if (sentiment?.fearGreed) sources.push("Miedo y Avaricia: alternative.me");
+  if (calendar) sources.push(`Calendario: ${calendar.source}${calendar.stale ? " (copia vieja)" : ""}`);
+  if (structure) sources.push(`Dominancia: ${structure.source}`);
+  return {
+    symbol: p.symbol,
+    now: p.now,
+    candles: { h1: p.h1 ?? [], h4: p.h4, d1: p.d1 },
+    btc: isBtc ? p.h1 : p.btc,
+    eth: isEth ? p.h1 : p.eth,
+    derivatives,
+    liquidations: p.liquidations,
+    macro: {
+      btcDominance: structure?.dominance.btc ?? null,
+      usdtDominance: structure?.dominance.usdt ?? null,
+      marketCapChange24h: structure?.marketCapChange24h ?? null,
+      events: calendar?.events ?? null,
+      calendarSource: calendar?.source ?? null,
+    },
+    news: Array.isArray(sentiment?.news) ? sentiment.news : null,
+    fearGreed: sentiment?.fearGreed ?? null,
+    sources,
+  };
 }
 
 /**
@@ -152,56 +232,17 @@ export async function loadDeskSnapshot(symbol: string, opts: { now?: number; str
   const isBtc = symbol === "BTCUSDT";
   const isEth = symbol === "ETHUSDT";
   const venues = new Set<string>();
-  const [h1, h4, d1, btc, eth, sentiment, calendar, structure] = await Promise.all([
+  const [h1, h4, d1, btc, eth, context] = await Promise.all([
     candlesOf(symbol, "1h", 1000, now, signal, venues),
     candlesOf(symbol, "4h", 300, now, signal, venues),
     candlesOf(symbol, "1d", 220, now, signal, venues),
     isBtc ? Promise.resolve(null) : candlesOf("BTCUSDT", "1h", 200, now, signal),
     isEth ? Promise.resolve(null) : candlesOf("ETHUSDT", "1h", 200, now, signal),
-    fetch("/api/sentiment", { cache: "no-store", signal })
-      .then((r) => (r.ok ? (r.json() as Promise<{ fearGreed?: FearGreed | null; news?: CryptoNewsItem[] }>) : null))
-      .catch(() => null),
-    loadCalendar().catch(() => null),
-    opts.structure !== undefined && opts.structure !== null
-      ? Promise.resolve(opts.structure)
-      : fetch("/api/market-structure", { cache: "no-store", signal })
-          .then((r) => (r.ok ? (r.json() as Promise<MarketStructure | null>) : null))
-          .catch(() => null),
+    loadMarketContext(signal, opts.structure),
   ]);
   const price = h1?.at(-1)?.close ?? null;
   const [deriv, liq] = h1
     ? await Promise.all([loadDerivatives(symbol, price, signal).catch(() => null), serverMarket(symbol, price, "liquidaciones", signal)])
     : [null, null];
-  const derivatives = deriv?.derivatives ?? null;
-  const liquidations = liq?.liquidaciones ?? null;
-  // The venue that actually answered: futures first, spot or the server's copy when futures does not.
-  const sources = [`Velas: ${venues.size ? [...venues].join(" + ") : "sin respuesta"} (1h, 4h y 1d, solo cerradas)`];
-  if (derivatives) {
-    const fields = [derivatives.fundingPct !== null && "funding", derivatives.oiChange24hPct !== null && "interés abierto", derivatives.longShortRatio !== null && "ratio largo/corto", derivatives.takerBuySell !== null && "flujo agresor"].filter(Boolean).join(", ");
-    sources.push(`Derivados: ${derivatives.source}${deriv?.viaServer ? " (desde el servidor: Binance no respondió)" : ""} · ${fields}`);
-  }
-  if (liquidations) sources.push(`Liquidaciones reales: ${liquidations.fuente}`);
-  if (sentiment?.news) sources.push("Noticias: CoinDesk, Cointelegraph, Decrypt, The Block, Bitcoin Magazine (titulares)");
-  if (sentiment?.fearGreed) sources.push("Miedo y Avaricia: alternative.me");
-  if (calendar) sources.push(`Calendario: ${calendar.source}${calendar.stale ? " (copia vieja)" : ""}`);
-  if (structure) sources.push(`Dominancia: ${structure.source}`);
-  return {
-    symbol,
-    now,
-    candles: { h1: h1 ?? [], h4, d1 },
-    btc: isBtc ? h1 : btc,
-    eth: isEth ? h1 : eth,
-    derivatives,
-    liquidations,
-    macro: {
-      btcDominance: structure?.dominance.btc ?? null,
-      usdtDominance: structure?.dominance.usdt ?? null,
-      marketCapChange24h: structure?.marketCapChange24h ?? null,
-      events: calendar?.events ?? null,
-      calendarSource: calendar?.source ?? null,
-    },
-    news: Array.isArray(sentiment?.news) ? sentiment.news : null,
-    fearGreed: sentiment?.fearGreed ?? null,
-    sources,
-  };
+  return assembleSnapshot({ symbol, now, venues, h1, h4, d1, btc, eth, deriv, liquidations: liq?.liquidaciones ?? null, context });
 }
