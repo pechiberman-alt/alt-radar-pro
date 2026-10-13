@@ -1,9 +1,11 @@
 # Huellas de la araña: hash corto, líneas y ruta de cada archivo. Lo escribe npm run arana; lo lee --cambios.
+85b481b3469d	5	.claude/settings.json
 b531751b31a2	27	.github/workflows/claude.yml
 bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
-ceaa106c98e0	0	.gitignore
+cd6df567d84b	0	.gitignore
+01d17d57cd3e	9	.mcp.json
 6b5886c6306e	5	.openai/hosting.json
-f9d30a787fbd	57	CLAUDE.md
+9f7f9a424c2c	63	CLAUDE.md
 8b27e3600b59	64	README.md
 5aac31cab73c	36	THIRD_PARTY_NOTICES.md
 7d7e53d1533b	103	app/account-panel.css
@@ -63,6 +65,8 @@ aa86804bf9da	24	app/api/telegram/test/route.ts
 9f8f9a0bdfc4	176	app/api/telegram/webhook/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
+8dd957053b0c	9	app/arana-desk.css
+cbea45dd3ba2	42	app/arana-desk.tsx
 109c61b2bb44	34	app/asset-flows.css
 866aeee2a3d1	125	app/asset-flows.tsx
 c8f77f7b2422	70	app/assistant-console.css
@@ -116,7 +120,7 @@ e490e4f09815	279	app/jarvis-paper.tsx
 39c4819ab1a5	121	app/jarvis.css
 cd30c7e836f9	1647	app/jarvis.tsx
 aa4d7c876c20	51	app/laptop.css
-34ec9337ceb1	130	app/layout.tsx
+30198b3908f1	131	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
 541dc714c4e8	4227	app/liquidation-heatmap-desk.tsx
 94022510ca41	3132	app/live-bookmap.tsx
@@ -138,7 +142,7 @@ f6c0da2d5db5	170	app/pressure-desk.tsx
 9f9d72a3dd57	87	app/pump-radar.css
 74db3d1c5d80	350	app/pump-radar.tsx
 f58412c957a0	53	app/pwa-register.tsx
-10965b818dbe	1361	app/radar-app.tsx
+76f7f0ef32bd	1367	app/radar-app.tsx
 72da20719972	274	app/responsive-fixes.css
 119930fcab22	76	app/risk-desk.css
 57216ff5dacb	344	app/risk-desk.tsx
@@ -164,12 +168,12 @@ fbfd8084693b	38	app/trade-journal-desk.css
 d1d42e77268a	43	app/unlock-desk.css
 75b335780f73	170	app/unlock-desk.tsx
 7d79d9a14c6a	343	app/workspace.css
-f9aec051f520	355	app/workspace.tsx
+1d85559d745b	356	app/workspace.tsx
 330c84e55f99	43	app/zones-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-03d928b31d1d	198	docs/araña/objetivos.md
+44044c1b1fd7	200	docs/araña/objetivos.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -335,7 +339,7 @@ e3716cedec35	259	lib/trading-profiles.ts
 5fe614a4e7bf	146	lib/web-push.ts
 19e2de71f66e	6	next-env.d.ts
 89327ac52fc9	8	next.config.ts
-4ed4e56659f8	51	package.json
+6394a346ad50	51	package.json
 8f8be689e9af	8	postcss.config.mjs
 81e071a890a7	0	public/favicon.svg
 43e2751ad2c3	0	public/file.svg
@@ -347,9 +351,10 @@ fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
 9f6da9fc755a	898	scripts/arana-vista.html
-aaabbc98195f	1024	scripts/arana.mjs
+1d0419f57c17	1065	scripts/arana.mjs
 30cfa0e96f19	19	scripts/write-build-info.mjs
 a6bc231bf554	374	tests/account-journal.test.ts
+847dabc14320	44	tests/agentes-mcp.test.ts
 bc528d50d94b	74	tests/ai-analyst.test.ts
 8236d721ebba	168	tests/ai-brains.test.ts
 57f3eea79cb8	38	tests/ai-numbers.test.ts
@@ -357,7 +362,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
-e9f096df4918	226	tests/arana.test.ts
+332134980b76	291	tests/arana.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
 8dffdd6b09f6	386	tests/assistant.test.ts
 dff2674006ae	17	tests/auth-pbkdf2.test.ts

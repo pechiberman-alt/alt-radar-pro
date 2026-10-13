@@ -21,9 +21,11 @@ export const DOCS = "docs/araña";
 export const OBJETIVOS = `${DOCS}/objetivos.md`;
 export const MAPA = `${DOCS}/MAPA.md`;
 export const HUELLAS = `${DOCS}/huellas.txt`;
+/** La página que sirve la app (la genera el build; no se commitea). */
+export const PAGINA = "public/arana/index.html";
 
 // Generated or heavy files: never indexed.
-const NO_INDEXAR = new Set(["lib/build-info.ts", "worker-configuration.d.ts", "tsconfig.tsbuildinfo", "package-lock.json", MAPA, HUELLAS]);
+const NO_INDEXAR = new Set(["lib/build-info.ts", "worker-configuration.d.ts", "tsconfig.tsbuildinfo", "package-lock.json", MAPA, HUELLAS, PAGINA]);
 const CARPETAS_EXCLUIDAS = new Set(["node_modules", ".git", "dist", ".next", ".vinext", ".wrangler", "coverage", "out"]);
 const CODIGO = /\.(?:ts|tsx|js|mjs|cjs)$/;
 const TEXTO = /\.(?:ts|tsx|js|mjs|cjs|css|md|json|jsonc|sql|yml|yaml|txt|html|toml)$/;
@@ -927,6 +929,34 @@ export function vistaHtml(plantilla, grafo) {
   return plantilla.replace("/*__GRAFO__*/null", () => json);
 }
 
+/**
+ * La vista como página suelta, para servirla desde la app: la plantilla es un
+ * fragmento (sin doctype ni cuerpo, como lo pide el artifact), así que acá se
+ * le pone el documento alrededor. El navegador cierra solo el head cuando
+ * llega el primer elemento del cuerpo.
+ */
+export function paginaHtml(fragmento) {
+  return `<!doctype html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<meta name="robots" content="noindex">\n${fragmento}\n</html>\n`;
+}
+
+const escaparHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+/** Lo que se sirve si el build no pudo dibujar la araña: avisa, no rompe el marco de la app. */
+export function paginaCaida(motivo) {
+  return `<!doctype html>\n<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Araña de ALT RADAR</title>\n<style>html,body{margin:0;height:100%;background:#030605;color:#dfe9e3;font:14px/1.6 system-ui,sans-serif}body{display:grid;place-content:center;padding:24px;text-align:center}code{color:#4fd8c4}small{color:#6f8278}</style></head>\n<body><div><p><b>La araña no se pudo dibujar en este build.</b></p><p><small>${escaparHtml(motivo)}</small></p><p><small>Para verla: <code>npm run arana -- --vista</code></small></p></div></body></html>\n`;
+}
+
+/** El commit corto: el del CI si está, si no el de git, si no nada. */
+function commitCorto() {
+  const ci = (process.env.GITHUB_SHA || "").slice(0, 7);
+  if (ci) return ci;
+  try {
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null;
+  } catch {
+    return null; // Not a git checkout: the view just does not name the commit.
+  }
+}
+
 const AYUDA = `La araña: el mapa de ALT RADAR PRO para consultar sin leer todo el repo.
 
   npm run arana                        reescribe docs/araña/MAPA.md y huellas.txt (después de cambiar archivos u objetivos)
@@ -939,6 +969,7 @@ const AYUDA = `La araña: el mapa de ALT RADAR PRO para consultar sin leer todo 
   npm run arana -- --cambios           qué cambió desde el último mapa
   npm run arana -- --check             falla si el mapa está viejo, si hay archivos sin objetivo o si el navegador toca secretos
   npm run arana -- --vista [salida]    dibuja la araña recorriendo el proyecto en docs/araña/vista.html (no se commitea)
+  npm run arana -- --pagina [salida]   la misma vista como página suelta en public/arana/index.html: la genera el build y la app la muestra en LA ARAÑA
   npm run arana -- --ayuda
 
 La lectura es estática: los imports que se arman en tiempo de ejecución no aparecen.`;
@@ -982,17 +1013,14 @@ export function ejecutar(args, index, { mapaGuardado = null, huellas = null } = 
     const r = chequear(index, mapaGuardado);
     return { codigo: r.ok ? 0 : 1, salida: textoCheck(r) };
   }
-  if (flag === "--vista") {
+  if (flag === "--vista" || flag === "--pagina") {
     const plantilla = readFileSync(join(ROOT, VISTA_PLANTILLA), "utf8");
-    let commit = null;
-    try {
-      commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
-    } catch {
-      // Not a git checkout: the view just does not name the commit.
-    }
-    const salida = tema || VISTA;
-    writeFileSync(join(ROOT, salida), vistaHtml(plantilla, grafoDe(index, { commit })));
-    return { codigo: 0, salida: `Vista de la araña: ${salida} (${resumen(index)})` };
+    const salida = tema || (flag === "--pagina" ? PAGINA : VISTA);
+    const vista = vistaHtml(plantilla, grafoDe(index, { commit: commitCorto() }));
+    const destino = resolve(ROOT, salida);
+    mkdirSync(dirname(destino), { recursive: true });
+    writeFileSync(destino, flag === "--pagina" ? paginaHtml(vista) : vista);
+    return { codigo: 0, salida: `${flag === "--pagina" ? "Página de la araña" : "Vista de la araña"}: ${salida} (${resumen(index)})` };
   }
   return { codigo: 2, salida: `No conozco «${flag}».\n\n${AYUDA}` };
 }
@@ -1014,10 +1042,23 @@ function regenerar(index) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  const index = cargarIndice(ROOT);
-  const { codigo, salida } = args.length
-    ? ejecutar(args, index, { mapaGuardado: leerSiExiste(ROOT, MAPA), huellas: leerSiExiste(ROOT, HUELLAS) })
-    : regenerar(index);
-  process.stdout.write(`${salida}\n`);
-  process.exitCode = codigo;
+  if (args[0] === "--pagina") {
+    // Corre en el build de la app: si algo falla, deja una página que avisa y el build sigue.
+    try {
+      process.stdout.write(`${ejecutar(args, cargarIndice(ROOT)).salida}\n`);
+    } catch (e) {
+      const motivo = e instanceof Error ? e.message : String(e);
+      const destino = resolve(ROOT, args.slice(1).join(" ").trim() || PAGINA);
+      mkdirSync(dirname(destino), { recursive: true });
+      writeFileSync(destino, paginaCaida(motivo));
+      process.stdout.write(`La página de la araña no se pudo armar (${motivo}); queda una que avisa.\n`);
+    }
+  } else {
+    const index = cargarIndice(ROOT);
+    const { codigo, salida } = args.length
+      ? ejecutar(args, index, { mapaGuardado: leerSiExiste(ROOT, MAPA), huellas: leerSiExiste(ROOT, HUELLAS) })
+      : regenerar(index);
+    process.stdout.write(`${salida}\n`);
+    process.exitCode = codigo;
+  }
 }

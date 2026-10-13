@@ -84,6 +84,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   { id: "rompe", label: "A PUNTO DE ROMPER", primary: false, group: "SEÑALES Y ENTRADAS" },
   { id: "dca", label: "DCA", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
   { id: "configuracion", label: "CONFIGURACIÓN", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
+  { id: "arana", label: "LA ARAÑA", primary: false, group: "GESTIÓN Y HERRAMIENTAS" },
 ];
 
 /**

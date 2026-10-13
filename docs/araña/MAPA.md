@@ -4,9 +4,9 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 474 · objetivos: 15 · sin objetivo: 0
+- Archivos: 479 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 43 · secretos: 4 · variables de entorno: 8 · rutas /api: 49 · hosts: 54
-- Código de navegador: 56 archivos con "use client" que alcanzan 154 · problemas: 0
+- Código de navegador: 57 archivos con "use client" que alcanzan 155 · problemas: 0
 - Lib sin prueba directa: 20 de 146
 
 ## Objetivos
@@ -306,17 +306,20 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/auth.ts` — Per-client authentication: email + password, isolated by user_id.
 - `lib/secret-box.ts` — AES-GCM with a base64 32-byte key: iv (12 bytes) + ciphertext, base64.
 
-### araña — La araña del proyecto y las instrucciones para trabajar en él (5)
+### araña — La araña del proyecto y las instrucciones para trabajar en él (7)
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
+- `.claude/settings.json`
+- `.mcp.json`
 - `CLAUDE.md` — ALT RADAR PRO — reglas del proyecto
 - `docs/araña/objetivos.md` — Objetivos de ALT RADAR PRO
 - `scripts/arana-vista.html`
-- `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, norm (+42)
+- `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, PAGINA (+45)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (119)
+### calidad — Pruebas (120)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
+- `tests/agentes-mcp.test.ts` — pruebas: ruflo is one MCP server run with npx, ruflo is pinned: exact version, cutoff date for its dependencies, no install scr, the project approves ruflo and gives the cold start time to download (+1)
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
 - `tests/ai-brains.test.ts` — pruebas: answers are read in every shape these APIs use, without the model, Cloudflare, the free brain on Workers AI: Qwen3 without thinking out loud; spent allowance a (+1)
 - `tests/ai-numbers.test.ts` — pruebas: numbers reach the AIs already written the Argentine way, forAi converts every number but times, and leaves the rest alone, a level written back is read in either notation, the one near the price winning
@@ -436,7 +439,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/workspace-sections.test.ts` — pruebas: every Collapsible section id is registered in WORKSPACE_SECTIONS, WORKSPACE_SECTIONS has no id without a matching Collapsible to open, every section belongs to one of the declared groups (+1)
 - `tests/xau-alerts.test.ts` — pruebas: gold and silver by any common name, and real coins untouched, the metals live on the futures API; everything else on spot, gold prices keep their cents and both writing habits work (+1)
 
-### app-movil — Interfaz, PWA y celular primero (95)
+### app-movil — Interfaz, PWA y celular primero (97)
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
 - `app/account-panel.css`
 - `app/account-panel.tsx` — exporta: AccountPanel, default
@@ -444,6 +447,8 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/agenda-macro.tsx` — exporta: AgendaMacro, default
 - `app/alert-center.css`
 - `app/alert-toasts.css` — Banners sit above everything but clear of the phone's bottom nav, and are click-through except on the cards themselves, so they never block a tap on the chart underneath.
+- `app/arana-desk.css`
+- `app/arana-desk.tsx` — exporta: AranaDesk, default
 - `app/asset-flows.css`
 - `app/asset-flows.tsx` — exporta: AssetFlowDesk, default
 - `app/assistant-console.css`
@@ -593,7 +598,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - variable `ASSETS` — en: worker/index.ts
 - variable `CODEX_SANDBOX` — en: vite.config.ts
 - variable `ENCRYPTION_KEY` — en: lib/app-settings.ts
-- variable `GITHUB_SHA` — en: scripts/write-build-info.mjs
+- variable `GITHUB_SHA` — en: scripts/arana.mjs, scripts/write-build-info.mjs
 - variable `IMAGES` — en: worker/index.ts
 - variable `MINIFLARE_REGISTRY_PATH` — en: vite.config.ts
 - variable `WRANGLER_LOG_PATH` — en: vite.config.ts
@@ -710,7 +715,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-paper.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-paper.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa

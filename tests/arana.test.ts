@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
@@ -13,6 +15,8 @@ import {
   grafoDe,
   MAPA,
   objetivoDe,
+  paginaCaida,
+  paginaHtml,
   parseObjetivos,
   renderHuellas,
   renderMapa,
@@ -222,4 +226,65 @@ test("the view: the graph goes inside the page once, and nothing in it can close
   assert.equal(html.split("</script>").length, plantilla.split("</script>").length, "no extra </script> from the data");
   assert.ok(html.includes("<title>Araña de ALT RADAR</title>"));
   assert.throws(() => vistaHtml("<p>sin marcador</p>", g), /falta el marcador/);
+});
+
+test("the page for the app: a whole document around the view, with the graph inside once", () => {
+  const plantilla = readFileSync(join(ROOT, VISTA_PLANTILLA), "utf8");
+  const g = grafoDe(construirIndice(FILES, parseObjetivos(FIXTURE_MD)), { generado: "2026-10-13T00:00:00.000Z", commit: "abc1234" });
+  const vista = vistaHtml(plantilla, g);
+  const pagina = paginaHtml(vista);
+  assert.ok(pagina.startsWith("<!doctype html>"), "without a doctype the browser renders in quirks mode");
+  assert.ok(pagina.includes('<meta charset="utf-8">') && pagina.includes('name="viewport"'));
+  assert.ok(pagina.includes(vista), "the view goes in untouched");
+  assert.equal(pagina.split("<title>").length, 2, "one title");
+  assert.ok(pagina.includes("abc1234"));
+  assert.ok(!pagina.includes("/*__GRAFO__*/null"));
+});
+
+test("the fallback page says what happened, escapes the reason and runs nothing", () => {
+  const html = paginaCaida('falta <script>alert("x")</script> & más');
+  assert.ok(html.startsWith("<!doctype html>"));
+  assert.ok(html.includes("La araña no se pudo dibujar"));
+  assert.ok(!html.includes("<script"), "no script, not even the one in the reason");
+  assert.ok(html.includes("&lt;script&gt;") && html.includes("&amp;"));
+});
+
+test("--pagina writes the standalone page where it is told to", () => {
+  const dir = mkdtempSync(join(tmpdir(), "arana-pagina-"));
+  try {
+    const salida = join(dir, "nueva", "index.html");
+    const r = ejecutar(["--pagina", salida], cargarIndice(ROOT));
+    assert.equal(r.codigo, 0);
+    const html = readFileSync(salida, "utf8");
+    assert.ok(html.startsWith("<!doctype html>") && html.includes("Araña de ALT RADAR"));
+    assert.ok(html.includes('"archivos"'), "the graph is inside");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("--pagina in a build that cannot read the project leaves the fallback page and does not fail the build", () => {
+  const dir = mkdtempSync(join(tmpdir(), "arana-caida-"));
+  try {
+    // A copy of the script with no docs next to it: the objectives file is missing, so the index cannot be built.
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    copyFileSync(join(ROOT, "scripts", "arana.mjs"), join(dir, "scripts", "arana.mjs"));
+    const r = spawnSync(process.execPath, [join(dir, "scripts", "arana.mjs"), "--pagina"], { encoding: "utf8" });
+    assert.equal(r.status, 0, "the build keeps going");
+    const html = readFileSync(join(dir, "public", "arana", "index.html"), "utf8");
+    assert.ok(html.includes("La araña no se pudo dibujar"));
+    assert.ok(r.stdout.includes("queda una que avisa"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the app wires the page: build step, ignored output, the frame and its section", () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  assert.ok(String(pkg.scripts.prebuild).includes("arana.mjs --pagina"), "the build draws the page");
+  assert.ok(readFileSync(join(ROOT, ".gitignore"), "utf8").split("\n").includes("/public/arana/"), "generated, so it is not committed");
+  const desk = readFileSync(join(ROOT, "app", "arana-desk.tsx"), "utf8");
+  assert.ok(desk.includes('src="/arana/index.html"') && desk.includes("sandbox="), "the frame loads the page, sandboxed");
+  const app = readFileSync(join(ROOT, "app", "radar-app.tsx"), "utf8");
+  assert.ok(app.includes('<Collapsible id="arana"') && app.includes('id: "arana"'), "section and nav entry");
 });

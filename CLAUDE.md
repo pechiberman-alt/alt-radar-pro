@@ -10,6 +10,12 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
 - No leas docs/araña/MAPA.md entero: es el mapa completo; usá las consultas.
 - `npm run arana -- --vista` dibuja la araña recorriendo el proyecto (docs/araña/vista.html, no se commitea): la página que ve Uri, publicada como artifact.
 
+## Agentes: Ruflo (MCP)
+- `.mcp.json` conecta Ruflo (ruvnet/ruflo, ex Claude-Flow: enjambres de agentes, memoria, 353 herramientas) como servidor MCP `ruflo`. `.claude/settings.json` lo aprueba y le da 2 minutos de arranque: la primera vez baja los paquetes (~1 min); después arranca en menos de 1 s.
+- Está fijado: `@claude-flow/cli@3.48.0` (el paquete `ruflo` apunta a `^3`, no fija nada), `--before=2026-09-29` (ninguna dependencia más nueva que esa fecha) y `--ignore-scripts`. Para subir de versión: revisá el changelog y el `postinstall` del paquete, probá `tools/list` y recién ahí cambiá el pin y la fecha.
+- No correr `npx ruflo init` ni `claude-flow init` en este repo: reescriben CLAUDE.md y agregan hooks. Los agentes de Ruflo trabajan con las reglas de este archivo, igual que cualquier otro.
+- Su estado local (`.swarm/`, `.claude-flow/`, `ruvector.db`) está en .gitignore. Nunca guardarle claves ni datos de usuarios en su memoria.
+
 ## Antes de proponer un cambio
 - `npm ci --no-audit --no-fund`, después `npm run lint`, `npm run test:unit` y `npm run build`. Los tres tienen que pasar.
 - Todo cambio de lógica lleva tests en `tests/` (node:test). Los de datos de mercado incluyen un test de que no se mira el futuro.
