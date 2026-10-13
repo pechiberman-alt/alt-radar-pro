@@ -34,6 +34,7 @@ import {
   ensureCoreSchema,
   isBusy,
   loadModel,
+  markCoreHits,
   openCoreSignals,
   readMind,
   recordCoreSignals,
@@ -448,6 +449,10 @@ test("telegram: taken signals only, with what it learned; closes with the record
   assert.ok(ev.every((e) => e.category === "JARVIS"));
   assert.match(ev[0].text, /Aprendizaje: favorable · esperado \+0,21R ± 0,08 \(640 casos\)\nPesa: Con BTC a favor \(\+0,25R\)/);
   assert.match(ev[1].text, /✅[\s\S]*llegó al objetivo: <b>\+1,92R<\/b>/);
+  // Entry 180, stop 177, target 186: the ladder is SL 177 · TP1 182 · TP2 184 · TP3 186.
+  assert.match(ev[0].text, /Entrada <b>180<\/b> · SL 177 · TP1 182 · TP2 184 · TP3 186/);
+  assert.match(ev[0].text, /TP3 es el objetivo que se mide/);
+  assert.match(ev[1].text, /Entrada 180 · SL 177 · TP1 182 · TP2 184 · TP3 186 ✓/);
   assert.match(ev[1].text, /Registro del núcleo: 1 cerradas · win rate 100% · PF ∞ · \+1,92R · muestra mínima/);
   const d = dailyEvent("2026-10-07", st, learn);
   assert.equal(d.key, "jarvis:daily:2026-10-07");
@@ -471,3 +476,21 @@ test("telegram collection: the first run only sets the starting point", { skip: 
 
 // Keep the type import used.
 export type _Unused = JarvisSignal;
+
+test("database: TP1 and TP2 of an open signal are written once, when reached, and kept when it closes", { skip: !sqlite }, async () => {
+  const db = makeDb();
+  await ensureCoreSchema(db);
+  await recordCoreSignals(db, [sig()], 1000);
+  const [open] = await openCoreSignals(db);
+  assert.deepEqual([open.tp1At, open.tp2At], [null, null]);
+  const withTp1 = { ...open, tp1At: 101 * H };
+  assert.equal(await markCoreHits(db, [open], [withTp1]), 1);
+  assert.equal(await markCoreHits(db, [withTp1], [withTp1]), 0, "nothing new, nothing written");
+  // A time already written is never overwritten.
+  await markCoreHits(db, [withTp1], [{ ...withTp1, tp1At: 105 * H, tp2At: 106 * H }]);
+  const read = (await openCoreSignals(db))[0];
+  assert.deepEqual([read.tp1At, read.tp2At], [101 * H, 106 * H]);
+  await closeCoreSignals(db, [{ ...read, result: "OBJETIVO", r: 1.92, closedAt: 110 * H }]);
+  const closed = (await coreActivitySince(db, 0)).find((s) => s.id === sig().id)!;
+  assert.deepEqual([closed.result, closed.tp1At, closed.tp2At], ["OBJETIVO", 101 * H, 106 * H]);
+});

@@ -1,3 +1,4 @@
+import { escaleraHacia, recorrer, type Escalera } from "./escalera.ts";
 import { lvStats, type LvStats } from "./liq-vol-signals.ts";
 import type { MagnetEvent, MagnetPair } from "./magnet-watch.ts";
 import type { PreBreak } from "./pre-breakout.ts";
@@ -21,6 +22,11 @@ import type { SwingCandle } from "./swing-entries.ts";
  *          other side if it sits 1–4R away, else 2R.
  * Alerts without a direction ("sin dirección", "cerca de un imán") are not
  * signals and are not counted.
+ *
+ * Every signal also carries its whole ladder (lib/escalera.ts): the target is
+ * TP3 — the level that is measured — and TP1/TP2 sit a third and two thirds of
+ * the way, for partials. The time each one is reached is recorded; the result
+ * (OBJETIVO / STOP / TIEMPO and its R) is exactly what it was before.
  */
 
 export const HORIZON = 48;
@@ -49,7 +55,21 @@ export type JarvisSignal = {
   /** Net of fees, in R; null while open. */
   r: number | null;
   closedAt: number | null;
+  /** Close time of the candle that reached TP1 / TP2 before the stop (absent in signals recorded before the ladder). */
+  tp1At?: number | null;
+  tp2At?: number | null;
 };
+
+/** The signal's SL, TP1, TP2 and TP3: TP3 is its target. Null if its levels are not coherent. */
+export const escaleraDe = (s: Pick<JarvisSignal, "side" | "entry" | "stop" | "target">): Escalera | null => escaleraHacia(s.side, s.entry, s.stop, s.target);
+
+/** The ladder in one line, «SL x · TP1 y ✓ · TP2 z · TP3 w», with ✓ on the targets already reached. */
+export function escaleraLinea(s: JarvisSignal, px: (v: number) => string): string {
+  const e = escaleraDe(s);
+  if (!e) return `stop ${px(s.stop)} · objetivo ${px(s.target)}`;
+  const ok = (at: number | null | undefined) => (at ? " ✓" : "");
+  return `SL ${px(e.stop)}${s.result === "STOP" ? " ✗" : ""} · TP1 ${px(e.tp1)}${ok(s.tp1At)} · TP2 ${px(e.tp2)}${ok(s.tp2At)} · TP3 ${px(e.tp3)}${s.result === "OBJETIVO" ? " ✓" : ""}`;
+}
 
 function atr(c: SwingCandle[], n = 14): number {
   let s = 0;
@@ -106,9 +126,25 @@ export function magnetSignal(symbol: string, timeframe: string, candles: SwingCa
   };
 }
 
-/** Resolves an open signal with the candles after its entry candle. */
+/**
+ * Resolves an open signal with the candles after its entry candle, walking its
+ * ladder: the result is the same as always (target = TP3, stop first, time exit
+ * after HORIZON candles, fees on both sides) and TP1/TP2 keep the time they were
+ * reached. A time already recorded is never lost.
+ */
 export function resolveSignal(s: JarvisSignal, candles: SwingCandle[], frameMs: number): JarvisSignal {
   if (s.result !== "ABIERTA") return s;
+  const e = escaleraDe(s);
+  if (!e) return resolveWithoutLadder(s, candles, frameMs);
+  const rec = recorrer(s.side, s.entry, e, s.time, candles, frameMs, Infinity, { horizonte: HORIZON, feePct: FEE_PCT });
+  const hits = { tp1At: rec.tp1At ?? s.tp1At ?? null, tp2At: rec.tp2At ?? s.tp2At ?? null };
+  if (rec.desenlace === "ABIERTA") return { ...s, ...hits };
+  const result = rec.desenlace === "SL" ? "STOP" : rec.desenlace === "TP3" ? "OBJETIVO" : "TIEMPO";
+  return { ...s, ...hits, result, r: rec.r, closedAt: rec.cerradaA };
+}
+
+/** The resolution without a ladder, for a stored signal whose levels are not coherent: the rules as they always were. */
+function resolveWithoutLadder(s: JarvisSignal, candles: SwingCandle[], frameMs: number): JarvisSignal {
   const after = candles.filter((c) => c.openTime > s.time).sort((a, b) => a.openTime - b.openTime);
   const risk = Math.abs(s.entry - s.stop);
   if (!(risk > 0)) return s;
@@ -168,11 +204,16 @@ export function statsSpeech(st: LedgerStats): string {
 }
 
 export function ledgerCsv(ledger: JarvisSignal[]): string {
-  const head = "fecha;fuente;moneda;marco;lado;entrada;stop;objetivo;resultado;R;nota";
-  const rows = ledger.map((s) =>
-    [new Date(s.time).toISOString(), s.source, s.symbol, s.timeframe, s.side, s.entry, s.stop, s.target, s.result, s.r === null ? "" : s.r.toFixed(3).replace(".", ","), s.note.replace(/;/g, ",")]
+  const head = "fecha;fuente;moneda;marco;lado;entrada;stop;tp1;tp2;tp3_objetivo;resultado;R;tp1_alcanzado;tp2_alcanzado;nota";
+  const iso = (t: number | null | undefined) => (t ? new Date(t).toISOString() : "");
+  const rows = ledger.map((s) => {
+    const e = escaleraDe(s);
+    return [
+      new Date(s.time).toISOString(), s.source, s.symbol, s.timeframe, s.side, s.entry, s.stop, e ? Number(e.tp1.toPrecision(10)) : "", e ? Number(e.tp2.toPrecision(10)) : "", s.target,
+      s.result, s.r === null ? "" : s.r.toFixed(3).replace(".", ","), iso(s.tp1At), iso(s.tp2At), s.note.replace(/;/g, ","),
+    ]
       .map((v) => (typeof v === "number" ? String(v).replace(".", ",") : String(v)))
-      .join(";"),
-  );
+      .join(";");
+  });
   return `\uFEFF${[head, ...rows].join("\r\n")}\r\n`;
 }

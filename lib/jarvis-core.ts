@@ -1,4 +1,4 @@
-import { breakoutSignal, magnetSignal, type JarvisSignal, type JarvisSource, type LearnedSource, type LedgerStats } from "./jarvis-ledger.ts";
+import { breakoutSignal, escaleraDe, magnetSignal, type JarvisSignal, type JarvisSource, type LearnedSource, type LedgerStats } from "./jarvis-ledger.ts";
 import {
   explain,
   featuresAt,
@@ -419,7 +419,17 @@ export function coreContext(snap: CoreSnapshot, now: number) {
       abiertas: snap.open
         .filter((s) => s.taken !== false)
         .slice(0, 8)
-        .map((s) => ({ moneda: coin(s.symbol), lado: s.side, entrada: s.entry, stop: s.stop, objetivo: s.target, fuente: s.source, calidad: s.grade, esperadoR: s.expectR })),
+        .map((s) => {
+          // Su escalera completa: el objetivo es el TP3; TP1 y TP2 con si ya se tocaron.
+          const e = escaleraDe(s);
+          const p = (v: number) => Number(v.toPrecision(6));
+          return {
+            moneda: coin(s.symbol), lado: s.side, entrada: s.entry, stop: s.stop,
+            tp1: e ? p(e.tp1) : null, tp2: e ? p(e.tp2) : null, objetivo: s.target,
+            tp1Alcanzado: Boolean(s.tp1At), tp2Alcanzado: Boolean(s.tp2At),
+            fuente: s.source, calidad: s.grade, esperadoR: s.expectR,
+          };
+        }),
       ultimasCerradas: snap.recent
         .filter((s) => s.taken !== false)
         .slice(0, 8)

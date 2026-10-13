@@ -2,7 +2,7 @@ import { BRAIN_LABEL } from "./ai-brains.ts";
 import { coreActivitySince, ensureCoreSchema, latestReading, loadModel, readCoreStats } from "./jarvis-core-db.ts";
 import type { MindReading } from "./jarvis-mind.ts";
 import type { CoreSignal } from "./jarvis-core.ts";
-import type { LedgerStats } from "./jarvis-ledger.ts";
+import { escaleraLinea, type LedgerStats } from "./jarvis-ledger.ts";
 import { summarizeModel, venuesSpeech, type LearnSummary } from "./jarvis-learn.ts";
 import type { TelegramEvent } from "./telegram.ts";
 
@@ -49,7 +49,7 @@ export function jarvisEvents(activity: CoreSignal[], since: number, st: LedgerSt
         key: `jarvis:closed:${s.id}`,
         category: "JARVIS",
         priority: 60,
-        text: `${icon} <b>JARVIS · ${esc(coin(s.symbol))} ${side} · ${esc(s.timeframe)}</b>\n${how}: <b>${rr(s.r)}</b> (comisiones incluidas)\nEntrada ${px(s.entry)} · stop ${px(s.stop)} · objetivo ${px(s.target)}${foot}`,
+        text: `${icon} <b>JARVIS · ${esc(coin(s.symbol))} ${side} · ${esc(s.timeframe)}</b>\n${how}: <b>${rr(s.r)}</b> (comisiones incluidas)\nEntrada ${px(s.entry)} · ${escaleraLinea(s, px)}${foot}`,
       });
     } else if (s.result === "ABIERTA") {
       const n = learn && s.source !== "IA" ? learn.sources[s.source].n : null;
@@ -57,7 +57,7 @@ export function jarvisEvents(activity: CoreSignal[], since: number, st: LedgerSt
         key: `jarvis:new:${s.id}`,
         category: "JARVIS",
         priority: 70,
-        text: `🤖 <b>JARVIS · nueva señal · ${esc(coin(s.symbol))} ${side} · ${esc(s.timeframe)}</b>\n${esc(kind)}: ${esc(s.note)}\nEntrada <b>${px(s.entry)}</b> · stop <b>${px(s.stop)}</b> · objetivo <b>${px(s.target)}</b>${gradeLine(s, n)}\nSi una vela toca stop y objetivo, cuenta el stop.${foot}`,
+        text: `🤖 <b>JARVIS · nueva señal · ${esc(coin(s.symbol))} ${side} · ${esc(s.timeframe)}</b>\n${esc(kind)}: ${esc(s.note)}\nEntrada <b>${px(s.entry)}</b> · ${escaleraLinea(s, px)}${gradeLine(s, n)}\nTP3 es el objetivo que se mide; TP1 y TP2 quedan a un tercio y dos tercios, para parciales. Si una vela toca stop y objetivo, cuenta el stop.${foot}`,
       });
     }
   }

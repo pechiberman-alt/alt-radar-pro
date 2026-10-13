@@ -49,6 +49,17 @@ export function escaleraHacia(lado: Lado, entrada: number, stop: number, objetiv
   return escaleraValida(lado, entrada, e) ? e : null;
 }
 
+/** Cuándo tocó cada nivel (hora de cierre de la vela), si lo tocó. */
+export type Toques = { sl?: number | null; tp1?: number | null; tp2?: number | null; tp3?: number | null };
+
+const hhmm = (ms: number) => `${new Date(ms).toISOString().slice(11, 16)} UTC`;
+
+/** La escalera en una línea: ✓ y la hora (UTC) en cada objetivo alcanzado, ✗ y la hora si terminó en el SL. */
+export function escaleraTexto(e: Escalera, px: (v: number) => string, t: Toques = {}): string {
+  const ok = (ms?: number | null) => (ms ? ` ✓ ${hhmm(ms)}` : "");
+  return `SL ${px(e.stop)}${t.sl ? ` ✗ ${hhmm(t.sl)}` : ""} · TP1 ${px(e.tp1)}${ok(t.tp1)} · TP2 ${px(e.tp2)}${ok(t.tp2)} · TP3 ${px(e.tp3)}${ok(t.tp3)}`;
+}
+
 /** Distancia en R: múltiplos del riesgo (de la entrada al SL). */
 export const enR = (entrada: number, stop: number, precio: number) => Math.abs(precio - entrada) / Math.abs(entrada - stop);
 

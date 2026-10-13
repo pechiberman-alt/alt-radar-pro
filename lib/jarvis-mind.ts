@@ -1,5 +1,6 @@
 import type { Brain } from "./ai-brains.ts";
 import { arNumber, parseLevel } from "./ai-numbers.ts";
+import { escaleraHacia } from "./escalera.ts";
 import type { CoreSignal, Mind } from "./jarvis-core.ts";
 import type { LvStats } from "./liq-vol-signals.ts";
 import type { LearnSummary } from "./jarvis-learn.ts";
@@ -329,7 +330,15 @@ export function thesisSignal(symbol: string, candleOpenTime: number, entry: numb
 export function readingSpeech(r: MindReading, now: number): string {
   const ago = Math.max(1, Math.round((now - r.at) / 60_000));
   const parts = [`Mi lectura de hace ${ago} ${ago === 1 ? "minuto" : "minutos"}: mercado ${r.sesgo === "NEUTRAL" ? "sin dirección clara" : r.sesgo.toLowerCase()}. ${r.resumen}`];
-  if (r.tesis.length) parts.push(`Tesis nuevas: ${r.tesis.map((t) => `${t.moneda} ${t.lado === "LONG" ? "alcista" : "bajista"}, objetivo ${arNumber(t.objetivo)}, invalidación ${arNumber(t.invalidacion)}`).join("; ")}.`);
+  // Cada tesis con su escalera: el objetivo es el TP3 (el que se mide) y la invalidación es el SL.
+  const tesis = (t: MindReading["tesis"][number]) => {
+    const e = escaleraHacia(t.lado, t.entrada, t.invalidacion, t.objetivo);
+    const lado = t.lado === "LONG" ? "alcista" : "bajista";
+    return e
+      ? `${t.moneda} ${lado}: TP1 ${arNumber(e.tp1)}, TP2 ${arNumber(e.tp2)}, TP3 ${arNumber(e.tp3)}, invalidación ${arNumber(t.invalidacion)}`
+      : `${t.moneda} ${lado}, objetivo ${arNumber(t.objetivo)}, invalidación ${arNumber(t.invalidacion)}`;
+  };
+  if (r.tesis.length) parts.push(`Tesis nuevas: ${r.tesis.map(tesis).join("; ")}.`);
   if (r.vigilar.length) parts.push(`A vigilar: ${r.vigilar.slice(0, 2).join("; ")}.`);
   parts.push("No es asesoramiento financiero.");
   return parts.join(" ");

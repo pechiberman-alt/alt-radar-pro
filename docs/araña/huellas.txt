@@ -82,7 +82,7 @@ a81c12bcbd6f	145	app/bookmap-premium.css
 5b669d5ff74b	447	app/bookmap-timeframe-chart.tsx
 7176a96db565	5	app/bookmap-timeframe.css
 787f3bfcb7ba	92	app/bot-desk.css
-27542d64de1d	336	app/bot-desk.tsx
+4bc7e745e25a	336	app/bot-desk.tsx
 62f40a847147	229	app/bot-journal.tsx
 57f95eac1484	91	app/chatgpt-auth.ts
 91767efb80e2	32	app/compare-chart.css
@@ -122,7 +122,7 @@ e4aeb9c38840	264	app/jarvis-trading.css
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
 719061eef9e9	192	app/jarvis-watch.tsx
 39c4819ab1a5	121	app/jarvis.css
-352bd25372ac	1677	app/jarvis.tsx
+734a88a1bb21	1680	app/jarvis.tsx
 aa4d7c876c20	51	app/laptop.css
 30198b3908f1	131	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -177,7 +177,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-99646a5d709d	252	docs/araña/objetivos.md
+02897bda4e4b	254	docs/araña/objetivos.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -225,7 +225,7 @@ dbb61e696813	67	lib/binance-futures.ts
 648fd4d96cb6	237	lib/binance-import.ts
 73da214e5692	36	lib/binance-ws.ts
 bb80398ecb7d	76	lib/bot-journal-db.ts
-cef39a322b14	199	lib/bot-journal.ts
+6a0d6ae2abb1	210	lib/bot-journal.ts
 021df37a3d16	209	lib/brain-security.ts
 6739820aa2be	50	lib/browser-voice.ts
 22867caddefc	328	lib/chart-patterns.ts
@@ -235,7 +235,7 @@ ed5b22c91c14	157	lib/dca-tracker.ts
 c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
-d6b360bf5203	104	lib/escalera.ts
+a2c5aeea0e4f	115	lib/escalera.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
 450b470bb8bd	173	lib/exchange-reserves.ts
 da42f6c9e464	311	lib/fair-value-gaps.ts
@@ -253,8 +253,8 @@ f83a7c4a72ca	222	lib/jarvis-analyst.ts
 b0f479478c6c	127	lib/jarvis-backtest-run.ts
 74940e570e61	281	lib/jarvis-backtest.ts
 f61124d7437f	79	lib/jarvis-chat.ts
-67c2bd6e8989	495	lib/jarvis-core-db.ts
-104f734141fd	467	lib/jarvis-core.ts
+574be51c0a56	519	lib/jarvis-core-db.ts
+5a9f14b0e859	477	lib/jarvis-core.ts
 7b2813e75f44	352	lib/jarvis-council.ts
 cb4645381ac1	582	lib/jarvis-desk-agents.ts
 98cd644e2ca6	249	lib/jarvis-desk-data.ts
@@ -262,11 +262,11 @@ d29490ffe116	101	lib/jarvis-desk-run.ts
 fa37d4a7b3d9	743	lib/jarvis-desk.ts
 7490f7cc5ddc	134	lib/jarvis-execution.ts
 e65cb00f1d4d	483	lib/jarvis-learn.ts
-5df49d023ff9	179	lib/jarvis-ledger.ts
+a97177fe60c0	220	lib/jarvis-ledger.ts
 e48a68b53281	100	lib/jarvis-local.ts
 a3cb05342414	82	lib/jarvis-memory.ts
 ec2fc7019671	204	lib/jarvis-mind-db.ts
-c4b51bfec404	337	lib/jarvis-mind.ts
+de08f7a44d9b	346	lib/jarvis-mind.ts
 1a8d71f669ad	170	lib/jarvis-paper-db.ts
 b2251683fc99	262	lib/jarvis-paper-run.ts
 cf67397ebde0	654	lib/jarvis-paper.ts
@@ -310,7 +310,7 @@ fd19498c8d8b	115	lib/mtf-zones.ts
 3f86ab0657ef	438	lib/order-flow-brain.ts
 757d33d6a6c9	249	lib/order-flow.ts
 fe173d15015d	227	lib/oscillators.ts
-07f49ca99e51	406	lib/paper-bot.ts
+f2ad043c6c3a	431	lib/paper-bot.ts
 7533116803f8	189	lib/pre-breakout.ts
 6bc98e7e1a03	236	lib/price-alerts-server.ts
 268aea814077	165	lib/price-alerts.ts
@@ -345,7 +345,7 @@ c9fd83f39ff3	171	lib/swing-liquidity-filter.ts
 be63542d2272	232	lib/telegram-ai-server.ts
 3acc6d8fd900	68	lib/telegram-ai.ts
 be11df97b79f	224	lib/telegram-dispatch.ts
-62d9d72f629e	122	lib/telegram-jarvis.ts
+454b972683d0	122	lib/telegram-jarvis.ts
 e9e4bb168a91	53	lib/telegram-magnets.ts
 a250fc69b552	36	lib/telegram-server.ts
 26e6999dc403	166	lib/telegram-voice.ts
@@ -407,7 +407,7 @@ d3752b5c0eee	221	tests/binance-account.test.ts
 0c1c8e289261	77	tests/binance-debug-log.test.ts
 c230ab327c5d	127	tests/binance-import.test.ts
 3c86102af0be	27	tests/binance-ws.test.ts
-5e5c92b9ef71	117	tests/bot-journal.test.ts
+bee17b9c8ee8	120	tests/bot-journal.test.ts
 4cf0e9d5e358	122	tests/breaker-blocks.test.ts
 0c6817af6bb4	138	tests/chart-patterns.test.ts
 e954e10a7eec	85	tests/cost-basis.test.ts
@@ -415,7 +415,7 @@ e954e10a7eec	85	tests/cost-basis.test.ts
 3bfb5918410f	140	tests/decoupling.test.ts
 bb85a3e6fff1	57	tests/diario-db.test.ts
 d8e87b00e33b	126	tests/econ-calendar.test.ts
-da9a710f9c0b	110	tests/escalera.test.ts
+645f0d2f0dc9	116	tests/escalera.test.ts
 b0ba998c8335	119	tests/etf-flows-multi.test.ts
 9ed4f49289ed	92	tests/exchange-reserves.test.ts
 eac12ecfb8fb	248	tests/fair-value-gaps.test.ts
@@ -436,17 +436,17 @@ cf22fb64056e	59	tests/jarvis-analyst.test.ts
 15f8484f64d6	97	tests/jarvis-backtest-run.test.ts
 ed1ff7a11a00	123	tests/jarvis-backtest.test.ts
 6d6b9ed4fa70	68	tests/jarvis-chat.test.ts
-45b5ffc94ac0	474	tests/jarvis-core.test.ts
+7da1c78946c5	497	tests/jarvis-core.test.ts
 400c6c695de7	432	tests/jarvis-council.test.ts
 d847995430f7	236	tests/jarvis-desk-risk.test.ts
 8fe82178c57c	106	tests/jarvis-desk-run.test.ts
 727811ff841e	220	tests/jarvis-desk.test.ts
 2ca97216ec48	219	tests/jarvis-learn.test.ts
-2cba958a1dba	78	tests/jarvis-ledger.test.ts
+2c081bc1146c	144	tests/jarvis-ledger.test.ts
 f509b7eb53bb	45	tests/jarvis-local.test.ts
 137800480401	49	tests/jarvis-memory.test.ts
 1fe4f8532904	88	tests/jarvis-mind-verify.test.ts
-66e7d8e4f1e8	167	tests/jarvis-mind.test.ts
+540d501d808e	168	tests/jarvis-mind.test.ts
 310a163bc5a2	198	tests/jarvis-paper-run.test.ts
 c977b546798a	414	tests/jarvis-paper.test.ts
 871655c35609	284	tests/jarvis-rules-v2.test.ts
@@ -481,7 +481,7 @@ a9cc32e63faf	283	tests/mesa-sombra.test.ts
 225b8a9ad252	350	tests/order-flow-brain.test.ts
 fc5082678796	301	tests/order-flow.test.ts
 17cc5595f11b	110	tests/oscillators.test.ts
-309367f06a67	322	tests/paper-bot.test.ts
+c5804356dfb9	336	tests/paper-bot.test.ts
 776df4f83f9f	79	tests/pre-breakout.test.ts
 8817c9b44699	163	tests/price-alerts-server.test.ts
 e8ebfaee708d	96	tests/price-alerts.test.ts
