@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 479 · objetivos: 15 · sin objetivo: 0
+- Archivos: 481 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 43 · secretos: 4 · variables de entorno: 8 · rutas /api: 49 · hosts: 54
 - Código de navegador: 57 archivos con "use client" que alcanzan 155 · problemas: 0
 - Lib sin prueba directa: 20 de 146
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (54)
+### jarvis — JARVIS, la IA propia del software (55)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -31,6 +31,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `app/jarvis-watch.tsx` — exporta: JarvisWatcher, WatchBlock
 - `app/jarvis.css` — JARVIS — HUD voice assistant
 - `app/jarvis.tsx` — exporta: Jarvis, default
+- `docs/mesa-reglas-v2.md` — La mesa de JARVIS: reglas v2
 - `lib/ai-analyst-server.ts` — exporta: quotaFor, consumeQuota, alternate, askClaude
 - `lib/ai-analyst.ts` — exporta: AI_MODEL, AI_DAILY_LIMIT, AI_MAX_OUTPUT, compactSnapshot, buildSystemPrompt, buildUserMessage (+4)
 - `lib/ai-brains.ts` — exporta: Brain, BRAIN_LABEL, Usage, BrainResult, AiLike, WORKERS_MODEL (+23)
@@ -50,7 +51,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-desk-agents.ts` — exporta: AgentId, AgentReport, NOT_AVAILABLE, AGENT_WEIGHTS, pct, px (+19)
 - `lib/jarvis-desk-data.ts` — exporta: DESK_FRAMES, Derivatives, MacroData, DeskSnapshot, DeskProvider, DESK_PROVIDERS (+3)
 - `lib/jarvis-desk-run.ts` — exporta: DESK_SETTINGS_KEY, DESK_SHOW_EVENT, typedNumber, loadDeskSettings, saveDeskSettings, openPaperRiskUsd (+3)
-- `lib/jarvis-desk.ts` — exporta: Side, Direction, Target, Plan, DeskSettings, MAX_OPEN_RISK_PCT (+30)
+- `lib/jarvis-desk.ts` — exporta: Side, Direction, Target, Plan, DeskSettings, MAX_OPEN_RISK_PCT (+34)
 - `lib/jarvis-execution.ts` — exporta: DeskMode, DESK_MODES, REAL_ORDERS_FROM_JARVIS, TICKET_TTL_MS, TICKET_MAX_AGE_MS, MAX_TICKET_RISK_PCT (+3)
 - `lib/jarvis-learn.ts` — exporta: Regime, Features, DIMS, D, ALPHA, MIN_CASES (+37)
 - `lib/jarvis-ledger.ts` — exporta: HORIZON, FEE_PCT, LearnedSource, JarvisSource, JarvisSignal, breakoutSignal (+7)
@@ -60,7 +61,7 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `lib/jarvis-mind.ts` — exporta: MindThesis, MindReading, MIND_MAX_THESES, MIND_MAX_OUTPUT, MIND_SYSTEM, thesisRecord (+14)
 - `lib/jarvis-paper-db.ts` — exporta: MAX_OPEN_PER_USER, MAX_TOTAL_PER_USER, LIST_LIMIT, ensurePaperSchema, listPaper, paperCounts (+5)
 - `lib/jarvis-paper-run.ts` — exporta: PAPER_LOCAL_KEY, PAPER_EVENT, PaperMode, paperState, paperTrades, lastPrice (+7)
-- `lib/jarvis-paper.ts` — exporta: PAPER_HORIZON_H, LIMIT_EXPIRY_H, MINUTE, PaperState, ExitKind, PaperExit (+27)
+- `lib/jarvis-paper.ts` — exporta: PAPER_HORIZON_H, LIMIT_EXPIRY_H, MINUTE, PaperState, ExitKind, Gestion (+30)
 - `lib/jarvis-voice-server.ts` — exporta: AiLike, VoiceModel, Bytes, Synth, AURA, MELO (+11)
 - `lib/jarvis-voice.ts` — JARVIS's neural voice, shared by the server route and the app.
 - `lib/jarvis-watch-run.ts` — exporta: WATCH_PREFS_KEY, WATCH_STATE_KEY, WATCH_EVENT, WatchStatus, loadWatchPrefs, saveWatchPrefs (+3)
@@ -316,7 +317,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, PAGINA (+45)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
-### calidad — Pruebas (120)
+### calidad — Pruebas (121)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agentes-mcp.test.ts` — pruebas: ruflo is one MCP server run with npx, ruflo is pinned: exact version, cutoff date for its dependencies, no install scr, the project approves ruflo and gives the cold start time to download (+1)
@@ -375,6 +376,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/jarvis-mind.test.ts` — pruebas: the answer, a thesis is kept only as a real plan from the current price, the hourly mind: once an hour from hh:17, with fresh reads only, theses checked  (+1)
 - `tests/jarvis-paper-run.test.ts` — pruebas: signed in but the record does not answer: an honest error, never an empty list t, signed out: the record lives on this device, opens once, refuses stale plans, re, signed in: opened and advanced through the server, whose version wins (+1)
 - `tests/jarvis-paper.test.ts` — pruebas: three targets: a third at each, fees on both sides, a candle that touches the stop and a target counts as the stop, TP1 then the stop: a third won, two thirds lost; the stop does not move (+1)
+- `tests/jarvis-rules-v2.test.ts` — pruebas: v2: after TP1 the stop is the entry; coming back to it closes the rest at break-, v2: the R is still measured against the plan, v2 worst case: the candle that cashes TP1 and also touches the entry closes the  (+1)
 - `tests/jarvis-voice.test.ts` — pruebas: voices: Cloudflare, synthesis: premium voice first; the simpler one if premium fails or is not allow, allowance: per person and premium for everyone, per UTC day (+1)
 - `tests/jarvis-watch-run.test.ts` — pruebas: switched off, the watch asks nothing, switched on: alerts published once, remembered across runs, memory kept on this 
 - `tests/jarvis-watch.test.ts` — pruebas: a close across a desk level is a break, once per candle, with its stars, a change of structure needs a recent previous reading, volume, funding and open interest past their thresholds; missing derivatives fir (+1)

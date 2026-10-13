@@ -1,6 +1,6 @@
 import { arNumber } from "./ai-numbers.ts";
 import { FEE_PCT } from "./jarvis-ledger.ts";
-import { MIN_RR, type DeskDecision, type DeskRecord, type Direction, type Side } from "./jarvis-desk.ts";
+import { DESK_RULES, MIN_RR, type DeskDecision, type DeskRecord, type Direction, type Side } from "./jarvis-desk.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
 /**
@@ -15,10 +15,13 @@ import type { SwingCandle } from "./swing-entries.ts";
  *    pedazo de hora en que se abrió se revisa con velas de 1 minuto; después,
  *    con velas de 1 h. Una límite se llena cuando el precio toca el nivel; si
  *    ve el TP1 antes de llenarse, o pasan 48 h, se cancela.
- *  - Salida de un tercio en cada objetivo; el stop no se mueve (es el plan que
- *    mostró la tarjeta).
+ *  - Salida de un tercio en cada objetivo. Con las reglas v2 (`gestion`
+ *    "BE_TP1"), al cobrar el TP1 el stop pasa a la entrada; las operaciones
+ *    guardadas antes siguen con el stop fijo del plan que mostró la tarjeta.
  *  - Peor caso primero: si una vela toca el stop y un objetivo, cuenta el stop.
- *    En la vela que llena una límite, solo cuenta el stop.
+ *    En la vela que llena una límite, solo cuenta el stop. En la vela que
+ *    cobra el TP1, si también toca la entrada, el resto sale en la entrada
+ *    (adentro de una vela no se sabe el orden).
  *  - Comisión de 0,05% por lado. A los 7 días se cierra lo que quede al cierre.
  *
  * El backtest (jarvis-backtest.ts) usa este mismo motor; ahí la decisión se
@@ -36,7 +39,10 @@ const H = 3_600_000;
 export const MINUTE = 60_000;
 
 export type PaperState = "PENDIENTE" | "ABIERTA" | "CERRADA" | "CANCELADA";
-export type ExitKind = "TP1" | "TP2" | "TP3" | "STOP" | "TIEMPO" | "MANUAL";
+/** BE: el stop movido a la entrada después de cobrar el TP1. */
+export type ExitKind = "TP1" | "TP2" | "TP3" | "STOP" | "BE" | "TIEMPO" | "MANUAL";
+/** Cómo se maneja el stop: BE_TP1 = pasa a la entrada al cobrar el TP1. Sin esto, el stop no se mueve (reglas v1). */
+export type Gestion = "BE_TP1";
 export type PaperExit = { kind: ExitKind; price: number; at: number; fraction: number };
 
 export type PaperTrade = {
@@ -91,12 +97,24 @@ export type PaperTrade = {
   cursor?: number;
   /** Precio al que entró de verdad una operación a mercado (el plan queda en `entrada`). */
   entradaReal?: number | null;
+  /**
+   * Cómo se mueve el stop. Se fija al abrirla y no cambia. Las operaciones
+   * guardadas antes de las reglas v2 no lo tienen: el stop no se mueve.
+   */
+  gestion?: Gestion;
+  /** Versión de las reglas de la mesa con las que se abrió (ver DESK_RULES). */
+  reglas?: number;
 };
 
 const dirOf = (side: Side) => (side === "LONG" ? 1 : -1);
 /** El precio con el que se mide: el de entrada real si lo hay, si no el del plan. */
 export const entryOf = (t: Pick<PaperTrade, "entrada"> & { entradaReal?: number | null }) => (typeof t.entradaReal === "number" && t.entradaReal > 0 ? t.entradaReal : t.entrada);
 const riskOf = (t: Pick<PaperTrade, "entrada" | "stop"> & { entradaReal?: number | null }) => Math.abs(entryOf(t) - t.stop);
+
+/** ¿El stop ya pasó a la entrada? Solo con gestión BE_TP1 y el TP1 ya cobrado. */
+export const stopAtEntry = (t: Pick<PaperTrade, "gestion" | "salidas">) => t.gestion === "BE_TP1" && t.salidas.some((e) => e.kind === "TP1");
+/** El stop que rige ahora: el del plan, o la entrada si pasó a equilibrio. El R se sigue midiendo contra el riesgo original. */
+export const stopNow = (t: Pick<PaperTrade, "gestion" | "salidas" | "entrada" | "stop"> & { entradaReal?: number | null }) => (stopAtEntry(t) ? entryOf(t) : t.stop);
 
 /** R:R ponderado (un tercio en cada objetivo) entrando a `price`; null si ese precio ya está del otro lado del stop o del TP1. */
 export function rrAt(t: Pick<PaperTrade, "lado" | "stop" | "tp">, price: number): number | null {
@@ -184,6 +202,8 @@ export function paperFromDesk(d: DeskDecision, now: number, opts: { atClose?: bo
     inicio,
     cursor: inicio,
     entradaReal: filledNow ? p.entrada : null,
+    gestion: "BE_TP1",
+    reglas: DESK_RULES,
   };
 }
 
@@ -238,7 +258,9 @@ export function resolvePaper(t: PaperTrade, candles: SwingCandle[], now: number,
     x.revisadaHasta = c.openTime;
     const end = c.openTime + frameMs;
     x.cursor = end;
-    const touchesStop = s > 0 ? c.low <= x.stop : c.high >= x.stop;
+    // Pending: only the plan's stop matters. Open: the stop in force (the entry, once TP1 was cashed with BE_TP1).
+    const stopPx = x.estado === "ABIERTA" ? stopNow(x) : x.stop;
+    const touchesStop = s > 0 ? c.low <= stopPx : c.high >= stopPx;
     if (x.estado === "PENDIENTE" && x.tipoEntrada === "MERCADO") {
       // A market entry: the open of the first candle after it was opened, if the plan still holds at that price.
       const price = c.open;
@@ -271,6 +293,10 @@ export function resolvePaper(t: PaperTrade, candles: SwingCandle[], now: number,
     x.mfeR = Math.max(x.mfeR ?? 0, hiR);
     x.maeR = Math.max(x.maeR ?? 0, loR);
     if (touchesStop) {
+      if (stopAtEntry(x)) {
+        x.salidas.push({ kind: "BE", price: stopPx, at: end, fraction: remaining() });
+        return close("Cobró el TP1 y el precio volvió a la entrada: el resto salió en equilibrio (el stop ya estaba en la entrada).", end);
+      }
       x.salidas.push({ kind: "STOP", price: x.stop, at: end, fraction: remaining() });
       return close(x.salidas.length > 1 ? "Tocó el stop después de cobrar parte en los objetivos." : "Tocó el stop.", end);
     }
@@ -280,6 +306,12 @@ export function resolvePaper(t: PaperTrade, candles: SwingCandle[], now: number,
       const hit = s > 0 ? c.high >= x.tp[k] : c.low <= x.tp[k];
       if (!hit) break;
       x.salidas.push({ kind, price: x.tp[k], at: end, fraction: k === 2 ? remaining() : 1 / 3 });
+      // Worst case: the candle that cashed TP1 may also have come back to the entry afterwards (the order inside a candle is unknown),
+      // so the stop at the entry counts before any further target of this same candle.
+      if (kind === "TP1" && stopAtEntry(x) && (s > 0 ? c.low <= entry : c.high >= entry)) {
+        x.salidas.push({ kind: "BE", price: entry, at: end, fraction: remaining() });
+        return close("Cobró el TP1 y volvió a la entrada en la misma vela: el resto salió en equilibrio (adentro de una vela no se sabe el orden).", end);
+      }
     }
     if (remaining() <= 1e-9) return close("Llegó a los tres objetivos.", end);
     const filledAt = x.llenadaA ?? x.vela + H;
@@ -344,7 +376,7 @@ export function auditOf(t: PaperTrade): Audit {
     return { analisis, decision, resultado: t.estado === "PENDIENTE" ? (t.tipoEntrada === "LÍMITE" ? "Esperando que el precio llene la orden límite." : "Entrando: toma el precio del primer minuto después de abrirla.") : `Abierta${hit ? `; ya cobró ${hit}` : ""}.`, veredicto: "ABIERTA", detalle: "Todavía sin resultado.", aprendizaje: "Se mide al cerrar." };
   }
   const hours = t.cerradaA && t.llenadaA ? Math.max(1, Math.round((t.cerradaA - t.llenadaA) / H)) : null;
-  const exits = t.salidas.map((e) => `${e.kind} ${px(e.price)}${e.kind === "TP1" || e.kind === "TP2" || (e.kind === "TP3" && e.fraction < 0.34) ? " (un tercio)" : ""}`).join(" · ");
+  const exits = t.salidas.map((e) => `${e.kind} ${px(e.price)}${e.kind === "TP1" || e.kind === "TP2" || (e.kind === "TP3" && e.fraction < 0.34) ? " (un tercio)" : e.kind === "BE" ? " (stop en la entrada)" : ""}`).join(" · ");
   const resultado = `${t.motivoCierre ?? "Cerrada"} Salidas: ${exits}. Resultado ${t.resultadoR >= 0 ? "+" : ""}${r1(t.resultadoR)} R neto de comisiones${t.decision.riesgoUsd !== null ? ` (${t.resultadoR >= 0 ? "+" : "−"}$${arNumber(Number(Math.abs(t.resultadoR * t.decision.riesgoUsd).toFixed(2)))})` : ""}${hours !== null ? ` en ${hours} h` : ""}.`;
   const veredicto = t.resultadoR > 0.02 ? "ACIERTO" : t.resultadoR < -0.02 ? "ERROR" : "NEUTRO";
   const right = veredicto === "ACIERTO" ? fav : veredicto === "ERROR" ? against : [];
@@ -353,7 +385,8 @@ export function auditOf(t: PaperTrade): Audit {
   const mfe = t.mfeR ?? 0;
   const mae = t.maeR ?? 0;
   let aprendizaje: string;
-  if (veredicto === "ERROR" && mfe >= 1) aprendizaje = `Llegó a +${r1(mfe)} R a favor antes de volverse: el movimiento existió, pero el primer objetivo quedó más lejos.`;
+  if (t.salidas.some((e) => e.kind === "BE")) aprendizaje = `Cobró el TP1 y el resto volvió a la entrada: el stop en equilibrio cortó ahí (llegó a +${r1(mfe)} R a favor). Sin ese stop movido, el resto habría quedado expuesto a volver hasta el stop del plan.`;
+  else if (veredicto === "ERROR" && mfe >= 1) aprendizaje = `Llegó a +${r1(mfe)} R a favor antes de volverse: el movimiento existió, pero el primer objetivo quedó más lejos.`;
   else if (veredicto === "ERROR" && mfe < 0.3) aprendizaje = `Nunca fue a favor (máximo +${r1(mfe)} R): la entrada quedó contra el movimiento inmediato.`;
   else if (veredicto === "ERROR") aprendizaje = `Fue hasta +${r1(mfe)} R a favor y volvió al stop.`;
   else if (t.salidas.some((e) => e.kind === "TIEMPO")) aprendizaje = `En ${PAPER_HORIZON_H / 24} días no llegó ni al stop ni a todos los objetivos (máximo +${r1(mfe)} R, mínimo −${r1(mae)} R): el movimiento esperado no apareció completo.`;
@@ -507,11 +540,26 @@ export function validatePaper(raw: unknown, now: number): PaperTrade | null {
   if (!Array.isArray(t.tp) || t.tp.length !== 3 || !validPlan(t)) return null;
   if (!num(t.abiertaA) || !num(t.vela) || t.vela > now || t.abiertaA > now + 60_000 || !num(t.rrPlan) || !num(t.confianza) || t.confianza < 0 || t.confianza > 100) return null;
   if (!t.analisis || typeof t.analisis !== "object" || !t.decision || typeof t.decision !== "object" || !Array.isArray(t.salidas) || t.salidas.length > 4) return null;
+  // How the stop moves and which rules opened it: absent in the trades saved before the v2 rules.
+  const gestion = t.gestion === undefined || t.gestion === null ? undefined : t.gestion;
+  if (gestion !== undefined && gestion !== "BE_TP1") return null;
+  const reglas = t.reglas === undefined || t.reglas === null ? undefined : t.reglas;
+  if (reglas !== undefined && (!num(reglas) || !Number.isInteger(reglas) || reglas < 1 || reglas > 99)) return null;
+  // The real entry of a market trade: between the stop and TP1, close to the plan's price.
+  const entradaReal = t.entradaReal === undefined || t.entradaReal === null ? null : t.entradaReal;
+  if (entradaReal !== null) {
+    if (!num(entradaReal) || t.tipoEntrada !== "MERCADO" || t.estado === "PENDIENTE" || rrAt(t, entradaReal) === null || Math.abs(entradaReal / t.entrada - 1) > 0.1) return null;
+  }
   let fraction = 0;
-  for (const e of t.salidas) {
-    if (!e || !["TP1", "TP2", "TP3", "STOP", "TIEMPO", "MANUAL"].includes(e.kind) || !num(e.price) || e.price <= 0 || !num(e.at) || !num(e.fraction) || e.fraction <= 0) return null;
-    // A target or the stop exits exactly at the plan's price.
-    const planned = e.kind === "STOP" ? t.stop : e.kind === "TP1" ? t.tp[0] : e.kind === "TP2" ? t.tp[1] : e.kind === "TP3" ? t.tp[2] : null;
+  for (let i = 0; i < t.salidas.length; i += 1) {
+    const e = t.salidas[i];
+    if (!e || !["TP1", "TP2", "TP3", "STOP", "BE", "TIEMPO", "MANUAL"].includes(e.kind) || !num(e.price) || e.price <= 0 || !num(e.at) || !num(e.fraction) || e.fraction <= 0) return null;
+    const cashedTp1 = t.salidas.slice(0, i).some((x) => x?.kind === "TP1");
+    // BE only exists with the BE_TP1 management and after TP1; with it, the stop after TP1 is the entry, never the plan's stop.
+    if (e.kind === "BE" && (gestion !== "BE_TP1" || !cashedTp1)) return null;
+    if (e.kind === "STOP" && gestion === "BE_TP1" && cashedTp1) return null;
+    // A target or the stop exits exactly at the plan's price (BE, at the entry it filled at).
+    const planned = e.kind === "STOP" ? t.stop : e.kind === "TP1" ? t.tp[0] : e.kind === "TP2" ? t.tp[1] : e.kind === "TP3" ? t.tp[2] : e.kind === "BE" ? (entradaReal ?? t.entrada) : null;
     if (planned !== null && Math.abs(e.price - planned) > planned * 1e-9) return null;
     fraction += e.fraction;
   }
@@ -525,11 +573,6 @@ export function validatePaper(raw: unknown, now: number): PaperTrade | null {
   if (inicio !== undefined && (!num(inicio) || inicio < closeAt || inicio > now + 120_000)) return null;
   const cursor = t.cursor === undefined || t.cursor === null ? undefined : t.cursor;
   if (cursor !== undefined && (!num(cursor) || cursor < (inicio ?? closeAt) || cursor > now + 60_000)) return null;
-  // The real entry of a market trade: between the stop and TP1, close to the plan's price.
-  const entradaReal = t.entradaReal === undefined || t.entradaReal === null ? null : t.entradaReal;
-  if (entradaReal !== null) {
-    if (!num(entradaReal) || t.tipoEntrada !== "MERCADO" || t.estado === "PENDIENTE" || rrAt(t, entradaReal) === null || Math.abs(entradaReal / t.entrada - 1) > 0.1) return null;
-  }
   // A market trade opened after the close enters at its own first price: open or closed without one, it is not valid.
   if (t.tipoEntrada === "MERCADO" && inicio !== undefined && inicio > closeAt && (t.estado === "ABIERTA" || t.estado === "CERRADA") && entradaReal === null) return null;
   const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
@@ -560,6 +603,8 @@ export function validatePaper(raw: unknown, now: number): PaperTrade | null {
     ...(inicio !== undefined ? { inicio } : {}),
     ...(cursor !== undefined ? { cursor } : {}),
     ...(t.entradaReal !== undefined ? { entradaReal } : {}),
+    ...(gestion !== undefined ? { gestion } : {}),
+    ...(reglas !== undefined ? { reglas } : {}),
   };
   return {
     ...base,

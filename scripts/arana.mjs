@@ -867,6 +867,8 @@ function tipoDe(f) {
  * Todo lo que muestra la vista, compacto: objetivos con sus reglas y
  * pendientes, archivos (índice = posición), imports entre archivos, qué prueba
  * cada test, tablas, secretos, rutas y las banderas que hay que atender.
+ * @param {any} index
+ * @param {{ generado?: string, commit?: string | null }} [opciones]
  */
 export function grafoDe(index, { generado = new Date().toISOString(), commit = null } = {}) {
   const pos = new Map(index.archivos.map((f, i) => [f.path, i]));

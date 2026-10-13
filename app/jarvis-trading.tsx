@@ -5,7 +5,7 @@ import type { AssistantContext } from "@/lib/assistant/index";
 import { arNumber } from "@/lib/ai-numbers";
 import { arTime, NOT_AVAILABLE, upcomingHighImpact, type AgentReport } from "@/lib/jarvis-desk-agents";
 import { DESK_PROVIDERS, type DeskSnapshot } from "@/lib/jarvis-desk-data";
-import { compareDesks, deskTicket, macroBrief, type Comparison, type DeskDecision, type DeskSettings, type Plan, type RiskReview } from "@/lib/jarvis-desk";
+import { compareDesks, deskTicket, MANAGEMENT_TEXT, macroBrief, type Comparison, type DeskDecision, type DeskSettings, type Plan, type RiskReview } from "@/lib/jarvis-desk";
 import { DESK_MODES, manualTicket, type DeskMode } from "@/lib/jarvis-execution";
 import { cachedDesk, deskFor, DESK_SHOW_EVENT, loadDeskSettings, saveDeskSettings, typedNumber } from "@/lib/jarvis-desk-run";
 import { withRecord } from "@/lib/jarvis-paper";
@@ -522,6 +522,7 @@ function DecisionCard({ d }: { d: DeskDecision }) {
           ))}
         </dl>
       )}
+      {p && <p className="jt-note">Gestión: {MANAGEMENT_TEXT}.</p>}
       {r && (
         <div className="jt-facts">
           <span>

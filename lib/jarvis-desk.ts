@@ -128,7 +128,21 @@ export type DeskRecord = { n: number; ganadas: number; winRate: number | null; e
 
 /** R:R ponderado mínimo que aprueba el gestor de riesgo (también al entrar en papel). */
 export const MIN_RR = 1.5;
-const CONSENSUS_EDGE = 0.15;
+/**
+ * Versión de las reglas de la mesa (cada operación de papel guarda con cuál
+ * se abrió). v1: stop a 0,25 ATR del nivel, consenso ±0,15, stop fijo. v2:
+ * stop a 1 ATR del nivel, consenso ±0,30 y, al cobrar el TP1, el stop pasa a
+ * la entrada. Medidas y límites en docs/mesa-reglas-v2.md.
+ */
+export const DESK_RULES = 2;
+/** Margen del stop detrás del nivel que lo defiende, en ATR de 4 h. */
+export const STOP_BUFFER_ATR = 1;
+/** Consenso mínimo (de −1 a +1) para que la mesa tome un lado. */
+export const CONSENSUS_EDGE = 0.3;
+/** Desde acá el consenso ya va en contra de un plan: el gestor de riesgo lo veta. */
+const AGAINST_EDGE = 0.15;
+/** Qué hace la mesa con el stop cuando se cobra el TP1 (se repite en la ficha, la orden manual y el papel). */
+export const MANAGEMENT_TEXT = "al cobrarse el TP1, el stop pasa a la entrada: lo que quede ya no puede perder (sin contar comisiones ni deslizamiento)";
 const MMR = 0.005;
 
 const sortSupports = (a: Analysis, price: number) => [...a.levels.supports].filter((l) => l.price < price).sort((x, y) => y.price - x.price);
@@ -151,8 +165,8 @@ export function buildPlan(side: Side, a: Analysis, atr: number, entryOverride?: 
   let stopRazon: string;
   if (anchor) {
     const edge = long ? Math.min(anchor.low, anchor.price) : Math.max(anchor.high, anchor.price);
-    stop = long ? edge - 0.25 * atr : edge + 0.25 * atr;
-    stopRazon = `detrás del ${long ? "soporte" : "resistencia"} ${px(anchor.price)} (${stars(anchor.stars)}) con un margen de 0,25 ATR de 4 h`;
+    stop = long ? edge - STOP_BUFFER_ATR * atr : edge + STOP_BUFFER_ATR * atr;
+    stopRazon = `detrás del ${long ? "soporte" : "resistencia"} ${px(anchor.price)} (${stars(anchor.stars)}) con un margen de ${arNumber(STOP_BUFFER_ATR)} ATR de 4 h`;
   } else {
     stop = long ? entrada - 1.5 * atr : entrada + 1.5 * atr;
     stopRazon = "a 1,5 ATR de 4 h (no hay un nivel cercano que lo defienda)";
@@ -231,7 +245,7 @@ export function reviewRisk(
   }
   if (stopPct < 0.25) vetos.push(`Stop a ${pct(stopPct, 2, false)}: dentro del ruido normal del precio.`);
   if (stopPct > 10 || stopAtr > 3.5) vetos.push(`Stop demasiado lejos (${pct(stopPct, 1, false)}, ${arNumber(Number(stopAtr.toFixed(1)))} ATR).`);
-  const against = p.lado === "LONG" ? ctx.consensus <= -CONSENSUS_EDGE : ctx.consensus >= CONSENSUS_EDGE;
+  const against = p.lado === "LONG" ? ctx.consensus <= -AGAINST_EDGE : ctx.consensus >= AGAINST_EDGE;
   if (against) vetos.push("El consenso de los especialistas va en contra de este lado.");
   if (ctx.coverage < 0.5) avisos.push("Faltan datos de varios especialistas: la lectura es parcial.");
   const soon = upcomingHighImpact(ctx.events, ctx.now, 12);
@@ -380,7 +394,7 @@ export function runDesk(raw: DeskSnapshot, settings: DeskSettings = DEFAULT_DESK
   const lean = (side: Side) => (side === "LONG" ? "alcista" : "bajista");
   if (!favored) {
     direccion = "ESPERAR";
-    resolucion = `Los especialistas están divididos (consenso ${arNumber(Number(cons.value.toFixed(2)))} sobre ±1): ni el escenario alcista ni el bajista tienen ventaja. La mesa espera una confirmación: ${bull.plan ? `arriba de ${px(sortResistances(a, price)[0]?.price ?? bull.plan.tp[0].price)}` : "una ruptura"} o ${bear.plan ? `abajo de ${px(sortSupports(a, price)[0]?.price ?? bear.plan.tp[0].price)}` : "una pérdida de soporte"}.`;
+    resolucion = `Los especialistas no coinciden lo suficiente (consenso ${arNumber(Number(cons.value.toFixed(2)))} sobre ±1; la mesa pide al menos ${arNumber(CONSENSUS_EDGE)} para tomar un lado): ni el escenario alcista ni el bajista tienen ventaja. La mesa espera una confirmación: ${bull.plan ? `arriba de ${px(sortResistances(a, price)[0]?.price ?? bull.plan.tp[0].price)}` : "una ruptura"} o ${bear.plan ? `abajo de ${px(sortSupports(a, price)[0]?.price ?? bear.plan.tp[0].price)}` : "una pérdida de soporte"}.`;
   } else if (!chosen?.plan || !chosen.riesgo) {
     direccion = "NO TRADE";
     resolucion = `El consenso es ${lean(favored)}, pero no se pudo armar un plan con stop y objetivos válidos.`;
@@ -679,6 +693,7 @@ export function deskTicket(d: DeskDecision): string {
     p.tp.forEach((t, i) => lines.push(`TAKE PROFIT ${i + 1}: ${px(t.price)} · ${t.label}`));
     lines.push(`RIESGO: ${r.nivel}`);
     lines.push(`R:R: ${rrText(r.rrPonderado)} · ponderado, un tercio en cada objetivo (por objetivo ${r.rr.map(rrText).join(" / ")})`);
+    lines.push(`GESTIÓN: ${MANAGEMENT_TEXT}`);
     lines.push(`APALANCAMIENTO SUGERIDO: ${r.apalancamiento}x · máximo seguro ${r.apalancamientoMaxSeguro}x · liquidación aprox. ${px(r.liquidacionAprox)}, ${arNumber(Number(r.liquidacionVsStop.toFixed(1)))} veces más lejos que el stop`);
     lines.push(r.posicionUsd !== null && r.riesgoUsd !== null ? `TAMAÑO: posición ${usd(r.posicionUsd)} (${px(r.cantidad ?? 0)} ${d.moneda}) · arriesgás ${usd(r.riesgoUsd)}${r.exposicionX !== null ? ` · exposición ${n2(r.exposicionX)}x tu capital` : ""}` : "TAMAÑO: cargá tu capital en «Mi riesgo» para calcularlo");
   } else {
@@ -699,7 +714,7 @@ export function deskTicket(d: DeskDecision): string {
 export function entrySpeech(d: DeskDecision): string {
   if ((d.direccion === "LONG" || d.direccion === "SHORT") && d.plan && d.riesgo) {
     const p = d.plan;
-    return `${d.moneda}: entraría en ${d.direccion === "LONG" ? "largo" : "corto"} ${p.tipoEntrada === "LÍMITE" ? "con orden límite en" : "a mercado cerca de"} ${px(p.entrada)}, stop en ${px(p.stop)} (${p.stopRazon}). Objetivos: ${p.tp.map((t, i) => `TP${i + 1} ${px(t.price)}`).join(", ")}. Riesgo/beneficio ${rrText(d.riesgo.rrPonderado)}, riesgo ${d.riesgo.nivel.toLowerCase()}, apalancamiento sugerido ${d.riesgo.apalancamiento}x. ${d.invalidacion} ${d.aviso}`;
+    return `${d.moneda}: entraría en ${d.direccion === "LONG" ? "largo" : "corto"} ${p.tipoEntrada === "LÍMITE" ? "con orden límite en" : "a mercado cerca de"} ${px(p.entrada)}, stop en ${px(p.stop)} (${p.stopRazon}). Objetivos: ${p.tp.map((t, i) => `TP${i + 1} ${px(t.price)}`).join(", ")}. Riesgo/beneficio ${rrText(d.riesgo.rrPonderado)}, riesgo ${d.riesgo.nivel.toLowerCase()}, apalancamiento sugerido ${d.riesgo.apalancamiento}x. Gestión: ${MANAGEMENT_TEXT}. ${d.invalidacion} ${d.aviso}`;
   }
   if (d.direccion === "ESPERAR" && d.plan) return `${d.moneda}: todavía no entraría. ${d.resolucion} Si se da, el plan sería ${d.plan.lado === "LONG" ? "largo" : "corto"} en ${px(d.plan.entrada)} con stop en ${px(d.plan.stop)}. ${d.aviso}`;
   return `${d.moneda}: no entraría. ${d.resolucion} ${d.aviso}`;

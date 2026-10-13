@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { aggregate } from "../lib/asset-read.ts";
-import { runDesk } from "../lib/jarvis-desk.ts";
+import { DESK_RULES, runDesk } from "../lib/jarvis-desk.ts";
 import type { DeskSnapshot } from "../lib/jarvis-desk-data.ts";
 import { FEE_PCT } from "../lib/jarvis-ledger.ts";
 import { auditOf, canPaper, closeManually, cursorOf, entryOf, LIMIT_EXPIRY_H, MINUTE, needsMinutes, openR, PAPER_HORIZON_H, paperCsv, paperForAi, paperFromDesk, paperSpeech, paperStats, recordFor, resolvePaper, rrAt, statsBy, validatePaper, withRecord, type PaperTrade } from "../lib/jarvis-paper.ts";
@@ -241,26 +241,28 @@ function snapshot(h1: SwingCandle[]): DeskSnapshot {
 }
 
 test("following the desk: only an approved plan, frozen with its analysis; the record never changes the plan", () => {
-  const d = runDesk(snapshot(path((i) => 100 * 1.0015 ** i + 2 * Math.sin(i / 6), 1000)))!;
+  // A steady, mild advance: the consensus clears the v2 minimum (±0,30) and the plan passes the risk manager.
+  const d = runDesk(snapshot(path((i) => 100 * 1.0007 ** i + 12 * Math.sin(i / 6), 1000)))!;
   const now = d.generadoA;
-  if (canPaper(d)) {
-    const t = paperFromDesk(d, now)!;
-    assert.equal(t.entrada, d.plan!.entrada);
-    assert.equal(t.stop, d.plan!.stop);
-    assert.deepEqual(t.tp, d.plan!.tp.map((x) => x.price));
-    assert.equal(t.vela, d.vela);
-    assert.equal(t.confianza, d.puntaje);
-    // Opened by a person: it waits for its first price after now, whatever the entry type.
-    assert.equal(t.estado, "PENDIENTE");
-    assert.ok(t.inicio! >= now && t.inicio! % MINUTE === 0, "prices count from the next whole minute");
-    assert.ok(validatePaper(t, now), "what the browser builds, the server accepts");
-    // The backtest decides at the close: a market plan enters at that close.
-    const atClose = paperFromDesk(d, now, { atClose: true })!;
-    assert.equal(atClose.inicio, d.vela + H);
-    if (d.plan!.tipoEntrada === "MERCADO") {
-      assert.equal(atClose.estado, "ABIERTA");
-      assert.equal(entryOf(atClose), d.plan!.entrada);
-    }
+  assert.ok(canPaper(d), `the desk should approve a plan here, it said ${d.direccion}: ${d.resolucion}`);
+  const t = paperFromDesk(d, now)!;
+  assert.equal(t.entrada, d.plan!.entrada);
+  assert.equal(t.stop, d.plan!.stop);
+  assert.deepEqual(t.tp, d.plan!.tp.map((x) => x.price));
+  assert.equal(t.vela, d.vela);
+  assert.equal(t.confianza, d.puntaje);
+  assert.equal(t.gestion, "BE_TP1", "new trades move the stop to the entry once TP1 is cashed");
+  assert.equal(t.reglas, DESK_RULES);
+  // Opened by a person: it waits for its first price after now, whatever the entry type.
+  assert.equal(t.estado, "PENDIENTE");
+  assert.ok(t.inicio! >= now && t.inicio! % MINUTE === 0, "prices count from the next whole minute");
+  assert.ok(validatePaper(t, now), "what the browser builds, the server accepts");
+  // The backtest decides at the close: a market plan enters at that close.
+  const atClose = paperFromDesk(d, now, { atClose: true })!;
+  assert.equal(atClose.inicio, d.vela + H);
+  if (d.plan!.tipoEntrada === "MERCADO") {
+    assert.equal(atClose.estado, "ABIERTA");
+    assert.equal(entryOf(atClose), d.plan!.entrada);
   }
   const vetoed = { ...d, direccion: "NO TRADE" as const, riesgo: d.riesgo ? { ...d.riesgo, vetos: ["prueba"] } : null };
   assert.equal(canPaper(vetoed), false);
@@ -270,7 +272,7 @@ test("following the desk: only an approved plan, frozen with its analysis; the r
   const withHist = withRecord(d, history);
   assert.deepEqual(withHist.plan, d.plan, "the measured record is shown, the plan stays");
   assert.equal(withHist.direccion, d.direccion);
-  if (d.plan) assert.equal(withHist.historial!.n, 2);
+  assert.equal(withHist.historial!.n, 2);
 });
 
 // ── Stored per account (D1) ──
