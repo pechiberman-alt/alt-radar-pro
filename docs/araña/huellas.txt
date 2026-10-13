@@ -5,7 +5,7 @@ bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
 bcde9385654a	0	.gitignore
 fe5716951a62	10	.mcp.json
 6b5886c6306e	5	.openai/hosting.json
-515a20ca4278	70	CLAUDE.md
+44bceb7e9100	71	CLAUDE.md
 8b27e3600b59	64	README.md
 5aac31cab73c	36	THIRD_PARTY_NOTICES.md
 7d7e53d1533b	103	app/account-panel.css
@@ -55,6 +55,7 @@ bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
 258c46b07f01	70	app/api/radar/route.ts
+4700fca70f5c	19	app/api/registro/route.ts
 a99ad37e5d45	96	app/api/robot/signal/route.ts
 1d6f0811ce3f	94	app/api/rolling/route.ts
 67ac76c459c7	194	app/api/scalping/route.ts
@@ -67,8 +68,8 @@ aa86804bf9da	24	app/api/telegram/test/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
 9505382d7d36	44	app/arana-desk.css
-55b44c48caec	115	app/arana-desk.tsx
-f65b5c38ea5d	350	app/arana-vivo.tsx
+1ec31caf7068	116	app/arana-desk.tsx
+666a2ff41624	368	app/arana-vivo.tsx
 109c61b2bb44	34	app/asset-flows.css
 866aeee2a3d1	125	app/asset-flows.tsx
 c8f77f7b2422	70	app/assistant-console.css
@@ -177,7 +178,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-9985854d7303	255	docs/araña/objetivos.md
+dc95da8f11db	265	docs/araña/objetivos.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -211,7 +212,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 dbd75245f8b8	366	lib/alerts.ts
 374fb7012b3c	155	lib/app-settings.ts
 b32e56319e6e	45	lib/arana-vivo-auto.ts
-399462931886	278	lib/arana-vivo.ts
+ab1defe0d619	284	lib/arana-vivo.ts
 025856e9b96a	181	lib/asset-read.ts
 8b7646335b22	743	lib/assistant/index.ts
 861e6e35ec57	309	lib/assistant/knowledge.ts
@@ -253,7 +254,7 @@ f83a7c4a72ca	222	lib/jarvis-analyst.ts
 b0f479478c6c	127	lib/jarvis-backtest-run.ts
 74940e570e61	281	lib/jarvis-backtest.ts
 f61124d7437f	79	lib/jarvis-chat.ts
-574be51c0a56	519	lib/jarvis-core-db.ts
+780046fc11e7	525	lib/jarvis-core-db.ts
 5a9f14b0e859	477	lib/jarvis-core.ts
 7b2813e75f44	352	lib/jarvis-council.ts
 cb4645381ac1	582	lib/jarvis-desk-agents.ts
@@ -318,6 +319,9 @@ f2ad043c6c3a	431	lib/paper-bot.ts
 357bfd64bf54	170	lib/pump-pressure.ts
 067ef991f873	300	lib/pump-radar.ts
 519f91b497f6	533	lib/radar.ts
+25e4f9cee7a3	106	lib/registro-db.ts
+62a90a1d0b2d	43	lib/registro-run.ts
+bdb811520d07	161	lib/registro.ts
 efc446c0f3ed	90	lib/reversal-zones.ts
 bc992c13bd28	130	lib/risk-calc.ts
 00e3d377935b	129	lib/robot-ledger-db.ts
@@ -374,7 +378,7 @@ fdf534d15afa	0	public/og.png
 6674fd76ede0	24	public/sw.js
 aaa393c36db1	0	public/window.svg
 dec125f1757e	1624	scripts/arana-vista.html
-4311eb41e3bb	740	scripts/arana-vivo.html
+d54b88652bba	795	scripts/arana-vivo.html
 eb4f4f4b4dac	1340	scripts/arana.mjs
 d13ecf4702a3	63	scripts/claude-hooks.mjs
 e65a72a07cd2	167	scripts/herramientas.mjs
@@ -494,6 +498,7 @@ d6fc96889cbf	52	tests/pump-plan.test.ts
 6046eb825968	96	tests/pump-pressure.test.ts
 1727ab858d8f	239	tests/pump-radar.test.ts
 016ee14324bf	304	tests/radar.test.ts
+11db531a9580	165	tests/registro.test.ts
 0d8e570a96dc	366	tests/rendered-html.test.mjs
 1e25d45e3800	108	tests/risk-calc.test.ts
 eb269257bf27	211	tests/risk.test.ts

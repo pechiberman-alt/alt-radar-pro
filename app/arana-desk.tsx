@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ControlesSombra, ControlesVivo, PanelVivo, useAutoEscaneo, useSombra, useVivo } from "./arana-vivo";
+import { ControlesSombra, ControlesVivo, PanelVivo, useAutoEscaneo, useRegistro, useSombra, useVivo } from "./arana-vivo";
 
 /**
  * La araña dentro de la app, en dos pestañas. EN VIVO: todas las monedas que la
@@ -27,6 +27,7 @@ export default function AranaDesk() {
   const zonaVivo = useRef<HTMLDivElement>(null);
   const vivo = useVivo();
   useSombra();
+  useRegistro();
   const { auto, estado, pausado, alternarPausa, escanearAhora, cancelar } = useAutoEscaneo(zonaVivo);
 
   // La foto y el estado del escaneo automático van al marco de la mesa en vivo.

@@ -8,6 +8,7 @@ import { loadPaper, PAPER_EVENT, paperTrades } from "../lib/jarvis-paper-run.ts"
 import { cancelScan, lastScan, SCAN_EVENT, scanState, startScan } from "../lib/jarvis-scan-run.ts";
 import { watchStatus, WATCH_EVENT } from "../lib/jarvis-watch-run.ts";
 import { MEDICION } from "../lib/mesa-medicion.ts";
+import { cargarRegistro, REGISTRO_ESPERA_MS, REGISTRO_EVENT, registroActual } from "../lib/registro-run.ts";
 import { aprobarVariante, cargarSombra, correrSombra, laboratorio, resumenActual, revocarVariante, SOMBRA_EVENT } from "../lib/mesa-sombra-run.ts";
 import { textoEvento } from "../lib/mesa-sombra.ts";
 
@@ -17,7 +18,7 @@ import { textoEvento } from "../lib/mesa-sombra.ts";
  * junto con lo medido en el pasado, cada cosa con su muestra. Ninguna lectura
  * manda una orden: el escaneo automático solo lee datos públicos de Binance.
  */
-const EVENTOS = [SCAN_EVENT, PAPER_EVENT, BACKTEST_EVENT, WATCH_EVENT, SOMBRA_EVENT] as const;
+const EVENTOS = [SCAN_EVENT, PAPER_EVENT, BACKTEST_EVENT, WATCH_EVENT, SOMBRA_EVENT, REGISTRO_EVENT] as const;
 /** Cada cuánto, como mucho, se rearma la foto: un escaneo cambia una moneda por vez. */
 const REFRESCO_MS = 400;
 
@@ -46,6 +47,7 @@ function armar(): VivoSnapshot {
     vigilancia: watchStatus(),
     medido: MEDICION,
     sombra: vivoSombra(),
+    registro: registroActual().registro,
   });
 }
 
@@ -146,6 +148,22 @@ const SOMBRA_ESPERA_MS = 3000;
  * operaciones de papel o un backtest nuevo, y cada 10 minutos con la pestaña
  * visible. Sin datos nuevos, una corrida no hace nada ni pide nada al servidor.
  */
+/** El registro del servidor: se lee al abrir la araña y después como mucho cada 5 minutos, solo con la pestaña visible. */
+export function useRegistro() {
+  useEffect(() => {
+    const correr = () => {
+      if (document.visibilityState === "visible") void cargarRegistro().catch(() => null);
+    };
+    correr();
+    const cada = setInterval(correr, REGISTRO_ESPERA_MS);
+    document.addEventListener("visibilitychange", correr);
+    return () => {
+      clearInterval(cada);
+      document.removeEventListener("visibilitychange", correr);
+    };
+  }, []);
+}
+
 export function useSombra() {
   useEffect(() => {
     let espera: ReturnType<typeof setTimeout> | null = null;

@@ -221,7 +221,7 @@ Reglas:
 - La descripción de cada archivo es el comentario que lo abre o, si no hay, el bloque `/** … */` de tres líneas o más que sigue a los imports (uno de una línea ahí describe a la primera función, no al archivo). Un archivo nuevo lleva ese comentario: sin él la búsqueda solo lo encuentra por su ruta y sus exportaciones.
 - Una regla que se agrega a un objetivo se escribe con lo importante al principio (el nombre y la conclusión): `--buscar` muestra solo sus primeras 200 letras. Las palabras que la gente usa y el código no van como sinónimos arriba en este archivo.
 - Después de agregar, mover o borrar archivos, o cambiar estos objetivos: `npm run arana`. `npm run test:unit` avisa si el mapa quedó viejo.
-- La araña en vivo (lib/arana-vivo.ts, app/arana-vivo.tsx) solo muestra lo que la app leyó en el navegador y lo medido, cada cosa con su muestra y su intervalo. No ejecuta, no propone órdenes y no guarda nada. Si falta un dato, dice «sin datos».
+- La araña en vivo (lib/arana-vivo.ts, app/arana-vivo.tsx) solo muestra lo que la app leyó (incluido el registro unificado de /api/registro) y lo medido, cada cosa con su muestra y su intervalo. No ejecuta, no propone órdenes y no guarda nada. Si falta un dato, dice «sin datos».
 - Lo medido que muestra la araña (lib/mesa-medicion.ts) tiene que estar escrito en docs/mesa-reglas-v2.md con sus números; tests/mesa-medicion.test.ts lo chequea. Para cambiarlo, volver a medir con `medir.ts 1h --estadistica` y actualizar los dos.
 - La mesa en vivo (EN VIVO, scripts/arana-vivo.html) es solo una vista: recibe la foto por postMessage desde la página madre, sin guardar nada ni pedir datos a la red, y sin botones que manden órdenes. Si cambia la forma de la foto, cambian a la vez lib/arana-vivo.ts, app/arana-vivo.tsx y la página (hay pruebas que lo cuidan).
 - El escaneo automático (lib/arana-vivo-auto.ts) escanea como mucho cada 15 minutos, solo con la mesa a la vista y la pestaña visible; nunca dos a la vez; se pausa con un botón y un intento fallido también espera el intervalo entero (no reintenta en bucle contra Binance). Cambiar el intervalo cambia lo que cuesta a Binance: medirlo antes.
@@ -232,6 +232,16 @@ Reglas:
 - La app la muestra en LA ARAÑA (AVANZADO): el build corre `npm run arana -- --pagina` (prebuild) y deja public/arana/index.html, que `app/arana-desk.tsx` pone en un marco sandboxeado (sin allow-same-origin: con scripts y mismo origen la página podría quitarse el sandbox). La página no guarda nada ni pide nada a la red; solo avisa su alto por postMessage y el marco lo respeta si viene de él. Se genera, no se commitea; si el build no puede leerla deja una página que avisa y no falla.
 - Ruflo (MCP de los agentes) vive en `.mcp.json` y `.claude/settings.json`, con versión, fecha y `--ignore-scripts` fijados; `tests/agentes-mcp.test.ts` lo vigila. No correr `ruflo init` acá: reescribe CLAUDE.md Expone solo los grupos que se usan (`CLAUDE_FLOW_MCP_TOOLS`): las 353 herramientas pesan ~66k tokens de esquema.
 - Gastar pocos tokens: `npm run verificar` (araña, lint, tests, tsc y build) muestra solo lo que falla y anota el árbol que pasó; `npm run subir` sube solo ese árbol (rama, PR, squash, espera el deploy) y frena secretos y workflows o wrangler sin pedido. Los hooks de `.claude/settings.json` frenan leer entero un archivo de más de 600 líneas (ficha de la araña o por partes; con `limit` se puede) y editar secretos.
+
+## registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente
+Texto: el único lugar donde la app calcula el acierto, el profit factor y la expectancia. Cada fuente (JARVIS, el bot de papel, el robot) con su muestra y su intervalo; lo que no se pudo leer dice «sin datos», no cero.
+Archivos: lib/registro.ts, lib/registro-db.ts, lib/registro-run.ts, app/api/registro/**, tests/registro.test.ts
+Reglas:
+- Un resultado cuenta una sola vez: R mayor que 0 gana, menor que 0 pierde, igual a 0 empata. Las abiertas no entran al acierto. Una cerrada sin resultado conocido no cuenta ni como acierto ni como cero.
+- Todo porcentaje va con su muestra y su intervalo de Wilson al 90 %; menos de 15 cerradas se marca «muestra mínima». El profit factor no se divide por cero: sin pérdidas dice «sin pérdidas».
+- Nada fuera de este registro calcula aciertos. La araña y la app muestran estos números tal cual; el diario del bot es una copia del papel y no se cuenta dos veces. Las señales del radar (signal_records) no entran hasta definir qué es un acierto para un plan sin R.
+- Las lecturas son acotadas: por fuente se leen las últimas 1.000 operaciones y, si hay más o filas ilegibles, la fuente dice «incompleta». JARVIS usa sus contadores globales; la base no hace COUNT(*) sobre tablas que crecen.
+- El laboratorio en sombra (JARVIS · señales en sombra) se muestra aparte y no entra en el total: no son operaciones.
 
 ## calidad — Pruebas
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.

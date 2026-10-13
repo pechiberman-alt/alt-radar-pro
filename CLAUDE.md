@@ -60,6 +60,7 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
 ## Honestidad (marca url.fx)
 - Ninguna probabilidad inventada. Todo porcentaje va con su tamaño de muestra (menos de 15 = "muestra mínima").
 - Desconocido no es cero: si falta un dato, se dice y no se estima a escondidas.
+- El acierto, el profit factor y la expectancia de la app salen solo del registro unificado (`lib/registro.ts`, `leerRegistroUnificado`): cada fuente con su muestra e intervalo. Nada fuera del registro calcula aciertos.
 - Señales y calculadoras llevan "no es asesoramiento financiero". Un resultado nunca se favorece: si una vela toca stop y objetivo, cuenta el stop.
 - Toda operación lleva SL, TP1, TP2 y TP3 fijados al abrirla (`lib/escalera.ts`; la mesa trae los suyos). Si nace con un solo
   objetivo, ese es el TP3 (el que se midió) y TP1/TP2 van a un tercio y dos tercios del camino. Cada nivel tocado queda registrado con su hora.
