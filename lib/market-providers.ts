@@ -292,6 +292,14 @@ export async function derivativesWithFallback(
   return { derivatives: null, provider: null, tried };
 }
 
+/**
+ * Lo que el servidor guarda en caché de un resultado de derivados: nada si ningún proveedor respondió. Así el caché
+ * (lib/upstream-cache.ts) sirve la última lectura buena mientras dure, en vez de pisarla con un vacío durante 60 s.
+ */
+export function parteDerivados<D>(r: { derivatives: D | null; provider: ProviderId | null; tried: Attempt[] }): { data: D; provider: ProviderId | null; tried: Attempt[] } | null {
+  return r.derivatives ? { data: r.derivatives, provider: r.provider, tried: r.tried } : null;
+}
+
 // ── Liquidaciones reales (OKX) ──
 
 export type LiquidationWindow = { horas: number; largosUsd: number; cortosUsd: number; ordenes: number; completa: boolean };

@@ -22,6 +22,7 @@ ab7409f8b7e4	148	app/api/admin/settings/route.ts
 45b256c81a5a	49	app/api/alerts/latest/route.ts
 03cbeef8a626	52	app/api/alerts/prebreak/route.ts
 6b4b0cad841f	58	app/api/analyst/ai/route.ts
+5f25e873c7ca	55	app/api/arana/ultimo/route.ts
 d0392dc083e7	44	app/api/auth/login/route.ts
 6b5d9403bf5d	21	app/api/auth/logout/route.ts
 602a68ae0568	12	app/api/auth/me/route.ts
@@ -52,7 +53,7 @@ a6e8db10b2ee	57	app/api/jarvis/sombra/route.ts
 ef3e2bf85432	160	app/api/klines/route.ts
 c1dc8c2ca83f	93	app/api/liquidity-history/route.ts
 a9e76218b723	216	app/api/market-structure/route.ts
-d3204ba0eb2d	52	app/api/market/derivatives/route.ts
+cfd124d61648	49	app/api/market/derivatives/route.ts
 bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
@@ -72,7 +73,7 @@ e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
 9505382d7d36	44	app/arana-desk.css
 1ec31caf7068	116	app/arana-desk.tsx
-6cc4b2d2edd6	369	app/arana-vivo.tsx
+1c85572f45c3	376	app/arana-vivo.tsx
 109c61b2bb44	34	app/asset-flows.css
 866aeee2a3d1	125	app/asset-flows.tsx
 c8f77f7b2422	70	app/assistant-console.css
@@ -181,7 +182,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-5f293480ff89	276	docs/araña/objetivos.md
+1c7e6d87db07	276	docs/araña/objetivos.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -214,6 +215,8 @@ b8e38621b74b	46	lib/ai-numbers.ts
 509da5ba4297	47	lib/alert-bus.ts
 dbd75245f8b8	366	lib/alerts.ts
 374fb7012b3c	155	lib/app-settings.ts
+8bc8d3dc5620	41	lib/arana-ultimo-db.ts
+8e5f0ea3f30d	35	lib/arana-ultimo.ts
 b32e56319e6e	45	lib/arana-vivo-auto.ts
 ab1defe0d619	284	lib/arana-vivo.ts
 025856e9b96a	181	lib/asset-read.ts
@@ -277,7 +280,7 @@ de08f7a44d9b	346	lib/jarvis-mind.ts
 1a8d71f669ad	170	lib/jarvis-paper-db.ts
 054b7c80b980	274	lib/jarvis-paper-run.ts
 cf67397ebde0	654	lib/jarvis-paper.ts
-a616ae6ddc5b	292	lib/jarvis-scan-run.ts
+e3ccab89cd1b	330	lib/jarvis-scan-run.ts
 1f2ad361d4f7	296	lib/jarvis-scan.ts
 187b69f4e8e6	367	lib/jarvis-stats.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
@@ -307,7 +310,7 @@ ce35aedc59de	144	lib/live-market.ts
 da795f0e150a	194	lib/magnet-watch.ts
 08266ef48c1d	445	lib/market-brain.ts
 c5ba3f905dda	317	lib/market-fetch.ts
-69447ca24760	387	lib/market-providers.ts
+f0be46251006	395	lib/market-providers.ts
 dca52626b743	252	lib/market-structure.ts
 dd7f989876a5	57	lib/mesa-medicion.ts
 8de6a64346cf	57	lib/mesa-sombra-auditoria.ts
@@ -414,6 +417,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
+e8ec72c5deb7	89	tests/arana-ultimo.test.ts
 41f8e61920bb	44	tests/arana-vivo-auto.test.ts
 b9e32500d850	247	tests/arana-vivo.test.ts
 72fda45a2ae9	467	tests/arana.test.ts
@@ -432,6 +436,7 @@ bee17b9c8ee8	120	tests/bot-journal.test.ts
 e954e10a7eec	85	tests/cost-basis.test.ts
 6cc784f01e52	156	tests/dca-tracker.test.ts
 3bfb5918410f	140	tests/decoupling.test.ts
+4b15d35063ac	33	tests/derivados-cache.test.ts
 bb85a3e6fff1	57	tests/diario-db.test.ts
 d8e87b00e33b	126	tests/econ-calendar.test.ts
 645f0d2f0dc9	116	tests/escalera.test.ts

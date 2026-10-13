@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 549 · objetivos: 17 · sin objetivo: 0
-- Tablas D1: 47 · secretos: 4 · variables de entorno: 12 · rutas /api: 52 · hosts: 55
-- Código de navegador: 61 archivos con "use client" que alcanzan 181 · problemas: 0
-- Lib sin prueba directa: 22 de 172
+- Archivos: 554 · objetivos: 17 · sin objetivo: 0
+- Tablas D1: 48 · secretos: 4 · variables de entorno: 12 · rutas /api: 53 · hosts: 55
+- Código de navegador: 61 archivos con "use client" que alcanzan 182 · problemas: 0
+- Lib sin prueba directa: 23 de 174
 
 ## Objetivos
 
@@ -170,7 +170,7 @@ Pendiente: Alertas de volumen siguen silenciosas desde el 30/09: Binance solo. F
 - `lib/trendlines.ts` — Trendlines and breakouts, found mechanically.
 - `lib/volume-spike.ts` — Unusual volume: the latest candle's volume against the average of the 20 candles before it, on the same timeframe.
 
-### datos-mercado — Velas, precios, noticias y frescura (29)
+### datos-mercado — Velas, precios, noticias y frescura (30)
 Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden tardar. Siempre se dice la fuente.
 - `app/api/calendar/route.ts` — exporta: dynamic, GET
 - `app/api/etf-flows/route.ts` — exporta: dynamic, GET
@@ -201,6 +201,7 @@ Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden 
 - `lib/shared-cache.ts` — Shared, short-lived cache for database-backed JSON that is the same for everyone (signal ledger, performance totals).
 - `lib/token-unlocks.ts` — Supply overhang: how much of each token still has to reach the market.
 - `lib/upstream-cache.ts` — Shared in-Worker cache for upstream market data.
+- `tests/derivados-cache.test.ts` — pruebas: sin ningún proveedor que responda, la parte de derivados es null (no un objeto v, con datos, la parte lleva la moneda, el proveedor y los intentos, si los proveedores fallan, el caché sirve la última lectura buena y no la pisa c
 
 ### binance-usuario — Cuenta de Binance del usuario (12)
 Texto: lectura de la cuenta y operaciones con claves del usuario, siempre desde su navegador.
@@ -335,15 +336,18 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/auth.ts` — Per-client authentication: email + password, isolated by user_id.
 - `lib/secret-box.ts` — AES-GCM with a base64 32-byte key: iv (12 bytes) + ciphertext, base64.
 
-### araña — La araña del proyecto y las instrucciones para trabajar en él (21)
+### araña — La araña del proyecto y las instrucciones para trabajar en él (25)
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
 - `.claude/settings.json`
 - `.mcp.json`
 - `CLAUDE.md` — ALT RADAR PRO — reglas del proyecto
+- `app/api/arana/ultimo/route.ts` — exporta: dynamic, GET, PUT
 - `app/arana-desk.css`
 - `app/arana-desk.tsx` — La araña dentro de la app, en dos pestañas.
 - `app/arana-vivo.tsx` — La mesa en vivo, para la araña: lo que la app leyó ahora mismo (el escaneo que va llegando o el último completo, el papel, el último backtest y la vigilancia) junto con lo medido e
 - `docs/araña/objetivos.md` — Objetivos de ALT RADAR PRO
+- `lib/arana-ultimo-db.ts` — La tabla del último escaneo de la araña: una fila por cuenta, leída y escrita por clave primaria (una lectura de D1 al entrar, una escritura por escaneo completo).
+- `lib/arana-ultimo.ts` — El último escaneo completo de la araña, guardado por cuenta para que al entrar a la app no empiece de cero.
 - `lib/arana-vivo-auto.ts` — El escaneo automático de la araña en vivo: como mucho cada 15 minutos, solo mientras la araña está a la vista, nunca en paralelo con otro escaneo y con un botón para pausarlo.
 - `lib/arana-vivo.ts` — La araña en vivo: junta lo que la app ya tiene en el navegador (el escaneo que va llegando o el último completo, las operaciones de papel, el último backtest y la vigilancia) en un
 - `scripts/arana-vista.html`
@@ -353,6 +357,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `scripts/herramientas.mjs` — Herramientas para trabajar en el repo gastando pocos tokens: el resumen corto de lint, tests, tsc y build que imprime `npm run verificar`, el control de secretos y archivos protegi
 - `scripts/subir.mjs` — npm run subir: lleva a producción el cambio que pasó `npm run verificar`, en un paso y con salida corta: rama, commit, PR, squash a main y espera el deploy del CI.
 - `scripts/verificar.mjs` — npm run verificar: todo lo que tiene que pasar antes de subir un cambio, con salida corta (una línea por paso y solo el detalle de lo que falla): mapa de la araña, lint, tests, tsc
+- `tests/arana-ultimo.test.ts` — pruebas: acepta un escaneo con la forma correcta y lo devuelve tal cual, rechaza lo que no tiene forma de escaneo, no acepta más filas que el tope del escáner (+1)
 - `tests/arana-vivo-auto.test.ts` — pruebas: la primera vez, con la araña a la vista, escanea enseguida, fuera de vista nunca escanea en segundo plano, aunque ya toque, pausado no escanea solo, y con un escaneo en curso no se empieza otro (+1)
 - `tests/arana-vivo.test.ts` — pruebas: sin escaneo, sin papel y sin backtest: todo dice «sin datos», nada se inventa, el escaneo al día muestra las mejores aprobadas, ordenadas por puntaje, sin los , un escaneo viejo avisa que ya no es de ahora, y uno parcial dice por qué se cort (+1)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
@@ -625,6 +630,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `ai_probe` — crea: lib/ai-probe.ts · usa: lib/ai-probe.ts · sin índice visible en el código
 - `ai_usage` — crea: lib/ai-analyst-server.ts · usa: lib/ai-analyst-server.ts, tests/ai-brains.test.ts · sin índice visible en el código
 - `app_settings` — crea: lib/app-settings.ts · usa: lib/app-settings.ts, tests/app-settings.test.ts, tests/binance-account.test.ts · sin índice visible en el código
+- `arana_ultimo` — crea: lib/arana-ultimo-db.ts · usa: lib/arana-ultimo-db.ts · sin índice visible en el código
 - `automation_state` — crea: db/schema.ts, lib/automation.ts, tests/signal-plan-db.test.ts (+1) · usa: app/api/signals/route.ts, lib/automation.ts, lib/scalping-automation.ts, lib/signal-plan-db.ts, tests/signal-plan-db.test.ts, tests/telegram-signals.test.ts · sin índice visible en el código
 - `binance_credentials` — crea: db/schema.ts, lib/auth.ts · usa: app/api/binance/credentials/route.ts, app/api/binance/link/route.ts · sin índice visible en el código
 - `binance_debug_log` — crea: lib/binance-debug-log.ts · usa: lib/binance-debug-log.ts, tests/binance-debug-log.test.ts · sin índice visible en el código
@@ -694,6 +700,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/alerts/latest` [GET] — app/api/alerts/latest/route.ts · alertas
 - `/api/alerts/prebreak` [POST] — app/api/alerts/prebreak/route.ts · alertas
 - `/api/analyst/ai` [POST] — app/api/analyst/ai/route.ts · jarvis
+- `/api/arana/ultimo` [GET, PUT] — app/api/arana/ultimo/route.ts · araña
 - `/api/auth/login` [POST] — app/api/auth/login/route.ts · seguridad
 - `/api/auth/logout` [POST] — app/api/auth/logout/route.ts · seguridad
 - `/api/auth/me` [GET] — app/api/auth/me/route.ts · seguridad
@@ -808,4 +815,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

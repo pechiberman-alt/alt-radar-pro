@@ -5,7 +5,8 @@ import { AUTO_REVISA_MS, decidirAuto, type DecisionAuto, type EstadoAuto } from 
 import { buildVivo, type VivoSnapshot, type VivoSombra } from "../lib/arana-vivo.ts";
 import { BACKTEST_EVENT, lastBacktest } from "../lib/jarvis-backtest-run.ts";
 import { loadPaper, PAPER_EVENT, paperTrades } from "../lib/jarvis-paper-run.ts";
-import { cancelScan, lastScan, SCAN_EVENT, scanState, startScan } from "../lib/jarvis-scan-run.ts";
+import { inicioDeUltimo } from "../lib/arana-ultimo.ts";
+import { cancelScan, cargarUltimoEscaneo, lastScan, SCAN_EVENT, scanState, startScan, ultimoEscaneoListo } from "../lib/jarvis-scan-run.ts";
 import { watchStatus, WATCH_EVENT } from "../lib/jarvis-watch-run.ts";
 import { MEDICION } from "../lib/mesa-medicion.ts";
 import { cargarRegistro, REGISTRO_ESPERA_MS, REGISTRO_EVENT, registroActual } from "../lib/registro-run.ts";
@@ -97,11 +98,15 @@ export function useAutoEscaneo(zona: RefObject<HTMLElement | null>) {
 
   useEffect(() => {
     const decidir = () => {
+      // Hasta leer el último escaneo guardado no se decide nada: si no, el primer escaneo se lanza a ciegas y pisa la cadencia.
+      if (!ultimoEscaneoListo()) return;
+      const guardado = lastScan();
       const d = decidirAuto({
         visible: visibleRef.current && document.visibilityState === "visible",
         pausado: pausadoRef.current,
         enCurso: scanState().running,
-        ultimoIntento: intentoRef.current,
+        // El último intento es el de esta sesión o, si no hubo, cuando empezó el último escaneo guardado.
+        ultimoIntento: intentoRef.current ?? (guardado ? inicioDeUltimo(guardado) : null),
         ahora: Date.now(),
       });
       if (d.escanear) {
@@ -111,6 +116,8 @@ export function useAutoEscaneo(zona: RefObject<HTMLElement | null>) {
       setAuto(d);
     };
     decidirRef.current = decidir;
+    // Al entrar: leer el último escaneo y, cuando esté, decidir de una vez (no hay que esperar al próximo tick de 30 s).
+    void cargarUltimoEscaneo().then(() => decidirRef.current());
     const mirar = new IntersectionObserver((entradas) => {
       visibleRef.current = entradas.some((x) => x.isIntersecting);
       decidir();

@@ -270,6 +270,43 @@ export function lastScan(): ScanResult | null {
   return state.result;
 }
 
+// ── El último escaneo completo, guardado por cuenta: al entrar, la araña lo muestra en vez de empezar de cero ──
+
+let ultimoListo = false;
+let cargaUltimo: Promise<void> | null = null;
+
+/** true cuando la lectura del último escaneo guardado ya terminó (haya o no un resultado). */
+export const ultimoEscaneoListo = (): boolean => ultimoListo;
+
+/** Lee una vez el último escaneo completo de la cuenta. Sin sesión o sin red queda listo igual y el escaneo sigue como antes. */
+export function cargarUltimoEscaneo(): Promise<void> {
+  if (!cargaUltimo) {
+    cargaUltimo = (async () => {
+      try {
+        const r = await fetch("/api/arana/ultimo", { cache: "no-store", credentials: "same-origin" });
+        if (!r.ok) return;
+        const d = (await r.json()) as { scan?: ScanResult | null };
+        if (d.scan && state.result === null && !state.running) set({ result: d.scan });
+      } catch {
+        // Sin red: se escanea como antes.
+      } finally {
+        ultimoListo = true;
+      }
+    })();
+  }
+  return cargaUltimo;
+}
+
+/** Guarda el escaneo completo de la cuenta. Un parcial no reemplaza a uno completo; sin sesión no se guarda nada. */
+async function guardarUltimoEscaneo(r: ScanResult) {
+  if (r.parcial) return;
+  try {
+    await fetch("/api/arana/ultimo", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scan: r }), credentials: "same-origin" });
+  } catch {
+    // Sin red: el resultado queda en esta sesión, como antes.
+  }
+}
+
 /** Empieza un escaneo (uno por vez). El avance y el resultado se leen con scanState(). */
 export function startScan(opts: { minVolume?: number } = {}): Promise<ScanOutcome> {
   if (state.running) return Promise.resolve({ ok: false, error: "Ya hay un escaneo en curso." });
@@ -278,6 +315,7 @@ export function startScan(opts: { minVolume?: number } = {}): Promise<ScanOutcom
   return scanMarket({ minVolume: opts.minVolume, signal: controller.signal, onProgress: (p) => set({ progress: p }), onRow: (r) => set({ filas: [...state.filas, r] }) })
     .then((out) => {
       set(out.ok ? { running: false, progress: null, result: out.result, filas: [] } : { running: false, progress: null, error: out.error, filas: [] });
+      if (out.ok) void guardarUltimoEscaneo(out.result);
       return out;
     })
     .catch(() => {
