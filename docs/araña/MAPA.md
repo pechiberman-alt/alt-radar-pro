@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 541 · objetivos: 16 · sin objetivo: 0
+- Archivos: 549 · objetivos: 17 · sin objetivo: 0
 - Tablas D1: 47 · secretos: 4 · variables de entorno: 12 · rutas /api: 52 · hosts: 55
-- Código de navegador: 60 archivos con "use client" que alcanzan 174 · problemas: 0
-- Lib sin prueba directa: 22 de 167
+- Código de navegador: 61 archivos con "use client" que alcanzan 181 · problemas: 0
+- Lib sin prueba directa: 22 de 172
 
 ## Objetivos
 
@@ -41,7 +41,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `lib/ai-analyst-server.ts` — The Anthropic call and the daily quota, shared by the app's ANALISTA and the Telegram bot.
 - `lib/ai-analyst.ts` — AI mode for the ANALISTA panel: Claude, instructed with ALT RADAR's own methodology and fed the live snapshot on every question.
 - `lib/ai-brains.ts` — JARVIS's brains, in the order they answer a free question:
-- `lib/ai-cascade.ts` — La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el cupo de la persona), después por Groq (si hay clave gratis) y después por el modelo gratis de 
+- `lib/ai-cascade.ts` — La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el cupo de la persona), después por Groq (si hay clave gratis) y después por el modelo gratis de
 - `lib/ai-numbers.ts` — Numbers for the AIs, already written the Argentine way ("82.920", "11,066", "0,7042", "-2,99").
 - `lib/ai-probe.ts` — Once per deploy, the minute cron asks the free brain (Cloudflare Workers AI) a one-word question and keeps what happened, so the settings screen — and whoever deployed — can see th
 - `lib/assistant/index.ts` — Deterministic terminal assistant.
@@ -356,7 +356,7 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `tests/arana-vivo-auto.test.ts` — pruebas: la primera vez, con la araña a la vista, escanea enseguida, fuera de vista nunca escanea en segundo plano, aunque ya toque, pausado no escanea solo, y con un escaneo en curso no se empieza otro (+1)
 - `tests/arana-vivo.test.ts` — pruebas: sin escaneo, sin papel y sin backtest: todo dice «sin datos», nada se inventa, el escaneo al día muestra las mejores aprobadas, ordenadas por puntaje, sin los , un escaneo viejo avisa que ya no es de ahora, y uno parcial dice por qué se cort (+1)
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
-- `tests/herramientas.test.ts` — Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada más, `npm run subir` tiene que frenar secretos y archivos protegi
+- `tests/herramientas.test.ts` — Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada más, `npm run subir` tiene que frenar secretos, archivos protegid
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)
 
 ### registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente (10)
@@ -371,6 +371,17 @@ Texto: el único lugar donde la app calcula el acierto, el profit factor y la ex
 - `lib/registro.ts` — El registro unificado de operaciones: el único lugar donde la app calcula el acierto, el profit factor y la expectancia.
 - `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
+
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (8)
+Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
+- `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
+- `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
+- `lib/lab-evaluacion.ts` — La evaluación del AI TRADING LAB sobre un backtest de la mesa (lib/jarvis-backtest.ts): parte el período en DESARROLLO y EVALUACIÓN por fecha (corte fijado antes de mirar), y en ca
+- `lib/lab-jarvis.ts` — JARVIS sobre el AI TRADING LAB: contesta con los datos reales de la foto del laboratorio (lib/lab.ts) qué hace la araña, qué encontró, qué estrategias se evalúan, cuál rinde mejor
+- `lib/lab-riesgo.ts` — El gestor de riesgo central del AI TRADING LAB: una sola compuerta para toda operación simulada, en el motor de papel del navegador y en la API del servidor (no solo en la pantalla
+- `lib/lab-run.ts` — El AI TRADING LAB en el navegador: guarda los límites de riesgo que eligió la persona (dentro de los topes de lib/lab-riesgo.ts) y anota la actividad del laboratorio con su hora (r
+- `lib/lab.ts` — AI TRADING LAB: la foto del laboratorio armada con lo que la app ya tiene (la araña en vivo, el backtest, el papel, el registro y el gestor de riesgo).
+- `tests/lab.test.ts` — AI TRADING LAB: el gestor de riesgo central frena lo que pasa los límites y nadie lo afloja más allá de los topes; la evaluación del backtest respeta la cronología; el centro de la
 
 ### calidad — Pruebas (131)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
@@ -792,7 +803,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa

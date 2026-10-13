@@ -35,7 +35,8 @@ function vivoSombra(): VivoSombra {
   };
 }
 
-function armar(): VivoSnapshot {
+/** La foto en vivo de este momento, para quien la necesita fuera de un componente (JARVIS, el laboratorio). */
+export function armar(): VivoSnapshot {
   const st = scanState();
   return buildVivo({
     now: Date.now(),

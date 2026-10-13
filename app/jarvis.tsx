@@ -4,6 +4,11 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { openInMap, showSection } from "@/lib/account-events";
 import { eligible } from "@/lib/decoupling";
 import { briefingText, findCoins, findTimeframe, greeting, HELP_TEXT, parseCommand, priceLine, type JarvisIntent, type Ticker } from "@/lib/jarvis";
+import { armar as armarVivo } from "./arana-vivo";
+import { labParaIa } from "@/lib/lab";
+import { respuestaLab } from "@/lib/lab-jarvis";
+import { operacionDePapel } from "@/lib/lab-riesgo";
+import { fotoLab } from "@/lib/lab-run";
 import { compareDesks, deskForAi, deskSpeech, deskTicket, entrySpeech, indicatorsSpeech, liquidationRisk, macroBrief, macroKindOf, macroSpeech, whatIf, type DeskDecision } from "@/lib/jarvis-desk";
 import { cachedDesk, deskFor, showInDesk } from "@/lib/jarvis-desk-run";
 import { canPaper, paperForAi, paperSpeech } from "@/lib/jarvis-paper";
@@ -860,6 +865,11 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
           case "AI": {
             // What the question is about: a coin it names, or what is on screen ("analizalo").
             const named = findCoins(intent.question, known.current);
+            // AI TRADING LAB questions (what the spider is doing, which strategy did better, drawdown, risks…) are
+            // answered from the lab's real data, never guessed by a model (lib/lab-jarvis.ts).
+            const labFoto = fotoLab({ vivo: armarVivo(), operaciones: paperTrades().map((t) => operacionDePapel(t)), ahora: Date.now(), enLinea: navigator.onLine !== false, autoPausado: false });
+            const labRespuesta = named.length ? null : respuestaLab(intent.question, labFoto);
+            if (labRespuesta) return speak(labRespuesta, "laboratorio");
             if (named.length) focusRef.current = { symbol: `${named[0]}USDT`, timeframe: findTimeframe(intent.question) ?? focusRef.current.timeframe };
             const onScreen = !named.length && pointsAtScreen(intent.question);
             const focus: Focus = { screen: screenRef.current, symbol: focusRef.current.symbol, timeframe: focusRef.current.timeframe };
@@ -911,6 +921,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                     // Its own paper record (simulated), so it can discuss how its plans actually went.
                     papel: paperForAi(paperTrades()),
                     backtest: subject && lastBacktest()?.symbol === subject ? backtestForAi(lastBacktest()!) : null,
+                    // The simulated multi-agent lab: state, agents, risk and the registry, with its sample sizes.
+                    laboratorio: labParaIa(labFoto),
                   },
                   history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
                 }),

@@ -5,12 +5,12 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   archivoDeSecretos, archivoProtegido, buscarSecretos, decidirEdicion, decidirLectura, duracion, filtrarTsc,
-  MAX_LINEAS_LECTURA, repoDesdeRemoto, resumirLint, resumirTests,
+  MAX_LINEAS_LECTURA, repoDesdeRemoto, resumirLint, resumirTests, revisarArchivosNuevos,
 } from "../scripts/herramientas.mjs";
 
 /**
  * Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada
- * más, `npm run subir` tiene que frenar secretos y archivos protegidos, y los hooks de Claude Code tienen que frenar
+ * más, `npm run subir` tiene que frenar secretos, archivos protegidos y archivos nuevos sin seguimiento, y los hooks de Claude Code tienen que frenar
  * la lectura entera de archivos largos y la edición de secretos.
  */
 
@@ -139,4 +139,20 @@ test("remote and duration helpers", () => {
   assert.equal(repoDesdeRemoto("http://proxy@127.0.0.1:1234/git/pechiberman-alt/alt-radar-pro/"), "pechiberman-alt/alt-radar-pro");
   assert.equal(duracion(42_400), "42 s");
   assert.equal(duracion(185_000), "3 min 05 s");
+});
+
+test("subir no suma archivos nuevos sin verlos: los lista y pide --incluir-nuevos", () => {
+  const sin = revisarArchivosNuevos("docs/nuevo.md\n\n  lib/otro.ts  \n");
+  assert.deepEqual(sin.nuevos, ["docs/nuevo.md", "lib/otro.ts"]);
+  assert.equal(sin.error, "hay 2 archivos nuevos sin seguimiento: docs/nuevo.md, lib/otro.ts. Si son parte del cambio, repetí con --incluir-nuevos; si no, sacalos o agregalos a .gitignore.");
+  assert.deepEqual(revisarArchivosNuevos("docs/nuevo.md\n", true), { nuevos: ["docs/nuevo.md"], error: null });
+  assert.deepEqual(revisarArchivosNuevos(""), { nuevos: [], error: null });
+  assert.match(revisarArchivosNuevos("uno.txt").error ?? "", /^hay 1 archivo nuevo sin seguimiento: uno\.txt\./);
+});
+
+test("el aviso de archivos nuevos nombra hasta 15 y cuenta el resto", () => {
+  const lista = Array.from({ length: 17 }, (_, i) => `scratch/${i}.txt`).join("\n");
+  const r = revisarArchivosNuevos(lista);
+  assert.match(r.error ?? "", /^hay 17 archivos nuevos sin seguimiento: scratch\/0\.txt, .*scratch\/14\.txt y 2 más\./);
+  assert.doesNotMatch(r.error ?? "", /scratch\/15\.txt/);
 });

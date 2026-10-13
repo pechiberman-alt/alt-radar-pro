@@ -16,10 +16,11 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
 - Fijado: `@claude-flow/cli@3.48.0` (el paquete `ruflo` apunta a `^3`), `--before=2026-09-29` y `--ignore-scripts`. Para subir de versión: changelog y `postinstall` del paquete, `tools/list`, y recién ahí el pin y la fecha.
 - No correr `npx ruflo init` ni `claude-flow init` en este repo: reescriben CLAUDE.md y agregan hooks. Los agentes de Ruflo trabajan con las reglas de este archivo, igual que cualquier otro.
 - Su estado local (`.swarm/`, `.claude-flow/`, `ruvector.db`) está en .gitignore. Nunca guardarle claves ni datos de usuarios en su memoria.
+- Diagnóstico: `npx -y --ignore-scripts --before=2026-09-29 -p @claude-flow/cli@3.48.0 claude-flow doctor` (la versión fijada, sin scripts de instalación). `npx --yes ruflo@latest doctor` además ejecuta los scripts de instalación de sus dependencias y deja un daemon en segundo plano: paralo con `npx --yes ruflo@3.56.9 daemon stop`. Puede escribir `.claude/proven-config.json` (política que Ruflo adopta sola; está en .gitignore): revisalo antes de confiar en él.
 
 ## Antes de proponer un cambio
 - `npm ci --no-audit --no-fund` si cambiaron dependencias, y `npm run verificar`: araña, lint, tests, tsc (el CI no lo corre; el único error esperado es el de `vite.config.ts`) y build, con salida corta. Tiene que terminar en ✓. `--rapido` saltea tsc y build mientras iterás.
-- Subir: `npm run subir -- --rama <r> --titulo "…" --mensaje <archivo> --cuerpo <archivo>`: commit, PR, squash a `main` y espera el deploy. Se niega si el árbol cambió desde el último verificar o si ve secretos. Después confirmá producción en `/api/version?nocache=<sha7>`.
+- Subir: `npm run subir -- --rama <r> --titulo "…" --mensaje <archivo> --cuerpo <archivo>`: commit, PR, squash a `main` y espera el deploy. Se niega si el árbol cambió desde el último verificar, si ve secretos o si hay archivos nuevos sin seguimiento: esos los suma solo con `--incluir-nuevos`, después de verlos listados. Después confirmá producción en `/api/version?nocache=<sha7>`.
 - Todo cambio de lógica lleva tests en `tests/` (node:test). Los de datos de mercado incluyen un test de que no se mira el futuro.
 - Al hacer merge a `main`, el CI despliega solo (lint, tests, build, migraciones D1, deploy).
 - No tocar `.github/workflows/` ni `wrangler*.jsonc` salvo pedido explícito (un hook pide confirmación).

@@ -231,7 +231,7 @@ Reglas:
 - Honestidad de la vista: todo panel sale del mapa; lo que es adorno (malla fina entre vecinos, retícula, polvo) lo dice la leyenda y el pie. La posición de cada punto la calcula `esferaDe` en scripts/arana.mjs y es siempre la misma para el mismo proyecto (hay prueba). Un porcentaje lleva su n y menos de 15 es «muestra mínima»; lo que no se puede medir se muestra como «sin datos», no como cero.
 - La app la muestra en LA ARAÑA (AVANZADO): el build corre `npm run arana -- --pagina` (prebuild) y deja public/arana/index.html, que `app/arana-desk.tsx` pone en un marco sandboxeado (sin allow-same-origin: con scripts y mismo origen la página podría quitarse el sandbox). La página no guarda nada ni pide nada a la red; solo avisa su alto por postMessage y el marco lo respeta si viene de él. Se genera, no se commitea; si el build no puede leerla deja una página que avisa y no falla.
 - Ruflo (MCP de los agentes) vive en `.mcp.json` y `.claude/settings.json`, con versión, fecha y `--ignore-scripts` fijados; `tests/agentes-mcp.test.ts` lo vigila. No correr `ruflo init` acá: reescribe CLAUDE.md Expone solo los grupos que se usan (`CLAUDE_FLOW_MCP_TOOLS`): las 353 herramientas pesan ~66k tokens de esquema.
-- Gastar pocos tokens: `npm run verificar` (araña, lint, tests, tsc y build) muestra solo lo que falla y anota el árbol que pasó; `npm run subir` sube solo ese árbol (rama, PR, squash, espera el deploy) y frena secretos y workflows o wrangler sin pedido. Los hooks de `.claude/settings.json` frenan leer entero un archivo de más de 600 líneas (ficha de la araña o por partes; con `limit` se puede) y editar secretos.
+- Gastar pocos tokens: `npm run verificar` (araña, lint, tests, tsc y build) muestra solo lo que falla y anota el árbol que pasó; `npm run subir` sube solo ese árbol (rama, PR, squash, espera el deploy) y frena secretos, archivos nuevos sin seguimiento (salvo con `--incluir-nuevos`) y workflows o wrangler sin pedido. Los hooks de `.claude/settings.json` frenan leer entero un archivo de más de 600 líneas (ficha de la araña o por partes; con `limit` se puede) y editar secretos.
 
 ## registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente
 Texto: el único lugar donde la app calcula el acierto, el profit factor y la expectancia. Cada fuente (JARVIS, el bot de papel, el robot) con su muestra y su intervalo; lo que no se pudo leer dice «sin datos», no cero.
@@ -243,6 +243,16 @@ Reglas:
 - Las lecturas son acotadas: por fuente se leen las últimas 1.000 operaciones y, si hay más o filas ilegibles, la fuente dice «incompleta». JARVIS usa sus contadores globales; la base no hace COUNT(*) sobre tablas que crecen.
 - El laboratorio en sombra (JARVIS · señales en sombra) se muestra aparte y no entra en el total: no son operaciones.
 - Flujo de órdenes (lib/flujo.ts, PLAN_FLUJO_1): una lectura de presión con dirección y puntaje de 60 o más es operación solo con plan completo de los niveles que ya calcula el libro (stop en el piso o techo más cercano del lado contrario, objetivo en el más cercano del lado de la dirección). Se mide con velas de 5 minutos, 48 velas, comisión de 0,05 % por lado; una lectura por símbolo, lado y media hora. La regla se fijó antes de medirla: cambiarla es un PR revisado, no un ajuste a los números.
+
+## laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones
+Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
+Archivos: lib/lab.ts, lib/lab-riesgo.ts, lib/lab-evaluacion.ts, lib/lab-jarvis.ts, lib/lab-run.ts, app/ai-trading-lab.tsx, app/ai-trading-lab.css, tests/lab.test.ts
+Reglas:
+- Solo simulación: el laboratorio no importa ningún camino de ejecución real (lib/binance-client-signed.ts, lib/jarvis-execution.ts) ni nombra endpoints de órdenes; un test lo vigila. Operar con dinero real es otra fase, con revisión de seguridad y autorización explícita.
+- Toda operación de papel pasa por lib/lab-riesgo.ts en el motor del navegador y en la API del servidor. Los límites los pone la persona dentro de topes fijos; ningún agente los cambia ni apaga la compuerta. Sin riesgo por operación conocido, no se abre.
+- El estado de la araña sale de lo que corre de verdad (escaneo, backtest, conexión, errores). Sin dato de avance, el avance es indeterminado: nunca un porcentaje inventado.
+- La evaluación del backtest separa DESARROLLO y EVALUACIÓN por fecha (el último 30 %, fijado antes de mirar); cada operación cae en el tramo en que se abrió. El deslizamiento es un supuesto y se dice.
+- JARVIS no corona una estrategia con menos de 15 cerradas, y dice que lo pasado no garantiza el futuro. Los agentes dicen qué está implementado, qué está activo y qué falta.
 
 ## calidad — Pruebas
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.

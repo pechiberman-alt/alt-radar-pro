@@ -1,7 +1,7 @@
 /**
  * npm run subir: lleva a producción el cambio que pasó `npm run verificar`, en un paso y con salida corta: rama,
  * commit, PR, squash a main y espera el deploy del CI. Se niega si el árbol cambió desde el último verificar, si hay
- * archivos o líneas que parecen secretos, o si toca workflows o wrangler sin --permitir-protegidos (CLAUDE.md).
+ * archivos nuevos sin seguimiento (salvo con --incluir-nuevos), archivos o líneas que parecen secretos, o si toca workflows o wrangler sin --permitir-protegidos (CLAUDE.md).
  * Uso: npm run subir -- --rama x --titulo "…" --mensaje archivo --cuerpo archivo [--sin-merge] | --seguir <sha>
  */
 import { execFileSync, spawnSync } from "node:child_process";
@@ -9,6 +9,7 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import { parseArgs } from "node:util";
 import {
   arbolActual, archivoDeSecretos, archivoProtegido, archivoVerificado, buscarSecretos, duracion, repoDesdeRemoto,
+  revisarArchivosNuevos,
 } from "./herramientas.mjs";
 
 const { values: op } = parseArgs({
@@ -20,6 +21,7 @@ const { values: op } = parseArgs({
     "sin-merge": { type: "boolean" },
     "sin-verificar": { type: "boolean" },
     "permitir-protegidos": { type: "boolean" },
+    "incluir-nuevos": { type: "boolean" },
     esperar: { type: "string" },
     seguir: { type: "string" },
   },
@@ -91,6 +93,11 @@ if (!op["sin-verificar"]) {
   if (v.rapido) fallar("el último verificar fue --rapido: corré el completo");
   if (v.arbol !== arbolActual()) fallar("el árbol cambió desde el último npm run verificar: volvé a correrlo");
 }
+
+// Un archivo nuevo entra al commit con `git add -A`: se lista antes de tocar ramas y no se suma sin --incluir-nuevos.
+const sinSeguimiento = revisarArchivosNuevos(git("-c", "core.quotePath=false", "ls-files", "--others", "--exclude-standard"), Boolean(op["incluir-nuevos"]));
+if (sinSeguimiento.error) fallar(sinSeguimiento.error);
+if (sinSeguimiento.nuevos.length) console.log(`… suma ${sinSeguimiento.nuevos.length} archivo(s) nuevo(s): ${sinSeguimiento.nuevos.join(", ")}`);
 
 let rama = git("rev-parse", "--abbrev-ref", "HEAD");
 if (rama === "main") {

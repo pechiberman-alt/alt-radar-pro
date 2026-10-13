@@ -49,6 +49,7 @@ import PortfolioRisk from "./portfolio-risk";
 import SpotDesk from "./spot-desk";
 import SentimentDesk from "./sentiment-desk";
 import AranaDesk from "./arana-desk";
+import AiTradingLab from "./ai-trading-lab";
 import SettingsDesk from "./settings-desk";
 import SwingDesk from "./swing-desk";
 import { Collapsible, WelcomeHint, WorkspaceBar, useWorkspace, isVisibleSection, useAdvanced } from "./workspace";
@@ -101,6 +102,7 @@ const NAV_ITEMS = [
   { label: "DCA", mobile: "DCA", icon: "⟳", id: "dca" },
   { label: "CONFIGURACIÓN", mobile: "AJUSTES", icon: "⚙", id: "configuracion" },
   { label: "LA ARAÑA", mobile: "ARAÑA", icon: "✺", id: "arana" },
+  { label: "AI TRADING LAB", mobile: "LAB", icon: "⌬", id: "lab" },
   { label: "ESTRATEGIA SPOT", mobile: "SPOT", icon: "◎", id: "spot" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
@@ -1119,6 +1121,10 @@ export default function RadarApp() {
 
         <Collapsible id="arana" label="LA ARAÑA · MAPA DEL PROYECTO" open={workspace.open["arana"]} onToggle={workspace.toggle}>
           {workspace.open["arana"] && <AranaDesk />}
+        </Collapsible>
+
+        <Collapsible id="lab" label="AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES" open={workspace.open["lab"]} onToggle={workspace.toggle}>
+          {workspace.open["lab"] && <AiTradingLab />}
         </Collapsible>
 
         <Collapsible id="cartera" label="MI CARTERA" open={workspace.open["cartera"]} onToggle={workspace.toggle}>

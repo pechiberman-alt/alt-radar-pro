@@ -58,6 +58,9 @@ tsconfig.tsbuildinfo
 /.swarm/
 /.claude-flow/
 /ruvector.db*
+# política que Ruflo adopta sola al diagnosticar (ver CLAUDE.md)
+/.claude/proven-config.json
+/.claude/.proven-config-version
 
 # lo que baja y calcula la investigación de la mesa (scripts/investigacion/README.md)
 /datos-investigacion/
