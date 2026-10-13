@@ -178,13 +178,14 @@ export function leerArchivos(root, rutas) {
   });
 }
 
+/** The shebang line and the "use client" / "use server" directives that come before the code. */
 function quitarDirectivas(t) {
-  return t.replace(/^\s*(?:(["'])use (?:client|server)\1;?\s*)+/, "");
+  return t.replace(/^#![^\n]*\n/, "").replace(/^\s*(?:(["'])use (?:client|server)\1;?\s*)+/, "");
 }
 
-/** The leading comment of a code file, without its markers. */
-function comentarioInicial(t) {
-  let resto = quitarDirectivas(t).trimStart();
+/** The comment that opens `resto`, without its markers: block comments (tooling directives skipped) or // lines. */
+function comentarioAl(resto) {
+  resto = resto.trimStart();
   while (resto.startsWith("/*")) {
     const fin = resto.indexOf("*/");
     if (fin < 0) break;
@@ -208,6 +209,41 @@ function comentarioInicial(t) {
   return "";
 }
 
+/** What is left of a file once the import statements that open it are skipped (multi-line ones, and // notes between them, included). */
+function sinImportaciones(t) {
+  let resto = t.trimStart();
+  for (;;) {
+    const m = resto.match(/^import\b[^"';]*?\bfrom\s*["'][^"'\n]+["']\s*;?[ \t]*|^import\s*["'][^"'\n]+["']\s*;?[ \t]*/);
+    if (m) {
+      resto = resto.slice(m[0].length).trimStart();
+      continue;
+    }
+    // A // note that sits between two imports belongs to the next one; one that follows the last import is left alone.
+    const nota = resto.match(/^(?:\/\/[^\n]*\n\s*)+/);
+    if (nota && /^import\b/.test(resto.slice(nota[0].length))) {
+      resto = resto.slice(nota[0].length);
+      continue;
+    }
+    return resto;
+  }
+}
+
+/**
+ * The comment that says what a code file is for: the one that opens it or, as
+ * most files here do, the one right after its imports. After the imports only
+ * a doc block of three lines or more counts: a one-line doc there belongs to
+ * the first function, and describing the whole file with it would mislead.
+ */
+export function comentarioInicial(t) {
+  const resto = quitarDirectivas(t).trimStart();
+  const abre = comentarioAl(resto);
+  if (abre) return abre;
+  const despues = sinImportaciones(resto);
+  if (despues === resto || !despues.startsWith("/**")) return "";
+  const cabecera = comentarioAl(despues);
+  return cabecera.split("\n").length >= 3 ? cabecera : "";
+}
+
 /** The first sentence of the first paragraph: what the file is for. */
 export function primeraFrase(texto) {
   const parrafo = texto.split(/\n\s*\n/)[0].replace(/\s+/g, " ").trim();
@@ -220,6 +256,23 @@ function resumenMarkdown(t) {
   const titulo = lineas.find((l) => /^#\s+/.test(l));
   const primera = lineas.find((l) => l && !l.startsWith("#") && !l.startsWith("---"));
   return (titulo ? titulo.replace(/^#\s+/, "") : primera ?? "").slice(0, 180);
+}
+
+/** The section headings of a Markdown file (## to ####), code blocks left out: they are searched and they point to the section to read. */
+export function encabezadosMarkdown(t) {
+  const salida = [];
+  let enCodigo = false;
+  for (const linea of t.split("\n")) {
+    if (/^\s*(?:```|~~~)/.test(linea)) {
+      enCodigo = !enCodigo;
+      continue;
+    }
+    if (enCodigo) continue;
+    const m = linea.match(/^#{2,4}\s+(.+?)\s*#*\s*$/);
+    if (m) salida.push(m[1].replace(/[`*_]/g, "").slice(0, 90));
+    if (salida.length >= 60) break;
+  }
+  return salida;
 }
 
 export function exportesDe(t) {
@@ -303,6 +356,7 @@ export function analizar(archivo) {
     lineas: 0,
     objetivo: null,
     resumen: "",
+    titulos: [],
     exporta: [],
     especificadores: [],
     importa: [],
@@ -322,6 +376,7 @@ export function analizar(archivo) {
   info.lineas = texto.split("\n").length;
   if (path.endsWith(".md")) {
     info.resumen = resumenMarkdown(texto);
+    info.titulos = encabezadosMarkdown(texto);
     return info;
   }
   info.resumen = primeraFrase(comentarioInicial(texto));
@@ -516,7 +571,7 @@ export function renderMapa(index) {
     "",
     "> Lo escribe `npm run arana` (scripts/arana.mjs) desde el código y desde docs/araña/objetivos.md. No se edita a mano.",
     "> Lectura estática: los imports armados en tiempo de ejecución no aparecen.",
-    "> Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.",
+    "> Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.",
     "",
     `- Archivos: ${index.archivos.length} · objetivos: ${index.objetivos.length} · sin objetivo: ${index.sinObjetivo.length}`,
     `- Tablas D1: ${index.tablas.size} · secretos: ${index.secretos.size} · variables de entorno: ${index.variables.size} · rutas /api: ${index.rutas.length} · hosts: ${index.hosts.size}`,
@@ -579,7 +634,7 @@ export function expandir(sinonimos, termino) {
 }
 
 // How much a match in each field is worth. The path says the most about a file.
-const PESOS = { ruta: 6, exporta: 4, tablas: 4, resumen: 3, objetivo: 2, pruebas: 2 };
+const PESOS = { ruta: 6, exporta: 4, tablas: 4, resumen: 3, titulos: 3, objetivo: 2, pruebas: 2 };
 
 function camposDe(f, objetivo, tablasUso) {
   return {
@@ -587,15 +642,66 @@ function camposDe(f, objetivo, tablasUso) {
     exporta: tokens(f.exporta.join(" ")),
     tablas: tokens([...tablasUso, ...f.secretos.map((s) => s.nombre), ...f.variables].join(" ")),
     resumen: tokens(f.resumen),
+    titulos: tokens(f.titulos.join(" ")),
     objetivo: objetivo ? tokens(`${objetivo.slug} ${objetivo.titulo} ${objetivo.texto}`) : [],
     pruebas: tokens(f.pruebas.join(" ")),
   };
 }
 
+/** The words of a query with their synonyms: a text talks about a word when it has any of the words in its set. */
+export function expandirConsulta(index, consulta) {
+  const terminos = [...new Set(tokens(consulta))].filter((t) => !STOP.has(t));
+  return terminos.map((termino) => ({ termino, set: expandir(index.sinonimos, termino) }));
+}
+
+const tieneAlguno = (set, toks) => [...set].some((t) => toks.has(t));
+
+/** The heading of a Markdown file that talks about the most words of the query, or null: the section to read. */
+function seccionDe(f, expansiones) {
+  let mejor = null;
+  let mejorHits = 0;
+  for (const titulo of f.titulos) {
+    const toks = new Set(tokens(titulo));
+    const hits = expansiones.filter(({ set }) => tieneAlguno(set, toks)).length;
+    if (hits > mejorHits) {
+      mejor = titulo;
+      mejorHits = hits;
+    }
+  }
+  return mejor;
+}
+
+/**
+ * The rules and pending items of the objectives that talk about the topic: the
+ * answer, before opening any file. With several words most of them must be
+ * there, so «paper trading» does not bring every line that says «paper».
+ */
+export function reglasQueCalzan(index, expansiones, max = 3) {
+  if (!expansiones.length) return [];
+  const necesarias = Math.max(1, Math.ceil(expansiones.length * 0.6));
+  const halladas = [];
+  for (const o of index.objetivos) {
+    for (const [tipo, items] of [["regla", o.reglas], ["pendiente", o.pendiente]]) {
+      for (const texto of items) {
+        const toks = new Set(tokens(texto));
+        const titulo = new Set(tokens(texto.split(/[:(]/)[0]));
+        let hits = 0;
+        let enTitulo = 0;
+        for (const { set } of expansiones) {
+          if (tieneAlguno(set, toks)) hits += 1;
+          if (tieneAlguno(set, titulo)) enTitulo += 1;
+        }
+        if (hits >= necesarias) halladas.push({ slug: o.slug, tipo, texto, hits, enTitulo });
+      }
+    }
+  }
+  halladas.sort((a, b) => b.hits - a.hits || b.enTitulo - a.enTitulo || a.texto.length - b.texto.length);
+  return halladas.slice(0, max);
+}
+
 /** Ranks files for a topic, in Spanish or English, through the synonyms of the objectives file. */
 export function buscar(index, consulta, limite = 12) {
-  const terminos = [...new Set(tokens(consulta))].filter((t) => !STOP.has(t));
-  const expansiones = terminos.map((termino) => ({ termino, set: expandir(index.sinonimos, termino) }));
+  const expansiones = expandirConsulta(index, consulta);
   const tablasDe = tablasPorArchivo(index);
   const resultados = [];
   for (const f of index.archivos) {
@@ -607,7 +713,7 @@ export function buscar(index, consulta, limite = 12) {
       for (const [campo, toks] of Object.entries(campos)) if (toks.some((t) => set.has(t))) mejor = Math.max(mejor, PESOS[campo]);
       puntaje += mejor;
     }
-    if (puntaje > 0) resultados.push({ f, puntaje });
+    if (puntaje > 0) resultados.push({ f, puntaje, seccion: seccionDe(f, expansiones) });
   }
   resultados.sort((a, b) => b.puntaje - a.puntaje || (a.f.path < b.f.path ? -1 : a.f.path > b.f.path ? 1 : 0));
   const porObjetivo = index.objetivos
@@ -622,8 +728,12 @@ export function buscar(index, consulta, limite = 12) {
     resultados: resultados.slice(0, limite),
     total: resultados.length,
     objetivo: porObjetivo[0]?.slug ?? null,
+    reglas: reglasQueCalzan(index, expansiones),
   };
 }
+
+/** A text cut at a word, with an ellipsis when it was longer. */
+const recorte = (t, n) => (t.length <= n ? t : `${t.slice(0, n).replace(/\s+\S*$/, "")}…`);
 
 export function textoBusqueda(index, consulta) {
   if (!tokens(consulta).some((t) => !STOP.has(t))) return "Decime qué buscás: por ejemplo `--buscar voz` o `--buscar alertas de precio`.";
@@ -633,17 +743,30 @@ export function textoBusqueda(index, consulta) {
     return otros.length ? `${termino} (${lista(otros, 8)})` : termino;
   });
   const out = [`Buscar «${consulta}»: ${sinonimos.join(" · ")}`];
-  if (!r.resultados.length) {
+  if (!r.resultados.length && !r.reglas.length) {
     out.push("Nada. Probá otra palabra o agregá el sinónimo en docs/araña/objetivos.md.");
     return out.join("\n");
   }
-  r.resultados.forEach(({ f }, i) => {
+  r.resultados.forEach(({ f, seccion }, i) => {
     const detalle = f.resumen ? f.resumen.slice(0, 110) : f.pruebas.length ? `pruebas: ${lista(f.pruebas, 2)}` : `exporta: ${lista(f.exporta, 4) || "nada"}`;
-    out.push(`${String(i + 1).padStart(2)}. ${f.path} [${f.objetivo ?? "sin objetivo"}] ${detalle}`);
+    out.push(`${String(i + 1).padStart(2)}. ${f.path} [${f.objetivo ?? "sin objetivo"}] ${detalle}${seccion ? ` · § ${seccion}` : ""}`);
   });
   if (r.total > r.resultados.length) out.push(`… y ${r.total - r.resultados.length} más. Afiná la búsqueda o usá --objetivo.`);
+  if (r.reglas.length) {
+    out.push("Reglas y pendientes que lo mencionan (--regla <tema> las trae completas):");
+    for (const x of r.reglas) out.push(`  - [${x.slug}] ${x.tipo === "pendiente" ? "pendiente: " : ""}${recorte(x.texto, 200)}`);
+  }
   if (r.objetivo) out.push(`Objetivo que más calza: ${r.objetivo} (--objetivo ${r.objetivo})`);
   return out.join("\n");
+}
+
+/** The full text of the rules and pending items that talk about the topic (up to 5): the answer without opening a file. */
+export function textoReglas(index, consulta) {
+  const expansiones = expandirConsulta(index, consulta);
+  if (!expansiones.length) return "Decime qué buscás: por ejemplo `--regla escáner` o `--regla comisiones`.";
+  const reglas = reglasQueCalzan(index, expansiones, 5);
+  if (!reglas.length) return `Ninguna regla ni pendiente de objetivos.md menciona «${consulta}». Probá --buscar ${consulta}.`;
+  return reglas.map((x) => `[${x.slug}] ${x.tipo === "pendiente" ? "pendiente: " : ""}${x.texto}`).join("\n\n");
 }
 
 /** Resolves a path typed in full, or a part of it, ignoring accents: "arana" finds docs/araña. */
@@ -713,6 +836,16 @@ export function textoObjetivo(index, slug) {
   }
   out.push(`Patrones: ${o.patrones.map((p) => (p.tapado ? `${p.glob} (tapado por otro objetivo)` : `${p.glob} (${p.coincidencias})`)).join(", ")}`);
   return out.join("\n");
+}
+
+/** What is still to do, by objective: the «Pendiente:» lines of objetivos.md, all in one place. */
+export function textoPendientes(index) {
+  const out = [];
+  for (const o of index.objetivos) {
+    if (!o.pendiente.length) continue;
+    out.push(`[${o.slug}]`, ...o.pendiente.map((x) => `- ${x}`));
+  }
+  return out.length ? out.join("\n") : "No hay nada pendiente en objetivos.md.";
 }
 
 export function textoTablas(index) {
@@ -962,10 +1095,12 @@ function commitCorto() {
 const AYUDA = `La araña: el mapa de ALT RADAR PRO para consultar sin leer todo el repo.
 
   npm run arana                        reescribe docs/araña/MAPA.md y huellas.txt (después de cambiar archivos u objetivos)
-  npm run arana -- --buscar <tema>     archivos que tratan un tema, en español o inglés (sinónimos en objetivos.md)
+  npm run arana -- --buscar <tema>     archivos (y la sección de los .md) y reglas que tratan un tema, en español o inglés (sinónimos en objetivos.md)
+  npm run arana -- --regla <tema>      el texto completo de las reglas y pendientes que hablan del tema: la respuesta sin abrir archivos
   npm run arana -- --archivo <ruta>    ficha de un archivo: qué exporta, qué importa, quién lo usa, tablas, secretos
   npm run arana -- --ruta <archivo>    qué se revisa si lo cambiás (quién lo usa, hasta 3 niveles)
-  npm run arana -- --objetivo [nombre] un objetivo con sus reglas, pendientes y archivos
+  npm run arana -- --objetivo [nombre] un objetivo con sus reglas, pendientes y archivos (pesa: sin nombre lista los objetivos)
+  npm run arana -- --pendientes        lo que falta, por objetivo, en pocas líneas
   npm run arana -- --tablas            tablas D1: quién las crea y quién las usa
   npm run arana -- --secretos          secretos y variables de entorno, y si el navegador los toca
   npm run arana -- --cambios           qué cambió desde el último mapa
@@ -998,6 +1133,9 @@ export function ejecutar(args, index, { mapaGuardado = null, huellas = null } = 
   if (flag === "--buscar") {
     return tema ? { codigo: 0, salida: textoBusqueda(index, tema) } : { codigo: 2, salida: "Falta el tema: --buscar <tema>." };
   }
+  if (flag === "--regla") {
+    return tema ? { codigo: 0, salida: textoReglas(index, tema) } : { codigo: 2, salida: "Falta el tema: --regla <tema>." };
+  }
   if (flag === "--archivo" || flag === "--ruta") {
     if (!tema) return { codigo: 2, salida: `Falta la ruta: ${flag} <archivo>.` };
     const hallados = buscarArchivo(index, tema);
@@ -1008,6 +1146,7 @@ export function ejecutar(args, index, { mapaGuardado = null, huellas = null } = 
     return { codigo: 0, salida: flag === "--archivo" ? textoArchivo(index, hallados[0]) : textoDependencias(index, hallados[0]) };
   }
   if (flag === "--objetivo") return { codigo: 0, salida: textoObjetivo(index, tema) };
+  if (flag === "--pendientes") return { codigo: 0, salida: textoPendientes(index) };
   if (flag === "--tablas") return { codigo: 0, salida: textoTablas(index) };
   if (flag === "--secretos") return { codigo: 0, salida: textoSecretos(index) };
   if (flag === "--cambios") return { codigo: 0, salida: textoCambios(index, huellas, mapaGuardado) };

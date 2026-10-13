@@ -2,7 +2,7 @@
 
 > Lo escribe `npm run arana` (scripts/arana.mjs) desde el código y desde docs/araña/objetivos.md. No se edita a mano.
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
-> Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--tablas`, `--secretos`, `--cambios`, `--check`.
+> Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
 - Archivos: 500 · objetivos: 15 · sin objetivo: 0
 - Tablas D1: 43 · secretos: 4 · variables de entorno: 11 · rutas /api: 49 · hosts: 54
@@ -13,7 +13,7 @@
 
 ### jarvis — JARVIS, la IA propia del software (71)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
-Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó.
+Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · Escáner por voz o chat de JARVIS («escaneá el mercado»): `scanSpeech` de lib/jarvis-scan.ts ya arma la respuesta; falta la intención en app/jarvis.tsx. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/alert/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/chat/route.ts` — exporta: dynamic, GET, POST, DELETE
@@ -23,57 +23,57 @@ Pendiente: Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a
 - `app/api/jarvis/voice/route.ts` — exporta: dynamic, GET, POST
 - `app/api/telegram/webhook/route.ts` — exporta: dynamic, POST
 - `app/assistant-console.tsx` — exporta: AssistantConsole, default
-- `app/jarvis-backtest.tsx` — exporta: BacktestBlock
-- `app/jarvis-council.tsx` — exporta: CommandBoard
-- `app/jarvis-paper.tsx` — exporta: usePaper, PaperFollow, PaperBlock
-- `app/jarvis-scan.tsx` — exporta: ScanBlock
+- `app/jarvis-backtest.tsx` — Backtesting de la mesa: la misma mesa y las reglas del papel sobre velas pasadas de Binance, corrido en el celular.
+- `app/jarvis-council.tsx` — El tablero de mando de JARVIS TRADING: la misma decisión de la mesa, vista por dentro.
+- `app/jarvis-paper.tsx` — Paper trading de JARVIS TRADING: seguir un plan aprobado sin plata real y medir el resultado con su cadena de auditoría.
+- `app/jarvis-scan.tsx` — El escáner de todo el mercado de JARVIS TRADING: lee todas las monedas de Binance Futures con volumen suficiente con la misma mesa de arriba y muestra las que hoy tienen un plan ap
 - `app/jarvis-trading.css` — JARVIS TRADING — la mesa de especialistas.
-- `app/jarvis-trading.tsx` — exporta: JarvisTrading, default
+- `app/jarvis-trading.tsx` — JARVIS TRADING: la mesa de especialistas de JARVIS sobre un activo, pensada primero para el celular.
 - `app/jarvis-voice-player.ts` — Plays JARVIS's neural voice (app/api/jarvis/voice) fluidly: the reply is cut into sentences, the first two are requested at once and each next one while the current plays, so after
-- `app/jarvis-watch.tsx` — exporta: JarvisWatcher, WatchBlock
+- `app/jarvis-watch.tsx` — Las alertas de la mesa: qué vigilar, en qué activos y con qué umbrales.
 - `app/jarvis.css` — JARVIS — HUD voice assistant
-- `app/jarvis.tsx` — exporta: Jarvis, default
+- `app/jarvis.tsx` — JARVIS: a voice assistant over the whole app.
 - `docs/mesa-aprendizaje.md` — ¿Puede la mesa aprender de sus propias operaciones?
 - `docs/mesa-perfiles.md` — La mesa con otras velas base (15 min a 12 h)
 - `docs/mesa-reglas-v2.md` — La mesa de JARVIS: reglas v2
-- `lib/ai-analyst-server.ts` — exporta: quotaFor, consumeQuota, alternate, askClaude
-- `lib/ai-analyst.ts` — exporta: AI_MODEL, AI_DAILY_LIMIT, AI_MAX_OUTPUT, compactSnapshot, buildSystemPrompt, buildUserMessage (+4)
-- `lib/ai-brains.ts` — exporta: Brain, BRAIN_LABEL, Usage, BrainResult, AiLike, WORKERS_MODEL (+23)
-- `lib/ai-cascade.ts` — exporta: CascadeOk, CascadeFail, answerWithBrains
+- `lib/ai-analyst-server.ts` — The Anthropic call and the daily quota, shared by the app's ANALISTA and the Telegram bot.
+- `lib/ai-analyst.ts` — AI mode for the ANALISTA panel: Claude, instructed with ALT RADAR's own methodology and fed the live snapshot on every question.
+- `lib/ai-brains.ts` — JARVIS's brains, in the order they answer a free question:
+- `lib/ai-cascade.ts` — La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el cupo de la persona), después por Groq (si hay clave gratis) y después por el modelo gratis de 
 - `lib/ai-numbers.ts` — Numbers for the AIs, already written the Argentine way ("82.920", "11,066", "0,7042", "-2,99").
-- `lib/ai-probe.ts` — exporta: PROBE_SCHEMA, Probe, readProbe, probeFreeBrain, resetProbe
-- `lib/assistant/index.ts` — exporta: AssistantContext, AssistantAnswer, extractSymbol, ask
+- `lib/ai-probe.ts` — Once per deploy, the minute cron asks the free brain (Cloudflare Workers AI) a one-word question and keeps what happened, so the settings screen — and whoever deployed — can see th
+- `lib/assistant/index.ts` — Deterministic terminal assistant.
 - `lib/assistant/knowledge.ts` — Curated explanations for the concepts the terminal actually uses.
 - `lib/browser-voice.ts` — Picks the best Spanish voice the browser has.
 - `lib/hands-free.ts` — Manos libres: the rules behind JARVIS's listening mode in the browser.
-- `lib/jarvis-analyst.ts` — exporta: Frames, Scenario, Analysis, analyzeAsset, analysisText, analysisForAi
-- `lib/jarvis-backtest-run.ts` — exporta: BACKTEST_EVENT, BACKTEST_DAYS, BacktestProgress, BacktestOutcome, lastBacktest, historyOf (+1)
-- `lib/jarvis-backtest.ts` — exporta: BACKTEST_STEP_H, WARMUP_H1, BacktestInput, BacktestMetrics, BacktestResult, BACKTEST_LIMITS (+11)
+- `lib/jarvis-analyst.ts` — JARVIS's own analyst: every engine of ALT RADAR PRO run on one asset, on 1h, 4h and daily candles — trend and momentum by timeframe, levels with their reasons (structure, volume pr
+- `lib/jarvis-backtest-run.ts` — El backtest en el navegador: baja la historia de Binance (futuros primero, la misma fuente de la mesa) y camina de a pedazos para no trabar el celular.
+- `lib/jarvis-backtest.ts` — Backtesting de la mesa de JARVIS: la misma mesa y las mismas reglas del paper trading, caminando hacia adelante sobre velas pasadas.
 - `lib/jarvis-chat.ts` — The conversation with JARVIS in the app, kept for each signed-in person, so a reload does not lose the thread.
-- `lib/jarvis-core-db.ts` — exporta: ensureCoreSchema, rowToSignal, readCoreStats, recordCoreSignals, openCoreSignals, isBusy (+12)
-- `lib/jarvis-core.ts` — exporta: CORE_TF, CORE_FRAME, CORE_COINS, CORE_MAGNETS, CYCLE_MIN, CoreTask (+36)
-- `lib/jarvis-council.ts` — exporta: SESGO_MINIMO, signed, fix2, Voto, Pivotal, Consejo (+9)
-- `lib/jarvis-desk-agents.ts` — exporta: AgentId, AgentReport, NOT_AVAILABLE, AGENT_WEIGHTS, pct, px (+19)
-- `lib/jarvis-desk-data.ts` — exporta: DESK_FRAMES, Derivatives, MacroData, DeskSnapshot, DeskProvider, DESK_PROVIDERS (+8)
-- `lib/jarvis-desk-run.ts` — exporta: DESK_SETTINGS_KEY, DESK_SHOW_EVENT, typedNumber, loadDeskSettings, saveDeskSettings, openPaperRiskUsd (+3)
-- `lib/jarvis-desk.ts` — exporta: Side, Direction, Target, Plan, DeskSettings, MAX_OPEN_RISK_PCT (+35)
-- `lib/jarvis-execution.ts` — exporta: DeskMode, DESK_MODES, REAL_ORDERS_FROM_JARVIS, TICKET_TTL_MS, TICKET_MAX_AGE_MS, MAX_TICKET_RISK_PCT (+3)
-- `lib/jarvis-learn.ts` — exporta: Regime, Features, DIMS, D, ALPHA, MIN_CASES (+37)
-- `lib/jarvis-ledger.ts` — exporta: HORIZON, FEE_PCT, LearnedSource, JarvisSource, JarvisSignal, breakoutSignal (+7)
-- `lib/jarvis-local.ts` — exporta: Focus, pointsAtScreen, SCREEN_TOPIC, SECTION_SCREEN, withFocus, localAnswer
+- `lib/jarvis-core-db.ts` — Database side of JARVIS CORE (see jarvis-core.ts and jarvis-learn.ts).
+- `lib/jarvis-core.ts` — JARVIS CORE: the part of JARVIS that runs on the server around the clock, with the app closed.
+- `lib/jarvis-council.ts` — El tablero de mando de JARVIS TRADING: la misma decisión de la mesa, vista por dentro.
+- `lib/jarvis-desk-agents.ts` — JARVIS TRADING · los especialistas.
+- `lib/jarvis-desk-data.ts` — JARVIS TRADING · datos de mercado.
+- `lib/jarvis-desk-run.ts` — JARVIS TRADING en el navegador: carga los datos, corre la mesa y guarda la última decisión de cada activo un rato, para que la sección y el chat de JARVIS hablen de lo mismo sin pe
+- `lib/jarvis-desk.ts` — JARVIS TRADING · la mesa.
+- `lib/jarvis-execution.ts` — JARVIS TRADING · los tres modos, separados a propósito:
+- `lib/jarvis-learn.ts` — How JARVIS CORE learns, all the time and without looking ahead.
+- `lib/jarvis-ledger.ts` — JARVIS's own track record.
+- `lib/jarvis-local.ts` — JARVIS's own analyst: what it says when no AI is available (no session, or every AI's daily allowance is used up), and the data every AI gets about what is on screen.
 - `lib/jarvis-memory.ts` — What a person asked JARVIS to remember ("Jarvis, recordá que opero solo BTC y SOL").
-- `lib/jarvis-mind-db.ts` — exporta: MIND_MINUTE, MindDeps, runMindHour, mindStatus
-- `lib/jarvis-mind.ts` — exporta: MindThesis, MindReading, MIND_MAX_THESES, MIND_MAX_OUTPUT, MIND_SYSTEM, thesisRecord (+14)
-- `lib/jarvis-paper-db.ts` — exporta: MAX_OPEN_PER_USER, MAX_TOTAL_PER_USER, LIST_LIMIT, ensurePaperSchema, listPaper, paperCounts (+5)
-- `lib/jarvis-paper-run.ts` — exporta: PAPER_LOCAL_KEY, PAPER_EVENT, PaperMode, paperState, paperTrades, lastPrice (+7)
-- `lib/jarvis-paper.ts` — exporta: PAPER_HORIZON_H, LIMIT_EXPIRY_H, MINUTE, PaperState, ExitKind, Gestion (+30)
-- `lib/jarvis-scan-run.ts` — exporta: SCAN_EVENT, SCAN_GAP_MS, ScanProgress, ScanOutcome, ScanOptions, scanMarket (+5)
-- `lib/jarvis-scan.ts` — exporta: SCAN_MIN_VOLUMES, DEFAULT_SCAN_VOLUME, SCAN_MAX_COINS, SCAN_DEEP_MAX, SCAN_STALE_MS, Eligible (+22)
-- `lib/jarvis-voice-server.ts` — exporta: AiLike, VoiceModel, Bytes, Synth, AURA, MELO (+11)
+- `lib/jarvis-mind-db.ts` — Database side of JARVIS MENTE (jarvis-mind.ts): the hourly reading, its storage (one row per hour, the last 72 kept) and the run status.
+- `lib/jarvis-mind.ts` — JARVIS MENTE: once an hour, on the server, JARVIS writes its own reading of the market from everything the software knows — the technical read of 20 coins (trend by timeframe, leve
+- `lib/jarvis-paper-db.ts` — Las operaciones de papel de JARVIS TRADING, por cuenta.
+- `lib/jarvis-paper-run.ts` — Paper trading en el navegador.
+- `lib/jarvis-paper.ts` — Paper trading de JARVIS TRADING: seguir un plan de la mesa sin plata real y medir qué habría pasado.
+- `lib/jarvis-scan-run.ts` — El escáner de todo el mercado en el navegador: baja de Binance Futures las velas de cada moneda de a poco, corre la mesa (lib/jarvis-scan.ts) y relee completas las aprobadas.
+- `lib/jarvis-scan.ts` — El escáner de todo el mercado de JARVIS TRADING: la misma mesa de siempre, moneda por moneda, sobre todos los contratos de Binance Futures con volumen suficiente.
+- `lib/jarvis-voice-server.ts` — Server side of JARVIS's neural voice: synthesis with fallbacks, a daily allowance in D1 (two rows per day: the person and everyone), and a shared cache so a phrase said before cost
 - `lib/jarvis-voice.ts` — JARVIS's neural voice, shared by the server route and the app.
-- `lib/jarvis-watch-run.ts` — exporta: WATCH_PREFS_KEY, WATCH_STATE_KEY, WATCH_EVENT, WatchStatus, loadWatchPrefs, saveWatchPrefs (+3)
-- `lib/jarvis-watch.ts` — exporta: WatchKind, WATCH_KINDS, WatchPrefs, DEFAULT_WATCH_PREFS, MAX_WATCHED, CENTER_VOLUME (+6)
-- `lib/jarvis-world.ts` — exporta: WorldNews, World, worldDigest, readWorld, saveWorld
+- `lib/jarvis-watch-run.ts` — La vigilancia de la mesa en el navegador: con la app abierta y visible, cada pocos minutos lee los activos elegidos con la misma mesa y publica las alertas nuevas (banners, y notif
+- `lib/jarvis-watch.ts` — Las alertas de la mesa de JARVIS, configurables: lo que la persona pidió que la mesa vigile en sus activos.
+- `lib/jarvis-world.ts` — What the world says, for JARVIS's 24/7 mind: the Fear & Greed index and the headlines that matter.
 - `lib/jarvis.ts` — JARVIS: the app's voice assistant.
 - `lib/speech-text.ts` — What JARVIS writes, turned into what a Spanish voice should say.
 - `scripts/investigacion/README.md` — Investigación de la mesa
@@ -105,60 +105,60 @@ Pendiente: Alertas de volumen siguen silenciosas desde el 30/09: Binance solo. F
 - `app/pump-radar.tsx` — exporta: PumpRadar, default
 - `app/radar-app.tsx` — exporta: RadarApp, default
 - `app/scalping-desk.tsx` — exporta: ScalpingDesk, default
-- `lib/asset-read.ts` — exporta: Trend, TfRead, Level, AssetRead, ema, aggregate (+5)
-- `lib/automation.ts` — exporta: AutomationResult, ensureSignalSchema, loadMarket, loadRiskScore, loadBtcDominance, evaluateOpenSignals (+3)
+- `lib/asset-read.ts` — The technical read of one asset from its closed 1h candles: trend on 1h, 4h and 1d (built from the same candles), the nearest supports and resistances (swing points on 4h), volatil
+- `lib/automation.ts` — La automatización de señales del Worker.
 - `lib/big-trades.ts` — Large executed trades: who is actually hitting the book with size.
-- `lib/brain-security.ts` — exporta: BRAIN_MODEL_VERSION, BrainSecurityState, unavailableBrainSecurity, ensureBrainSecuritySchema, appendBrainAuditEvent, registerBrainManifest (+1)
-- `lib/chart-patterns.ts` — exporta: FlagPattern, findFlags, WyckoffEvent, WyckoffReading, readWyckoff
+- `lib/brain-security.ts` — La cadena de auditoría del cerebro de mercado: cada observación y cada resultado se guarda en D1 encadenado con hashes, y la cadena se verifica (INTEGRIDAD VERIFICADA, CADENA DEGRA
+- `lib/chart-patterns.ts` — Flags and Wyckoff events, detected mechanically.
 - `lib/decoupling.ts` — "Suben solas": coins rising on their own while BTC and ETH don't.
-- `lib/fair-value-gaps.ts` — exporta: GapKind, FairValueGap, GapOptions, findFairValueGaps, ZoneStats, GapStats (+1)
-- `lib/fib-backtest.ts` — exporta: FIB_LEVELS, FibLevel, FibSide, FibTradeOutcome, FibOutcome, runFibBacktest (+2)
-- `lib/fib-zone.ts` — exporta: FibZoneState, readFibZone
+- `lib/fair-value-gaps.ts` — Fair value gaps and their inversions.
+- `lib/fib-backtest.ts` — Fibonacci retracement backtest.
+- `lib/fib-zone.ts` — Whether price is sitting in the Fibonacci retracement band right now.
 - `lib/footprint.ts` — Order-flow for the map: candle delta, CVD and footprint cells.
-- `lib/inducement.ts` — exporta: IdmSide, IdmOutcome, Inducement, IdmOptions, findInducements, IdmStats (+1)
+- `lib/inducement.ts` — Inducement (IDM), as Smart Money Concepts uses it.
 - `lib/institutional-flows.ts` — US spot Bitcoin ETF flows, read as a demand regime.
-- `lib/key-levels.ts` — exporta: KeyLevel, KeyLevelOptions, keyLevels
-- `lib/level-engine.ts` — exporta: LevelSource, Level, atrOf, structureSources, referenceSources, volumeProfile (+7)
-- `lib/liq-vol-signals.ts` — exporta: LvSide, LvSignal, LvOptions, FlushSeries, flushRatioAt, findLvSignals (+6)
-- `lib/liquidation-columns.ts` — exporta: LiquidationLife, LivesOptions, buildLiquidationLives, GridOptions, LiquidationGrid, liquidationGrid (+1)
-- `lib/liquidation-heatmap.ts` — exporta: MAJOR_LEVERAGE_TIERS, DEFAULT_LEVERAGE_TIERS, leverageTiersFor, TIER1_MAINTENANCE_MARGIN_RATE, maintenanceMarginRateFor, TierShare (+9)
-- `lib/liquidity-archive.ts` — exporta: archiveCoreLiquidity
-- `lib/liquidity-history.ts` — exporta: LiquidityLevel, LiquiditySnapshot, ensureLiquiditySchema, validateLevels, readLiquidityHistory, storeLiquiditySnapshot
-- `lib/liquidity-pools.ts` — exporta: PoolSide, LiquidityPool, PoolOptions, findLiquidityPools, MtfPool, mergeMtfPools
-- `lib/liquidity-sweeps.ts` — exporta: Sweep, findSweeps, SweepStats, sweepStats
-- `lib/magnet-watch.ts` — exporta: Magnet, MagnetPair, strongestMagnets, atrPct, MagnetEvent, MagnetEventOptions (+4)
+- `lib/key-levels.ts` — Key support and resistance: prices where the market turned several times.
+- `lib/level-engine.ts` — The level engine: one list of the levels that matter, ranked by how many independent reasons agree on them — and measured.
+- `lib/liq-vol-signals.ts` — LIQ+VOL: a liquidity sweep confirmed by volume and by a liquidation flush.
+- `lib/liquidation-columns.ts` — The liquidation map through time: the stacked columns of a pro heatmap.
+- `lib/liquidation-heatmap.ts` — An estimated liquidation heatmap: where leveraged positions would be forced closed if price reached each level.
+- `lib/liquidity-archive.ts` — El archivo del libro de órdenes: guarda instantáneas de la profundidad de BTC, ETH y SOL con lib/liquidity-history.ts.
+- `lib/liquidity-history.ts` — El historial de liquidez del libro de órdenes en D1: instantáneas (precio medio, bids y asks) por símbolo y por mercado (spot o futuros), con los niveles validados y acotados antes
+- `lib/liquidity-pools.ts` — Liquidity pools: where resting orders cluster at prior highs and lows.
+- `lib/liquidity-sweeps.ts` — Liquidity sweeps ("tomas de liquidez"): a candle that trades beyond a prior confirmed swing high or low — where stops rest — and closes back inside.
+- `lib/magnet-watch.ts` — Liquidation magnets: the heaviest estimated liquidation zone above price (shorts) and below it (longs), alerts when price gets close to one or a candle sweeps it, and a measurement
 - `lib/market-structure.ts` — Global market structure: total capitalisation and dominance.
-- `lib/mtf-zones.ts` — exporta: MtfZone, MtfZoneBoard, buildMtfZones
-- `lib/order-blocks.ts` — exporta: OrderBlock, OrderBlockOptions, findOrderBlocks, ZoneStats, orderBlockStats, BreakerBlock (+2)
+- `lib/mtf-zones.ts` — Supply and demand across timeframes, and what price is standing in.
+- `lib/order-blocks.ts` — Order blocks: the last opposing candle before an impulsive move that broke structure.
 - `lib/order-flow-brain.ts` — Explicit extension so Node can run this directly in the unit tests; the bundler resolves it the same way.
 - `lib/order-flow.ts` — Pure order-flow analysis, extracted from the bookmap component so it can be exercised without mounting a WebSocket-driven canvas.
-- `lib/oscillators.ts` — exporta: rsi, ema, Macd, macd, Divergence, DivergenceOptions (+5)
-- `lib/pre-breakout.ts` — exporta: PreBreakSide, PreBreak, readPreBreak, PreBreakReplay, replayPreBreakout, preBreakKey (+3)
-- `lib/pump-plan.ts` — exporta: PumpAction, PumpPlan, pumpPlan
-- `lib/pump-pressure.ts` — exporta: PressureFactors, PressureReading, PressureInput, readPressure, rankPressure
-- `lib/pump-radar.ts` — exporta: PumpCandle, PumpStage, PumpMetrics, PumpReading, PumpCandidate, screenPumpCandidates (+2)
-- `lib/radar.ts` — exporta: MarketAsset, NewsEvent, RadarPayload, ScoreConfig, ScoreReason, ScoredAsset (+7)
+- `lib/oscillators.ts` — RSI, MACD and divergences between them and price.
+- `lib/pre-breakout.ts` — A PUNTO DE ROMPER: a coiled market pressing a level.
+- `lib/pump-plan.ts` — A trade plan for each pump stage, from the same 5-minute candles the radar reads.
+- `lib/pump-pressure.ts` — Pre-pump pressure: which assets are coiled, not which are running.
+- `lib/pump-radar.ts` — El radar de pumps, en dos pasos.
+- `lib/radar.ts` — El radar de altseason: el puntaje de cada activo con sus razones (`scoreAssets`), el riesgo global a partir de las noticias (`globalRisk`), el puntaje de altseason (`altseasonScore
 - `lib/reversal-zones.ts` — Best reversal zones: where several independent detectors agree.
-- `lib/scalp-signals.ts` — exporta: ScalpSignal, ScalpOptions, findScalpSignals, ScalpStats, scalpStats
-- `lib/scalping-automation.ts` — exporta: ScalpingAutomationResult, runScalpingAutomation
-- `lib/scalping-engine.ts` — exporta: ScalpStatus, ScalpSignal, ScalpContext, buildScalpSignal
-- `lib/scenario-analysis.ts` — exporta: ScenarioLevel, Scenario, ScenarioBoard, buildScenarios
-- `lib/signal-confluence.ts` — exporta: SignalTargets, buildSignalTargets, ProximityAlert, proximityAlert
-- `lib/signal-ledger.ts` — exporta: SignalOutcome, SignalPlanView, SignalRecord, LedgerStats, LedgerPayload
-- `lib/signal-plan-db.ts` — exporta: PLAN_COLUMNS, resetPlanColumnsCache, ensureSignalPlanColumns, attachPlan, evaluateSignalPlans, STATS_DAYS (+4)
-- `lib/signal-plan-record.ts` — exporta: recordConfluencePlan, recordScalpPlan, evaluatePlansSafely
-- `lib/signal-plan.ts` — exporta: PlanSide, SignalPlan, PlanOutcome, PLAN_EXPIRY_MS, ATR_PERIOD, SWING_CANDLES (+18)
+- `lib/scalp-signals.ts` — Scalping signals for the chart, on any timeframe.
+- `lib/scalping-automation.ts` — La automatización del scalping del Worker: baja velas de 5 y 15 min, arma la señal con lib/scalping-engine.ts, la registra con su plan, la anota en la cadena de auditoría (lib/brai
+- `lib/scalping-engine.ts` — El motor de scalping: con velas cortas arma la señal de un activo (`buildScalpSignal`) con su estado WATCH, SETUP, TRIGGER o NO SIGNAL.
+- `lib/scenario-analysis.ts` — Synthesizes the chart's separate detectors into a small set of directional scenarios — what price would need to do, what it would likely be aiming for if it does, and what would pr
+- `lib/signal-confluence.ts` — Where a signal's targets should sit, read off the liquidation map.
+- `lib/signal-ledger.ts` — Los tipos del libro de señales: cada señal registrada con su plan (stop, objetivos y cómo terminó), las estadísticas del libro (`LedgerStats`) y el payload (`LedgerPayload`).
+- `lib/signal-plan-db.ts` — The ledger side of signal plans: extra columns on signal_records, writing a plan next to a signal, and reading the outcomes back.
+- `lib/signal-plan-record.ts` — What the crons call.
+- `lib/signal-plan.ts` — A signal's plan, fixed at the moment it is detected, and how it turned out.
 - `lib/spot-plan-client.ts` — Client-side data assembly for a spot plan: candles from Binance mirrors, MTF zones, the Fibonacci band, trend, and locked-supply overhang — the same inputs app/spot-desk.tsx has al
 - `lib/spot-strategy.ts` — Spot buying strategy: a fixed plan plus a live checklist and ladders.
 - `lib/squeeze.ts` — Squeeze conditions: which side is trapped, and what it would cost to hold.
-- `lib/structure-archive.ts` — exporta: StructurePoint, StructureTrend, ensureStructureSchema, recordStructureSnapshot, seriesChange, loadStructureTrend
-- `lib/supply-demand.ts` — exporta: ZoneKind, ZoneState, SupplyDemandZone, ZoneStats, ZoneOptions, detectZones (+2)
+- `lib/structure-archive.ts` — Persists a periodic snapshot of global capitalisation and dominance.
+- `lib/supply-demand.ts` — Supply and demand zones, tracked across timeframes.
 - `lib/swing-entries.ts` — Swing entry detection.
-- `lib/swing-liquidity-filter.ts` — exporta: StopAdjustment, adjustStopForLiquidity
-- `lib/trade-bubbles.ts` — exporta: Bubble, BubbleOptions, DEFAULT_MAX_BUBBLES, DEFAULT_TOP_SHARE, pickBubbles, bubbleRadius (+1)
-- `lib/trading-profiles.ts` — exporta: ProfileId, Horizon, TradingProfile, TRADING_PROFILES, PROFILE_ORDER, RiskInput (+2)
-- `lib/trendlines.ts` — exporta: Pivot, LineSide, Trendline, Outcome, TrendBreak, RangeBreak (+8)
-- `lib/volume-spike.ts` — exporta: VOLUME_LOOKBACK, VOLUME_THRESHOLD, VolumeSpike, detectVolumeSpike, dec, dollars (+2)
+- `lib/swing-liquidity-filter.ts` — Keeps a swing stop out of the liquidity that would come looking for it.
+- `lib/trade-bubbles.ts` — Trade bubbles: the biggest aggressive orders, drawn where and when they printed, as order-flow tools do.
+- `lib/trading-profiles.ts` — Los perfiles de trading (TRADING_PRO, HEDGE_VALUE_PRO y SPOT_TRADER) con su riesgo por operación, su apalancamiento máximo y su R:R, y la calculadora de tamaño de posición (`calcul
+- `lib/trendlines.ts` — Trendlines and breakouts, found mechanically.
+- `lib/volume-spike.ts` — Unusual volume: the latest candle's volume against the average of the 20 candles before it, on the same timeframe.
 
 ### datos-mercado — Velas, precios, noticias y frescura (29)
 Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden tardar. Siempre se dice la fuente.
@@ -175,19 +175,19 @@ Texto: de dónde vienen los precios, velas, noticias y flujos, y cuánto pueden 
 - `app/api/structure-trend/route.ts` — exporta: dynamic, GET
 - `app/api/tickers/route.ts` — exporta: dynamic, normalizeTickers, GET
 - `app/binance-klines.ts` — Shared candle loader for the browser-side panels.
-- `lib/crypto-news.ts` — exporta: CRYPTO_FEEDS, NewsCategory, CryptoNewsItem, classifyCryptoNews, dedupeNews, CryptoNewsResult (+1)
+- `lib/crypto-news.ts` — Crypto news, classified by what kind of fundamental it is.
 - `lib/econ-calendar.ts` — Macro calendar (Forex Factory) and the trading blackouts built from it.
 - `lib/etf-flows-multi.ts` — Institutional ETF flows across assets: which coin the funds are actually putting money into, side by side.
 - `lib/exchange-reserves.ts` — Exchange reserves, read as accumulation or distribution.
 - `lib/fear-greed.ts` — Crypto Fear & Greed index (alternative.me), summarized.
-- `lib/klines-history.ts` — exporta: BACKTEST_INTERVALS, fetchHistoricalCandles
-- `lib/klines-server.ts` — exporta: GLOBAL_BASES, THIN_BASES, FUTURES_BASES_SERVER, KRAKEN_BASE, COINBASE_BASE, FUTURES_ONLY (+12)
-- `lib/live-feed.ts` — exporta: FeedSource, FeedState, FeedStatus, FeedDeps, FEED_TIMING, startLiveFeed (+1)
+- `lib/klines-history.ts` — Velas históricas para los backtests (15 m, 1 h, 4 h y 1 d): una sola llamada a las velas de Binance, con tope de 1.000 velas y 5 minutos de caché; prueba los espejos en orden y, si
+- `lib/klines-server.ts` — Candles fetched from the Worker.
+- `lib/live-feed.ts` — The live price feed for the map, independent of React so it can be tested against a fake socket and a fake network — the real Binance hosts are not reachable from the build environ
 - `lib/live-market.ts` — Live feed for the liquidation map: the forming candle and REAL liquidations.
-- `lib/market-brain.ts` — exporta: BRAIN_TIMEFRAMES, BrainTimeframe, MarketBias, MarketVenue, TIMEFRAME_MINUTES, Candle (+12)
+- `lib/market-brain.ts` — El cerebro de mercado: lee velas de 5 min a 1 d, analiza cada marco (`analyzeCandles`), arma el consenso entre marcos (`buildConsensus`) y las zonas de liquidación teóricas, y defi
 - `lib/market-fetch.ts` — Browser-side market fetchers, shared by the panels that need them.
-- `lib/market-providers.ts` — exporta: ProviderId, Fetcher, Attempt, PROVIDER_LABEL, BINANCE_FUTURES, BYBIT (+18)
-- `lib/news-intelligence.ts` — exporta: RawNewsItem, NewsIntelligenceResult, parseRss, classifyNewsItems, loadGlobalNews
+- `lib/market-providers.ts` — Proveedores de datos de derivados y liquidaciones, con respaldo.
+- `lib/news-intelligence.ts` — La inteligencia de noticias: baja titulares de feeds RSS públicos (`parseRss`), los clasifica por región, categoría, riesgo e impacto en BTC (`classifyNewsItems`) y devuelve los ev
 - `lib/shared-cache.ts` — Shared, short-lived cache for database-backed JSON that is the same for everyone (signal ledger, performance totals).
 - `lib/token-unlocks.ts` — Supply overhang: how much of each token still has to reach the market.
 - `lib/upstream-cache.ts` — Shared in-Worker cache for upstream market data.
@@ -200,11 +200,11 @@ Texto: lectura de la cuenta y operaciones con claves del usuario, siempre desde 
 - `app/api/binance/link/route.ts` — exporta: dynamic, POST, DELETE
 - `lib/binance-account.ts` — Per-client Binance spot account linking.
 - `lib/binance-client-signed.ts` — Signed Binance calls made FROM THE BROWSER, over Binance's WebSocket API.
-- `lib/binance-debug-log.ts` — exporta: logBinanceFailure
+- `lib/binance-debug-log.ts` — A durable trail for Binance-related failures, written to D1.
 - `lib/binance-futures.ts` — Per-client Binance USDⓈ-M futures reading, using the same linked credentials and the same signed-request machinery as spot (lib/binance-account.ts) — this module adds no new signin
-- `lib/binance-import.ts` — exporta: parseCsv, parseQuantity, parseTime, parseSide, ImportResult, parseBinanceCsv (+2)
+- `lib/binance-import.ts` — Reads a trade-history file exported from Binance's website.
 - `lib/binance-ws.ts` — Binance USDⓈ-M futures WebSocket routing — one place for it.
-- `lib/futures-log-db.ts` — exporta: MAX_FUTURES_LOG_ROWS, ensureFuturesLogSchema, listFuturesLog, countFuturesLog, saveFuturesLog
+- `lib/futures-log-db.ts` — The real-account futures record, per account.
 - `lib/futures-log.ts` — The record of the person's REAL Binance USDⓈ-M futures activity.
 
 ### telegram — Bot: alertas 24/7, comandos y chat con JARVIS (14)
@@ -213,26 +213,26 @@ Pendiente: Notas de voz: con Groq si está la clave; si no, Whisper de Workers A
 - `app/api/telegram/link/route.ts` — exporta: dynamic, GET, POST, PUT, DELETE
 - `app/api/telegram/test/route.ts` — exporta: dynamic, POST
 - `app/telegram-card.tsx` — exporta: TelegramCard, default
-- `lib/price-alerts-server.ts` — exporta: PRICE_ALERTS_SCHEMA, ensurePriceAlertsSchema, listUserAlerts, fetchSpotPrice, CreateResult, createPriceAlert (+2)
-- `lib/price-alerts.ts` — exporta: AlertDirection, PriceAlert, MAX_ALERTS_PER_USER, LOOKBACK_MINUTES, MIN_DISTANCE, normalizeSymbol (+9)
-- `lib/telegram-ai-server.ts` — exporta: loadServerSnapshot, clearChat, answerInTelegram, answerVoiceInTelegram
+- `lib/price-alerts-server.ts` — Storage, commands and the 5-minute check for Telegram price alerts.
+- `lib/price-alerts.ts` — Price alerts you ask the bot for: "/alerta BTC 90000" and the Worker watches the price for you, with every browser closed, and writes when it gets there.
+- `lib/telegram-ai-server.ts` — La IA del bot de Telegram, del lado del servidor: arma la lectura del mercado (`loadServerSnapshot`), contesta en segundo plano las preguntas escritas (`answerInTelegram`, con la c
 - `lib/telegram-ai.ts` — Telegram answers from the ALT RADAR analyst: the pure parts.
-- `lib/telegram-dispatch.ts` — exporta: runTelegramDispatch
-- `lib/telegram-jarvis.ts` — exporta: recordLine, gradeLine, jarvisEvents, readingEvent, dailyEvent, collectJarvisEvents
-- `lib/telegram-magnets.ts` — exporta: MAGNET_WATCH, magnetEventsFromMind, collectMagnetEvents
-- `lib/telegram-server.ts` — exporta: ensureTelegramSchema, botUsername, ensureWebhook
+- `lib/telegram-dispatch.ts` — Runs from the Worker cron every 5 minutes: collects what happened since the last run and sends each linked user what their preferences ask for.
+- `lib/telegram-jarvis.ts` — Telegram messages from JARVIS CORE: each signal it takes (with the plan and what it had learned about that kind of signal), each one it closes (with the result and the running reco
+- `lib/telegram-magnets.ts` — Liquidation-magnet alerts from the server, so they reach the phone with the app closed: BTC, ETH and SOL on 1h.
+- `lib/telegram-server.ts` — Lo que comparten las rutas de Telegram: el esquema de la tabla, el nombre del bot y el registro del webhook (solo se vuelve a registrar cuando Telegram tiene otra URL, así que vinc
 - `lib/telegram-voice.ts` — JARVIS on Telegram by voice.
-- `lib/telegram-volume.ts` — exporta: VOLUME_WATCH, VOLUME_FRAMES, framesFor, volumeEventsFrom, collectVolumeEvents
+- `lib/telegram-volume.ts` — Unusual volume for Telegram, computed from public candles in the Worker so it works with every browser closed.
 - `lib/telegram.ts` — Telegram alerts: the pure parts.
 
 ### alertas — Avisos de la app: push del navegador y centro de alertas (8)
 Texto: lo que llega al navegador o al celular cuando algo pasa.
 - `app/alert-center.tsx` — exporta: AlertCenter, default
-- `app/alert-toasts.tsx` — exporta: AlertToasts, default
+- `app/alert-toasts.tsx` — On-screen alert banners.
 - `app/api/alerts/latest/route.ts` — exporta: dynamic, GET
 - `app/api/alerts/prebreak/route.ts` — exporta: dynamic, POST
 - `app/api/push/subscribe/route.ts` — exporta: dynamic, POST, DELETE
-- `lib/alert-bus.ts` — exporta: subscribeToAlerts, publishAlert, resetAlertBus
+- `lib/alert-bus.ts` — A tiny in-memory channel between whatever detects an alert and whatever displays it.
 - `lib/alerts.ts` — One alert engine for every panel.
 - `lib/web-push.ts` — Web Push: notifications that arrive with the app closed.
 
@@ -251,12 +251,12 @@ Texto: calculadoras y registros de la persona: cuánto arriesga, qué compró, a
 - `app/diario-views.tsx` — exporta: NoteMap, EquityChart, SummaryView, TradesView
 - `app/risk-desk.tsx` — exporta: RiskDesk, default
 - `app/trade-journal-desk.tsx` — exporta: TradeJournalDesk, default
-- `lib/account-journal.ts` — exporta: Market, FillSource, JFill, JFunding, DOLLARS, splitSymbol (+25)
-- `lib/bot-journal-db.ts` — exporta: ensureBotJournalSchema, listBotJournal, countBotJournal, saveBotJournal, journalKey, MAX_ROWS_PER_USER
-- `lib/bot-journal.ts` — exporta: JournalStatus, JournalRow, journalKey, journalRowFrom, validateJournalRow, mergeJournal (+5)
+- `lib/account-journal.ts` — The account journal: turns the raw executions of a real Binance account (futures and spot) into TRADES — a position from opening to closing — and measures them.
+- `lib/bot-journal-db.ts` — The bot record, stored per account.
+- `lib/bot-journal.ts` — The permanent record of the futures bot: one row per closed trade.
 - `lib/cost-basis.ts` — Weighted-average cost basis and the risk numbers built on top of it, for a spot portfolio pulled from Binance.
 - `lib/dca-tracker.ts` — A record of DCA purchases the person made themselves, and the arithmetic that turns it into a position.
-- `lib/diario-db.ts` — exporta: MAX_JOURNAL_FILLS, MAX_JOURNAL_NOTES, TRADE_KEY, ensureDiarioSchema, listJournalFills, countJournalFills (+3)
+- `lib/diario-db.ts` — Storage for the account journal: the spot fills read from Binance and the rows imported from Binance's files (futures fills recorded live stay in binance_futures_log), plus the per
 - `lib/futures-risk.ts` — Pure math over one raw Binance futures position: side, ROE, distance to liquidation, and how much of that position's loss is actually capped.
 - `lib/risk-calc.ts` — Position-size and risk calculator.
 - `lib/trade-journal.ts` — A manual trade journal, and the win-rate math it feeds.
@@ -265,9 +265,9 @@ Texto: calculadoras y registros de la persona: cuánto arriesga, qué compró, a
 Texto: operaciones simuladas para medir ideas. No mueven dinero real.
 - `app/api/robot/signal/route.ts` — exporta: dynamic, POST
 - `app/robot-signals-desk.tsx` — exporta: RobotSignalsDesk, default
-- `lib/mm-robot.ts` — exporta: LiveLevel, MmEvent, liquidityAt, mmEvents, MmFilter, MmTrade (+12)
-- `lib/paper-bot.ts` — exporta: BotCandle, BotConfig, DEFAULT_BOT_CONFIG, TradeStatus, PaperTrade, Skips (+8)
-- `lib/robot-signals.ts` — exporta: MM_WIDE_KEY, MM_WIDE_TTL, ROBOT_FRAMES, WideVariant, WideSummary, liveRobotTrade (+4)
+- `lib/mm-robot.ts` — ROBOT MM: trades the way liquidity gets hunted, and studies itself first.
+- `lib/paper-bot.ts` — A paper-trading futures bot: the same decisions a live one would make, with fictional money, so its record can be read before anything real depends on it.
+- `lib/robot-signals.ts` — ROBOT MM signals: the only signals the app sends.
 
 ### d1-presupuesto — Base D1 y presupuesto gratis (0)
 Texto: transversal. Plan gratuito: 5 millones de filas leídas por día, ya superado más de una vez.
@@ -300,7 +300,7 @@ Texto: cómo llega el código a producción, cómo corre en el Worker y la confi
 - `eslint.config.mjs` — exporta: default
 - `examples/d1/app/api/notes/route.ts` — exporta: GET, POST
 - `examples/d1/db/schema.ts` — exporta: notes
-- `lib/app-settings.ts` — exporta: SETTINGS_SCHEMA, SecretName, SettingsEnv, SecretSource, Packed, packSecret (+11)
+- `lib/app-settings.ts` — App-level secrets stored in D1, encrypted, so the owner can configure the Telegram bot and the AI key from the app instead of the Cloudflare dashboard.
 - `next-env.d.ts`
 - `next.config.ts` — exporta: default
 - `package.json`
@@ -330,19 +330,19 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `CLAUDE.md` — ALT RADAR PRO — reglas del proyecto
 - `docs/araña/objetivos.md` — Objetivos de ALT RADAR PRO
 - `scripts/arana-vista.html`
-- `scripts/arana.mjs` — exporta: ROOT, DOCS, OBJETIVOS, MAPA, HUELLAS, PAGINA (+45)
+- `scripts/arana.mjs` — La araña: the project map of ALT RADAR PRO.
 - `tests/arana.test.ts` — pruebas: the objectives file gives its synonyms and its objectives, transversal ones incl, an objective without Texto or Archivos is a mistake, not a silent gap, globs: * stays inside one folder, ** goes through all of them (+1)
 
 ### calidad — Pruebas (124)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
-- `tests/agentes-mcp.test.ts` — pruebas: ruflo is one MCP server run with npx, ruflo is pinned: exact version, cutoff date for its dependencies, no install scr, the project approves ruflo and gives the cold start time to download (+1)
+- `tests/agentes-mcp.test.ts` — Ruflo (el MCP de los agentes) arranca código de terceros con `npx`.
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
 - `tests/ai-brains.test.ts` — pruebas: answers are read in every shape these APIs use, without the model, Cloudflare, the free brain on Workers AI: Qwen3 without thinking out loud; spent allowance a (+1)
 - `tests/ai-numbers.test.ts` — pruebas: numbers reach the AIs already written the Argentine way, forAi converts every number but times, and leaves the rest alone, a level written back is read in either notation, the one near the price winning
 - `tests/alert-bus.test.ts` — pruebas: a published alert reaches every subscriber, the same condition is not raised twice, unsubscribing actually stops delivery (+1)
 - `tests/alerts.test.ts` — pruebas: nothing is delivered while alerts are off, the same condition does not re-fire on every refresh, priority floor keeps the quiet tier out of notifications (+1)
-- `tests/api-routes.test.ts` — pruebas: every proxy route refuses to cache upstream failures as success, no route sends a no-store response as cacheable, klines validates symbol and interval before reaching upstream (+1)
+- `tests/api-routes.test.ts` — Route contracts.
 - `tests/app-settings.test.ts` — pruebas: a generated key is 32 bytes of base64 and usable for AES-GCM, a value encrypted with one key does not open with another, stored values remember which key encrypted them (+1)
 - `tests/asset-read.test.ts` — pruebas: 4h and daily candles are built from complete groups of 1h candles, aligned to UT, trend by timeframe: a steady climb is alcista, a slide bajista, a wave de costad, supports and resistances are swing points on 4h, nearest first, merged when clos (+1)
 - `tests/assistant.test.ts` — pruebas: reports institutional patterns from the live order flow, answers where the strongest floor is, with its confluence, answers the side that was asked about first (+1)
@@ -366,7 +366,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/fair-value-gaps.test.ts` — pruebas: a bullish gap is found between the first and third candle, the mirror case produces a bearish gap, overlapping candles leave no gap at all (+1)
 - `tests/fib-backtest.test.ts` — pruebas: finds no legs on a flat series, LONG: a clean pullback into 0.618 that continues to the extreme is a TARGET win, LONG: a pullback that breaks the leg origin before reclaiming it is a STOP loss (+1)
 - `tests/fib-zone.test.ts` — pruebas: levels come from the shared FIB_LEVELS, not a private copy, a pullback inside the band is reported as in-zone, a shallow pullback is reported as not there yet (+1)
-- `tests/footprint-signals.test.ts` — pruebas: no imbalanced cells at all → no stacks, two consecutive imbalanced levels is below the default minimum of 3, exactly 3 consecutive same-direction imbalances qualifies (+1)
+- `tests/footprint-signals.test.ts` — A cell where buy dominates enough to read as a COMPRA imbalance against the level below it, or the mirror for VENTA — built directly, not reverse-engineered from raw trades, so eac
 - `tests/footprint-sweeps.test.ts` — pruebas: candle delta splits volume by aggressor from the taker-buy field, CVD accumulates and carries across gaps, bucket size is round and gives about ten rows (+1)
 - `tests/footprint-verdict.test.ts` — pruebas: fewer than 3 candles with taker data → no verdict, rather than one built on noth, candles without taker data or without volume are ignored, not counted as balance, aggressive buyers winning is reported as such, with the share and the delta (+1)
 - `tests/futures-log.test.ts` — pruebas: an execution becomes a fill with everything the report needs, new orders, cancels, expiries and amendments are not operations, liquidations are recorded and flagged, whether Binance marks them by execution t (+1)
@@ -382,7 +382,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/jarvis-backtest.test.ts` — pruebas: the backtest trades with the desk and the paper rules, one trade at a time, no lookahead: changing the future after a moment never changes the trades that c, the desk at a past hour only sees candles closed at that hour, and no history it (+1)
 - `tests/jarvis-chat.test.ts` — pruebas: only question and answer turns are kept, trimmed and bounded, the thread comes back in order, and only to its owner, a thread older than six hours starts fresh, as the Telegram thread does (+1)
 - `tests/jarvis-core.test.ts` — pruebas: the 15-minute cycle covers 20 coins, 3 magnets, one resolution and a study minut, live reading: no lookahead, the same 200-candle window as the history walk, grad, magnet sweeps from the stored previous map: swept and closed back = reversal sig (+1)
-- `tests/jarvis-council.test.ts` — pruebas: the weights of the voters add up to 1 and their contributions add up to the desk, who votes, who gives context and who had no data are told apart; the order puts , a consensus just over the minimum names the specialists who tip it, and says so (+1)
+- `tests/jarvis-council.test.ts` — El tablero de mando (lib/jarvis-council.ts) no calcula nada nuevo sobre el mercado: reordena los números de la mesa.
 - `tests/jarvis-desk-risk.test.ts` — pruebas: the risk manager judges a market entry at today, no live price: nothing is assumed, the plan stands on its own numbers, a size that does not fit the capital at a safe leverage is NO TRADE; one that fi (+1)
 - `tests/jarvis-desk-run.test.ts` — pruebas: risk settings: nonsense falls back to the safe defaults, never to a bigger risk, risk settings round-trip; leverage is a whole number, nothing cached is nothing, not a made-up decision (+1)
 - `tests/jarvis-desk.test.ts` — pruebas: the desk never reads a candle still forming, on any series (no lookahead), a steady advance is never read as a short; any plan has its stop and targets on , a steady decline is never read as a long (+1)
@@ -395,7 +395,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/jarvis-paper-run.test.ts` — pruebas: signed in but the record does not answer: an honest error, never an empty list t, signed out: the record lives on this device, opens once, refuses stale plans, re, signed in: opened and advanced through the server, whose version wins (+1)
 - `tests/jarvis-paper.test.ts` — pruebas: three targets: a third at each, fees on both sides, a candle that touches the stop and a target counts as the stop, TP1 then the stop: a third won, two thirds lost; the stop does not move (+1)
 - `tests/jarvis-rules-v2.test.ts` — pruebas: v2: after TP1 the stop is the entry; coming back to it closes the rest at break-, v2: the R is still measured against the plan, v2 worst case: the candle that cashes TP1 and also touches the entry closes the  (+1)
-- `tests/jarvis-scan.test.ts` — pruebas: the universe: real coins with enough volume, most traded first; stablecoins, ind, the universe: the volume minimum and the cap are applied, and what the cap leave, the quick read of a coin is the desk (+1)
+- `tests/jarvis-scan.test.ts` — El escáner lee todas las monedas con la misma mesa, pero de a poco y sin mirar el futuro.
 - `tests/jarvis-voice.test.ts` — pruebas: voices: Cloudflare, synthesis: premium voice first; the simpler one if premium fails or is not allow, allowance: per person and premium for everyone, per UTC day (+1)
 - `tests/jarvis-watch-run.test.ts` — pruebas: switched off, the watch asks nothing, switched on: alerts published once, remembered across runs, memory kept on this 
 - `tests/jarvis-watch.test.ts` — pruebas: a close across a desk level is a break, once per candle, with its stars, a change of structure needs a recent previous reading, volume, funding and open interest past their thresholds; missing derivatives fir (+1)
@@ -457,7 +457,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/upstream-cache.test.ts` — pruebas: first read loads, second is served from cache, concurrent readers coalesce into one upstream call, an expired entry is refreshed (+1)
 - `tests/volume-spike.test.ts` — pruebas: 3.5× the average of the previous 20 is a spike; just under 3× is not; exactly 3×, only the 20 candles before the last count: an older spike doesn, not enough history, no baseline, or unusable numbers: nothing is reported (+1)
 - `tests/web-push.test.ts` — pruebas: the VAPID token is addressed to the push service, not to us, a different endpoint host produces a different audience, the token expires within the window push services accept (+1)
-- `tests/workspace-sections.test.ts` — pruebas: every Collapsible section id is registered in WORKSPACE_SECTIONS, WORKSPACE_SECTIONS has no id without a matching Collapsible to open, every section belongs to one of the declared groups (+1)
+- `tests/workspace-sections.test.ts` — Every <Collapsible id="x" ...
 - `tests/xau-alerts.test.ts` — pruebas: gold and silver by any common name, and real coins untouched, the metals live on the futures API; everything else on spot, gold prices keep their cents and both writing habits work (+1)
 
 ### app-movil — Interfaz, PWA y celular primero (97)
@@ -469,7 +469,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/alert-center.css`
 - `app/alert-toasts.css` — Banners sit above everything but clear of the phone's bottom nav, and are click-through except on the cards themselves, so they never block a tap on the chart underneath.
 - `app/arana-desk.css`
-- `app/arana-desk.tsx` — exporta: AranaDesk, default
+- `app/arana-desk.tsx` — La araña dentro de la app.
 - `app/asset-flows.css`
 - `app/asset-flows.tsx` — exporta: AssetFlowDesk, default
 - `app/assistant-console.css`
@@ -501,7 +501,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/flow-brain.css`
 - `app/futures-desk.css`
 - `app/futures-log-report.tsx` — exporta: FuturesLogReport, default
-- `app/futures-recorder.tsx` — exporta: RecorderState, RecorderStatus, RECORDER_STATUS_EVENT, RECORDER_ROWS_EVENT, recorderStatus, FuturesRecorder (+1)
+- `app/futures-recorder.tsx` — Records every execution and funding payment on the person's REAL Binance futures account while the app is open in any tab — whichever panel is on screen — by listening to the accou
 - `app/globals.css`
 - `app/install-panel.css`
 - `app/install-panel.tsx` — exporta: InstallPanel, default
@@ -545,7 +545,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/unlock-desk.css`
 - `app/unlock-desk.tsx` — exporta: UnlockDesk, default
 - `app/workspace.css` — Workspace chrome: the bar that indexes every panel and the collapsible wrapper each section sits in.
-- `app/workspace.tsx` — exporta: WorkspaceSection, WORKSPACE_GROUPS, WorkspaceGroup, WORKSPACE_SECTIONS, ESSENTIAL_IDS, setAdvanced (+6)
+- `app/workspace.tsx` — Workspace layout.
 - `app/zones-desk.css`
 - `app/zones-desk.tsx` — exporta: ZonesDesk, default
 - `lib/account-events.ts` — Small browser events so any panel can open the account drawer, and every panel learns when someone signs in or out without reloading the page.

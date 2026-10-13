@@ -1,3 +1,9 @@
+/**
+ * La inteligencia de noticias: baja titulares de feeds RSS públicos (`parseRss`), los clasifica
+ * por región, categoría, riesgo e impacto en BTC (`classifyNewsItems`) y devuelve los eventos
+ * que alimentan el riesgo global del radar (`loadGlobalNews`). La usan /api/radar,
+ * lib/automation.ts y lib/crypto-news.ts.
+ */
 import type { NewsEvent } from "./radar";
 
 type FeedDefinition = {

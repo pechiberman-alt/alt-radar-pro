@@ -46,6 +46,28 @@ manos: hands, hand, libres, freehands
 libres: free, hands, manos
 dictado: dictation, recognition, reconocimiento, stt
 transcripcion: transcription, transcribe, whisper, groq, stt
+escaner: scan, scanner, escanear, escaneo, escaneos, barrido
+tablero: board, consejo, council, votos, votes
+consejo: council, board, tablero, votos, votes
+mesa: especialistas, specialists, consenso, consensus
+consenso: consensus, voto, votos, votes
+moneda: coin, coins, symbol, symbols, simbolo, simbolos, universo, universe
+monedas: coin, coins, symbol, symbols, simbolo, simbolos, universo, universe
+winrate: win, wr, acierto, aciertos, pf
+acierto: winrate, hit, win
+backtest: backtesting, retroprueba, historico, simulacion
+comision: fee, fees, comisiones, costo, costos, costs, slippage
+m15: 15m, 15min, quince
+minutos: min, minutes, minute
+agentes: agent, agents, ruflo, mcp, swarm, enjambre
+ruflo: agentes, agent, agents, mcp, swarm, enjambre
+subir: publicar, despliegue, deploy, fusionar
+publicar: despliegue, deploy, publish, release, subir
+fusionar: merge, pr, subir
+capital: exposicion, exposure, equity
+exposicion: exposure, capital
+cinta: tape
+registro: record, ledger
 
 ## jarvis — JARVIS, la IA propia del software
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
@@ -58,6 +80,7 @@ Reglas:
 - Claude nunca en tareas programadas: cuesta por respuesta.
 - Los números van a las IAs ya en formato argentino (lib/ai-numbers.ts): copian, no convierten.
 - JARVIS TRADING (lib/jarvis-desk*.ts): la mesa de especialistas es determinista y corre en el navegador; ninguna IA decide la dirección, solo la conversa con los números de la mesa.
+- Mapa de JARVIS TRADING: motor y reglas lib/jarvis-desk.ts; especialistas y pesos lib/jarvis-desk-agents.ts; datos lib/jarvis-desk-data.ts (el snapshot y el contexto compartido); correr y guardar la última lectura lib/jarvis-desk-run.ts; tablero lib/jarvis-council.ts; escáner lib/jarvis-scan.ts y lib/jarvis-scan-run.ts; papel lib/jarvis-paper.ts, lib/jarvis-paper-run.ts y lib/jarvis-paper-db.ts (la tabla); backtest lib/jarvis-backtest.ts y lib/jarvis-backtest-run.ts; alertas lib/jarvis-watch.ts y lib/jarvis-watch-run.ts; los tres modos y el ticket manual lib/jarvis-execution.ts. Pantallas: app/jarvis-trading.tsx (la mesa) con app/jarvis-council.tsx, app/jarvis-scan.tsx, app/jarvis-paper.tsx, app/jarvis-backtest.tsx y app/jarvis-watch.tsx; estilos app/jarvis-trading.css. Todo corre en el navegador salvo el papel (se guarda en D1 por /api/jarvis/paper) y el núcleo del servidor (lib/jarvis-core.ts: 20 monedas cada 15 minutos).
 - La mesa lee solo velas cerradas (test de no mirar el futuro). Un especialista sin datos pesa cero y lo dice: «Este dato no está disponible actualmente.».
 - El puntaje de confluencia no es una probabilidad. El gestor de riesgo veta (R:R menor a 1,5, stop absurdo, contra la mesa) y espera (evento de alto impacto en menos de 2 h); el veto gana a cualquier confianza.
 - Análisis, papel y ejecución real están separados (lib/jarvis-execution.ts): JARVIS no envía órdenes, no hay código que lo haga (`REAL_ORDERS_FROM_JARVIS` es falso). Para plata real arma un ticket manual que solo aparece con todos los controles en verde (plan aprobado, lectura de menos de 10 min, precio en vivo dentro del plan, capital cargado, riesgo ≤ 2%, liquidación ≥ 3 stops) y la confirmación explícita de la persona.
@@ -68,11 +91,18 @@ Reglas:
 - Tablero de mando (lib/jarvis-council.ts, app/jarvis-council.tsx): muestra por dentro la decisión de la mesa —voto, peso y aporte de cada especialista, las compuertas hasta la decisión— y, aparte y marcado PAPEL · SIMULADO, el capital en riesgo, la cinta y el registro del papel. No calcula nada nuevo sobre el mercado ni inventa una probabilidad: el consenso mide cuánto coinciden los especialistas; lo único medido es el registro del papel, con su muestra. Un riesgo sin calcular se cuenta aparte, no como cero. Usa los mismos umbrales que la mesa (`CONSENSUS_EDGE`, `AGAINST_EDGE`, `MAX_OPEN_RISK_PCT`): no los copia.
 - Escáner de todo el mercado (lib/jarvis-scan.ts, lib/jarvis-scan-run.ts, app/jarvis-scan.tsx): lee con la misma mesa todas las monedas de futuros USDT con volumen mínimo (por defecto 5 millones de dólares en 24 h; sin dólares sintéticos, índices ni metales; tope de 400). Corre solo en el navegador, de a una moneda cada 700 ms (≈ 770 de los 2.400 de peso por minuto de Binance) y solo contra los espejos de futuros: nunca cae al Worker (`/api/klines` gasta D1) ni a Kraken o Coinbase (sin volumen). Se frena ante un 418 y espera ante un 429. Lectura rápida de todas (velas y datos compartidos; derivados y liquidaciones pesan cero y se dice) y relectura completa solo de las aprobadas (hasta 10): vale la completa. Moneda sin velas suficientes = SIN DATOS, nunca una decisión inventada. Cuenta monedas, no porcentajes; el orden por confluencia no es una probabilidad. Las reglas se midieron en 10 monedas grandes y en el resto no hay medición propia: se dice en pantalla. Es análisis: no abre papel ni ejecuta; el núcleo del servidor sigue leyendo 20 monedas.
 - Investigación de la mesa (scripts/investigacion/**, docs/mesa-perfiles.md, docs/mesa-aprendizaje.md): mide las reglas sobre velas pasadas, con otras velas base y con modelos; no corre en la app ni la toca. Ningún modelo ni probabilidad de ahí llega a la mesa salvo que su intervalo del 90% en el período de desarrollo quede por encima de cero y se confirme hacia adelante en papel. Si cambia el motor de la mesa hay que volver a validar el simulador contra el backtest real (`node --experimental-strip-types scripts/investigacion/medir.ts 1h --real BTCUSDT`).
+- Win rate y profit factor medidos en las reglas v2 (docs/mesa-reglas-v2.md; 10 monedas, comisión de 0,05% por lado, una operación a la vez, sin derivados ni noticias históricos): el win rate pasa de 33–36% a 45–46% y el profit factor de 1,09 / 1,02 / 1,12 (v1) a 1,16 / 1,15 / 1,22 (v2) en los tres períodos largos, con casi la mitad de las operaciones, menor caída y un total en R parecido (+314 R contra +320 R). En los últimos 180 días v2 no mejoró (profit factor 1,10 contra 1,15, unas 300 operaciones: ruido). Parte de la suba del win rate es mecánica (cerca del 15% de las operaciones salen a la entrada con ganancia chica): se mira profit factor, expectativa y caída, no solo el win rate.
+- Velas base, 15 minutos (m15) y más lentas (docs/mesa-perfiles.md): 15 min no tiene ventaja medida con comisiones (profit factor 0,99 con v1 y 1,03 con v2, con intervalos que incluyen 1; con 0,10% por lado pierde): el stop en precio es chico y 0,05% por lado se lleva 0,085 R por operación contra 0,040 R con 1 h. Más lento (2 h a 12 h) da mejor profit factor por operación pero muchas menos operaciones y el total en R no sube (+318 R con 1 h, +241 con 2 h, +20 con 12 h); lo que se ve ahí son sobre todo compras en años alcistas. La app sigue con velas de 1 h y no tiene selector de velas base.
+- Aprendizaje de la mesa (docs/mesa-aprendizaje.md): se entrenaron 7 modelos hacia adelante (regresión logística, ridge y árboles; 27.968 decisiones, 35 datos) para ordenar las decisiones y ninguno cumplió el criterio fijado antes de mirar (el intervalo del 90% de «alta − baja» en desarrollo por encima de cero): no se adoptó ningún filtro ni probabilidad. Para volver a probar: scripts/investigacion/aprendizaje.ts y modelos.ts.
 - Alertas de la mesa (lib/jarvis-watch*.ts): las configura la persona (activos, tipos, umbrales); corren en el navegador con la app abierta y visible, una vez por vela o evento, categoría MESA del centro de alertas. Liquidaciones: el tape real de Binance en vivo. Con la app cerrada, solo las de nivel por Telegram (/api/jarvis/alert, misma tabla que /alerta).
 - Backtesting (lib/jarvis-backtest*.ts): la misma mesa y las reglas del papel sobre velas pasadas, una operación a la vez; en cada cierre de 4 h solo ve lo cerrado (test de no mirar el futuro). Lo que no tiene historial (derivados, noticias, sentimiento, calendario) pesa cero y se dice. Nunca se presenta como garantía.
 Pendiente:
 - Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI).
 - Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó.
+- Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda.
+- Escáner por voz o chat de JARVIS («escaneá el mercado»): `scanSpeech` de lib/jarvis-scan.ts ya arma la respuesta; falta la intención en app/jarvis.tsx.
+- El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador.
+- Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 
 ## honestidad — Nunca inventar: probabilidades, precios, noticias
 Texto: transversal a todo el producto. Lo que no se sabe se dice, no se estima a escondidas.
@@ -102,6 +132,7 @@ Reglas:
 - Derivados con respaldo (lib/market-providers.ts): Binance Futures y después Bybit desde el navegador; si no responden, el servidor (/api/market/derivatives) prueba OKX, Hyperliquid, Bybit y Binance, en ese orden (medido en producción: OKX contesta al Worker con todo; Bybit lo rechaza por región). Una sola fuente por lectura (nunca se mezclan campos de dos exchanges), funding llevado a 8 h, y la fuente se dice. Liquidaciones reales con historial: OKX, que es una parte del mercado y así se dice. Son APIs públicas: ninguna clave.
 - CoinMarketCap solo con la clave del dueño (CONFIGURACIÓN o el secreto CMC_API_KEY), en el servidor, una lectura cada 15 min; sin clave, CoinGecko y CoinLore como siempre.
 - Nunca Binance.US para volumen (es mínimo). Nunca Kraken/Coinbase para alertas de volumen ni para XAU/XAG.
+- Peso de las consultas de velas a Binance Futures (límite de 2.400 de peso por minuto por conexión; 429 = esperar, 418 = conexión bloqueada por un rato): con limit menor a 100 pesa 1, de 100 a 499 pesa 2, de 500 a 1.000 pesa 5 y más de 1.000 pesa 10. Leer una moneda completa (1 h × 1.000, 4 h × 300, 1 d × 220) cuesta 9. Lo que lee muchas monedas va de a una cada 700 ms y desde el navegador (lib/jarvis-scan-run.ts), nunca desde el Worker.
 - Un dato viejo se rechaza (maxAgeMs). Nunca se completa con otro.
 - Si el origen no entrega, la ruta responde 503 con «SIN DATOS», no un valor.
 
@@ -161,6 +192,8 @@ Reglas:
 - No tocar .github/workflows/ ni wrangler*.jsonc salvo pedido explícito.
 - Antes de proponer un cambio: npm ci, npm run lint, npm run test:unit (con TZ=UTC) y npm run build. Los tres pasan.
 - Al mergear a main, el CI despliega solo (lint, tests, build, migraciones D1, deploy).
+- Subir un cambio, paso a paso: rama nueva desde main; `npm ci`, `npm run lint`, `npm run test:unit` y `npm run build` (el build reescribe lib/build-info.ts: `git checkout lib/build-info.ts` después); `npm run arana` y commitear docs/araña/ junto con el cambio; push de la rama; PR por REST con `gh api repos/pechiberman-alt/alt-radar-pro/pulls` (`gh pr create` usa GraphQL, que en las sesiones de Claude Code en la nube está bloqueado); fusionar con `gh api -X PUT repos/pechiberman-alt/alt-radar-pro/pulls/<n>/merge -f merge_method=squash`. Los PR no tienen chequeos: el CI «Deploy ALT RADAR PRO» corre recién al fusionar a main, así que la barrera es correr los tres comandos antes.
+- Confirmar el despliegue: el run de Actions del commit de merge (`gh api "repos/pechiberman-alt/alt-radar-pro/actions/runs?head_sha=<sha>"`) en success, y `/api/version?nocache=<sha de 7 letras>` en producción devuelve `build` con esas 7 letras. Desde el shell de la nube curl a workers.dev da 403: se mira con WebFetch.
 - Los crons del Worker corren 24/7 aunque la app esté cerrada.
 - examples/ es una plantilla de la plataforma: no es parte del producto.
 
@@ -179,6 +212,9 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 Archivos: scripts/arana.mjs, scripts/arana-vista.html, docs/araña/**, tests/arana.test.ts, CLAUDE.md, .mcp.json, .claude/settings.json
 Reglas:
 - Antes de leer archivos enteros: `npm run arana -- --buscar <tema>` o `--archivo <ruta>`.
+- Escalera para gastar poco: `--buscar <tema>` (archivos, la sección de los .md y las reglas que lo mencionan, cortadas a 200 letras) → `--regla <tema>` (el texto completo de esas reglas: muchas veces alcanza) → `--archivo <ruta>` (la ficha) → recién ahí leer. `--objetivo <nombre>` trae todas las reglas de un objetivo y pesa mucho: usarlo solo para ver el panorama.
+- La descripción de cada archivo es el comentario que lo abre o, si no hay, el bloque `/** … */` de tres líneas o más que sigue a los imports (uno de una línea ahí describe a la primera función, no al archivo). Un archivo nuevo lleva ese comentario: sin él la búsqueda solo lo encuentra por su ruta y sus exportaciones.
+- Una regla que se agrega a un objetivo se escribe con lo importante al principio (el nombre y la conclusión): `--buscar` muestra solo sus primeras 200 letras. Las palabras que la gente usa y el código no van como sinónimos arriba en este archivo.
 - Después de agregar, mover o borrar archivos, o cambiar estos objetivos: `npm run arana`. `npm run test:unit` avisa si el mapa quedó viejo.
 - La araña lee el código sin ejecutarlo: lo que se arma en tiempo de ejecución no aparece, y el mapa lo dice.
 - La vista (`npm run arana -- --vista`) dibuja el mismo mapa: la araña recorre cada objetivo por sus imports, con registro, cobertura, banderas y buscador. Se genera, no se commitea (docs/araña/vista.html está en .gitignore).
@@ -192,6 +228,7 @@ Reglas:
 - Los tests de datos de mercado incluyen uno que prueba que no se mira el futuro.
 - Nada de parámetros de propiedades ni enums en código que corre en tests; imports dentro de lib/ con extensión .ts.
 - Una prueba no se borra ni se salta para que pase: se arregla el código.
+- Lo que baja datos de la red o lleva un ritmo recibe `fetchImpl`, el reloj y `sleep` como opciones (lib/jarvis-scan-run.ts): la prueba inyecta un fetch falso (con `status`, `ok`, `headers.get` y `json`), un reloj falso y un sleep que lo adelanta, y corre en milisegundos y sin red (tests/jarvis-scan.test.ts).
 
 ## app-movil — Interfaz, PWA y celular primero
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
@@ -201,3 +238,4 @@ Reglas:
 - Todo texto visible va en español rioplatense (vos, «comprá», decimales con coma).
 - Las reglas de React: el setState de un efecto va después del primer await.
 - Los tipos compartidos viven en lib/. El código de cliente nunca importa rutas de app/api/.
+- Ver un componente sin levantar la app: empaquetar un archivo de entrada con esbuild (alias `@` a la raíz, los módulos de red reemplazados por stubs), armar una página con app/globals.css y el CSS del componente (hay que definir `--font-mono`) y sacarle capturas con Playwright (Chromium está en /opt/pw-browsers) a 390 y a 1100 px. Se mira que `document.documentElement.scrollWidth` sea igual al ancho de la ventana: sin desborde horizontal.

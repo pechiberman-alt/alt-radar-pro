@@ -4,7 +4,8 @@ Terminal de inteligencia de mercado cripto (marca url.fx). App React sobre un Cl
 base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-radar-pro.pechiberman.workers.dev/
 
 ## La araña: mapa del proyecto (ahorra tokens)
-- Antes de leer archivos enteros: `npm run arana -- --buscar <tema>` (en español o inglés), `--archivo <ruta>` (ficha), `--ruta <archivo>` (qué se revisa si lo cambiás), `--objetivo <nombre>`, `--tablas`, `--secretos`. Todo: `npm run arana -- --ayuda`.
+- Antes de leer archivos enteros: `npm run arana -- --buscar <tema>` (archivos, secciones de .md y reglas; en español o inglés), `--regla <tema>` (la regla completa: muchas veces alcanza; ej. `--regla subir cambio`, `--regla mapa jarvis trading`), `--archivo <ruta>` (ficha), `--ruta <archivo>` (qué se revisa si lo cambiás), `--pendientes`, `--tablas`, `--secretos`. `--objetivo <nombre>` pesa: es el objetivo entero. Todo: `npm run arana -- --ayuda`.
+- Un archivo nuevo abre con un comentario de tres líneas o más que diga para qué es: es lo que muestra la búsqueda.
 - docs/araña/objetivos.md dice a qué objetivo pertenece cada archivo, con sus reglas y pendientes. Un archivo sin objetivo hace fallar `npm run test:unit`: agregalo ahí.
 - Después de agregar, mover o borrar archivos, o cambiar código y objetivos: `npm run arana` y commiteá docs/araña/ junto con el cambio. `npm run arana -- --cambios` dice qué cambió desde el último mapa.
 - No leas docs/araña/MAPA.md entero: es el mapa completo; usá las consultas.

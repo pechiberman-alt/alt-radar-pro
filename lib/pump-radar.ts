@@ -1,3 +1,9 @@
+/**
+ * El radar de pumps, en dos pasos. `screenPumpCandidates` filtra todo el universo con las
+ * ventanas móviles que la app ya carga (no pide nada más y nunca decide un pump solo);
+ * `analyzePump` confirma con velas cerradas y da la etapa (ACUMULACIÓN, IGNICIÓN, PUMP ACTIVO,
+ * CLÍMAX, DISTRIBUCIÓN o SIN PUMP). Lo usa app/pump-radar.tsx.
+ */
 import type { MarketAsset } from "./radar";
 
 export type PumpCandle = {

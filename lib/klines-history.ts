@@ -1,3 +1,8 @@
+/**
+ * Velas históricas para los backtests (15 m, 1 h, 4 h y 1 d): una sola llamada a las velas de
+ * Binance, con tope de 1.000 velas y 5 minutos de caché; prueba los espejos en orden y, si
+ * ninguno responde, devuelve null. La usa /api/backtest/fibonacci.
+ */
 import { cached } from "./upstream-cache.ts";
 import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
 

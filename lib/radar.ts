@@ -1,3 +1,9 @@
+/**
+ * El radar de altseason: el puntaje de cada activo con sus razones (`scoreAssets`), el riesgo
+ * global a partir de las noticias (`globalRisk`), el puntaje de altseason (`altseasonScore`),
+ * la rotación y el diagnóstico de por qué no hay señales. El riesgo macro se anota como
+ * contexto: nunca suprime una señal. Los tipos MarketAsset y NewsEvent salen de acá.
+ */
 export type MarketAsset = {
   symbol: string;
   price: number;

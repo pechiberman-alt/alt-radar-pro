@@ -1,3 +1,9 @@
+/**
+ * La automatización de señales del Worker. Arma el esquema de señales en D1, baja el mercado
+ * (Binance y, si no responde, CoinLore), el riesgo global y el dominio de BTC, y evalúa las
+ * señales abiertas contra el precio. `runSignalAutomation` abre señales nuevas; `windDownSignals`
+ * solo cierra lo abierto, que es lo que corre el cron mientras los motores están apagados.
+ */
 import { evaluatePlansSafely, recordConfluencePlan } from "./signal-plan-record.ts";
 import {
   altseasonScore,

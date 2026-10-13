@@ -1,3 +1,9 @@
+/**
+ * La automatización del scalping del Worker: baja velas de 5 y 15 min, arma la señal con
+ * lib/scalping-engine.ts, la registra con su plan, la anota en la cadena de auditoría
+ * (lib/brain-security.ts) y evalúa las señales abiertas. El riesgo macro baja el puntaje
+ * dentro del motor, pero ya no frena el ciclo.
+ */
 import { recordScalpPlan } from "./signal-plan-record.ts";
 import { appendBrainAuditEvent, ensureBrainSecuritySchema, registerBrainManifest } from "./brain-security";
 import { evaluateOpenSignals, ensureSignalSchema, loadMarket, loadRiskScore } from "./automation";

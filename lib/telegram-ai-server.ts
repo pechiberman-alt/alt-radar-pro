@@ -1,3 +1,10 @@
+/**
+ * La IA del bot de Telegram, del lado del servidor: arma la lectura del mercado
+ * (`loadServerSnapshot`), contesta en segundo plano las preguntas escritas (`answerInTelegram`,
+ * con la cascada de cerebros) y las notas de voz (`answerVoiceInTelegram`, con Whisper en Groq
+ * o en Workers AI), y borra el hilo (`clearChat`). Guarda solo la pregunta y la respuesta,
+ * nunca los datos; el token del bot nunca llega al log.
+ */
 import { buildSystemPrompt, buildUserMessage, type ChatTurn } from "./ai-analyst.ts";
 import { addFreeNeurons, BRAIN_LABEL, FREE_DAILY_NEURONS, freeUsage, type AiLike } from "./ai-brains.ts";
 import { answerWithBrains } from "./ai-cascade.ts";

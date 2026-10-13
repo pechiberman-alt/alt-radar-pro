@@ -1,3 +1,9 @@
+/**
+ * El motor de scalping: con velas cortas arma la señal de un activo (`buildScalpSignal`) con su
+ * estado WATCH, SETUP, TRIGGER o NO SIGNAL. El contexto macro pesa en el puntaje pero no la
+ * veta: solo anula la señal el propio activo cuando está extendido. Lo usan /api/scalping y
+ * lib/scalping-automation.ts.
+ */
 import {
   analyzeCandles,
   clamp,
