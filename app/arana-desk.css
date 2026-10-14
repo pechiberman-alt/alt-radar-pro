@@ -41,3 +41,8 @@
 .vivo-aviso{margin:6px 0 0;color:#d9a441}
 .vivo-adv{margin:10px 0 0;font-size:9px;color:var(--muted)}
 @media(max-width:700px){.arana-note{padding:0 14px 12px}.arana-tabs{padding:0 14px 10px}.arana-frame iframe{height:78vh;min-height:480px}.vivo{margin:0 14px 12px}.vivo-wait{margin:0 14px 12px}.vivo-ctl{margin:0 14px 10px}}
+
+.arana-fallo{position:absolute;inset:0;z-index:2;display:grid;place-content:center;gap:12px;padding:20px;text-align:center;background:var(--bg,#050807);color:var(--text,#d8e6df);font:12px/1.5 var(--font-mono)}
+.arana-fallo>div{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.arana-fallo button,.arana-fallo a{min-height:44px;padding:0 16px;display:inline-grid;place-content:center;border:1px solid var(--line,#2a3a33);background:transparent;color:inherit;font:inherit;letter-spacing:1.2px;text-decoration:none;cursor:pointer}
+.arana-fallo-nota{color:var(--muted);font-size:11px}

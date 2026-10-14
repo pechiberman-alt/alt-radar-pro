@@ -71,8 +71,8 @@ aa86804bf9da	24	app/api/telegram/test/route.ts
 9f8f9a0bdfc4	176	app/api/telegram/webhook/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
-9505382d7d36	44	app/arana-desk.css
-6c81c9774860	122	app/arana-desk.tsx
+6fcf458df190	49	app/arana-desk.css
+452d0d94c40a	168	app/arana-desk.tsx
 1c85572f45c3	376	app/arana-vivo.tsx
 109c61b2bb44	34	app/asset-flows.css
 866aeee2a3d1	125	app/asset-flows.tsx
@@ -389,7 +389,7 @@ bc7491d499a6	0	public/globe.svg
 73c710a4743a	0	public/icon-512.png
 537e4d0fb48f	0	public/manifest.webmanifest
 fdf534d15afa	0	public/og.png
-6674fd76ede0	24	public/sw.js
+9500061babf1	24	public/sw.js
 aaa393c36db1	0	public/window.svg
 28ad537c49c6	1624	scripts/arana-vista.html
 1ab15708d01b	820	scripts/arana-vivo.html
@@ -420,7 +420,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 e8ec72c5deb7	89	tests/arana-ultimo.test.ts
 41f8e61920bb	44	tests/arana-vivo-auto.test.ts
 b9e32500d850	247	tests/arana-vivo.test.ts
-72fda45a2ae9	467	tests/arana.test.ts
+8050efa8245e	470	tests/arana.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
 8dffdd6b09f6	386	tests/assistant.test.ts
 dff2674006ae	17	tests/auth-pbkdf2.test.ts

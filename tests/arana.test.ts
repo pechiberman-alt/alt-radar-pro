@@ -414,7 +414,10 @@ test("the app wires the page: build step, ignored output, the frame and its sect
   assert.ok(String(pkg.scripts.prebuild).includes("arana.mjs --pagina"), "the build draws the page");
   assert.ok(readFileSync(join(ROOT, ".gitignore"), "utf8").split("\n").includes("/public/arana/"), "generated, so it is not committed");
   const desk = readFileSync(join(ROOT, "app", "arana-desk.tsx"), "utf8");
-  assert.ok(desk.includes('src="/arana/index.html"') && desk.includes("sandbox="), "the frame loads the page, sandboxed");
+  // La ruta puede ir literal o en la constante RUTA del panel; lo que importa es que el marco cargue esa página.
+  const cargaPagina = (pagina: string, clave: string) =>
+    desk.includes(`src="${pagina}"`) || (desk.includes(`${clave}: "${pagina}"`) && desk.includes(`src={RUTA.${clave}}`));
+  assert.ok(cargaPagina("/arana/index.html", "mapa") && desk.includes("sandbox="), "the frame loads the page, sandboxed");
   const app = readFileSync(join(ROOT, "app", "radar-app.tsx"), "utf8");
   assert.ok(app.includes('<Collapsible id="arana"') && app.includes('id: "arana"'), "section and nav entry");
 });
@@ -454,7 +457,7 @@ test("the live page is built as a plain copy, the build makes it, and the app sh
   const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
   assert.ok(String(pkg.scripts.prebuild).includes("arana.mjs --vivo"), "the build copies the live page");
   const desk = readFileSync(join(ROOT, "app", "arana-desk.tsx"), "utf8");
-  assert.ok(desk.includes('src="/arana/vivo.html"') && desk.includes('role="tab"') && desk.includes("MAPA DEL PROYECTO"), "two tabs: EN VIVO and the map");
+  assert.ok((desk.includes('src="/arana/vivo.html"') || (desk.includes('vivo: "/arana/vivo.html"') && desk.includes("src={RUTA.vivo}"))) && desk.includes('role="tab"') && desk.includes("MAPA DEL PROYECTO"), "two tabs: EN VIVO and the map");
 });
 
 test("the automatic scan looks at the screen, respects the pause, and never stacks two scans", () => {

@@ -15,6 +15,12 @@ import { ControlesSombra, ControlesVivo, PanelVivo, useAutoEscaneo, useRegistro,
  */
 const ALTO_MIN = 480;
 const ALTO_MAX = 12000;
+/**
+ * Un marco que no pudo cargar (red, bloqueo) igual dispara «cargado», pero la página de error no avisa su alto.
+ * Si pasado este tiempo desde que cargó no llegó el alto, se ofrece abrirla aparte y reintentar.
+ */
+const ESPERA_ALTO_MS = 6000;
+const RUTA: Record<"vivo" | "mapa", string> = { vivo: "/arana/vivo.html", mapa: "/arana/index.html" };
 
 type Pestana = "vivo" | "mapa";
 
@@ -22,6 +28,8 @@ export default function AranaDesk() {
   const [pestana, setPestana] = useState<Pestana>("vivo");
   const [listo, setListo] = useState<Record<Pestana, boolean>>({ vivo: false, mapa: false });
   const [alto, setAlto] = useState<Record<Pestana, number | null>>({ vivo: null, mapa: null });
+  const [fallo, setFallo] = useState<Record<Pestana, boolean>>({ vivo: false, mapa: false });
+  const [intento, setIntento] = useState<Record<Pestana, number>>({ vivo: 0, mapa: 0 });
   const marcoVivo = useRef<HTMLIFrameElement>(null);
   const marcoMapa = useRef<HTMLIFrameElement>(null);
   const zonaVivo = useRef<HTMLDivElement>(null);
@@ -37,6 +45,37 @@ export default function AranaDesk() {
     marcoVivo.current?.contentWindow?.postMessage({ arana: "vivo", vivo, auto: autoFoto }, "*");
   }, [listo.vivo, vivo, auto, estado]);
 
+  // Cargó pero no avisó su alto: es la página de error del navegador, no la araña.
+  useEffect(() => {
+    const vigilar = (["vivo", "mapa"] as Pestana[]).filter((q) => listo[q] && alto[q] === null);
+    if (!vigilar.length) return;
+    const t = setTimeout(() => setFallo((f) => ({ ...f, ...Object.fromEntries(vigilar.map((q) => [q, true])) })), ESPERA_ALTO_MS);
+    return () => clearTimeout(t);
+  }, [listo, alto]);
+
+  const reintentar = (q: Pestana) => {
+    setFallo((f) => ({ ...f, [q]: false }));
+    setListo((l) => ({ ...l, [q]: false }));
+    setAlto((a) => ({ ...a, [q]: null }));
+    setIntento((i) => ({ ...i, [q]: i[q] + 1 }));
+  };
+
+  const aviso = (q: Pestana) =>
+    fallo[q] ? (
+      <div className="arana-fallo" role="alert">
+        <p>No se pudo cargar esta vista dentro de la app (puede ser la conexión).</p>
+        <div>
+          <button type="button" onClick={() => reintentar(q)}>
+            REINTENTAR
+          </button>
+          <a href={RUTA[q]} target="_blank" rel="noopener noreferrer">
+            ABRIR APARTE
+          </a>
+        </div>
+        <p className="arana-fallo-nota">Abierta aparte, si falla, el navegador muestra el código del error: mandámelo.</p>
+      </div>
+    ) : null;
+
   useEffect(() => {
     const escuchar = (e: MessageEvent) => {
       const quien: Pestana | null =
@@ -46,6 +85,7 @@ export default function AranaDesk() {
       if (!d || d.arana !== "alto" || typeof d.h !== "number" || !Number.isFinite(d.h)) return;
       const h = Math.max(ALTO_MIN, Math.min(ALTO_MAX, Math.round(d.h)));
       setAlto((prev) => (prev[quien] === h ? prev : { ...prev, [quien]: h }));
+      setFallo((f) => (f[quien] ? { ...f, [quien]: false } : f));
     };
     window.addEventListener("message", escuchar);
     return () => window.removeEventListener("message", escuchar);
@@ -75,6 +115,8 @@ export default function AranaDesk() {
         </button>
         <button type="button" role="tab" id="arana-tab-mapa" aria-controls="arana-panel-mapa" aria-selected={pestana === "mapa"} onClick={() => {
             setListo((p) => ({ ...p, mapa: false }));
+            setAlto((p) => ({ ...p, mapa: null }));
+            setFallo((p) => ({ ...p, mapa: false }));
             setPestana("mapa");
           }}>
           MAPA DEL PROYECTO
@@ -86,9 +128,11 @@ export default function AranaDesk() {
         <PanelVivo vivo={vivo} />
         <div className="arana-frame" aria-busy={!listo.vivo}>
           {!listo.vivo && <span className="arana-wait">ARMANDO LA MESA EN VIVO…</span>}
+          {aviso("vivo")}
           <iframe
+            key={`vivo-${intento.vivo}`}
             ref={marcoVivo}
-            src="/arana/vivo.html"
+            src={RUTA.vivo}
             title="La mesa en vivo: todas las monedas que la app leyó, con sus compuertas y sus especialistas"
             sandbox="allow-scripts allow-popups"
             allow="clipboard-write"
@@ -102,10 +146,12 @@ export default function AranaDesk() {
         <div className="arana-frame" aria-busy={!listo.mapa}>
           {!listo.mapa && <span className="arana-wait">DIBUJANDO LA ARAÑA…</span>}
           {/* Solo montado con la pestaña a la vista: dos páginas pesadas a la vez pueden tirar el marco en un celular (carita triste). */}
+          {pestana === "mapa" && aviso("mapa")}
           {pestana === "mapa" && (
           <iframe
+            key={`mapa-${intento.mapa}`}
             ref={marcoMapa}
-            src="/arana/index.html"
+            src={RUTA.mapa}
             title="La araña de ALT RADAR PRO recorriendo los archivos del proyecto"
             sandbox="allow-scripts allow-popups"
             allow="clipboard-write"
