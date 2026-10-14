@@ -185,8 +185,9 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-b8ff433c8ab1	282	docs/araña/objetivos.md
-f9c8974a886b	84	docs/estudio-estrategias.md
+78e166db1b7c	282	docs/araña/objetivos.md
+25e7d2744ee2	187	docs/busqueda-linea.md
+5aa1dbfbeaa2	102	docs/estudio-estrategias.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -250,8 +251,8 @@ c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
 a2c5aeea0e4f	115	lib/escalera.ts
-160b54b0026d	658	lib/estrategias.ts
-bf36da93c02c	1465	lib/estudio-estrategias-datos.ts
+42b8a904e9d9	844	lib/estrategias.ts
+0bc8985e0db3	1888	lib/estudio-estrategias-datos.ts
 ca8f3802c4a6	21	lib/estudio-resumen.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
 450b470bb8bd	173	lib/exchange-reserves.ts
@@ -308,6 +309,7 @@ fe550a7f3308	117	lib/lab-jarvis.ts
 3e2b37fb7033	99	lib/lab-run.ts
 eda55eca2fdc	298	lib/lab.ts
 99fb494d0e6a	267	lib/level-engine.ts
+4dbec818cfe9	179	lib/linea-busqueda.ts
 f30387232851	191	lib/liq-vol-signals.ts
 1321af2613b0	198	lib/liquidation-columns.ts
 c0acc715c3f7	640	lib/liquidation-heatmap.ts
@@ -386,7 +388,7 @@ ba55aa5bdb5b	143	lib/token-unlocks.ts
 d0434e2eafe5	81	lib/trade-bubbles.ts
 759b1ffa8280	142	lib/trade-journal.ts
 3ae6c5a6865e	265	lib/trading-profiles.ts
-5eadaa546bd0	280	lib/trendlines.ts
+09d30197f4dc	283	lib/trendlines.ts
 31e36836f747	96	lib/upstream-cache.ts
 93845159d10c	27	lib/visible-interval.ts
 41692b83da6c	76	lib/volume-spike.ts
@@ -411,9 +413,10 @@ d13ecf4702a3	63	scripts/claude-hooks.mjs
 b36fd1c34b30	183	scripts/herramientas.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
-9fe101c4b0be	0	scripts/investigacion/datos-binance.py
-abc3c4cc022d	0	scripts/investigacion/datos.py
-601dcbc756b5	232	scripts/investigacion/estrategias.ts
+a8d206c4cc1f	0	scripts/investigacion/datos-binance.py
+8e25f67c73e7	0	scripts/investigacion/datos.py
+5747b2a16fab	249	scripts/investigacion/estrategias.ts
+c83b5a866c3f	296	scripts/investigacion/linea-busqueda.ts
 36d231690dfe	238	scripts/investigacion/medir.ts
 2dea6b11e55f	236	scripts/investigacion/modelos.ts
 3d2f8d602cf9	110	scripts/investigacion/perfiles.ts
@@ -457,7 +460,7 @@ e954e10a7eec	85	tests/cost-basis.test.ts
 bb85a3e6fff1	57	tests/diario-db.test.ts
 d8e87b00e33b	126	tests/econ-calendar.test.ts
 645f0d2f0dc9	116	tests/escalera.test.ts
-0903b10311ae	182	tests/estrategias.test.ts
+9189fc682540	335	tests/estrategias.test.ts
 b0ba998c8335	119	tests/etf-flows-multi.test.ts
 9ed4f49289ed	92	tests/exchange-reserves.test.ts
 eac12ecfb8fb	248	tests/fair-value-gaps.test.ts
@@ -504,6 +507,7 @@ a3b57999655c	66	tests/key-levels.test.ts
 ddb22425e6c1	206	tests/klines-server-fallback.test.ts
 cf86a1b623ad	334	tests/lab.test.ts
 d6740b560f54	108	tests/level-engine.test.ts
+2948686ae71f	271	tests/linea-busqueda.test.ts
 4140df7712ce	122	tests/liq-vol-signals.test.ts
 c0ed5e2a7dd6	203	tests/liquidation-columns.test.ts
 72e8e1c2b0da	414	tests/liquidation-heatmap.test.ts

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Baja de data.binance.vision lo que falta para el preregistro del flujo (scripts/investigacion/preregistro-flujo.ts):
-velas de futuros USDⓈ-M de 4 h con volumen taker comprador, funding y, con --metricas, open interest a 5 min.
+velas de futuros USDⓈ-M de 4 h (o de 1 h con --intervalo 1h) con volumen taker comprador, funding y, con --metricas, open interest a 5 min.
 
 LICENCIA: los datos de Binance Vision están bajo CC BY-NC-SA 4.0 (términos v1.0 del 26/08/2026). Uso permitido:
 investigación personal de backtesting, no producción. No se commitean (datos-investigacion/ está en .gitignore), no se
 redistribuyen y no alimentan señales para terceros. Cada zip se verifica con su .CHECKSUM (sha256).
 
-  python3 scripts/investigacion/datos-binance.py [carpeta] [--metricas] [--desde 2020-01 --hasta 2026-09]
+  python3 scripts/investigacion/datos-binance.py [carpeta] [--intervalo 1h] [--metricas] [--desde 2020-01 --hasta 2026-09]
 
 Escribe en la carpeta (por defecto datos-investigacion):
-  SIMBOLO-4h-fut.json   [openTime, open, high, low, close, volumen, volumenTakerComprador]
+  SIMBOLO-4h-fut.json   [openTime, open, high, low, close, volumen, volumenTakerComprador]  (SIMBOLO-1h-fut.json con --intervalo 1h)
   SIMBOLO-funding.json  [fundingTime, tasa]
   SIMBOLO-oi.json       [hora, openInterest]  (solo con --metricas; un dato cada 5 min, días faltantes quedan sin dato)
 Corre en tu PC: este entorno de Claude no tiene salida a data.binance.vision.
@@ -60,6 +60,11 @@ def bajar(url, destino: Path):
     return [f for f in filas if f and f[0][:1].isdigit()]  # sin encabezado (algunos meses lo traen)
 
 
+def nombre_zip(iv, m):
+    """Nombre local del zip mensual de velas; las de 4 h conservan los nombres de antes (ya descargados)."""
+    return f"k-{m}.zip" if iv == "4h" else f"k-{iv}-{m}.zip"
+
+
 def ms(v):
     t = int(float(v))
     return t // 1000 if t > 10**14 else t  # microsegundos desde 2025 en algunos archivos
@@ -72,21 +77,23 @@ def main():
     ap.add_argument("--desde", default="2020-01")
     ap.add_argument("--hasta", default="2026-09")
     ap.add_argument("--metricas", action="store_true", help="también open interest diario a 5 min (muchos archivos)")
+    ap.add_argument("--intervalo", default="4h", choices=["1h", "4h"], help="temporalidad de las velas de futuros (4h por defecto; XAUUSDT se estudia también en 1h)")
     a = ap.parse_args()
+    iv = a.intervalo
     out = Path(a.carpeta)
     crudo = out / "crudo-binance"
     for sym in a.monedas:
         ms_ = list(meses(a.desde, a.hasta))
         with ThreadPoolExecutor(8) as ex:
-            k = ex.map(lambda m: bajar(f"{BASE}/monthly/klines/{sym}/4h/{sym}-4h-{m}.zip", crudo / sym / f"k-{m}.zip"), ms_)
+            k = ex.map(lambda m: bajar(f"{BASE}/monthly/klines/{sym}/{iv}/{sym}-{iv}-{m}.zip", crudo / sym / nombre_zip(iv, m)), ms_)
             f = ex.map(lambda m: bajar(f"{BASE}/monthly/fundingRate/{sym}/{sym}-fundingRate-{m}.zip", crudo / sym / f"f-{m}.zip"), ms_)
             velas = {ms(r[0]): [ms(r[0]), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), float(r[9])] for filas in k if filas for r in filas}
             funding = {ms(r[0]): [ms(r[0]), float(r[2])] for filas in f if filas for r in filas}
         if velas:
-            (out / f"{sym}-4h-fut.json").write_text(json.dumps([velas[t] for t in sorted(velas)]))
+            (out / f"{sym}-{iv}-fut.json").write_text(json.dumps([velas[t] for t in sorted(velas)]))
         if funding:
             (out / f"{sym}-funding.json").write_text(json.dumps([funding[t] for t in sorted(funding)]))
-        print(f"{sym}: {len(velas)} velas 4h de futuros, {len(funding)} fundings", file=sys.stderr)
+        print(f"{sym}: {len(velas)} velas {iv} de futuros, {len(funding)} fundings", file=sys.stderr)
         if a.metricas:
             d0 = date.fromisoformat(a.desde + "-01")
             d1 = date.fromisoformat(a.hasta + "-28")

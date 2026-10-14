@@ -8,9 +8,10 @@
  * siguiente y el recorrido usa solo velas posteriores. Una operación por vez por moneda y estrategia.
  */
 import { escaleraHacia, recorrer, type Lado } from "./escalera.ts";
+import { BREAK_ATR, findPivots, FLAT_ATR, MIN_SPAN, type Pivot, WICK_ATR } from "./trendlines.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
-export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "AZAR";
+export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "AZAR";
 
 /** Lo que una estrategia propone en la vela i: lado, stop y objetivo final (TP3). Sin señal, null. */
 export type Senal = { lado: Lado; stop: number; objetivo: number };
@@ -35,12 +36,16 @@ export type Indicadores = {
   poc: number[];
   /** Dirección del Supertrend (10, 3) del marco superior (HTF) ya cerrado: diario si las velas son de 4 h o más, de 4 h si son menores. */
   htfDir: number[];
+  /** MACD y RSI de los marcos superiores ya cerrados, en el mismo sentido: +1 si todos alcistas, -1 si todos bajistas, 0 si no coinciden (NaN sin datos). */
+  alineacionHtf: number[];
   /** Volumen de la vela dividido por el promedio de las 20 velas anteriores (NaN sin historia o sin volumen). */
   volRel: number[];
   /** SNR: precio del nivel de resistencia fresco que esta vela tocó por primera vez con la mecha y rechazó (NaN si no). */
   snrRes: number[];
   /** SNR: precio del nivel de soporte fresco que esta vela tocó por primera vez con la mecha y rechazó (NaN si no). */
   snrSop: number[];
+  /** Ruptura de una línea de tendencia de dos pivotes en esta vela (ver rupturasLinea): +1 alcista, -1 bajista, 0 sin ruptura. */
+  lineaRuptura: number[];
 };
 
 export type Estrategia = {
@@ -193,14 +198,11 @@ export function pocPerfil(v: SwingCandle[]): number[] {
 }
 
 /**
- * Dirección del Supertrend del marco superior en cada vela. Solo cuenta la vela superior ya cerrada: dentro del día
- * (o de las 4 h) en curso se usa la anterior, así que nada mira adelante.
+ * Agrupa `v` en cubos de `cubo` ms (4 h o un día). Para cada vela dice qué cubo ya cerró en su cierre (-1 si ninguno):
+ * un cubo a medio formar nunca cuenta, así que nada mira adelante.
  */
-export function direccionHtf(v: SwingCandle[]): number[] {
-  const out = new Array<number>(v.length).fill(Number.NaN);
-  if (v.length < 2) return out;
+function cubosCerrados(v: SwingCandle[], cubo: number): { sup: SwingCandle[]; cerrado: number[] } {
   const marco = v[1].openTime - v[0].openTime;
-  const cubo = marco >= 4 * 3_600_000 ? 86_400_000 : 4 * 3_600_000;
   const sup: SwingCandle[] = [];
   const claveDe = (i: number) => Math.floor(v[i].openTime / cubo);
   const idx = new Array<number>(v.length);
@@ -219,11 +221,75 @@ export function direccionHtf(v: SwingCandle[]): number[] {
     }
     idx[i] = sup.length - 1;
   }
-  const dir = supertrend(sup, 10, 3).dir;
-  for (let i = 0; i < v.length; i += 1) {
+  const cerrado = v.map((_, i) => {
     const cierraAqui = v[i].openTime + marco >= (claveDe(i) + 1) * cubo;
-    const d = cierraAqui ? idx[i] : idx[i] - 1;
-    if (d >= 0) out[i] = dir[d];
+    return cierraAqui ? idx[i] : idx[i] - 1;
+  });
+  return { sup, cerrado };
+}
+
+/**
+ * Dirección del Supertrend del marco superior en cada vela. Solo cuenta la vela superior ya cerrada: dentro del día
+ * (o de las 4 h) en curso se usa la anterior, así que nada mira adelante.
+ */
+export function direccionHtf(v: SwingCandle[]): number[] {
+  const out = new Array<number>(v.length).fill(Number.NaN);
+  if (v.length < 2) return out;
+  const marco = v[1].openTime - v[0].openTime;
+  const cubo = marco >= 4 * 3_600_000 ? 86_400_000 : 4 * 3_600_000;
+  const { sup, cerrado } = cubosCerrados(v, cubo);
+  const dir = supertrend(sup, 10, 3).dir;
+  for (let i = 0; i < v.length; i += 1) if (cerrado[i] >= 0) out[i] = dir[cerrado[i]];
+  return out;
+}
+
+/** MACD (12, 26) y su señal (EMA 9 de la línea), con NaN hasta tener historia. */
+function macdDe(c: number[]): { macd: number[]; senal: number[] } {
+  const e12 = ema(c, 12);
+  const e26 = ema(c, 26);
+  const macd = c.map((_, i) => e12[i] - e26[i]);
+  const primero = macd.findIndex((x) => Number.isFinite(x));
+  const senalParcial = primero < 0 ? [] : ema(macd.slice(primero), 9);
+  const senal = c.map((_, i) => (primero >= 0 && i >= primero ? senalParcial[i - primero] : Number.NaN));
+  return { macd, senal };
+}
+
+/** Estado del MACD y del RSI (14) de cada cubo ya cerrado: +1 alcistas, -1 bajistas, 0 mezclados, NaN sin datos. */
+function estadoMacdRsi(v: SwingCandle[], cubo: number): number[] {
+  const { sup, cerrado } = cubosCerrados(v, cubo);
+  const c = sup.map((x) => x.close);
+  const { macd: m, senal: s } = macdDe(c);
+  const r = rsi(c, 14);
+  const estado = c.map((_, j) => {
+    if (!ok(m[j], s[j], r[j])) return Number.NaN;
+    if (m[j] > s[j] && r[j] > 50) return 1;
+    if (m[j] < s[j] && r[j] < 50) return -1;
+    return 0;
+  });
+  return cerrado.map((d) => (d >= 0 ? estado[d] : Number.NaN));
+}
+
+/** Temporalidades que pueden servir de marco superior, en ms y de menor a mayor. */
+const MARCOS_SUPERIORES_MS = [15 * 60_000, 3_600_000, 4 * 3_600_000, 86_400_000];
+
+/**
+ * MACD y RSI de los marcos superiores ya cerrados, en el mismo sentido: +1 si todos están alcistas, -1 si todos bajistas,
+ * 0 si no coinciden, NaN sin datos. Mira todas las temporalidades por encima de la de la vela: desde 3 min, las de
+ * 15 min, 1 h, 4 h y diarias; desde 15 min, 1 h, 4 h y diarias; desde 1 h, 4 h y diarias; desde 4 h, las diarias.
+ */
+export function alineacionHtf(v: SwingCandle[]): number[] {
+  const out = new Array<number>(v.length).fill(Number.NaN);
+  if (v.length < 2) return out;
+  const marco = v[1].openTime - v[0].openTime;
+  const cubos = MARCOS_SUPERIORES_MS.filter((ms) => ms > marco);
+  if (cubos.length === 0) return out;
+  const estados = cubos.map((cubo) => estadoMacdRsi(v, cubo));
+  for (let i = 0; i < v.length; i += 1) {
+    const vals = estados.map((e) => e[i]);
+    if (!vals.every((x) => Number.isFinite(x))) continue;
+    if (vals.every((x) => x === 1)) out[i] = 1;
+    else if (vals.every((x) => x === -1)) out[i] = -1;
+    else out[i] = 0;
   }
   return out;
 }
@@ -292,6 +358,92 @@ export function nivelesSnr(v: SwingCandle[]): { res: number[]; sop: number[] } {
   return { res, sop };
 }
 
+// ── Rupturas de línea de tendencia (dos pivotes) ──
+
+/** Pivotes de 5 velas a cada lado: el mismo criterio que dibuja la app (lib/trendlines.ts). */
+const LINEA_PIVOTES = 5;
+/** Una línea deja de contar cuando su segundo pivote tiene 200 velas o más. */
+const LINEA_VIDA = 200;
+
+type ParLinea = { a: Pivot; b: Pivot; pendiente: number; atrB: number };
+
+/** Una ruptura de línea de tendencia: la línea que la causó (anclada en su primer pivote) y el sentido (+1 alcista, -1 bajista). */
+export type EventoLinea = { signo: 1 | -1; a: Pivot; pendiente: number; atrB: number };
+
+/** Precio de la línea de un evento en la vela k. */
+export const precioLinea = (e: Pick<EventoLinea, "a" | "pendiente">, k: number): number => e.a.price + e.pendiente * (k - e.a.i);
+
+/**
+ * La línea que une dos pivotes del mismo tipo (picos: resistencia que baja; valles: soporte que sube), si cumple las
+ * reglas de la app: al menos 5 velas de separación, no plana (0,5 ATR entre sus puntos), y el precio la respeta entre
+ * los dos (ningún cierre la pasa por 0,1 ATR; ninguna mecha por más de 0,5 ATR). Y no se rompió antes de conocerse el
+ * segundo pivote: en ese caso nadie la podía haber dibujado a tiempo.
+ */
+function formarPar(v: SwingCandle[], atr14: number[], a: Pivot, b: Pivot): ParLinea | null {
+  const atrB = atr14[b.i];
+  if (b.i - a.i < MIN_SPAN || !(atrB > 0)) return null;
+  const pendiente = (b.price - a.price) / (b.i - a.i);
+  if (a.kind === "high" ? pendiente >= 0 : pendiente <= 0) return null;
+  if (Math.abs(b.price - a.price) < FLAT_ATR * atrB) return null;
+  const signo = a.kind === "high" ? 1 : -1;
+  const linea = (k: number) => a.price + pendiente * (k - a.i);
+  for (let k = a.i + 1; k < b.i; k += 1) {
+    const mecha = a.kind === "high" ? v[k].high : v[k].low;
+    if (signo * (v[k].close - linea(k)) > BREAK_ATR * atrB || signo * (mecha - linea(k)) > WICK_ATR * atrB) return null;
+  }
+  for (let k = b.i + 1; k <= b.confirmedAt; k += 1) {
+    if (signo * (v[k].close - linea(k)) > BREAK_ATR * atrB) return null;
+  }
+  return { a, b, pendiente, atrB };
+}
+
+/**
+ * Rupturas de línea de tendencia, causales, con pivotes de `n` velas a cada lado (5, como la app, por defecto). En cada vela,
+ * la línea es la que une los dos últimos pivotes ya conocidos del mismo tipo; un pivote se conoce `n` velas después de
+ * formarse, así que la vela i usa pivotes confirmados hasta la i-1. El primer cierre que pasa la línea por 0,1 ATR da un
+ * evento (+1 si rompe una resistencia hacia arriba, -1 si rompe un soporte hacia abajo), una sola vez por línea. Si en una
+ * misma vela pasa las dos líneas, no hay evento. Cada valor usa solo velas hasta el suyo.
+ */
+export function eventosLinea(v: SwingCandle[], n = LINEA_PIVOTES, vida = LINEA_VIDA): (EventoLinea | null)[] {
+  const out = new Array<EventoLinea | null>(v.length).fill(null);
+  const atr14 = atr(v, 14);
+  const confirmados = findPivots(v, n);
+  const ultimos: Record<"high" | "low", Pivot[]> = { high: [], low: [] };
+  const par: Record<"high" | "low", ParLinea | null> = { high: null, low: null };
+  let p = 0;
+  for (let i = 0; i < v.length; i += 1) {
+    while (p < confirmados.length && confirmados[p].confirmedAt <= i - 1) {
+      const nuevo = confirmados[p];
+      p += 1;
+      const lista = ultimos[nuevo.kind];
+      lista.push(nuevo);
+      if (lista.length > 2) lista.shift();
+      par[nuevo.kind] = lista.length === 2 ? formarPar(v, atr14, lista[0], lista[1]) : null;
+    }
+    const cruces: EventoLinea[] = [];
+    for (const lado of ["high", "low"] as const) {
+      const q = par[lado];
+      if (!q) continue;
+      if (i - q.b.i > vida) {
+        par[lado] = null;
+        continue;
+      }
+      const signo = lado === "high" ? 1 : -1;
+      if (signo * (v[i].close - precioLinea(q, i)) > BREAK_ATR * q.atrB) {
+        cruces.push({ signo, a: q.a, pendiente: q.pendiente, atrB: q.atrB });
+        par[lado] = null;
+      }
+    }
+    if (cruces.length === 1) out[i] = cruces[0];
+  }
+  return out;
+}
+
+/** Rupturas de línea de tendencia como números: +1 alcista, -1 bajista, 0 sin ruptura (ver eventosLinea). */
+export function rupturasLinea(v: SwingCandle[]): number[] {
+  return eventosLinea(v).map((e) => (e ? e.signo : 0));
+}
+
 export function indicadores(v: SwingCandle[]): Indicadores {
   const c = v.map((x) => x.close);
   const bbMedia = new Array<number>(v.length).fill(Number.NaN);
@@ -308,15 +460,10 @@ export function indicadores(v: SwingCandle[]): Indicadores {
     bbAlta[i] = m + 2 * d;
     bbBaja[i] = m - 2 * d;
   }
-  const e12 = ema(c, 12);
-  const e26 = ema(c, 26);
-  const macd = c.map((_, i) => e12[i] - e26[i]);
-  const primero = macd.findIndex((x) => Number.isFinite(x));
-  const senalParcial = primero < 0 ? [] : ema(macd.slice(primero), 9);
-  const macdSenal = c.map((_, i) => (primero >= 0 && i >= primero ? senalParcial[i - primero] : Number.NaN));
+  const { macd, senal: macdSenal } = macdDe(c);
   const st = supertrend(v, 10, 3);
   const snr = nivelesSnr(v);
-  return { ema20: ema(c, 20), ema50: ema(c, 50), ema200: ema(c, 200), rsi14: rsi(c, 14), atr14: atr(v, 14), bbMedia, bbAlta, bbBaja, macd, macdSenal, stLinea: st.linea, stDir: st.dir, vwap: vwapSemanal(v), poc: pocPerfil(v), htfDir: direccionHtf(v), volRel: volumenRelativo(v), snrRes: snr.res, snrSop: snr.sop };
+  return { ema20: ema(c, 20), ema50: ema(c, 50), ema200: ema(c, 200), rsi14: rsi(c, 14), atr14: atr(v, 14), bbMedia, bbAlta, bbBaja, macd, macdSenal, stLinea: st.linea, stDir: st.dir, vwap: vwapSemanal(v), poc: pocPerfil(v), htfDir: direccionHtf(v), alineacionHtf: alineacionHtf(v), volRel: volumenRelativo(v), snrRes: snr.res, snrSop: snr.sop, lineaRuptura: rupturasLinea(v) };
 }
 
 const ok = (...xs: number[]) => xs.every((x) => Number.isFinite(x));
@@ -426,6 +573,20 @@ export const ESTRATEGIAS: Estrategia[] = [
     },
   },
   {
+    id: "MACD_MTF_SNR",
+    agente: "Agente Momento MTF + SNR",
+    nombre: "Cruce de MACD a favor de la EMA 200, con marcos superiores alineados y rechazo de un nivel SNR",
+    regla: "Igual que el Agente Momento, y además el RSI (14) de la vela de señal está del lado del cruce (sobre 50 para largos, bajo 50 para cortos); el MACD y el RSI de todas las temporalidades superiores ya cerradas van en el mismo sentido (en velas de 3 min: 15 min, 1 h, 4 h y diaria; de 15 min: 1 h, 4 h y diaria; de 1 h: 4 h y diaria; de 4 h: diaria); y la vela toca con la mecha y rechaza un nivel SNR fresco del lado de la operación. Stop a 1,5 ATR. Objetivo 2 R.",
+    senal: (v, ind, i) => {
+      const { macd: m, macdSenal: s, ema200: d, atr14: t, rsi14: r, alineacionHtf: a, snrSop: sp, snrRes: rs } = ind;
+      if (i < 1 || !ok(m[i], s[i], m[i - 1], s[i - 1], d[i], t[i], r[i], a[i])) return null;
+      const c = v[i].close;
+      if (c > d[i] && m[i - 1] <= s[i - 1] && m[i] > s[i] && r[i] > 50 && a[i] === 1 && Number.isFinite(sp[i])) return conRR("LONG", c, c - 1.5 * t[i], 2);
+      if (c < d[i] && m[i - 1] >= s[i - 1] && m[i] < s[i] && r[i] < 50 && a[i] === -1 && Number.isFinite(rs[i])) return conRR("SHORT", c, c + 1.5 * t[i], 2);
+      return null;
+    },
+  },
+  {
     id: "SUPERTREND",
     agente: "Agente Supertrend",
     nombre: "Supertrend (10, 3) con filtro de EMA 200",
@@ -509,6 +670,20 @@ export const ESTRATEGIAS: Estrategia[] = [
     }),
   ),
   {
+    id: "TENDENCIA_LINEA",
+    agente: "Agente Línea de tendencia",
+    nombre: "Ruptura de una línea de tendencia (dos pivotes de 5 velas)",
+    regla: "Une los dos últimos pivotes (picos, para una resistencia que baja; valles, para un soporte que sube) con una línea que el precio respeta entre ambos. Entra en el primer cierre que la pasa por 0,1 ATR: largo si rompe hacia arriba, corto si rompe hacia abajo. Stop a 1,5 ATR. Objetivo 2 R.",
+    senal: (v, ind, i) => {
+      const { lineaRuptura: r, atr14: t } = ind;
+      if (!ok(t[i]) || r[i] === 0) return null;
+      const c = v[i].close;
+      if (r[i] === 1) return conRR("LONG", c, c - 1.5 * t[i], 2);
+      if (r[i] === -1) return conRR("SHORT", c, c + 1.5 * t[i], 2);
+      return null;
+    },
+  },
+  {
     id: "AZAR",
     agente: "Agente Control (azar)",
     nombre: "Entrada al azar (control)",
@@ -516,8 +691,10 @@ export const ESTRATEGIAS: Estrategia[] = [
     senal: (v, ind, i) => {
       const t = ind.atr14[i];
       if (!ok(t)) return null;
-      // Azar reproducible: depende solo de la hora de la vela, no de su precio ni de lo que viene.
-      const h = Math.sin(v[i].openTime / 3_600_000) * 10_000;
+      // Azar reproducible: depende solo del momento de la vela (su hora, o la vela misma si es más corta que una hora),
+      // no de su precio ni de lo que viene. Así en 1 h y 4 h no cambia, y en 15 min o 3 min no entra por racimos de una hora.
+      const paso = v.length > 1 ? Math.min(v[1].openTime - v[0].openTime, 3_600_000) : 3_600_000;
+      const h = Math.sin(v[i].openTime / paso) * 10_000;
       const u = h - Math.floor(h);
       if (u >= 0.02) return null;
       const c = v[i].close;
@@ -543,14 +720,17 @@ export type Operacion = {
 
 export type OpcionesEstudio = { marcoMs: number; horizonte: number; feePct: number };
 
-/** Todas las operaciones de una estrategia en una moneda, una por vez, con la escalera de la app. */
-export function operar(e: Estrategia, symbol: string, v: SwingCandle[], o: OpcionesEstudio): Operacion[] {
-  const ind = indicadores(v);
+/**
+ * Todas las operaciones de una señal por vez por moneda, con la escalera de la app: `senal(i)` decide con velas hasta la i,
+ * y la entrada es la apertura de la vela siguiente. Es el recorrido común de cualquier estrategia o variante (ver operar y
+ * lib/linea-busqueda.ts).
+ */
+export function operarSenales(id: EstrategiaId, symbol: string, v: SwingCandle[], senal: (i: number) => Senal | null, o: OpcionesEstudio): Operacion[] {
   const out: Operacion[] = [];
   let libreDesde = 0;
   for (let i = 0; i < v.length - 1; i += 1) {
     if (v[i].openTime < libreDesde) continue;
-    const s = e.senal(v, ind, i);
+    const s = senal(i);
     if (!s) continue;
     // Entrada a la apertura de la vela siguiente; el stop y el objetivo mantienen su distancia en R.
     const entrada = v[i + 1].open;
@@ -566,7 +746,7 @@ export function operar(e: Estrategia, symbol: string, v: SwingCandle[], o: Opcio
     const rec = recorrer(s.lado, entrada, esc, v[i].openTime, tramo, o.marcoMs, Number.POSITIVE_INFINITY, { horizonte: o.horizonte, feePct: o.feePct });
     if (rec.r === null || rec.cerradaA === null) break; // se quedó sin velas: abierta al final, no cuenta
     out.push({
-      estrategia: e.id,
+      estrategia: id,
       symbol,
       lado: s.lado,
       abiertaA: v[i + 1].openTime,
@@ -580,6 +760,12 @@ export function operar(e: Estrategia, symbol: string, v: SwingCandle[], o: Opcio
     libreDesde = rec.cerradaA;
   }
   return out;
+}
+
+/** Todas las operaciones de una estrategia en una moneda, una por vez, con la escalera de la app. */
+export function operar(e: Estrategia, symbol: string, v: SwingCandle[], o: OpcionesEstudio): Operacion[] {
+  const ind = indicadores(v);
+  return operarSenales(e.id, symbol, v, (i) => e.senal(v, ind, i), o);
 }
 
 export type Medicion = {

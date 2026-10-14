@@ -79,10 +79,13 @@ export type TrendAnalysis = { lines: Trendline[]; breaks: TrendBreak[]; ranges: 
 export type TrendOptions = { pivotN?: number; rangeN?: number; maxAge?: number };
 
 export const MIN_SPAN = 5;
-const BREAK_ATR = 0.1;
-const WICK_ATR = 0.5;
+/** Un cierre tiene que pasar la línea por esto (en ATR) para ser ruptura. Lo usa también el estudio (lib/estrategias.ts). */
+export const BREAK_ATR = 0.1;
+/** Entre sus dos puntos, ninguna mecha puede pasar la línea por más de esto (en ATR). */
+export const WICK_ATR = 0.5;
 const TOUCH_ATR = 0.35;
-const FLAT_ATR = 0.5;
+/** Dos puntos a menos de esto (en ATR) de distancia forman un nivel plano, no una línea. */
+export const FLAT_ATR = 0.5;
 const VOLUME_CONFIRM = 1.3;
 const HOLD_CANDLES = 3;
 const RANGE_MAX_ATR = 6;
