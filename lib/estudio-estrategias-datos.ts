@@ -41,12 +41,12 @@ export const ESTUDIO_META = {
   "costoPorLadoPct": 0.07,
   "horizonteVelas": 48,
   "auditoria": {
-    "variantesTabla": 28,
-    "ensayosDeclarados": 200,
-    "varianzaSharpes": 0.0159,
+    "variantesTabla": 35,
+    "ensayosDeclarados": 300,
+    "varianzaSharpes": 0.0169,
     "diasEvaluacion": 740,
-    "pRealityCheck": 0.8546,
-    "pSpa": 0.2176
+    "pRealityCheck": 0.8834,
+    "pSpa": 0.2624
   }
 } as const;
 
@@ -330,6 +330,53 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 1,
     "monedasConOperaciones": 10,
     "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "MACD_MTF_SNR",
+    "agente": "Agente Momento MTF + SNR",
+    "nombre": "Cruce de MACD a favor de la EMA 200, con marcos superiores alineados y rechazo de un nivel SNR",
+    "regla": "Igual que el Agente Momento, y además el RSI (14) de la vela de señal está del lado del cruce (sobre 50 para largos, bajo 50 para cortos); el MACD y el RSI de todas las temporalidades superiores ya cerradas van en el mismo sentido (en velas de 3 min: 15 min, 1 h, 4 h y diaria; de 15 min: 1 h, 4 h y diaria; de 1 h: 4 h y diaria; de 4 h: diaria); y la vela toca con la mecha y rechaza un nivel SNR fresco del lado de la operación. Stop a 1,5 ATR. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 256,
+      "ganadas": 92,
+      "winRate": 0.3594,
+      "tasaTp1": 0.6445,
+      "tasaTp2": 0.457,
+      "tasaTp3": 0.3242,
+      "tasaSl": 0.6289,
+      "profitFactor": 0.9108,
+      "expectancia": -0.0615,
+      "expectanciaIc": {
+        "low": -0.2048,
+        "high": 0.0818
+      },
+      "netoR": -15.7433,
+      "maxCaidaR": 31.3958
+    },
+    "evaluacion": {
+      "operaciones": 114,
+      "ganadas": 30,
+      "winRate": 0.2632,
+      "tasaTp1": 0.5,
+      "tasaTp2": 0.3509,
+      "tasaTp3": 0.2456,
+      "tasaSl": 0.7105,
+      "profitFactor": 0.5906,
+      "expectancia": -0.3263,
+      "expectanciaIc": {
+        "low": -0.5262,
+        "high": -0.1264
+      },
+      "netoR": -37.1979,
+      "maxCaidaR": 39.8243
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 1,
+    "monedasConOperaciones": 10,
+    "psr": 0.0093,
     "dsrTabla": 0,
     "dsrDeclarado": 0
   },
@@ -710,6 +757,53 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "dsrDeclarado": 0
   },
   {
+    "estrategia": "TENDENCIA_LINEA",
+    "agente": "Agente Línea de tendencia",
+    "nombre": "Ruptura de una línea de tendencia (dos pivotes de 5 velas)",
+    "regla": "Une los dos últimos pivotes (picos, para una resistencia que baja; valles, para un soporte que sube) con una línea que el precio respeta entre ambos. Entra en el primer cierre que la pasa por 0,1 ATR: largo si rompe hacia arriba, corto si rompe hacia abajo. Stop a 1,5 ATR. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 8485,
+      "ganadas": 3054,
+      "winRate": 0.3599,
+      "tasaTp1": 0.6165,
+      "tasaTp2": 0.4387,
+      "tasaTp3": 0.3245,
+      "tasaSl": 0.6244,
+      "profitFactor": 0.9238,
+      "expectancia": -0.0526,
+      "expectanciaIc": {
+        "low": -0.0775,
+        "high": -0.0277
+      },
+      "netoR": -446.3372,
+      "maxCaidaR": 460.9712
+    },
+    "evaluacion": {
+      "operaciones": 3474,
+      "ganadas": 1235,
+      "winRate": 0.3555,
+      "tasaTp1": 0.6019,
+      "tasaTp2": 0.4298,
+      "tasaTp3": 0.3253,
+      "tasaSl": 0.6324,
+      "profitFactor": 0.8809,
+      "expectancia": -0.0851,
+      "expectanciaIc": {
+        "low": -0.1242,
+        "high": -0.046
+      },
+      "netoR": -295.5879,
+      "maxCaidaR": 319.0588
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 1,
+    "monedasConOperaciones": 10,
+    "psr": 0.0002,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
     "estrategia": "AZAR",
     "agente": "Agente Control (azar)",
     "nombre": "Entrada al azar (control)",
@@ -1039,6 +1133,53 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "dsrDeclarado": 0
   },
   {
+    "estrategia": "MACD_MTF_SNR",
+    "agente": "Agente Momento MTF + SNR",
+    "nombre": "Cruce de MACD a favor de la EMA 200, con marcos superiores alineados y rechazo de un nivel SNR",
+    "regla": "Igual que el Agente Momento, y además el RSI (14) de la vela de señal está del lado del cruce (sobre 50 para largos, bajo 50 para cortos); el MACD y el RSI de todas las temporalidades superiores ya cerradas van en el mismo sentido (en velas de 3 min: 15 min, 1 h, 4 h y diaria; de 15 min: 1 h, 4 h y diaria; de 1 h: 4 h y diaria; de 4 h: diaria); y la vela toca con la mecha y rechaza un nivel SNR fresco del lado de la operación. Stop a 1,5 ATR. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 180,
+      "ganadas": 75,
+      "winRate": 0.4167,
+      "tasaTp1": 0.6667,
+      "tasaTp2": 0.5167,
+      "tasaTp3": 0.4056,
+      "tasaSl": 0.5833,
+      "profitFactor": 1.3195,
+      "expectancia": 0.1949,
+      "expectanciaIc": {
+        "low": 0.0142,
+        "high": 0.3756
+      },
+      "netoR": 35.077,
+      "maxCaidaR": 12.4797
+    },
+    "evaluacion": {
+      "operaciones": 57,
+      "ganadas": 16,
+      "winRate": 0.2807,
+      "tasaTp1": 0.5614,
+      "tasaTp2": 0.3684,
+      "tasaTp3": 0.2807,
+      "tasaSl": 0.7193,
+      "profitFactor": 0.7169,
+      "expectancia": -0.2148,
+      "expectanciaIc": {
+        "low": -0.5106,
+        "high": 0.0809
+      },
+      "netoR": -12.244,
+      "maxCaidaR": 12.9476
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 3,
+    "monedasConOperaciones": 10,
+    "psr": 0.1358,
+    "dsrTabla": 0.0012,
+    "dsrDeclarado": 0.0001
+  },
+  {
     "estrategia": "SUPERTREND",
     "agente": "Agente Supertrend",
     "nombre": "Supertrend (10, 3) con filtro de EMA 200",
@@ -1082,7 +1223,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 10,
     "monedasConOperaciones": 10,
     "psr": 0.9987,
-    "dsrTabla": 0.0056,
+    "dsrTabla": 0.0015,
     "dsrDeclarado": 0
   },
   {
@@ -1129,7 +1270,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 10,
     "monedasConOperaciones": 10,
     "psr": 0.9982,
-    "dsrTabla": 0.0046,
+    "dsrTabla": 0.0012,
     "dsrDeclarado": 0
   },
   {
@@ -1176,7 +1317,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 9,
     "monedasConOperaciones": 10,
     "psr": 0.9858,
-    "dsrTabla": 0.0017,
+    "dsrTabla": 0.0005,
     "dsrDeclarado": 0
   },
   {
@@ -1223,7 +1364,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 9,
     "monedasConOperaciones": 10,
     "psr": 0.9852,
-    "dsrTabla": 0.0018,
+    "dsrTabla": 0.0005,
     "dsrDeclarado": 0
   },
   {
@@ -1270,7 +1411,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 10,
     "monedasConOperaciones": 10,
     "psr": 0.9822,
-    "dsrTabla": 0.0013,
+    "dsrTabla": 0.0003,
     "dsrDeclarado": 0
   },
   {
@@ -1317,8 +1458,8 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 9,
     "monedasConOperaciones": 10,
     "psr": 0.9985,
-    "dsrTabla": 0.1543,
-    "dsrDeclarado": 0.0077
+    "dsrTabla": 0.0926,
+    "dsrDeclarado": 0.0022
   },
   {
     "estrategia": "SNR",
@@ -1415,6 +1556,53 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "dsrDeclarado": 0
   },
   {
+    "estrategia": "TENDENCIA_LINEA",
+    "agente": "Agente Línea de tendencia",
+    "nombre": "Ruptura de una línea de tendencia (dos pivotes de 5 velas)",
+    "regla": "Une los dos últimos pivotes (picos, para una resistencia que baja; valles, para un soporte que sube) con una línea que el precio respeta entre ambos. Entra en el primer cierre que la pasa por 0,1 ATR: largo si rompe hacia arriba, corto si rompe hacia abajo. Stop a 1,5 ATR. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 2051,
+      "ganadas": 778,
+      "winRate": 0.3793,
+      "tasaTp1": 0.6426,
+      "tasaTp2": 0.452,
+      "tasaTp3": 0.3413,
+      "tasaSl": 0.6007,
+      "profitFactor": 1.0898,
+      "expectancia": 0.0569,
+      "expectanciaIc": {
+        "low": 0.0058,
+        "high": 0.108
+      },
+      "netoR": 116.6868,
+      "maxCaidaR": 45.4296
+    },
+    "evaluacion": {
+      "operaciones": 947,
+      "ganadas": 364,
+      "winRate": 0.3844,
+      "tasaTp1": 0.622,
+      "tasaTp2": 0.4498,
+      "tasaTp3": 0.3516,
+      "tasaSl": 0.6093,
+      "profitFactor": 1.0876,
+      "expectancia": 0.0567,
+      "expectanciaIc": {
+        "low": -0.0195,
+        "high": 0.1328
+      },
+      "netoR": 53.6533,
+      "maxCaidaR": 63.5048
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 5,
+    "monedasConOperaciones": 10,
+    "psr": 0.8917,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
     "estrategia": "AZAR",
     "agente": "Agente Control (azar)",
     "nombre": "Entrada al azar (control)",
@@ -1456,6 +1644,241 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "CONTROL",
     "monedasPositivas": 4,
+    "monedasConOperaciones": 10,
+    "psr": null,
+    "dsrTabla": null,
+    "dsrDeclarado": null
+  },
+  {
+    "estrategia": "MACD_MTF_SNR",
+    "agente": "Agente Momento MTF + SNR",
+    "nombre": "Cruce de MACD a favor de la EMA 200, con marcos superiores alineados y rechazo de un nivel SNR",
+    "regla": "Igual que el Agente Momento, y además el RSI (14) de la vela de señal está del lado del cruce (sobre 50 para largos, bajo 50 para cortos); el MACD y el RSI de todas las temporalidades superiores ya cerradas van en el mismo sentido (en velas de 3 min: 15 min, 1 h, 4 h y diaria; de 15 min: 1 h, 4 h y diaria; de 1 h: 4 h y diaria; de 4 h: diaria); y la vela toca con la mecha y rechaza un nivel SNR fresco del lado de la operación. Stop a 1,5 ATR. Objetivo 2 R.",
+    "marco": "15m",
+    "desarrollo": {
+      "operaciones": 60,
+      "ganadas": 14,
+      "winRate": 0.2333,
+      "tasaTp1": 0.5667,
+      "tasaTp2": 0.3333,
+      "tasaTp3": 0.2167,
+      "tasaSl": 0.7667,
+      "profitFactor": 0.4239,
+      "expectancia": -0.5224,
+      "expectanciaIc": {
+        "low": -0.7831,
+        "high": -0.2616
+      },
+      "netoR": -31.3413,
+      "maxCaidaR": 33.7092
+    },
+    "evaluacion": {
+      "operaciones": 136,
+      "ganadas": 56,
+      "winRate": 0.4118,
+      "tasaTp1": 0.625,
+      "tasaTp2": 0.4559,
+      "tasaTp3": 0.4044,
+      "tasaSl": 0.5882,
+      "profitFactor": 0.9841,
+      "expectancia": -0.0117,
+      "expectanciaIc": {
+        "low": -0.2228,
+        "high": 0.1994
+      },
+      "netoR": -1.5882,
+      "maxCaidaR": 12.7911
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 5,
+    "monedasConOperaciones": 10,
+    "psr": 0.4639,
+    "dsrTabla": 0.0005,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "TENDENCIA_LINEA",
+    "agente": "Agente Línea de tendencia",
+    "nombre": "Ruptura de una línea de tendencia (dos pivotes de 5 velas)",
+    "regla": "Une los dos últimos pivotes (picos, para una resistencia que baja; valles, para un soporte que sube) con una línea que el precio respeta entre ambos. Entra en el primer cierre que la pasa por 0,1 ATR: largo si rompe hacia arriba, corto si rompe hacia abajo. Stop a 1,5 ATR. Objetivo 2 R.",
+    "marco": "15m",
+    "desarrollo": {
+      "operaciones": 5156,
+      "ganadas": 1798,
+      "winRate": 0.3487,
+      "tasaTp1": 0.6053,
+      "tasaTp2": 0.4284,
+      "tasaTp3": 0.3231,
+      "tasaSl": 0.6387,
+      "profitFactor": 0.7206,
+      "expectancia": -0.2246,
+      "expectanciaIc": {
+        "low": -0.2568,
+        "high": -0.1924
+      },
+      "netoR": -1158.1202,
+      "maxCaidaR": 1169.3493
+    },
+    "evaluacion": {
+      "operaciones": 14334,
+      "ganadas": 5053,
+      "winRate": 0.3525,
+      "tasaTp1": 0.6064,
+      "tasaTp2": 0.4336,
+      "tasaTp3": 0.3262,
+      "tasaSl": 0.6342,
+      "profitFactor": 0.7144,
+      "expectancia": -0.2313,
+      "expectanciaIc": {
+        "low": -0.2507,
+        "high": -0.2119
+      },
+      "netoR": -3315.3822,
+      "maxCaidaR": 3317.1128
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 0,
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "AZAR",
+    "agente": "Agente Control (azar)",
+    "nombre": "Entrada al azar (control)",
+    "regla": "Entra en un 2 % de las velas, con lado al azar y semilla fija. Stop a 1,5 ATR. Objetivo 2 R. Sirve de vara: lo que no le gana a esto no tiene ventaja.",
+    "marco": "15m",
+    "desarrollo": {
+      "operaciones": 3981,
+      "ganadas": 1385,
+      "winRate": 0.3479,
+      "tasaTp1": 0.6054,
+      "tasaTp2": 0.4223,
+      "tasaTp3": 0.3137,
+      "tasaSl": 0.6363,
+      "profitFactor": 0.7075,
+      "expectancia": -0.2341,
+      "expectanciaIc": {
+        "low": -0.2703,
+        "high": -0.1979
+      },
+      "netoR": -932.0357,
+      "maxCaidaR": 1003.7427
+    },
+    "evaluacion": {
+      "operaciones": 11260,
+      "ganadas": 3704,
+      "winRate": 0.329,
+      "tasaTp1": 0.581,
+      "tasaTp2": 0.4097,
+      "tasaTp3": 0.306,
+      "tasaSl": 0.6559,
+      "profitFactor": 0.6495,
+      "expectancia": -0.294,
+      "expectanciaIc": {
+        "low": -0.3156,
+        "high": -0.2723
+      },
+      "netoR": -3310.0407,
+      "maxCaidaR": 3342.1281
+    },
+    "veredicto": "CONTROL",
+    "monedasPositivas": 0,
+    "monedasConOperaciones": 10,
+    "psr": null,
+    "dsrTabla": null,
+    "dsrDeclarado": null
+  },
+  {
+    "estrategia": "MACD_MTF_SNR",
+    "agente": "Agente Momento MTF + SNR",
+    "nombre": "Cruce de MACD a favor de la EMA 200, con marcos superiores alineados y rechazo de un nivel SNR",
+    "regla": "Igual que el Agente Momento, y además el RSI (14) de la vela de señal está del lado del cruce (sobre 50 para largos, bajo 50 para cortos); el MACD y el RSI de todas las temporalidades superiores ya cerradas van en el mismo sentido (en velas de 3 min: 15 min, 1 h, 4 h y diaria; de 15 min: 1 h, 4 h y diaria; de 1 h: 4 h y diaria; de 4 h: diaria); y la vela toca con la mecha y rechaza un nivel SNR fresco del lado de la operación. Stop a 1,5 ATR. Objetivo 2 R.",
+    "marco": "3m",
+    "desarrollo": {
+      "operaciones": 103,
+      "ganadas": 37,
+      "winRate": 0.3592,
+      "tasaTp1": 0.6117,
+      "tasaTp2": 0.4466,
+      "tasaTp3": 0.3495,
+      "tasaSl": 0.6311,
+      "profitFactor": 0.5655,
+      "expectancia": -0.4224,
+      "expectanciaIc": {
+        "low": -0.6689,
+        "high": -0.1758
+      },
+      "netoR": -43.5051,
+      "maxCaidaR": 44.7287
+    },
+    "evaluacion": {
+      "operaciones": 290,
+      "ganadas": 97,
+      "winRate": 0.3345,
+      "tasaTp1": 0.5897,
+      "tasaTp2": 0.3966,
+      "tasaTp3": 0.331,
+      "tasaSl": 0.6552,
+      "profitFactor": 0.5397,
+      "expectancia": -0.4402,
+      "expectanciaIc": {
+        "low": -0.5812,
+        "high": -0.2991
+      },
+      "netoR": -127.6525,
+      "maxCaidaR": 127.7638
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 1,
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "AZAR",
+    "agente": "Agente Control (azar)",
+    "nombre": "Entrada al azar (control)",
+    "regla": "Entra en un 2 % de las velas, con lado al azar y semilla fija. Stop a 1,5 ATR. Objetivo 2 R. Sirve de vara: lo que no le gana a esto no tiene ventaja.",
+    "marco": "3m",
+    "desarrollo": {
+      "operaciones": 20751,
+      "ganadas": 7084,
+      "winRate": 0.3414,
+      "tasaTp1": 0.6001,
+      "tasaTp2": 0.4359,
+      "tasaTp3": 0.3308,
+      "tasaSl": 0.6339,
+      "profitFactor": 0.4314,
+      "expectancia": -0.6083,
+      "expectanciaIc": {
+        "low": -0.6254,
+        "high": -0.5912
+      },
+      "netoR": -12622.378,
+      "maxCaidaR": 12625.2051
+    },
+    "evaluacion": {
+      "operaciones": 59078,
+      "ganadas": 19648,
+      "winRate": 0.3326,
+      "tasaTp1": 0.5977,
+      "tasaTp2": 0.4329,
+      "tasaTp3": 0.3281,
+      "tasaSl": 0.6437,
+      "profitFactor": 0.3991,
+      "expectancia": -0.6687,
+      "expectanciaIc": {
+        "low": -0.6791,
+        "high": -0.6584
+      },
+      "netoR": -39507.6317,
+      "maxCaidaR": 39524.2553
+    },
+    "veredicto": "CONTROL",
+    "monedasPositivas": 0,
     "monedasConOperaciones": 10,
     "psr": null,
     "dsrTabla": null,
