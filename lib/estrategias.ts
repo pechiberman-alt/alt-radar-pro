@@ -10,7 +10,7 @@
 import { escaleraHacia, recorrer, type Lado } from "./escalera.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
-export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "AZAR";
+export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "AZAR";
 
 /** Lo que una estrategia propone en la vela i: lado, stop y objetivo final (TP3). Sin señal, null. */
 export type Senal = { lado: Lado; stop: number; objetivo: number };
@@ -37,6 +37,10 @@ export type Indicadores = {
   htfDir: number[];
   /** Volumen de la vela dividido por el promedio de las 20 velas anteriores (NaN sin historia o sin volumen). */
   volRel: number[];
+  /** SNR: precio del nivel de resistencia fresco que esta vela tocó por primera vez con la mecha y rechazó (NaN si no). */
+  snrRes: number[];
+  /** SNR: precio del nivel de soporte fresco que esta vela tocó por primera vez con la mecha y rechazó (NaN si no). */
+  snrSop: number[];
 };
 
 export type Estrategia = {
@@ -239,6 +243,55 @@ export function volumenRelativo(v: SwingCandle[], n = 20): number[] {
   return out;
 }
 
+/** Cuántas velas vive un nivel de SNR sin tocarse antes de descartarlo. */
+const SNR_VIDA = 200;
+
+/**
+ * SNR (soportes y resistencias del estilo «malayo»), con las reglas fijadas antes de medir. Niveles de UN precio: el pico de la
+ * línea de cierres (nivel A, resistencia), el valle (nivel V, soporte) y el hueco entre dos velas del mismo color (el hueco
+ * al alza es soporte; a la baja, resistencia, al precio de apertura de la segunda). Un nivel es fresco hasta que una mecha lo
+ * toca: esa primera visita se vuelve señal solo si la vela cierra del lado del rechazo (debajo de una resistencia, encima
+ * de un soporte); después el nivel se gasta. Cada nivel se conoce una vela después de formarse y se puede tocar desde la
+ * siguiente, así que nada mira adelante.
+ */
+export function nivelesSnr(v: SwingCandle[]): { res: number[]; sop: number[] } {
+  const res = new Array<number>(v.length).fill(Number.NaN);
+  const sop = new Array<number>(v.length).fill(Number.NaN);
+  type Nivel = { precio: number; tipo: "R" | "S"; desde: number; nacio: number };
+  let activos: Nivel[] = [];
+  for (let i = 0; i < v.length; i += 1) {
+    const x = v[i];
+    let tocoRes = Infinity;
+    let tocoSop = -Infinity;
+    activos = activos.filter((n) => {
+      if (i - n.nacio > SNR_VIDA) return false;
+      if (i < n.desde) return true;
+      if (n.tipo === "R" && x.high >= n.precio) {
+        if (x.close < n.precio) tocoRes = Math.min(tocoRes, n.precio);
+        return false;
+      }
+      if (n.tipo === "S" && x.low <= n.precio) {
+        if (x.close > n.precio) tocoSop = Math.max(tocoSop, n.precio);
+        return false;
+      }
+      return true;
+    });
+    if (tocoRes < Infinity) res[i] = tocoRes;
+    if (tocoSop > -Infinity) sop[i] = tocoSop;
+    if (i >= 2) {
+      const c1 = v[i - 1].close;
+      if (c1 > v[i - 2].close && c1 > x.close) activos.push({ precio: c1, tipo: "R", desde: i + 1, nacio: i });
+      else if (c1 < v[i - 2].close && c1 < x.close) activos.push({ precio: c1, tipo: "S", desde: i + 1, nacio: i });
+    }
+    if (i >= 1) {
+      const a = v[i - 1];
+      if (a.close > a.open && x.close > x.open && x.open > a.close) activos.push({ precio: x.open, tipo: "S", desde: i + 1, nacio: i });
+      if (a.close < a.open && x.close < x.open && x.open < a.close) activos.push({ precio: x.open, tipo: "R", desde: i + 1, nacio: i });
+    }
+  }
+  return { res, sop };
+}
+
 export function indicadores(v: SwingCandle[]): Indicadores {
   const c = v.map((x) => x.close);
   const bbMedia = new Array<number>(v.length).fill(Number.NaN);
@@ -262,7 +315,8 @@ export function indicadores(v: SwingCandle[]): Indicadores {
   const senalParcial = primero < 0 ? [] : ema(macd.slice(primero), 9);
   const macdSenal = c.map((_, i) => (primero >= 0 && i >= primero ? senalParcial[i - primero] : Number.NaN));
   const st = supertrend(v, 10, 3);
-  return { ema20: ema(c, 20), ema50: ema(c, 50), ema200: ema(c, 200), rsi14: rsi(c, 14), atr14: atr(v, 14), bbMedia, bbAlta, bbBaja, macd, macdSenal, stLinea: st.linea, stDir: st.dir, vwap: vwapSemanal(v), poc: pocPerfil(v), htfDir: direccionHtf(v), volRel: volumenRelativo(v) };
+  const snr = nivelesSnr(v);
+  return { ema20: ema(c, 20), ema50: ema(c, 50), ema200: ema(c, 200), rsi14: rsi(c, 14), atr14: atr(v, 14), bbMedia, bbAlta, bbBaja, macd, macdSenal, stLinea: st.linea, stDir: st.dir, vwap: vwapSemanal(v), poc: pocPerfil(v), htfDir: direccionHtf(v), volRel: volumenRelativo(v), snrRes: snr.res, snrSop: snr.sop };
 }
 
 const ok = (...xs: number[]) => xs.every((x) => Number.isFinite(x));
@@ -433,6 +487,27 @@ export const ESTRATEGIAS: Estrategia[] = [
       return null;
     },
   },
+  ...[
+    { id: "SNR", agente: "Agente SNR", nombre: "SNR: primera visita a un nivel fresco", conHtf: false, extra: "" },
+    { id: "SNR_HTF", agente: "Agente SNR + Storyline", nombre: "SNR con la tendencia del marco superior a favor", conHtf: true, extra: " y la tendencia del marco superior (Supertrend diario) va en el mismo sentido (la «storyline»)" },
+  ].map(
+    (f): Estrategia => ({
+      id: f.id as EstrategiaId,
+      agente: f.agente,
+      nombre: f.nombre,
+      regla: `Soportes y resistencias de un solo precio (pico y valle de la línea de cierres, y huecos entre velas del mismo color). La primera mecha que toca un nivel fresco y cierra del lado del rechazo da la entrada${f.extra}. Stop en el extremo de esa vela. Objetivo 2 R.`,
+      senal: (v, ind, i) => {
+        const { snrRes: r, snrSop: sp, htfDir: h } = ind;
+        const c = v[i].close;
+        if (i < 3 || (f.conHtf && !ok(h[i]))) return null;
+        const corto = Number.isFinite(r[i]) && !Number.isFinite(sp[i]) && v[i].high > c && (!f.conHtf || h[i] === -1);
+        const largo = Number.isFinite(sp[i]) && !Number.isFinite(r[i]) && v[i].low < c && (!f.conHtf || h[i] === 1);
+        if (corto) return conRR("SHORT", c, v[i].high, 2);
+        if (largo) return conRR("LONG", c, v[i].low, 2);
+        return null;
+      },
+    }),
+  ),
   {
     id: "AZAR",
     agente: "Agente Control (azar)",
@@ -564,7 +639,14 @@ export function medir(ops: Operacion[]): Medicion {
  * ventaja si el intervalo de su expectancia queda entero por encima de cero y le gana al control; sin ventaja si
  * queda por debajo; sin conclusión si cruza el cero o la muestra es chica.
  */
-export type Veredicto = "VENTAJA" | "SIN VENTAJA" | "SIN CONCLUSIÓN";
+export type Veredicto = "VENTAJA" | "CANDIDATA" | "SIN VENTAJA" | "SIN CONCLUSIÓN";
+/**
+ * Una VENTAJA que no sobrevive a la auditoría de sobreajuste (lib/sobreajuste.ts) baja a CANDIDATA: pasa la regla simple,
+ * pero su DSR contando todas las variantes miradas queda por debajo del 95 %. Solo la medición hacia adelante la confirma.
+ */
+export const DSR_MINIMO = 0.95;
+export const conAuditoria = (v: Veredicto, dsrDeclarado: number | null): Veredicto =>
+  v === "VENTAJA" && !(dsrDeclarado !== null && dsrDeclarado >= DSR_MINIMO) ? "CANDIDATA" : v;
 export const MUESTRA_ESTUDIO = 100;
 
 export function veredicto(m: Medicion, control: Medicion | null): Veredicto {

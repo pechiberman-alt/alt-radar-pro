@@ -15,6 +15,10 @@ import { parseFearGreed, type FearGreed } from "./fear-greed.ts";
 import { sendMessage, tg } from "./telegram.ts";
 import { buildServerSnapshot, markdownToTelegramHtml, splitForTelegram, type ServerSnapshot } from "./telegram-ai.ts";
 import { cached } from "./upstream-cache.ts";
+import { resultadosSt } from "./agente-st-db.ts";
+import { resumenEstudio } from "./estudio-resumen.ts";
+import { parseSwingKlines } from "./swing-entries.ts";
+import { candidatosMoneda, lecturaMoneda, type LecturaMoneda } from "./telegram-moneda.ts";
 import { coreContext } from "./jarvis-core.ts";
 import { coreSnapshot } from "./jarvis-core-db.ts";
 import { sharedJson } from "./shared-cache.ts";
@@ -46,6 +50,48 @@ async function majorsFromBinance() {
     }
   }
   return [];
+}
+
+/** Una moneda que la persona pidió por nombre: su precio y sus velas de 4 h de Binance. «existe: false» solo si Binance dice que ese par no existe. */
+async function monedaPedida(base: string, now: number): Promise<{ existe: boolean; lectura: LecturaMoneda | null }> {
+  const par = `${base}USDT`;
+  for (const host of SPOT_HOSTS) {
+    try {
+      const [t, k] = await Promise.all([
+        fetch(`${host}/api/v3/ticker/24hr?symbol=${par}`, { signal: AbortSignal.timeout(5000) }),
+        fetch(`${host}/api/v3/klines?symbol=${par}&interval=4h&limit=500`, { signal: AbortSignal.timeout(5000) }),
+      ]);
+      if (t.status === 400 || k.status === 400) return { existe: false, lectura: null };
+      if (!t.ok || !k.ok) continue;
+      const tj = (await t.json()) as { lastPrice?: string; priceChangePercent?: string };
+      const ch = Number(tj.priceChangePercent);
+      return { existe: true, lectura: lecturaMoneda(par, parseSwingKlines(await k.json()), Number(tj.lastPrice), Number.isFinite(ch) ? ch : null, now) };
+    } catch {
+      // Siguiente espejo.
+    }
+  }
+  return { existe: true, lectura: null };
+}
+
+/** Lo que se suma al resumen del servidor según la pregunta y la cuenta: monedas pedidas, el estudio y el agente de papel. */
+export async function datosExtraTelegram(db: D1Database, userId: number, question: string, now = Date.now()): Promise<Pick<ServerSnapshot, "pedidas" | "noEncontradas" | "estudio" | "agenteSt">> {
+  const [pedidas, filas] = await Promise.all([
+    Promise.all(candidatosMoneda(question).map(async (b) => ({ b, ...(await monedaPedida(b, now)) }))),
+    resultadosSt(db, userId, 50).catch(() => []),
+  ]);
+  const cerradas = filas.filter((f) => f.r !== null);
+  return {
+    pedidas: pedidas.flatMap((x) => (x.lectura ? [x.lectura] : [])),
+    noEncontradas: pedidas.filter((x) => !x.existe).map((x) => x.b),
+    estudio: resumenEstudio(),
+    agenteSt: {
+      abiertas: filas.filter((f) => f.desenlace === "ABIERTA").length,
+      cerradas: cerradas.length,
+      ganadas: cerradas.filter((f) => (f.r ?? 0) > 0).length,
+      netoR: Math.round(cerradas.reduce((a, f) => a + (f.r ?? 0), 0) * 100) / 100,
+      muestra: cerradas.length < 15 ? "muestra mínima (menos de 15 cerradas)" : "muestra razonable",
+    },
+  };
 }
 
 export async function loadServerSnapshot(db: D1Database, now = Date.now()): Promise<ServerSnapshot> {
@@ -123,7 +169,8 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?:
       loadServerSnapshot(db),
       sharedJson("jarvis-core-v1", 60, () => coreSnapshot(db, Date.now())).catch(() => null),
     ]);
-    const snapshot = core ? { ...base, jarvis: coreContext(core, Date.now()).nucleo } : base;
+    const extra = await datosExtraTelegram(db, userId, question).catch(() => ({}));
+    const snapshot = { ...(core ? { ...base, jarvis: coreContext(core, Date.now()).nucleo } : base), ...extra };
     const messages: ChatTurn[] = [...history, { role: "user", content: buildUserMessage(question, snapshot, memoryBlock(notes)) }];
     // Claude first, then the free brains (lib/ai-brains.ts); only the one that answered is counted.
     const answer = await answerWithBrains(db, userId, { claude: claudeKey.value, groq: groqKey.value }, env.AI ?? null, SYSTEM, messages);

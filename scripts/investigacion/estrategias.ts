@@ -8,8 +8,9 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ESTRATEGIAS, medir, operar, veredicto, type Medicion, type Operacion } from "../../lib/estrategias.ts";
+import { ESTRATEGIAS, conAuditoria, medir, operar, veredicto, type Medicion, type Operacion } from "../../lib/estrategias.ts";
 import { FRACCION_EVALUACION } from "../../lib/lab-evaluacion.ts";
+import { dsr, momentos, pruebaMultiple, psr } from "../../lib/sobreajuste.ts";
 import type { SwingCandle } from "../../lib/swing-entries.ts";
 import { DATOS } from "./util.ts";
 
@@ -21,6 +22,13 @@ const MARCOS = [
 /** Comisión 0,05 % + deslizamiento supuesto 0,02 %, por lado. */
 const COSTO_PCT = 0.07;
 const HORIZONTE = 48;
+/**
+ * Variantes que se miraron sobre estos mismos datos, contando las de fuera de esta tabla: la grilla SNR (128) y pruebas
+ * sueltas (filtros de bull run, MTF, modos de salida). Lo exacto es al menos 156 (28 de la tabla + 128); se redondea
+ * para arriba a propósito: subestimarlo infla la confianza.
+ */
+const ENSAYOS_DECLARADOS = 200;
+const DIA = 86_400_000;
 
 function leer(symbol: string, marco: string): SwingCandle[] {
   const raw = JSON.parse(readFileSync(join(DATOS, `${symbol}-${marco}.json`), "utf8")) as number[][];
@@ -39,13 +47,22 @@ type Fila = {
   /** Monedas con expectancia positiva en EVALUACIÓN, de las que tuvieron operaciones. */
   monedasPositivas: number;
   monedasConOperaciones: number;
+  /** Probabilidad de que el R medio por operación sea mayor que cero (PSR), y lo mismo descontando N ensayos (DSR). */
+  psr: number | null;
+  dsrTabla: number | null;
+  dsrDeclarado: number | null;
 };
 
 const filas: Fila[] = [];
+const momentosEv = new Map<number, ReturnType<typeof momentos>>();
 let desde = Infinity;
 let hasta = -Infinity;
 let corteGlobal = 0;
 const t0 = Date.now();
+/** Resultado diario (suma de R de las operaciones que cerraron ese día) en EVALUACIÓN, por fila: para Reality Check y SPA. */
+const diarios: { fila: number; dias: Map<number, number> }[] = [];
+let primerDiaEv = Infinity;
+let ultimoDiaEv = -Infinity;
 
 for (const marco of MARCOS) {
   const velas = new Map(MONEDAS.map((s) => [s, leer(s, marco.id)]));
@@ -68,6 +85,16 @@ for (const marco of MARCOS) {
     const dev = ops.filter((o) => o.abiertaA < corte);
     const ev = ops.filter((o) => o.abiertaA >= corte);
     const mEv = medir(ev);
+    if (e.id !== "AZAR") {
+      const dias = new Map<number, number>();
+      for (const o of ev) {
+        const d = Math.floor(o.cerradaA / DIA);
+        dias.set(d, (dias.get(d) ?? 0) + o.r);
+      }
+      primerDiaEv = Math.min(primerDiaEv, Math.floor(corte / DIA));
+      ultimoDiaEv = Math.max(ultimoDiaEv, Math.floor(hasta / DIA));
+      diarios.push({ fila: filas.length, dias });
+    }
     const porMoneda = MONEDAS.map((s) => medir(ev.filter((o) => o.symbol === s))).filter((m) => m.operaciones > 0);
     filas.push({
       estrategia: e.id,
@@ -80,9 +107,34 @@ for (const marco of MARCOS) {
       veredicto: e.id === "AZAR" ? "CONTROL" : veredicto(mEv, control),
       monedasPositivas: porMoneda.filter((m) => (m.expectancia ?? 0) > 0).length,
       monedasConOperaciones: porMoneda.length,
+      psr: null,
+      dsrTabla: null,
+      dsrDeclarado: null,
     });
+    momentosEv.set(filas.length - 1, momentos(ev.map((o) => o.r)));
   }
 }
+
+// Auditoría de sobreajuste: la varianza de los Sharpe entre las variantes de la tabla (sin el control).
+const sharpes = diarios.map((d) => momentosEv.get(d.fila)?.sharpe).filter((v): v is number => v !== undefined);
+const mediaSr = sharpes.reduce((s, v) => s + v, 0) / sharpes.length;
+const varSr = sharpes.reduce((s, v) => s + (v - mediaSr) ** 2, 0) / (sharpes.length - 1);
+const redondo4 = (v: number) => (Number.isFinite(v) ? Math.round(v * 10000) / 10000 : null);
+for (const d of diarios) {
+  const m = momentosEv.get(d.fila);
+  if (!m) continue;
+  filas[d.fila].psr = redondo4(psr(m));
+  filas[d.fila].dsrTabla = redondo4(dsr(m, diarios.length, varSr));
+  filas[d.fila].dsrDeclarado = redondo4(dsr(m, ENSAYOS_DECLARADOS, varSr));
+  filas[d.fila].veredicto = conAuditoria(filas[d.fila].veredicto as Parameters<typeof conAuditoria>[0], filas[d.fila].dsrDeclarado);
+}
+const columnas = diarios.map((d) => {
+  const out: number[] = [];
+  for (let k = primerDiaEv; k <= ultimoDiaEv; k += 1) out.push(d.dias.get(k) ?? 0);
+  return out;
+});
+const prueba = pruebaMultiple(columnas, { remuestreos: 5000, bloque: 10, semilla: 7 });
+writeFileSync(join(DATOS, "estudio-diarios.json"), JSON.stringify({ filas: diarios.map((d) => `${filas[d.fila].estrategia}-${filas[d.fila].marco}`), columnas }));
 
 const dia = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const pct = (v: number | null) => (v === null ? "—" : `${(v * 100).toFixed(1).replace(".", ",")} %`);
@@ -98,6 +150,14 @@ const meta = {
   monedas: MONEDAS,
   costoPorLadoPct: COSTO_PCT,
   horizonteVelas: HORIZONTE,
+  auditoria: {
+    variantesTabla: diarios.length,
+    ensayosDeclarados: ENSAYOS_DECLARADOS,
+    varianzaSharpes: redondo4(varSr),
+    diasEvaluacion: columnas[0]?.length ?? 0,
+    pRealityCheck: prueba?.pRealityCheck ?? null,
+    pSpa: prueba?.pSpa ?? null,
+  },
 };
 
 const ts = `/**
@@ -118,6 +178,9 @@ export type FilaEstudio = {
   veredicto: string;
   monedasPositivas: number;
   monedasConOperaciones: number;
+  psr: number | null;
+  dsrTabla: number | null;
+  dsrDeclarado: number | null;
 };
 
 export const ESTUDIO_META = ${JSON.stringify(meta, null, 2)} as const;
@@ -132,17 +195,25 @@ const md = [
   "",
   `Generado el ${meta.generado} con \`scripts/investigacion/estrategias.ts\`. Velas de Binance de ${MONEDAS.length} monedas (${MONEDAS.join(", ")}), del ${meta.datosDesde} al ${meta.datosHasta}. Desarrollo hasta el ${meta.corte}; evaluación después. Costos: ${String(COSTO_PCT).replace(".", ",")} % por lado (comisión + deslizamiento supuesto). Horizonte: ${HORIZONTE} velas. Escalera de la app: si una vela toca stop y objetivo, cuenta el stop.`,
   "",
-  "Cada agente tiene una estrategia clásica con parámetros fijos (no se optimizaron). El veredicto sale solo de la EVALUACIÓN: VENTAJA exige al menos 100 operaciones, el intervalo del 90 % de la expectancia entero por encima de cero y ganarle al agente de control (entradas al azar). Es una medición del pasado: no garantiza resultados futuros y no es asesoramiento financiero.",
+  "Cada agente tiene una estrategia clásica con parámetros fijos (no se optimizaron). El veredicto sale solo de la EVALUACIÓN: VENTAJA exige al menos 100 operaciones, el intervalo del 90 % de la expectancia entero por encima de cero y ganarle al agente de control (entradas al azar); si además su DSR contando todas las variantes miradas queda debajo del 95 %, baja a CANDIDATA (ver la auditoría). Es una medición del pasado: no garantiza resultados futuros y no es asesoramiento financiero.",
   "",
-  "## Evaluación (lo que cuenta), ordenado por expectancia",
+  "## Evaluación, ordenado por expectancia",
   "",
-  "| Agente | Velas | Operaciones | Acierto | TP1 | TP2 | TP3 | SL | Profit factor | Expectancia (IC 90 %) | Caída máx | Monedas + | Veredicto |",
-  "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+  "| Agente | Velas | Operaciones | Acierto | TP1 | TP2 | TP3 | SL | Profit factor | Expectancia (IC 90 %) | Caída máx | Monedas + | PSR | DSR (N tabla) | DSR (N declarado) | Veredicto |",
+  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
   ...orden.map((f) => {
     const m = f.evaluacion;
     const ic = m.expectanciaIc ? ` (${r3(m.expectanciaIc.low)} a ${r3(m.expectanciaIc.high)})` : "";
-    return `| ${f.agente} | ${f.marco} | ${m.operaciones} | ${pct(m.winRate)} | ${pct(m.tasaTp1)} | ${pct(m.tasaTp2)} | ${pct(m.tasaTp3)} | ${pct(m.tasaSl)} | ${n2(m.profitFactor)} | ${r3(m.expectancia)}${ic} | ${n2(m.maxCaidaR)} R | ${f.monedasPositivas}/${f.monedasConOperaciones} | ${f.veredicto} |`;
+    return `| ${f.agente} | ${f.marco} | ${m.operaciones} | ${pct(m.winRate)} | ${pct(m.tasaTp1)} | ${pct(m.tasaTp2)} | ${pct(m.tasaTp3)} | ${pct(m.tasaSl)} | ${n2(m.profitFactor)} | ${r3(m.expectancia)}${ic} | ${n2(m.maxCaidaR)} R | ${f.monedasPositivas}/${f.monedasConOperaciones} | ${pct(f.psr)} | ${pct(f.dsrTabla)} | ${pct(f.dsrDeclarado)} | ${f.veredicto} |`;
   }),
+  "",
+  "## Auditoría de sobreajuste",
+  "",
+  `PSR: probabilidad de que el R medio por operación sea mayor que cero, descontando asimetría y colas gordas. DSR: lo mismo, pero contra el mejor resultado que se esperaría solo por azar al elegir entre N variantes (Bailey y López de Prado). N tabla = ${meta.auditoria.variantesTabla} variantes de esta tabla; N declarado = ${ENSAYOS_DECLARADOS}, que suma la grilla SNR (128) y pruebas sueltas sobre los mismos datos. Un DSR menor a 95 % no alcanza para decir que hay ventaja.`,
+  "",
+  `Reality Check de White y SPA de Hansen sobre el resultado diario de las ${meta.auditoria.variantesTabla} variantes en evaluación (${meta.auditoria.diasEvaluacion} días, bootstrap estacionario, 5.000 remuestreos, bloques de 10 días): p = ${n2(meta.auditoria.pRealityCheck)} (Reality Check) y p = ${n2(meta.auditoria.pSpa)} (SPA; la librería \`arch\` de Python da 0,33 con los mismos datos y StepM no encuentra ninguna variante superior). La pregunta que responden: ¿alguna variante le gana a no operar, contando que se eligió la mejor entre todas? Con p menor a 0,05 la respuesta es sí.`,
+  "",
+  "Advertencia: la evaluación ya se miró al diseñar las variantes (la MTF + Volumen nació después de ver el Supertrend). Ningún número de esta tabla es una prueba limpia: la única es la medición hacia adelante del agente en papel.",
   "",
   "## Desarrollo (para comparar: si gana acá y pierde en evaluación, no se sostiene)",
   "",

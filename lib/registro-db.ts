@@ -10,6 +10,7 @@ import { readCoreCounters } from "./jarvis-core-db.ts";
 import type { PaperTrade } from "./jarvis-paper.ts";
 import { ensurePaperSchema } from "./jarvis-paper-db.ts";
 import { ensureRobotLedger } from "./robot-ledger-db.ts";
+import { resultadosSt } from "./agente-st-db.ts";
 import { resultadosFlujo } from "./flujo-db.ts";
 import { armarRegistro, type Cierre, CONTEO_CERO, contar, type Conteo, type EntradaRegistro, type OperacionLeida, type Registro, sumarConteos } from "./registro.ts";
 import { sharedJson } from "./shared-cache.ts";
@@ -136,6 +137,11 @@ async function leerFlujo(db: D1Database, userId: number): Promise<Lectura> {
   return { conteo: contar(operacionesDeRobot(filas)), incompleta: filas.length >= LIMITE_HISTORIA, ...cierresDeFilas(filas) };
 }
 
+async function leerAgenteSt(db: D1Database, userId: number): Promise<Lectura> {
+  const filas = await resultadosSt(db, userId, LIMITE_HISTORIA);
+  return { conteo: contar(operacionesDeRobot(filas)), incompleta: filas.length >= LIMITE_HISTORIA, ...cierresDeFilas(filas) };
+}
+
 async function leerRobot(db: D1Database, userId: number): Promise<Lectura> {
   await ensureRobotLedger(db);
   const filas = (
@@ -156,6 +162,7 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
   const cuenta = userId === null ? null : await seguro("papel", () => leerPapel(db, userId));
   const robot = userId === null ? null : await seguro("robot", () => leerRobot(db, userId));
   const flujo = userId === null ? null : await seguro("flujo", () => leerFlujo(db, userId));
+  const agenteSt = userId === null ? null : await seguro("agente supertrend", () => leerAgenteSt(db, userId));
   // Sin la serie del núcleo, el capital final sigue saliendo exacto de los contadores; solo falta la curva.
   const nucleoCierres = nucleo ? await seguro("núcleo cierres", async () => cierresDeNucleo(await leerCierresNucleo(db))) : null;
   const serie = (claves: string[]) => (nucleoCierres ? juntar(claves.map((k) => nucleoCierres[k])) : { cierres: null, desde: null });
@@ -172,6 +179,7 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
     { id: "PAPEL", conteo: cuenta?.conteo ?? null, incompleta: cuenta?.incompleta, cierres: cuenta?.cierres, desde: cuenta?.desde },
     { id: "ROBOT", conteo: robot?.conteo ?? null, incompleta: robot?.incompleta, cierres: robot?.cierres, desde: robot?.desde },
     { id: "FLUJO", conteo: flujo?.conteo ?? null, incompleta: flujo?.incompleta, cierres: flujo?.cierres, desde: flujo?.desde },
+    { id: "AGENTE_ST", conteo: agenteSt?.conteo ?? null, incompleta: agenteSt?.incompleta, cierres: agenteSt?.cierres, desde: agenteSt?.desde },
   ];
   return armarRegistro(entradas, ahora);
 }

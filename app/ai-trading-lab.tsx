@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRegistro, useVivo } from "./arana-vivo";
+import { iniciarAgenteSt } from "../lib/agente-st-run.ts";
+import LabAgenteSt from "./lab-agente-st";
 import { BACKTEST_DAYS, runBacktestFor } from "../lib/jarvis-backtest-run.ts";
 import { PAPER_EVENT, paperTrades } from "../lib/jarvis-paper-run.ts";
 import { agentesDe, centroDe, type EstadoMotor, type FotoLab } from "../lib/lab.ts";
@@ -60,6 +62,8 @@ function useLab(): FotoLab | null {
   const vivo = useVivo();
   useRegistro();
   const [foto, setFoto] = useState<FotoLab | null>(null);
+  // El agente de papel Supertrend MTF + Volumen corre hacia adelante mientras el laboratorio está abierto y con sesión.
+  useEffect(() => iniciarAgenteSt(), []);
   useEffect(() => {
     let activo = true;
     const armarFoto = () => {
@@ -228,6 +232,7 @@ export default function AiTradingLab() {
       {pestana === "agentes" && (
         <div className="lab-cuerpo lab-agentes">
           <LabPiso />
+          <LabAgenteSt />
           <h3 className="lab-sub">Los agentes de la araña</h3>
           {agentes.map((a) => (
             <article key={a.id} className={`lab-agente lab-a-${a.estado.replace(" ", "-")}`}>
