@@ -186,10 +186,11 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-e1d12e3c9f7d	284	docs/araña/objetivos.md
+68adbd16d4c5	285	docs/araña/objetivos.md
 db6358216fcf	188	docs/busqueda-breaker.md
 25e7d2744ee2	187	docs/busqueda-linea.md
-d66b37c7247a	102	docs/estudio-estrategias.md
+5656d4c4c99f	215	docs/busqueda-smc.md
+131e0c69490a	114	docs/estudio-estrategias.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -255,8 +256,8 @@ c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
 a2c5aeea0e4f	115	lib/escalera.ts
-3f2da827e13a	844	lib/estrategias.ts
-1d0db10efe7a	1888	lib/estudio-estrategias-datos.ts
+67f97c20defc	869	lib/estrategias.ts
+098d0ffc8cc1	2170	lib/estudio-estrategias-datos.ts
 ca8f3802c4a6	21	lib/estudio-resumen.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
 450b470bb8bd	173	lib/exchange-reserves.ts
@@ -370,6 +371,7 @@ f3ce54d07ab0	82	lib/signal-ledger.ts
 8e2f0a70ca9e	154	lib/signal-plan-db.ts
 a34a2cc0c0c0	54	lib/signal-plan-record.ts
 ab88433a8df5	215	lib/signal-plan.ts
+1b82c6e8e240	369	lib/smc-liquidez.ts
 33a43033eb07	159	lib/sobreajuste.ts
 5c5d69d9fd82	223	lib/speech-text.ts
 7e1138f29089	78	lib/spot-plan-client.ts
@@ -421,7 +423,7 @@ b36fd1c34b30	183	scripts/herramientas.mjs
 c88ad361f676	292	scripts/investigacion/breaker-busqueda.ts
 a8d206c4cc1f	0	scripts/investigacion/datos-binance.py
 8e25f67c73e7	0	scripts/investigacion/datos.py
-58553102d9e3	250	scripts/investigacion/estrategias.ts
+205b5a23f374	251	scripts/investigacion/estrategias.ts
 c83b5a866c3f	296	scripts/investigacion/linea-busqueda.ts
 36d231690dfe	238	scripts/investigacion/medir.ts
 2dea6b11e55f	236	scripts/investigacion/modelos.ts
@@ -429,6 +431,7 @@ c83b5a866c3f	296	scripts/investigacion/linea-busqueda.ts
 7d2ffebb4423	85	scripts/investigacion/precalcular.ts
 de7b856aefe5	73	scripts/investigacion/preregistro-flujo.ts
 831478cc318c	377	scripts/investigacion/simulador.ts
+e7d5bfa3f995	324	scripts/investigacion/smc-busqueda.ts
 5f560ffe8331	75	scripts/investigacion/util.ts
 50bfa1bd887e	141	scripts/subir.mjs
 e7571e9b3d07	66	scripts/verificar.mjs
@@ -561,6 +564,7 @@ de58453ca449	139	tests/scenario-analysis.test.ts
 0acb179e0c9c	133	tests/signal-confluence.test.ts
 b49ac1298da8	141	tests/signal-plan-db.test.ts
 f57d24eadbd3	213	tests/signal-plan.test.ts
+e5df5a020692	195	tests/smc-liquidez.test.ts
 cc660527d471	70	tests/sobreajuste.test.ts
 2897707d62d0	102	tests/speech-text.test.ts
 c71a0865f0b2	97	tests/spot-strategy.test.ts
