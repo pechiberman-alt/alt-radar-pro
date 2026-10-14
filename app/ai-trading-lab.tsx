@@ -10,6 +10,7 @@ import { respuestaLab } from "../lib/lab-jarvis.ts";
 import { operacionDePapel, TOPES, type LimitesRiesgo } from "../lib/lab-riesgo.ts";
 import { fijarBacktest, fijarError, fijarEvaluacion, fotoLab, guardarLimites, LAB_EVENT, registrarActividad } from "../lib/lab-run.ts";
 import { lineaFuente } from "../lib/registro.ts";
+import LabPiso from "./lab-piso";
 
 /**
  * AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES. Junta en un panel para el celular el estado real del motor de la
@@ -226,6 +227,8 @@ export default function AiTradingLab() {
 
       {pestana === "agentes" && (
         <div className="lab-cuerpo lab-agentes">
+          <LabPiso />
+          <h3 className="lab-sub">Los agentes de la araña</h3>
           {agentes.map((a) => (
             <article key={a.id} className={`lab-agente lab-a-${a.estado.replace(" ", "-")}`}>
               <header>
