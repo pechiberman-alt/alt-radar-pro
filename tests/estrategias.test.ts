@@ -92,3 +92,68 @@ test("supertrend: en una subida sostenida queda alcista con la línea por debajo
   assert.equal(st.dir[59], -1, "la caída lo da vuelta");
   assert.ok(st.linea[59] > v[59].close);
 });
+
+test("VWAP semanal: promedio ponderado por volumen que se reinicia cada lunes, sin mirar adelante", async () => {
+  const { vwapSemanal } = await import("../lib/estrategias.ts");
+  const D = 86_400_000;
+  const lunes = 4 * D; // 05/01/1970, lunes 00:00 UTC
+  const vela = (t: number, precio: number, volume: number) => ({ openTime: t, open: precio, high: precio, low: precio, close: precio, volume }) as SwingCandle;
+  const v = [vela(lunes, 10, 1), vela(lunes + D, 20, 3), vela(lunes + 7 * D, 50, 2)];
+  const w = vwapSemanal(v);
+  assert.equal(w[0], 10);
+  assert.equal(w[1], (10 * 1 + 20 * 3) / 4);
+  assert.equal(w[2], 50, "el lunes siguiente arranca de nuevo");
+  const largo = velas(500, 3);
+  const completo = vwapSemanal(largo);
+  const corto = vwapSemanal(largo.slice(0, 301));
+  assert.equal(completo[300], corto[300], "la vela 300 no cambia si se borran las siguientes");
+});
+
+test("perfil de volumen: el POC cae donde se concentró el volumen y no mira adelante", async () => {
+  const { pocPerfil } = await import("../lib/estrategias.ts");
+  const v: SwingCandle[] = [];
+  for (let i = 0; i < 260; i += 1) {
+    const p = i % 2 === 0 ? 100 : 120;
+    v.push({ openTime: i * H, open: p, high: p + 1, low: p - 1, close: p, volume: p === 100 ? 5 : 1 } as SwingCandle);
+  }
+  const poc = pocPerfil(v);
+  assert.ok(Number.isNaN(poc[100]), "sin 200 velas no hay perfil");
+  assert.ok(Math.abs(poc[259] - 100) < 1.5, `el volumen está en 100, no en 120 (POC ${poc[259]})`);
+  const largo = velas(500, 5);
+  assert.equal(pocPerfil(largo)[400], pocPerfil(largo.slice(0, 401))[400]);
+});
+
+test("marco superior (HTF): usa solo el día ya cerrado y no mira adelante", async () => {
+  const { direccionHtf, supertrend } = await import("../lib/estrategias.ts");
+  const F = 4 * H;
+  const D = 24 * H;
+  const v: SwingCandle[] = [];
+  for (let i = 0; i < 6 * 60; i += 1) {
+    const dia = Math.floor(i / 6);
+    const p = dia < 30 ? 100 + dia * 2 : 160 - (dia - 30) * 5; // sube 30 días y después cae
+    v.push({ openTime: i * F, open: p, high: p + 1, low: p - 1, close: p, volume: 1 } as SwingCandle);
+  }
+  const h = direccionHtf(v);
+  assert.equal(h[6 * 25 + 2], 1, "en la suba, el diario es alcista");
+  assert.equal(h[v.length - 1], -1, "tras la caída, bajista");
+  // Dentro de un día en curso se usa el día anterior: la vela 0 del día no ve el cierre de su propio día.
+  const diario = supertrend(
+    Array.from({ length: 60 }, (_, d) => ({ openTime: d * D, open: v[d * 6].open, high: v[d * 6].open + 1, low: v[d * 6].open - 1, close: v[d * 6 + 5].close, volume: 1 }) as SwingCandle),
+    10,
+    3,
+  ).dir;
+  assert.equal(h[6 * 40], diario[39], "primera vela del día 40: dirección del día 39");
+  assert.equal(h[6 * 40 + 5], diario[40], "la última vela del día 40 cierra el día");
+  for (const i of [200, 250, 300]) assert.equal(direccionHtf(v.slice(0, i + 1))[i], h[i], `vela ${i} sin las posteriores`);
+});
+
+test("volumen relativo: contra el promedio de las 20 anteriores, sin la vela misma ni las siguientes", async () => {
+  const { volumenRelativo } = await import("../lib/estrategias.ts");
+  const v = Array.from({ length: 40 }, (_, i) => ({ openTime: i * H, open: 1, high: 1, low: 1, close: 1, volume: i === 30 ? 30 : 10 }) as SwingCandle);
+  const x = volumenRelativo(v);
+  assert.ok(Number.isNaN(x[19]), "sin 20 velas previas no hay dato");
+  assert.equal(x[20], 1);
+  assert.equal(x[30], 3, "30 contra un promedio de 10");
+  assert.ok(Math.abs(x[31] - 10 / ((19 * 10 + 30) / 20)) < 1e-12, "el pico entra al promedio de la vela siguiente");
+  assert.equal(volumenRelativo(v.slice(0, 31))[30], x[30]);
+});

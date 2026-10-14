@@ -128,7 +128,7 @@ e4aeb9c38840	264	app/jarvis-trading.css
 719061eef9e9	192	app/jarvis-watch.tsx
 39c4819ab1a5	121	app/jarvis.css
 9f7dd2bcff90	1692	app/jarvis.tsx
-eacfd3ccd992	158	app/lab-piso.tsx
+967bc21be578	158	app/lab-piso.tsx
 aa4d7c876c20	51	app/laptop.css
 a8e3e09ba000	132	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -184,7 +184,7 @@ b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
 a37e1f6d681f	278	docs/araña/objetivos.md
-37bdbe21e81a	48	docs/estudio-estrategias.md
+5548fe10b0c2	68	docs/estudio-estrategias.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -245,8 +245,8 @@ c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
 a2c5aeea0e4f	115	lib/escalera.ts
-195fba917ade	419	lib/estrategias.ts
-67bff371c4d4	748	lib/estudio-estrategias-datos.ts
+a28ea1fb7b40	576	lib/estrategias.ts
+a60a05593075	1188	lib/estudio-estrategias-datos.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
 450b470bb8bd	173	lib/exchange-reserves.ts
 da42f6c9e464	311	lib/fair-value-gaps.ts
@@ -445,7 +445,7 @@ e954e10a7eec	85	tests/cost-basis.test.ts
 bb85a3e6fff1	57	tests/diario-db.test.ts
 d8e87b00e33b	126	tests/econ-calendar.test.ts
 645f0d2f0dc9	116	tests/escalera.test.ts
-c200b322b820	95	tests/estrategias.test.ts
+2a45d2f75990	160	tests/estrategias.test.ts
 b0ba998c8335	119	tests/etf-flows-multi.test.ts
 9ed4f49289ed	92	tests/exchange-reserves.test.ts
 eac12ecfb8fb	248	tests/fair-value-gaps.test.ts
