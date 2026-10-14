@@ -12,6 +12,7 @@ type Status = {
   ai: { configured: boolean; source: "cloudflare" | "app" | null };
   groq?: { configured: boolean; source: "cloudflare" | "app" | null };
   cmc?: { configured: boolean; source: "cloudflare" | "app" | null };
+  arkham?: { configured: boolean; source: "cloudflare" | "app" | null };
   freeAi?: { ok: boolean; at: number; ms: number; model: string; error: string | null } | null;
   encryption: "fuerte" | "local";
 };
@@ -32,6 +33,7 @@ export default function SettingsDesk() {
   const [anthropicKey, setAnthropicKey] = useState("");
   const [groqKey, setGroqKey] = useState("");
   const [cmcKey, setCmcKey] = useState("");
+  const [arkhamKey, setArkhamKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
@@ -71,13 +73,13 @@ export default function SettingsDesk() {
   };
 
   const save = async () => {
-    if (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !cmcKey.trim()) return;
+    if (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !cmcKey.trim() && !arkhamKey.trim()) return;
     setBusy(true);
     setResults({});
     const r = await fetch("/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telegramToken, anthropicKey, groqKey, cmcKey }),
+      body: JSON.stringify({ telegramToken, anthropicKey, groqKey, cmcKey, arkhamKey }),
     }).catch(() => null);
     const d = (await r?.json().catch(() => ({}))) as { results?: Record<string, string>; error?: string } | undefined;
     setResults(d?.results ?? { error: d?.error ?? "No se pudo guardar." });
@@ -86,11 +88,12 @@ export default function SettingsDesk() {
     setAnthropicKey("");
     setGroqKey("");
     setCmcKey("");
+    setArkhamKey("");
     setBusy(false);
     await load();
   };
 
-  const remove = async (which: "telegram" | "ai" | "groq" | "cmc") => {
+  const remove = async (which: "telegram" | "ai" | "groq" | "cmc" | "arkham") => {
     await fetch(`/api/admin/settings?which=${which}`, { method: "DELETE" }).catch(() => undefined);
     await load();
   };
@@ -155,6 +158,13 @@ export default function SettingsDesk() {
                 {status.cmc.source === "app" && <button onClick={() => remove("cmc")}>BORRAR</button>}
               </div>
             )}
+            {status.arkham && (
+              <div className={status.arkham.configured ? "on" : ""}>
+                <span>BALLENAS · ARKHAM</span>
+                <b>{sourceLabel(status.arkham)}</b>
+                {status.arkham.source === "app" && <button onClick={() => remove("arkham")}>BORRAR</button>}
+              </div>
+            )}
             <div className={status.freeAi?.ok ? "on" : ""}>
               <span>IA GRATIS · CLOUDFLARE</span>
               <b>
@@ -183,13 +193,17 @@ export default function SettingsDesk() {
             <span>Clave gratis de CoinMarketCap, opcional (coinmarketcap.com/api → plan Basic): dominancia de BTC, USDT y capitalización desde el servidor</span>
             <input type="password" value={cmcKey} onChange={(e) => setCmcKey(e.target.value)} placeholder="xxxxxxxx-xxxx-…" autoComplete="off" />
           </label>
-          <button className="set-save" onClick={save} disabled={busy || (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !cmcKey.trim())}>
+          <label className="set-field">
+            <span>Clave de Arkham, opcional (intel.arkm.com → API): alertas de Telegram con transferencias on-chain de 5 M de dólares o más</span>
+            <input type="password" value={arkhamKey} onChange={(e) => setArkhamKey(e.target.value)} placeholder="clave de la API de Arkham" autoComplete="off" />
+          </label>
+          <button className="set-save" onClick={save} disabled={busy || (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !cmcKey.trim() && !arkhamKey.trim())}>
             {busy ? "VERIFICANDO…" : "VERIFICAR Y GUARDAR"}
           </button>
 
           {Object.entries(results).map(([k, v]) => (
             <p key={k} className={`set-result ${v.startsWith("OK") ? "ok" : "bad"}`}>
-              {k === "telegram" ? "Telegram" : k === "ai" ? "IA" : k === "groq" ? "Groq" : k === "cmc" ? "CoinMarketCap" : "Error"}: {v}
+              {k === "telegram" ? "Telegram" : k === "ai" ? "IA" : k === "groq" ? "Groq" : k === "cmc" ? "CoinMarketCap" : k === "arkham" ? "Arkham" : "Error"}: {v}
             </p>
           ))}
 

@@ -18,7 +18,7 @@ bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
 e23fd9d98482	81	app/alert-toasts.tsx
-ab7409f8b7e4	148	app/api/admin/settings/route.ts
+19408d68277e	167	app/api/admin/settings/route.ts
 45b256c81a5a	49	app/api/alerts/latest/route.ts
 03cbeef8a626	52	app/api/alerts/prebreak/route.ts
 6b4b0cad841f	58	app/api/analyst/ai/route.ts
@@ -166,7 +166,7 @@ d180ba5315c4	324	app/scalping-desk.tsx
 61aeec6728ee	43	app/sentiment-desk.css
 17158023a26f	214	app/sentiment-desk.tsx
 2f608ab498fd	21	app/settings-desk.css
-65fd254cfb17	209	app/settings-desk.tsx
+6a9f3e13c84c	223	app/settings-desk.tsx
 9acc1747570b	19	app/sign-in-prompt.tsx
 94eb31e12b92	41	app/signal-ledger.css
 2053366a2a2f	624	app/signal-ledger.tsx
@@ -174,7 +174,7 @@ d180ba5315c4	324	app/scalping-desk.tsx
 ac93783c82e5	142	app/spot-desk.tsx
 90bd9eec5c36	68	app/swing-desk.css
 d92243b48c4e	226	app/swing-desk.tsx
-82f82549fc68	167	app/telegram-card.tsx
+bf2d0803539f	168	app/telegram-card.tsx
 fbfd8084693b	38	app/trade-journal-desk.css
 932eb45f1ee4	256	app/trade-journal-desk.tsx
 d1d42e77268a	43	app/unlock-desk.css
@@ -185,7 +185,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-78e166db1b7c	282	docs/araña/objetivos.md
+d871d3293aca	283	docs/araña/objetivos.md
 25e7d2744ee2	187	docs/busqueda-linea.md
 5aa1dbfbeaa2	102	docs/estudio-estrategias.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
@@ -222,11 +222,12 @@ b8e38621b74b	46	lib/ai-numbers.ts
 054288014395	51	lib/ai-probe.ts
 509da5ba4297	47	lib/alert-bus.ts
 dbd75245f8b8	366	lib/alerts.ts
-374fb7012b3c	155	lib/app-settings.ts
+db6ae19f1b13	157	lib/app-settings.ts
 8bc8d3dc5620	41	lib/arana-ultimo-db.ts
 8e5f0ea3f30d	35	lib/arana-ultimo.ts
 b32e56319e6e	45	lib/arana-vivo-auto.ts
 ab1defe0d619	284	lib/arana-vivo.ts
+60a9a1dfd559	95	lib/arkham-ballenas.ts
 025856e9b96a	181	lib/asset-read.ts
 8b7646335b22	743	lib/assistant/index.ts
 861e6e35ec57	309	lib/assistant/knowledge.ts
@@ -376,14 +377,14 @@ bf7335d9b46e	223	lib/supply-demand.ts
 c9fd83f39ff3	171	lib/swing-liquidity-filter.ts
 43d8a7f1ba3a	279	lib/telegram-ai-server.ts
 f1a112b70191	77	lib/telegram-ai.ts
-be11df97b79f	224	lib/telegram-dispatch.ts
+c86debc3fff0	234	lib/telegram-dispatch.ts
 454b972683d0	122	lib/telegram-jarvis.ts
 e9e4bb168a91	53	lib/telegram-magnets.ts
 1dfc904341cc	67	lib/telegram-moneda.ts
 a250fc69b552	36	lib/telegram-server.ts
 26e6999dc403	166	lib/telegram-voice.ts
 05101ed6c6c5	55	lib/telegram-volume.ts
-c9c116b50f57	242	lib/telegram.ts
+8b9615f14489	243	lib/telegram.ts
 ba55aa5bdb5b	143	lib/token-unlocks.ts
 d0434e2eafe5	81	lib/trade-bubbles.ts
 759b1ffa8280	142	lib/trade-journal.ts
@@ -441,6 +442,7 @@ e8ec72c5deb7	89	tests/arana-ultimo.test.ts
 41f8e61920bb	44	tests/arana-vivo-auto.test.ts
 b9e32500d850	247	tests/arana-vivo.test.ts
 8050efa8245e	470	tests/arana.test.ts
+834a523a45f4	84	tests/arkham-ballenas.test.ts
 c6a1983d724f	59	tests/asset-read.test.ts
 8dffdd6b09f6	386	tests/assistant.test.ts
 dff2674006ae	17	tests/auth-pbkdf2.test.ts
@@ -577,5 +579,5 @@ dafba0404d8e	92	tests/volume-spike.test.ts
 21b30109f4c3	79	tests/xau-alerts.test.ts
 b41bd6678407	33	tsconfig.json
 037c2ff06898	75	vite.config.ts
-e598a14ecdf3	158	worker/index.ts
+34e733d85cef	162	worker/index.ts
 8845060ba517	37	wrangler.production.jsonc

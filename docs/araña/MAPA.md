@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 580 · objetivos: 17 · sin objetivo: 0
-- Tablas D1: 49 · secretos: 4 · variables de entorno: 12 · rutas /api: 54 · hosts: 56
+- Archivos: 582 · objetivos: 17 · sin objetivo: 0
+- Tablas D1: 49 · secretos: 5 · variables de entorno: 12 · rutas /api: 54 · hosts: 57
 - Código de navegador: 63 archivos con "use client" que alcanzan 188 · problemas: 0
-- Lib sin prueba directa: 25 de 184
+- Lib sin prueba directa: 25 de 185
 
 ## Objetivos
 
@@ -222,12 +222,13 @@ Texto: lectura de la cuenta y operaciones con claves del usuario, siempre desde 
 - `lib/futures-log-db.ts` — The real-account futures record, per account.
 - `lib/futures-log.ts` — The record of the person's REAL Binance USDⓈ-M futures activity.
 
-### telegram — Bot: alertas 24/7, comandos y chat con JARVIS (16)
+### telegram — Bot: alertas 24/7, comandos y chat con JARVIS (18)
 Texto: el canal que trabaja con la app cerrada: manda alertas, responde preguntas y comandos, y recibe notas de voz.
 Pendiente: Notas de voz: con Groq si está la clave; si no, Whisper de Workers AI dentro del cupo gratis diario.
 - `app/api/telegram/link/route.ts` — exporta: dynamic, GET, POST, PUT, DELETE
 - `app/api/telegram/test/route.ts` — exporta: dynamic, POST
 - `app/telegram-card.tsx` — exporta: TelegramCard, default
+- `lib/arkham-ballenas.ts` — Big trades ("ballenas") from Arkham Intelligence, for Telegram: large on-chain transfers read from Arkham's REST API (GET /transfers, header API-Key) in the Worker, so they arrive
 - `lib/price-alerts-server.ts` — Storage, commands and the 5-minute check for Telegram price alerts.
 - `lib/price-alerts.ts` — Price alerts you ask the bot for: "/alerta BTC 90000" and the Worker watches the price for you, with every browser closed, and writes when it gets there.
 - `lib/telegram-ai-server.ts` — La IA del bot de Telegram, del lado del servidor: arma la lectura del mercado (`loadServerSnapshot`), contesta en segundo plano las preguntas escritas (`answerInTelegram`, con la c
@@ -240,6 +241,7 @@ Pendiente: Notas de voz: con Groq si está la clave; si no, Whisper de Workers A
 - `lib/telegram-voice.ts` — JARVIS on Telegram by voice.
 - `lib/telegram-volume.ts` — Unusual volume for Telegram, computed from public candles in the Worker so it works with every browser closed.
 - `lib/telegram.ts` — Telegram alerts: the pure parts.
+- `tests/arkham-ballenas.test.ts` — Pruebas de las alertas de big trades de Arkham (lib/arkham-ballenas.ts).
 - `tests/telegram-moneda.test.ts` — pruebas: candidatos: la palabra suelta, la que está en mayúsculas y la que sigue a «de» o, lectura: usa solo velas cerradas y no inventa lo que falta, resumen del estudio: dice quién dio positivo, si sobrevive a la auditoría y que 
 
 ### alertas — Avisos de la app: push del navegador y centro de alertas (8)
@@ -705,6 +707,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 ## Secretos y variables de entorno
 
 - `anthropic_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
+- `arkham_api_key` (secreto) — lee: app/api/admin/settings/route.ts, worker/index.ts · guarda: app/api/admin/settings/route.ts
 - `cmc_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/market-structure/route.ts · guarda: app/api/admin/settings/route.ts
 - `groq_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/jarvis-mind-db.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
 - `telegram_bot_token` (secreto) — lee: app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts, app/api/robot/signal/route.ts (+4) · guarda: app/api/admin/settings/route.ts
@@ -786,6 +789,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `api-gcp.binance.com` — app/api/tickers/route.ts, lib/automation.ts, lib/klines-server.ts, lib/telegram-ai-server.ts
 - `api.alternative.me` — app/api/sentiment/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-ai-server.ts, lib/telegram-dispatch.ts
 - `api.anthropic.com` — app/api/admin/settings/route.ts, lib/ai-analyst-server.ts
+- `api.arkm.com` — lib/arkham-ballenas.ts
 - `api.binance.com` — app/api/brain/route.ts, app/api/klines/route.ts, app/api/orderbook/route.ts, app/api/radar/route.ts, app/api/rolling/route.ts, app/api/scalping/route.ts (+15)
 - `api.binance.us` — app/api/scalping/route.ts, app/scalping-desk.tsx, lib/klines-server.ts, lib/scalping-automation.ts
 - `api.bybit.com` — lib/market-providers.ts

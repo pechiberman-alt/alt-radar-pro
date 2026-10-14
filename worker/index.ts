@@ -144,7 +144,11 @@ const worker = {
       // Token from a Cloudflare secret or, if absent, the one saved in the app.
       ctx.waitUntil(
         getSecret(env.DB, env, "telegram_bot_token")
-          .then(({ value }) => (value ? runTelegramDispatch(env.DB, value) : null))
+          .then(async ({ value }) => {
+            if (!value) return null;
+            const arkham = await getSecret(env.DB, env, "arkham_api_key").catch(() => ({ value: null }));
+            return runTelegramDispatch(env.DB, value, Date.now(), arkham.value);
+          })
           .catch((error) => {
             console.error("[ALT_RADAR_TELEGRAM_SCHEDULED]", error);
           }),

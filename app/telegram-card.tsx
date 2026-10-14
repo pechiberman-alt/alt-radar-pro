@@ -20,6 +20,7 @@ const CATS: [TelegramCategory, string, string][] = [
   ["ROMPE", "A PUNTO DE ROMPER", "Monedas comprimidas presionando un nivel (se calcula con la app abierta)"],
   ["IMANES", "IMANES DE LIQUIDACIÓN", "BTC, ETH y SOL en 1h: precio cerca de una zona fuerte o vela que la barre (llega con la app cerrada)"],
   ["JARVIS", "JARVIS · NÚCLEO 24/7", "Cada señal que abre el núcleo, con entrada, stop y objetivo, y cuando cierra, con su resultado y el acumulado"],
+  ["BALLENAS", "BALLENAS · ARKHAM", "Transferencias on-chain de 5 M de dólares o más, con quién las envía y quién las recibe (llega con la app cerrada; el administrador carga la clave de Arkham)"],
 ];
 
 /** Links the signed-in account to a Telegram chat and sets what gets sent. */
