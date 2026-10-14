@@ -149,8 +149,9 @@ Reglas:
 
 ## telegram — Bot: alertas 24/7, comandos y chat con JARVIS
 Texto: el canal que trabaja con la app cerrada: manda alertas, responde preguntas y comandos, y recibe notas de voz.
-Archivos: lib/telegram*.ts, lib/price-alerts*.ts, app/api/telegram/**, app/telegram-card.tsx, lib/telegram-moneda.ts, tests/telegram-moneda.test.ts
+Archivos: lib/telegram*.ts, lib/price-alerts*.ts, app/api/telegram/**, app/telegram-card.tsx, lib/telegram-moneda.ts, tests/telegram-moneda.test.ts, lib/arkham-ballenas.ts, tests/arkham-ballenas.test.ts
 Reglas:
+- Ballenas de Arkham (lib/arkham-ballenas.ts): con la clave de Arkham del administrador (CONFIGURACIÓN o el secreto ARKHAM_API_KEY), el cron de 5 minutos hace una consulta a GET /transfers (1 por segundo como máximo) y avisa por Telegram las transferencias on-chain de 5 M de dólares o más, con emisor y receptor según Arkham, valor histórico en USD y aviso de que no dice hacia dónde va el precio. Categoría BALLENAS, sin base de datos; una clave rechazada se registra, no se toma por "sin novedades".
 - Monedas pedidas por nombre (lib/telegram-moneda.ts): si la persona pregunta por una moneda que JARVIS no vigila (ej. ONDO), el servidor trae su precio y sus velas de 4 h de Binance y le da al modelo una lectura corta con los indicadores del estudio, sobre velas cerradas; si Binance no reconoce el par, el bot lo dice. También le llegan el resumen del estudio del laboratorio (lib/estudio-resumen.ts) y el estado del agente de papel de la cuenta con su muestra. Hasta tres consultas por mensaje.
 - Cada evento se manda una sola vez (telegram_sent).
 - El webhook exige el secreto de Telegram y siempre responde 200 para que Telegram no reintente.

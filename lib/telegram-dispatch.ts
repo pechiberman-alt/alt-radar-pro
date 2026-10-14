@@ -15,6 +15,7 @@ import {
 import { familyOf, kindKey } from "./signal-plan.ts";
 import { ensureSignalPlanColumns, getPlanStatsCached } from "./signal-plan-db.ts";
 import { collectVolumeEvents } from "./telegram-volume.ts";
+import { collectBallenaEvents } from "./arkham-ballenas.ts";
 import { collectMagnetEvents } from "./telegram-magnets.ts";
 import { collectJarvisEvents } from "./telegram-jarvis.ts";
 import { runPriceAlerts } from "./price-alerts-server.ts";
@@ -29,7 +30,7 @@ import { cached } from "./upstream-cache.ts";
  * most once per user. On the very first run it only records a starting point
  * for signals — it never floods a new user with history.
  */
-export async function runTelegramDispatch(db: D1Database, token: string, now = Date.now()) {
+export async function runTelegramDispatch(db: D1Database, token: string, now = Date.now(), arkhamKey: string | null = null) {
   for (const sql of TELEGRAM_SCHEMA) await db.prepare(sql).run();
   await ensureSignalPlanColumns(db).catch(() => undefined);
 
@@ -124,6 +125,15 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
     shared.push(...(await collectMagnetEvents(db, now)));
   } catch {
     // Exchange data down: the other categories still go out.
+  }
+
+  // Arkham big trades, only when the owner saved a key (one request, no database).
+  if (arkhamKey) {
+    try {
+      shared.push(...(await collectBallenaEvents(arkhamKey)));
+    } catch (error) {
+      console.error("[ALT_RADAR_ARKHAM]", error instanceof Error ? error.message : error);
+    }
   }
 
   // JARVIS CORE: signals it opened and closed since the last run (database, by index).
