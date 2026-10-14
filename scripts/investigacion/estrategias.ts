@@ -30,7 +30,7 @@ const MARCOS: Marco[] = [
 ];
 /** Estrategias que se miden en cada temporalidad fina (las demás van solo en 1 h y 4 h). */
 const ESTRATEGIAS_FINAS: Record<string, string[]> = {
-  "15m": ["MACD_MTF_SNR", "TENDENCIA_LINEA", "AZAR"],
+  "15m": ["MACD_MTF_SNR", "TENDENCIA_LINEA", "SMC_LIQUIDEZ", "SMC_TODO", "AZAR"],
   "3m": ["MACD_MTF_SNR", "AZAR"],
 };
 /** Comisión 0,05 % + deslizamiento supuesto 0,02 %, por lado. */
@@ -39,11 +39,12 @@ const HORIZONTE = 48;
 /**
  * Variantes que se miraron sobre estos mismos datos, contando las de fuera de esta tabla: la grilla SNR (128), pruebas
  * sueltas (filtros de bull run, MTF, modos de salida) y la búsqueda de confirmación y configuración de la línea de
- * tendencia (99 variantes, scripts/investigacion/linea-busqueda.ts) y la del breaker block (otras 99,
- * scripts/investigacion/breaker-busqueda.ts). Lo exacto es al menos 361 (35 de la tabla, 128 de la grilla SNR y 99 de cada
- * búsqueda); se redondea para arriba a propósito: subestimarlo infla la confianza.
+ * tendencia (99 variantes, scripts/investigacion/linea-busqueda.ts), la del breaker block (otras 99,
+ * scripts/investigacion/breaker-busqueda.ts) y la del agente de liquidez (108, scripts/investigacion/smc-busqueda.ts). Lo exacto
+ * es al menos 469 (35 de la tabla, 128 de la grilla SNR, 99 + 99 + 108 de las búsquedas); se redondea para arriba a propósito:
+ * subestimarlo infla la confianza.
  */
-const ENSAYOS_DECLARADOS = 400;
+const ENSAYOS_DECLARADOS = 550;
 const DIA = 86_400_000;
 
 function leer(symbol: string, marco: string): SwingCandle[] {
@@ -227,11 +228,11 @@ const md = [
   "",
   "## Auditoría de sobreajuste",
   "",
-  `PSR: probabilidad de que el R medio por operación sea mayor que cero, descontando asimetría y colas gordas. DSR: lo mismo, pero contra el mejor resultado que se esperaría solo por azar al elegir entre N variantes (Bailey y López de Prado). N tabla = ${meta.auditoria.variantesTabla} variantes de esta tabla; N declarado = ${ENSAYOS_DECLARADOS}, que suma la grilla SNR (128), pruebas sueltas y las búsquedas de confirmación y configuración de la línea de tendencia y del breaker block (99 cada una, en docs/busqueda-linea.md y docs/busqueda-breaker.md), sobre los mismos datos. Un DSR menor a 95 % no alcanza para decir que hay ventaja.`,
+  `PSR: probabilidad de que el R medio por operación sea mayor que cero, descontando asimetría y colas gordas. DSR: lo mismo, pero contra el mejor resultado que se esperaría solo por azar al elegir entre N variantes (Bailey y López de Prado). N tabla = ${meta.auditoria.variantesTabla} variantes de esta tabla; N declarado = ${ENSAYOS_DECLARADOS}, que suma la grilla SNR (128), pruebas sueltas y las búsquedas de confirmación y configuración de la línea de tendencia y del breaker block (99 cada una, en docs/busqueda-linea.md y docs/busqueda-breaker.md) y la del agente de liquidez (108, en docs/busqueda-smc.md), sobre los mismos datos. Un DSR menor a 95 % no alcanza para decir que hay ventaja.`,
   "",
   `Reality Check de White y SPA de Hansen sobre el resultado diario de las ${meta.auditoria.variantesTabla} variantes en evaluación (${meta.auditoria.diasEvaluacion} días, bootstrap estacionario, 5.000 remuestreos, bloques de 10 días): p = ${n2(meta.auditoria.pRealityCheck)} (Reality Check) y p = ${n2(meta.auditoria.pSpa)} (SPA). La pregunta que responden: ¿alguna variante le gana a no operar, contando que se eligió la mejor entre todas? Con p menor a 0,05 la respuesta es sí.`,
   "",
-  "Advertencia: la evaluación ya se miró al diseñar las variantes (la MTF + Volumen nació después de ver el Supertrend). Ningún número de esta tabla es una prueba limpia: la única es la medición hacia adelante del agente en papel. El Agente Línea de tendencia (TENDENCIA_LINEA) se mide con parámetros fijos: pivotes de 5 velas, ruptura de 0,1 ATR, stop a 1,5 ATR, objetivo de 2 R y sin confirmación. Se mide en 1 h, 4 h y 15 min. Después se buscó su mejor confirmación y configuración con reglas de desarrollo (docs/busqueda-linea.md); esas variantes ya cuentan en el N declarado.",
+  "Advertencia: la evaluación ya se miró al diseñar las variantes (la MTF + Volumen nació después de ver el Supertrend). Ningún número de esta tabla es una prueba limpia: la única es la medición hacia adelante del agente en papel. El Agente Línea de tendencia (TENDENCIA_LINEA) se mide con parámetros fijos: pivotes de 5 velas, ruptura de 0,1 ATR, stop a 1,5 ATR, objetivo de 2 R y sin confirmación. Se mide en 1 h, 4 h y 15 min. Después se buscó su mejor confirmación y configuración con reglas de desarrollo (docs/busqueda-linea.md); esas variantes ya cuentan en el N declarado. El Agente Liquidez + IFVG + Breaker (SMC_LIQUIDEZ) también se mide con configuración fijada de antemano (toma de liquidez, IFVG y breaker; zonas FVG y OB; margen 0,5 ATR; objetivo 2 R) en 1 h, 4 h y 15 min; su búsqueda de disparo y configuración está en docs/busqueda-smc.md y ya cuenta en el N declarado. El Agente Liquidez + IFVG + Breaker (SMC_LIQUIDEZ) también se mide con configuración fijada de antemano (disparo con toma de liquidez, IFVG y breaker; zonas FVG y OB; margen 0,5 ATR; objetivo 2 R) en 1 h, 4 h y 15 min; su búsqueda de disparo y configuración está en docs/busqueda-smc.md y ya cuenta en el N declarado.",
   "",
   "## Desarrollo (para comparar: si gana acá y pierde en evaluación, no se sostiene)",
   "",

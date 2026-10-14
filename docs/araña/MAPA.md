@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 589 · objetivos: 17 · sin objetivo: 0
+- Archivos: 593 · objetivos: 17 · sin objetivo: 0
 - Tablas D1: 49 · secretos: 5 · variables de entorno: 12 · rutas /api: 54 · hosts: 57
-- Código de navegador: 63 archivos con "use client" que alcanzan 190 · problemas: 0
-- Lib sin prueba directa: 24 de 187
+- Código de navegador: 63 archivos con "use client" que alcanzan 192 · problemas: 0
+- Lib sin prueba directa: 24 de 188
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (85)
+### jarvis — JARVIS, la IA propia del software (86)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía. · Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -98,6 +98,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `scripts/investigacion/precalcular.ts` — Precalcula lo que la mesa veía en cada cierre de 4 velas base (solo velas cerradas) para un perfil de velas.
 - `scripts/investigacion/preregistro-flujo.ts` — Mide el preregistro del flujo (lib/preregistro-flujo.ts): el Agente Supertrend MTF + Volumen en 4 h con cada uno de los cuatro filtros fijados el 14/10/2026, con las mismas velas,
 - `scripts/investigacion/simulador.ts` — Simulador rápido de la mesa sobre lecturas precalculadas (ver precalcular.ts).
+- `scripts/investigacion/smc-busqueda.ts` — La búsqueda del gatillo y la configuración del agente de liquidez (lib/smc-liquidez.ts): zonas FVG y OB de la temporalidad alta, con toma de liquidez, IFVG y breaker, en 1 h, 4 h y
 - `scripts/investigacion/util.ts` — Datos y escalas de tiempo de la investigación de la mesa.
 
 ### honestidad — Nunca inventar: probabilidades, precios, noticias (0)
@@ -391,7 +392,7 @@ Texto: el único lugar donde la app calcula el acierto, el profit factor y la ex
 - `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (28)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (31)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -400,6 +401,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `app/lab-piso.tsx` — El piso de estrategias del AI TRADING LAB.
 - `docs/busqueda-breaker.md` — Búsqueda de confirmación y configuración: breaker block
 - `docs/busqueda-linea.md` — Búsqueda de confirmación y configuración: línea de tendencia
+- `docs/busqueda-smc.md` — Búsqueda del gatillo y la configuración: zonas altas + toma de liquidez + IFVG + breaker
 - `docs/estudio-estrategias.md` — Estudio de estrategias del AI TRADING LAB
 - `lib/breaker-busqueda.ts` — La búsqueda de la mejor confirmación y configuración del breaker block (BREAKER_BLOCK): un order block (la última vela contraria antes de un impulso que rompió estructura, ver lib/
 - `lib/estrategias.ts` — El estudio de estrategias del AI TRADING LAB: cada agente tiene UNA estrategia clásica con parámetros fijos (no se buscan los que mejor dan: eso infla los resultados) y todas se mi
@@ -413,6 +415,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/lab.ts` — AI TRADING LAB: la foto del laboratorio armada con lo que la app ya tiene (la araña en vivo, el backtest, el papel, el registro y el gestor de riesgo).
 - `lib/linea-busqueda.ts` — La búsqueda de la mejor confirmación y configuración de la ruptura de línea de tendencia (TENDENCIA_LINEA, en lib/estrategias.ts).
 - `lib/preregistro-flujo.ts` — Preregistro del flujo real: cuatro filtros sobre el Agente Supertrend MTF + Volumen, fijados el 14/10/2026 ANTES de mirar datos de volumen taker, funding u open interest.
+- `lib/smc-liquidez.ts` — El agente «Liquidez + IFVG + Breaker en zona de alta temporalidad» (SMC_LIQUIDEZ) y su búsqueda de disparo y configuración.
 - `lib/sobreajuste.ts` — Auditoría de sobreajuste: cuánto de un buen resultado puede ser suerte por haber probado muchas variantes.
 - `tests/breaker-busqueda.test.ts` — Pruebas de la búsqueda del breaker block (lib/breaker-busqueda.ts): el caso armado a mano que lo forma, cada confirmación con su caso que la cumple y el que no, la zona que falla a
 - `tests/estrategias.test.ts` — pruebas: indicadores: EMA y RSI conocidos, ninguna estrategia mira el futuro: la señal en i no cambia si se borran las vela, operar: entra a la apertura siguiente, una operación por vez, con la escalera de (+1)
@@ -420,6 +423,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/lab.test.ts` — AI TRADING LAB: el gestor de riesgo central frena lo que pasa los límites y nadie lo afloja más allá de los topes; la evaluación del backtest respeta la cronología; el centro de la
 - `tests/linea-busqueda.test.ts` — Pruebas de la búsqueda de confirmación y configuración de la línea de tendencia (lib/linea-busqueda.ts): cada confirmación con su caso que la cumple y el que no, la ventana del ret
 - `tests/preregistro-flujo.test.ts` — Tests del preregistro del flujo (lib/preregistro-flujo.ts): cada filtro usa solo datos conocidos al cierre de la vela de la señal (no mira el futuro) y un dato faltante no aprueba
+- `tests/smc-liquidez.test.ts` — Pruebas del agente de liquidez + IFVG + breaker (lib/smc-liquidez.ts): las zonas altas (FVG y OB) con casos armados a mano, su vencimiento, la toma de liquidez, el IFVG, la grilla,
 - `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 
 ### calidad — Pruebas (132)

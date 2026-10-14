@@ -10,8 +10,9 @@
 import { escaleraHacia, recorrer, type Lado } from "./escalera.ts";
 import { BREAK_ATR, findPivots, FLAT_ATR, MIN_SPAN, type Pivot, WICK_ATR } from "./trendlines.ts";
 import type { SwingCandle } from "./swing-entries.ts";
+import { CONFIGURACION_BASE_SMC, DISPARO_DEL_AGENTE, senalesSmc, type FiltroSmc } from "./smc-liquidez.ts";
 
-export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "AZAR";
+export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "AZAR";
 
 /** Lo que una estrategia propone en la vela i: lado, stop y objetivo final (TP3). Sin señal, null. */
 export type Senal = { lado: Lado; stop: number; objetivo: number };
@@ -476,6 +477,16 @@ const conRR = (lado: Lado, entrada: number, stop: number, rr: number): Senal => 
 
 // ── Las estrategias, una por agente. Parámetros clásicos, fijos. ──
 
+/** Las señales del agente de liquidez, calculadas una vez por serie (son de toda la serie, pero cada una usa solo velas hasta su vela). */
+const SENALES_SMC = new WeakMap<SwingCandle[], Map<FiltroSmc, (i: number) => Senal | null>>();
+function senalSmc(v: SwingCandle[], ind: Indicadores, filtro: FiltroSmc, i: number): Senal | null {
+  let porFiltro = SENALES_SMC.get(v);
+  if (!porFiltro) SENALES_SMC.set(v, (porFiltro = new Map()));
+  let f = porFiltro.get(filtro);
+  if (!f) porFiltro.set(filtro, (f = senalesSmc(v, ind.atr14, DISPARO_DEL_AGENTE, CONFIGURACION_BASE_SMC, { filtro, stDir: ind.stDir, poc: ind.poc })));
+  return f(i);
+}
+
 export const ESTRATEGIAS: Estrategia[] = [
   {
     id: "RUPTURA",
@@ -682,6 +693,20 @@ export const ESTRATEGIAS: Estrategia[] = [
       if (r[i] === -1) return conRR("SHORT", c, c + 1.5 * t[i], 2);
       return null;
     },
+  },
+  {
+    id: "SMC_LIQUIDEZ",
+    agente: "Agente Liquidez + IFVG + Breaker",
+    nombre: "Zona alta (FVG u OB) + toma de liquidez + IFVG + breaker",
+    regla: "Zonas de la temporalidad alta (FVG y order blocks de 4 h, o diarios si la serie es de 4 h), conocidas solo al cierre de su vela alta. Con el precio en una zona viva, espera una toma de liquidez (mecha que pasa un pivote y cierra de vuelta) y, dentro de las 12 velas siguientes, un IFVG y un breaker en el mismo sentido: entra en la vela que completa las tres. Stop a 0,5 ATR del extremo de la toma. Objetivo 2 R. Configuración fijada de antemano, sin buscarla.",
+    senal: (v, ind, i) => senalSmc(v, ind, "NINGUNO", i),
+  },
+  {
+    id: "SMC_TODO",
+    agente: "Agente Liquidez + Perfil + Supertrend + EMAs",
+    nombre: "Liquidez + IFVG + breaker, con perfil de volumen, Supertrend y EMAs 9/21/30/50/100",
+    regla: "Igual que el Agente Liquidez + IFVG + Breaker, y además exige a favor: el cierre del lado favorable del POC del perfil de volumen (200 velas), la dirección del Supertrend (10, 3) y las EMAs de 9, 21, 30, 50 y 100 apiladas en orden. Stop a 0,5 ATR del extremo de la toma. Objetivo 2 R. Configuración fijada de antemano.",
+    senal: (v, ind, i) => senalSmc(v, ind, "TODO", i),
   },
   {
     id: "AZAR",

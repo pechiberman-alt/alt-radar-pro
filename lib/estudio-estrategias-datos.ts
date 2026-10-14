@@ -41,12 +41,12 @@ export const ESTUDIO_META = {
   "costoPorLadoPct": 0.07,
   "horizonteVelas": 48,
   "auditoria": {
-    "variantesTabla": 35,
-    "ensayosDeclarados": 400,
-    "varianzaSharpes": 0.0169,
+    "variantesTabla": 41,
+    "ensayosDeclarados": 550,
+    "varianzaSharpes": 0.034,
     "diasEvaluacion": 740,
     "pRealityCheck": 0.8834,
-    "pSpa": 0.2624
+    "pSpa": 0.3312
   }
 } as const;
 
@@ -804,6 +804,100 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "dsrDeclarado": 0
   },
   {
+    "estrategia": "SMC_LIQUIDEZ",
+    "agente": "Agente Liquidez + IFVG + Breaker",
+    "nombre": "Zona alta (FVG u OB) + toma de liquidez + IFVG + breaker",
+    "regla": "Zonas de la temporalidad alta (FVG y order blocks de 4 h, o diarios si la serie es de 4 h), conocidas solo al cierre de su vela alta. Con el precio en una zona viva, espera una toma de liquidez (mecha que pasa un pivote y cierra de vuelta) y, dentro de las 12 velas siguientes, un IFVG y un breaker en el mismo sentido: entra en la vela que completa las tres. Stop a 0,5 ATR del extremo de la toma. Objetivo 2 R. Configuración fijada de antemano, sin buscarla.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 470,
+      "ganadas": 192,
+      "winRate": 0.4085,
+      "tasaTp1": 0.5404,
+      "tasaTp2": 0.3149,
+      "tasaTp3": 0.1915,
+      "tasaSl": 0.4191,
+      "profitFactor": 1.0022,
+      "expectancia": 0.0011,
+      "expectanciaIc": {
+        "low": -0.0874,
+        "high": 0.0896
+      },
+      "netoR": 0.5214,
+      "maxCaidaR": 35.94
+    },
+    "evaluacion": {
+      "operaciones": 223,
+      "ganadas": 94,
+      "winRate": 0.4215,
+      "tasaTp1": 0.5067,
+      "tasaTp2": 0.3184,
+      "tasaTp3": 0.1839,
+      "tasaSl": 0.4843,
+      "profitFactor": 0.8924,
+      "expectancia": -0.0587,
+      "expectanciaIc": {
+        "low": -0.1866,
+        "high": 0.0693
+      },
+      "netoR": -13.0808,
+      "maxCaidaR": 29.9092
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 2,
+    "monedasConOperaciones": 10,
+    "psr": 0.2297,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "SMC_TODO",
+    "agente": "Agente Liquidez + Perfil + Supertrend + EMAs",
+    "nombre": "Liquidez + IFVG + breaker, con perfil de volumen, Supertrend y EMAs 9/21/30/50/100",
+    "regla": "Igual que el Agente Liquidez + IFVG + Breaker, y además exige a favor: el cierre del lado favorable del POC del perfil de volumen (200 velas), la dirección del Supertrend (10, 3) y las EMAs de 9, 21, 30, 50 y 100 apiladas en orden. Stop a 0,5 ATR del extremo de la toma. Objetivo 2 R. Configuración fijada de antemano.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 77,
+      "ganadas": 22,
+      "winRate": 0.2857,
+      "tasaTp1": 0.4675,
+      "tasaTp2": 0.2727,
+      "tasaTp3": 0.1558,
+      "tasaSl": 0.5844,
+      "profitFactor": 0.6051,
+      "expectancia": -0.2583,
+      "expectanciaIc": {
+        "low": -0.472,
+        "high": -0.0445
+      },
+      "netoR": -19.8873,
+      "maxCaidaR": 22.7841
+    },
+    "evaluacion": {
+      "operaciones": 29,
+      "ganadas": 14,
+      "winRate": 0.4828,
+      "tasaTp1": 0.5517,
+      "tasaTp2": 0.3793,
+      "tasaTp3": 0.3448,
+      "tasaSl": 0.4138,
+      "profitFactor": 1.5135,
+      "expectancia": 0.2478,
+      "expectanciaIc": {
+        "low": -0.1628,
+        "high": 0.6584
+      },
+      "netoR": 7.1867,
+      "maxCaidaR": 6.242
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 5,
+    "monedasConOperaciones": 10,
+    "psr": 0.8417,
+    "dsrTabla": 0.115,
+    "dsrDeclarado": 0.0186
+  },
+  {
     "estrategia": "AZAR",
     "agente": "Agente Control (azar)",
     "nombre": "Entrada al azar (control)",
@@ -1176,8 +1270,8 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 3,
     "monedasConOperaciones": 10,
     "psr": 0.1358,
-    "dsrTabla": 0.0012,
-    "dsrDeclarado": 0.0001
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "SUPERTREND",
@@ -1223,7 +1317,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 10,
     "monedasConOperaciones": 10,
     "psr": 0.9987,
-    "dsrTabla": 0.0015,
+    "dsrTabla": 0,
     "dsrDeclarado": 0
   },
   {
@@ -1270,7 +1364,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 10,
     "monedasConOperaciones": 10,
     "psr": 0.9982,
-    "dsrTabla": 0.0012,
+    "dsrTabla": 0,
     "dsrDeclarado": 0
   },
   {
@@ -1317,7 +1411,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 9,
     "monedasConOperaciones": 10,
     "psr": 0.9858,
-    "dsrTabla": 0.0005,
+    "dsrTabla": 0,
     "dsrDeclarado": 0
   },
   {
@@ -1364,7 +1458,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 9,
     "monedasConOperaciones": 10,
     "psr": 0.9852,
-    "dsrTabla": 0.0005,
+    "dsrTabla": 0,
     "dsrDeclarado": 0
   },
   {
@@ -1411,7 +1505,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 10,
     "monedasConOperaciones": 10,
     "psr": 0.9822,
-    "dsrTabla": 0.0003,
+    "dsrTabla": 0,
     "dsrDeclarado": 0
   },
   {
@@ -1458,8 +1552,8 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 9,
     "monedasConOperaciones": 10,
     "psr": 0.9985,
-    "dsrTabla": 0.0926,
-    "dsrDeclarado": 0.0012
+    "dsrTabla": 0.0005,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "SNR",
@@ -1603,6 +1697,100 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "dsrDeclarado": 0
   },
   {
+    "estrategia": "SMC_LIQUIDEZ",
+    "agente": "Agente Liquidez + IFVG + Breaker",
+    "nombre": "Zona alta (FVG u OB) + toma de liquidez + IFVG + breaker",
+    "regla": "Zonas de la temporalidad alta (FVG y order blocks de 4 h, o diarios si la serie es de 4 h), conocidas solo al cierre de su vela alta. Con el precio en una zona viva, espera una toma de liquidez (mecha que pasa un pivote y cierra de vuelta) y, dentro de las 12 velas siguientes, un IFVG y un breaker en el mismo sentido: entra en la vela que completa las tres. Stop a 0,5 ATR del extremo de la toma. Objetivo 2 R. Configuración fijada de antemano, sin buscarla.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 140,
+      "ganadas": 69,
+      "winRate": 0.4929,
+      "tasaTp1": 0.5714,
+      "tasaTp2": 0.2714,
+      "tasaTp3": 0.1786,
+      "tasaSl": 0.3786,
+      "profitFactor": 1.2754,
+      "expectancia": 0.1164,
+      "expectanciaIc": {
+        "low": -0.0401,
+        "high": 0.2729
+      },
+      "netoR": 16.2938,
+      "maxCaidaR": 9.3427
+    },
+    "evaluacion": {
+      "operaciones": 58,
+      "ganadas": 28,
+      "winRate": 0.4828,
+      "tasaTp1": 0.6034,
+      "tasaTp2": 0.3966,
+      "tasaTp3": 0.2414,
+      "tasaSl": 0.4483,
+      "profitFactor": 1.3859,
+      "expectancia": 0.1868,
+      "expectanciaIc": {
+        "low": -0.0885,
+        "high": 0.4621
+      },
+      "netoR": 10.8333,
+      "maxCaidaR": 6.2052
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 6,
+    "monedasConOperaciones": 10,
+    "psr": 0.8716,
+    "dsrTabla": 0.0226,
+    "dsrDeclarado": 0.0006
+  },
+  {
+    "estrategia": "SMC_TODO",
+    "agente": "Agente Liquidez + Perfil + Supertrend + EMAs",
+    "nombre": "Liquidez + IFVG + breaker, con perfil de volumen, Supertrend y EMAs 9/21/30/50/100",
+    "regla": "Igual que el Agente Liquidez + IFVG + Breaker, y además exige a favor: el cierre del lado favorable del POC del perfil de volumen (200 velas), la dirección del Supertrend (10, 3) y las EMAs de 9, 21, 30, 50 y 100 apiladas en orden. Stop a 0,5 ATR del extremo de la toma. Objetivo 2 R. Configuración fijada de antemano.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 19,
+      "ganadas": 8,
+      "winRate": 0.4211,
+      "tasaTp1": 0.6316,
+      "tasaTp2": 0.4211,
+      "tasaTp3": 0.1579,
+      "tasaSl": 0.4737,
+      "profitFactor": 0.9916,
+      "expectancia": -0.0046,
+      "expectanciaIc": {
+        "low": -0.4631,
+        "high": 0.4539
+      },
+      "netoR": -0.0867,
+      "maxCaidaR": 5.5023
+    },
+    "evaluacion": {
+      "operaciones": 4,
+      "ganadas": 3,
+      "winRate": 0.75,
+      "tasaTp1": 1,
+      "tasaTp2": 0.75,
+      "tasaTp3": 0.5,
+      "tasaSl": 0.25,
+      "profitFactor": 4.9195,
+      "expectancia": 0.9878,
+      "expectanciaIc": {
+        "low": -0.1747,
+        "high": 2.1503
+      },
+      "netoR": 3.951,
+      "maxCaidaR": 1.0081
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 3,
+    "monedasConOperaciones": 3,
+    "psr": 0.8243,
+    "dsrTabla": 0.6522,
+    "dsrDeclarado": 0.5693
+  },
+  {
     "estrategia": "AZAR",
     "agente": "Agente Control (azar)",
     "nombre": "Entrada al azar (control)",
@@ -1693,7 +1881,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 5,
     "monedasConOperaciones": 10,
     "psr": 0.4639,
-    "dsrTabla": 0.0005,
+    "dsrTabla": 0,
     "dsrDeclarado": 0
   },
   {
@@ -1740,6 +1928,100 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 0,
     "monedasConOperaciones": 10,
     "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "SMC_LIQUIDEZ",
+    "agente": "Agente Liquidez + IFVG + Breaker",
+    "nombre": "Zona alta (FVG u OB) + toma de liquidez + IFVG + breaker",
+    "regla": "Zonas de la temporalidad alta (FVG y order blocks de 4 h, o diarios si la serie es de 4 h), conocidas solo al cierre de su vela alta. Con el precio en una zona viva, espera una toma de liquidez (mecha que pasa un pivote y cierra de vuelta) y, dentro de las 12 velas siguientes, un IFVG y un breaker en el mismo sentido: entra en la vela que completa las tres. Stop a 0,5 ATR del extremo de la toma. Objetivo 2 R. Configuración fijada de antemano, sin buscarla.",
+    "marco": "15m",
+    "desarrollo": {
+      "operaciones": 270,
+      "ganadas": 102,
+      "winRate": 0.3778,
+      "tasaTp1": 0.4519,
+      "tasaTp2": 0.2704,
+      "tasaTp3": 0.1778,
+      "tasaSl": 0.463,
+      "profitFactor": 0.774,
+      "expectancia": -0.1288,
+      "expectanciaIc": {
+        "low": -0.2432,
+        "high": -0.0144
+      },
+      "netoR": -34.7762,
+      "maxCaidaR": 37.8605
+    },
+    "evaluacion": {
+      "operaciones": 832,
+      "ganadas": 276,
+      "winRate": 0.3317,
+      "tasaTp1": 0.482,
+      "tasaTp2": 0.2548,
+      "tasaTp3": 0.1334,
+      "tasaSl": 0.5433,
+      "profitFactor": 0.5541,
+      "expectancia": -0.2906,
+      "expectanciaIc": {
+        "low": -0.3525,
+        "high": -0.2286
+      },
+      "netoR": -241.7436,
+      "maxCaidaR": 245.4595
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 0,
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "SMC_TODO",
+    "agente": "Agente Liquidez + Perfil + Supertrend + EMAs",
+    "nombre": "Liquidez + IFVG + breaker, con perfil de volumen, Supertrend y EMAs 9/21/30/50/100",
+    "regla": "Igual que el Agente Liquidez + IFVG + Breaker, y además exige a favor: el cierre del lado favorable del POC del perfil de volumen (200 velas), la dirección del Supertrend (10, 3) y las EMAs de 9, 21, 30, 50 y 100 apiladas en orden. Stop a 0,5 ATR del extremo de la toma. Objetivo 2 R. Configuración fijada de antemano.",
+    "marco": "15m",
+    "desarrollo": {
+      "operaciones": 22,
+      "ganadas": 8,
+      "winRate": 0.3636,
+      "tasaTp1": 0.6364,
+      "tasaTp2": 0.3636,
+      "tasaTp3": 0.2273,
+      "tasaSl": 0.4091,
+      "profitFactor": 0.9212,
+      "expectancia": -0.0409,
+      "expectanciaIc": {
+        "low": -0.4599,
+        "high": 0.3781
+      },
+      "netoR": -0.8997,
+      "maxCaidaR": 6.0101
+    },
+    "evaluacion": {
+      "operaciones": 43,
+      "ganadas": 14,
+      "winRate": 0.3256,
+      "tasaTp1": 0.4884,
+      "tasaTp2": 0.2791,
+      "tasaTp3": 0.1163,
+      "tasaSl": 0.6047,
+      "profitFactor": 0.4592,
+      "expectancia": -0.3784,
+      "expectanciaIc": {
+        "low": -0.6489,
+        "high": -0.1078
+      },
+      "netoR": -16.2699,
+      "maxCaidaR": 16.2699
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 2,
+    "monedasConOperaciones": 9,
+    "psr": 0.029,
     "dsrTabla": 0,
     "dsrDeclarado": 0
   },
