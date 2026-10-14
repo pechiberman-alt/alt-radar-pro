@@ -86,24 +86,52 @@
   .lab-preguntas button{flex:1 1 100%}
   .lab-aviso,.lab-error,.lab-nota{margin-left:12px;margin-right:12px;padding-left:0}
 }
-/* Piso de estrategias (app/lab-piso.tsx): escritorios isométricos, uno por agente, coloreados por su veredicto medido. */
-.piso{margin:0 0 14px}
-.piso-svg{display:block;width:100%;max-width:560px;height:auto;margin:6px auto 10px}
-.piso-suelo{fill:#06101f;stroke:var(--lab-borde);stroke-width:1}
-.piso-mesa{cursor:pointer;outline:none}
-.piso-mesa:focus-visible .piso-tapa{stroke:#fff;stroke-width:2}
-.piso-tapa{fill:#0b1f42;stroke:var(--lab-borde);stroke-width:1}
-.piso-lado{fill:#081733}
-.piso-lado-d{fill:#06122a}
-.piso-pantalla{fill:#030a14;stroke:var(--lab-cian);stroke-width:1}
-.piso-agente{fill:#335a8a}
-.piso-rotulo{font:600 8.5px var(--font-mono);letter-spacing:.4px;fill:var(--soft)}
-.piso-gana .piso-tapa{fill:#0d3326;stroke:#3fd68f}.piso-gana .piso-agente,.piso-gana .piso-pantalla{fill:#3fd68f}
-.piso-duda .piso-tapa{fill:#33280d;stroke:#d9a441}.piso-duda .piso-agente{fill:#d9a441}
-.piso-pierde .piso-tapa{fill:#3a1016;stroke:#ff6b6b}.piso-pierde .piso-agente{fill:#ff6b6b}
-.piso-control .piso-tapa{fill:#1a2230;stroke:#7d8a99}.piso-control .piso-agente{fill:#7d8a99}
-.piso-activa .piso-tapa{stroke-width:2.5}
-@media (prefers-reduced-motion:no-preference){.piso-activa .piso-agente{animation:lab-brillo 1.2s infinite}}
+/* Piso de estrategias (app/lab-piso.tsx): el cerebro al centro, un agente con su mini araña en cada nodo, la arena abajo. */
+.piso{margin:0 0 14px;min-width:0}
+.piso-svg{display:block;width:100%;max-width:520px;height:auto;margin:6px auto 4px}
+.piso-guia{fill:none;stroke:var(--lab-borde);stroke-dasharray:1 5;stroke-width:1}
+.piso-cable{stroke-linecap:round}
+.piso-cable-papel{stroke:var(--lab-cian);stroke-width:1.8;stroke-dasharray:7 5;opacity:.9}
+.piso-cable-estudio{stroke:#335a8a;stroke-width:1;stroke-dasharray:1 4;opacity:.8}
+.piso-cable-activo{stroke:#fff;stroke-width:2;opacity:1}
+.piso-cerebro-disco{fill:#0b1f42;stroke:var(--lab-cian);stroke-width:1.5}
+.piso-cerebro-pulso{fill:none;stroke:var(--lab-cian);stroke-width:1;opacity:.35}
+.piso-cerebro-lobulo{fill:#0e2a55;stroke:var(--lab-cian);stroke-width:1.2;stroke-linejoin:round}
+.piso-cerebro-surco{fill:none;stroke:var(--lab-azul);stroke-width:1;stroke-linecap:round}
+.piso-cerebro-rotulo{font:700 8px var(--font-mono);letter-spacing:.8px;fill:var(--lab-cian)}
+.piso-nodo{cursor:pointer;outline:none}
+.piso-nodo:focus-visible .piso-nodo-disco{stroke:#fff;stroke-width:2.5}
+.piso-nodo-disco{fill:#071223;stroke:var(--lab-borde);stroke-width:2}
+.piso-nodo-aro{fill:none;stroke:#fff;stroke-width:1.2;stroke-dasharray:3 3;opacity:.8}
+.piso-rotulo{font:600 8px var(--font-mono);fill:var(--soft);paint-order:stroke;stroke:var(--lab-fondo);stroke-width:2.2px;stroke-linejoin:round}
+.piso-valor{font:700 8px var(--font-mono);fill:#a9b8c9;paint-order:stroke;stroke:var(--lab-fondo);stroke-width:2.2px;stroke-linejoin:round}
+.piso-valor-gana{fill:#3fd68f;color:#3fd68f}.piso-valor-pierde{fill:#ff6b6b;color:#ff6b6b}.piso-valor-neutro{fill:#a9b8c9;color:#a9b8c9}
+.piso-gana .piso-nodo-disco{fill:#0d3326;stroke:#3fd68f}
+.piso-duda .piso-nodo-disco{fill:#2a210c;stroke:#d9a441}
+.piso-pierde .piso-nodo-disco{fill:#3a1016;stroke:#ff6b6b}
+.piso-control .piso-nodo-disco{fill:#1a2230;stroke:#7d8a99}
+.mini-pata{fill:none;stroke:#8fb4e0;stroke-width:.9;stroke-linecap:round;transform-origin:0 0}
+.mini-torso,.mini-cabeza{fill:#8fb4e0}
+.mini-ojo{fill:#071223}
+.piso-gana .mini-pata{stroke:#3fd68f}.piso-gana .mini-torso,.piso-gana .mini-cabeza{fill:#3fd68f}
+.piso-duda .mini-pata{stroke:#d9a441}.piso-duda .mini-torso,.piso-duda .mini-cabeza{fill:#d9a441}
+.piso-pierde .mini-pata{stroke:#ff6b6b}.piso-pierde .mini-torso,.piso-pierde .mini-cabeza{fill:#ff6b6b}
+.piso-control .mini-pata{stroke:#7d8a99}.piso-control .mini-torso,.piso-control .mini-cabeza{fill:#7d8a99}
+@media (prefers-reduced-motion:no-preference){
+  .piso-cable-papel{animation:piso-flujo 1.4s linear infinite}
+  .piso-cerebro-pulso{animation:piso-pulso 2.4s ease-in-out infinite;transform-origin:190px 200px}
+  .mini-arana-activa .mini-pata{animation:lab-paso .9s ease-in-out infinite alternate}
+}
+@keyframes piso-flujo{to{stroke-dashoffset:-24}}
+@keyframes piso-pulso{50%{transform:scale(1.14);opacity:.1}}
+.piso-resumen{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0;list-style:none}
+.piso-resumen li{padding:4px 9px;border:1px solid var(--lab-borde);border-radius:99px;background:#06101e;font:600 10px var(--font-mono);letter-spacing:.4px;color:var(--soft)}
+.piso-resumen b{font-size:12px;margin-right:3px}
+.piso-resumen .piso-cand{border-color:#6fae8f;color:#8fd3b0}.piso-resumen .piso-gana{border-color:#3fd68f;color:#3fd68f}.piso-resumen .piso-duda{border-color:#d9a441;color:#d9a441}.piso-resumen .piso-pierde{border-color:#ff6b6b;color:#ff6b6b}
+.piso-leyenda{margin:0 0 10px;padding:0;list-style:none;display:grid;gap:3px;font:9.5px/1.5 var(--font-mono);color:var(--muted)}
+.piso-leyenda-linea{display:inline-block;width:22px;height:0;margin-right:6px;vertical-align:middle;border-top:2px dashed var(--lab-cian)}
+.piso-leyenda-estudio{border-top:2px dotted #335a8a}
+.piso-conexion{color:var(--lab-cian);font-size:10px}
 .piso-ficha{margin:0 0 12px;padding:10px 12px;border:1px solid var(--lab-borde);border-left-width:3px;border-radius:6px;background:#071223}
 .piso-ficha header{display:flex;justify-content:space-between;gap:8px;color:#fff}
 .piso-ficha.piso-gana{border-left-color:#3fd68f}.piso-ficha.piso-duda{border-left-color:#d9a441}.piso-ficha.piso-pierde{border-left-color:#ff6b6b}.piso-ficha.piso-control{border-left-color:#7d8a99}
@@ -116,3 +144,56 @@
 .piso-ranking li{margin:3px 0}
 .piso-ranking .piso-gana span{color:#3fd68f}.piso-ranking .piso-duda span{color:#d9a441}.piso-ranking .piso-pierde span{color:#ff6b6b}.piso-ranking .piso-control span{color:#7d8a99}
 .lab-agentes>.piso,.lab-agentes>.lab-sub{grid-column:1/-1}
+/* Arena (app/lab-piso.tsx): los agentes compiten, barra de R por operación con su intervalo y la raya del control. */
+.arena-marcos{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.arena-marcos button,.arena-mas{min-height:36px;padding:0 12px;border:1px solid var(--lab-borde);border-radius:99px;background:#071223;font:600 10px var(--font-mono);letter-spacing:.8px;color:var(--lab-cian);cursor:pointer;touch-action:manipulation}
+.arena-marcos button[aria-pressed="true"]{border-color:var(--lab-azul);background:#0b1f42;color:#fff}
+.arena-marcos button:focus-visible,.arena-mas:focus-visible,.arena-fila:focus-visible{outline:2px solid var(--lab-cian);outline-offset:2px}
+.arena-mas{display:block;margin:8px auto 4px}
+.arena-lista{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.arena-lista>li{border:1px solid var(--lab-borde);border-left-width:3px;border-radius:6px;background:#06101e}
+.arena-lista>li.piso-gana{border-left-color:#3fd68f}.arena-lista>li.piso-duda{border-left-color:#d9a441}.arena-lista>li.piso-pierde{border-left-color:#ff6b6b}.arena-lista>li.piso-control{border-left-color:#7d8a99}
+.arena-fila{display:grid;grid-template-columns:22px 1fr auto;grid-template-areas:"p n r" "b b b" "d d d";gap:4px 8px;align-items:center;width:100%;padding:8px 10px;border:0;background:none;font:10.5px var(--font-mono);color:var(--soft);text-align:left;cursor:pointer;touch-action:manipulation}
+.arena-puesto{grid-area:p;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#0a1a30;font-weight:700;font-size:10px;color:var(--muted)}
+.arena-podio{background:#d9a441;color:#1a1204}
+.arena-nombre{grid-area:n;min-width:0;color:#e6f1ff}
+.arena-nombre b{font-weight:600}.arena-nombre em{font-style:normal;color:var(--muted);margin-left:2px}
+.arena-nombre u{margin-left:6px;padding:1px 5px;border-radius:3px;background:#0b1f42;font-size:8.5px;letter-spacing:.6px;text-decoration:none;color:var(--lab-cian)}
+.arena-r{grid-area:r;font-weight:700;font-size:12px}
+.arena-pista{grid-area:b;position:relative;height:16px;border-radius:3px;background:#081426}
+.arena-cero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:#335a8a}
+.arena-barra{position:absolute;top:3px;bottom:3px;border-radius:2px;background:#d9a441;opacity:.55}
+.arena-gana .arena-barra{background:#3fd68f;opacity:.85}.arena-pierde .arena-barra{background:#ff6b6b;opacity:.85}.arena-control .arena-barra{background:#7d8a99;opacity:.7}
+.arena-duda .arena-barra{background:repeating-linear-gradient(135deg,#d9a441 0 3px,#6b5420 3px 6px)}
+.arena-candidata .arena-barra{background:repeating-linear-gradient(135deg,#3fd68f 0 3px,#14523a 3px 6px)}
+.arena-ic{position:absolute;top:50%;height:1.5px;background:#fff;opacity:.85;transform:translateY(-50%)}
+.arena-ic::before,.arena-ic::after{content:"";position:absolute;top:-3px;width:1.5px;height:7.5px;background:#fff}
+.arena-ic::before{left:0}.arena-ic::after{right:0}
+.arena-control{position:absolute;top:50%;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;background:var(--lab-cian);transform:rotate(45deg)}
+.arena-datos{grid-area:d;font-size:9.5px;color:var(--muted)}
+/* Señales del agente de papel (app/lab-agente-st.tsx): tarjetas con la escalera SL, entrada, TP1, TP2 y TP3. */
+.senal-titulo{display:flex;align-items:center;gap:8px}
+.senal-lista{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.senal-tarjeta{padding:9px 10px 8px;border:1px solid var(--lab-borde);border-left-width:3px;border-radius:6px;background:#06101e}
+.senal-tarjeta.piso-gana{border-left-color:#3fd68f}.senal-tarjeta.piso-duda{border-left-color:#d9a441}.senal-tarjeta.piso-pierde{border-left-color:#ff6b6b}
+.senal-tarjeta header{display:flex;align-items:center;gap:8px;font:10.5px var(--font-mono);color:var(--muted)}
+.senal-tarjeta header b{color:#fff;font-size:12px}
+.senal-tarjeta header time{margin-left:auto}
+.senal-lado{padding:1px 5px;border-radius:3px;background:#0b1f42;font-size:8.5px;letter-spacing:.6px;color:var(--lab-cian)}
+.senal-tarjeta header em{font-style:normal;font-weight:700}
+.senal-tarjeta.piso-gana header em{color:#3fd68f}.senal-tarjeta.piso-pierde header em{color:#ff6b6b}.senal-tarjeta.piso-duda header em{color:#d9a441}
+.senal-escalera{margin:10px 6px 38px}
+.senal-pista{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,#3a1016 0,#3a1016 33%,#0a1a30 33%)}
+.senal-relleno{position:absolute;top:0;bottom:0;background:#3fd68f;opacity:.7;border-radius:3px}
+.senal-marca{position:absolute;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;border:2px solid #335a8a;background:#050b14}
+.senal-marca.senal-toco.senal-ok{border-color:#3fd68f;background:#3fd68f}
+.senal-marca.senal-toco.senal-mal{border-color:#ff6b6b;background:#ff6b6b}
+.senal-marca.senal-ent{border-color:#fff;background:#fff}
+.senal-niveles{position:relative;height:0}
+.senal-nivel{position:absolute;top:9px;display:grid;justify-items:center;transform:translateX(-50%);font:8.5px/1.3 var(--font-mono);color:var(--muted);white-space:nowrap}
+.senal-nivel b{font-size:8px;letter-spacing:.5px}
+.senal-nivel.senal-toco.senal-ok{color:#3fd68f}.senal-nivel.senal-toco.senal-mal{color:#ff6b6b}.senal-nivel.senal-ent{color:#e6f1ff}
+.senal-nivel:first-child{transform:none}.senal-nivel:last-child{transform:translateX(-100%)}
+.senal-abierta{animation:lab-brillo 1.6s infinite}
+@media (prefers-reduced-motion:reduce){.senal-abierta{animation:none}}
+.senal-tarjeta small{display:block;color:var(--muted)}

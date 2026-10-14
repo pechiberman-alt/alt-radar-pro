@@ -8,7 +8,7 @@ Cada agente tiene una estrategia clásica con parámetros fijos (no se optimizar
 
 | Agente | Velas | Operaciones | Acierto | TP1 | TP2 | TP3 | SL | Profit factor | Expectancia (IC 90 %) | Caída máx | Monedas + | PSR | DSR (N tabla) | DSR (N declarado) | Veredicto |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Agente Supertrend MTF + Volumen | 4h | 227 | 51,1 % | 58,6 % | 37,0 % | 25,1 % | 38,8 % | 1,54 | +0,237 R (+0,102 R a +0,371 R) | 13,42 R | 9/10 | 99,9 % | 9,3 % | 0,2 % | CANDIDATA |
+| Agente Supertrend MTF + Volumen | 4h | 227 | 51,1 % | 58,6 % | 37,0 % | 25,1 % | 38,8 % | 1,54 | +0,237 R (+0,102 R a +0,371 R) | 13,42 R | 9/10 | 99,9 % | 9,3 % | 0,1 % | CANDIDATA |
 | Agente Supertrend | 4h | 438 | 48,6 % | 59,1 % | 35,4 % | 22,8 % | 40,0 % | 1,37 | +0,169 R (+0,074 R a +0,263 R) | 21,41 R | 10/10 | 99,9 % | 0,1 % | 0,0 % | CANDIDATA |
 | Agente Supertrend + VWAP | 4h | 434 | 48,2 % | 58,8 % | 35,3 % | 22,8 % | 40,1 % | 1,36 | +0,164 R (+0,069 R a +0,260 R) | 21,41 R | 10/10 | 99,8 % | 0,1 % | 0,0 % | CANDIDATA |
 | Agente Supertrend + Perfil | 4h | 374 | 46,3 % | 56,4 % | 35,0 % | 23,5 % | 41,7 % | 1,29 | +0,134 R (+0,031 R a +0,238 R) | 19,57 R | 9/10 | 98,6 % | 0,1 % | 0,0 % | CANDIDATA |
@@ -50,7 +50,7 @@ Cada agente tiene una estrategia clásica con parámetros fijos (no se optimizar
 
 ## Auditoría de sobreajuste
 
-PSR: probabilidad de que el R medio por operación sea mayor que cero, descontando asimetría y colas gordas. DSR: lo mismo, pero contra el mejor resultado que se esperaría solo por azar al elegir entre N variantes (Bailey y López de Prado). N tabla = 35 variantes de esta tabla; N declarado = 300, que suma la grilla SNR (128), pruebas sueltas y la búsqueda de confirmación y configuración de la línea de tendencia (99, en docs/busqueda-linea.md), sobre los mismos datos. Un DSR menor a 95 % no alcanza para decir que hay ventaja.
+PSR: probabilidad de que el R medio por operación sea mayor que cero, descontando asimetría y colas gordas. DSR: lo mismo, pero contra el mejor resultado que se esperaría solo por azar al elegir entre N variantes (Bailey y López de Prado). N tabla = 35 variantes de esta tabla; N declarado = 400, que suma la grilla SNR (128), pruebas sueltas y las búsquedas de confirmación y configuración de la línea de tendencia y del breaker block (99 cada una, en docs/busqueda-linea.md y docs/busqueda-breaker.md), sobre los mismos datos. Un DSR menor a 95 % no alcanza para decir que hay ventaja.
 
 Reality Check de White y SPA de Hansen sobre el resultado diario de las 35 variantes en evaluación (740 días, bootstrap estacionario, 5.000 remuestreos, bloques de 10 días): p = 0,88 (Reality Check) y p = 0,26 (SPA). La pregunta que responden: ¿alguna variante le gana a no operar, contando que se eligió la mejor entre todas? Con p menor a 0,05 la respuesta es sí.
 

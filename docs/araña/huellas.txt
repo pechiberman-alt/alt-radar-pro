@@ -12,7 +12,7 @@ ebfa1b2412ea	73	CLAUDE.md
 f78d8e271837	683	app/account-panel.tsx
 064cf5eb7605	229	app/active-signals.tsx
 63b274d443fe	122	app/agenda-macro.tsx
-1c6ec7cc3421	119	app/ai-trading-lab.css
+5bfce941a647	200	app/ai-trading-lab.css
 e4c2f43c2bed	402	app/ai-trading-lab.tsx
 bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
@@ -129,8 +129,9 @@ e4aeb9c38840	264	app/jarvis-trading.css
 719061eef9e9	192	app/jarvis-watch.tsx
 39c4819ab1a5	121	app/jarvis.css
 9f7dd2bcff90	1692	app/jarvis.tsx
-2d5733403337	105	app/lab-agente-st.tsx
-35ce7c0881a3	159	app/lab-piso.tsx
+a0bec1d6e010	165	app/lab-agente-st.tsx
+af77131cadb2	27	app/lab-mini-arana.tsx
+e3b51a33d7a3	296	app/lab-piso.tsx
 aa4d7c876c20	51	app/laptop.css
 a8e3e09ba000	132	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -185,9 +186,10 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d871d3293aca	283	docs/araña/objetivos.md
+e1d12e3c9f7d	284	docs/araña/objetivos.md
+db6358216fcf	188	docs/busqueda-breaker.md
 25e7d2744ee2	187	docs/busqueda-linea.md
-5aa1dbfbeaa2	102	docs/estudio-estrategias.md
+d66b37c7247a	102	docs/estudio-estrategias.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -243,6 +245,7 @@ dbb61e696813	67	lib/binance-futures.ts
 bb80398ecb7d	76	lib/bot-journal-db.ts
 6a0d6ae2abb1	210	lib/bot-journal.ts
 021df37a3d16	209	lib/brain-security.ts
+5ee4dc31ba13	190	lib/breaker-busqueda.ts
 6739820aa2be	50	lib/browser-voice.ts
 22867caddefc	328	lib/chart-patterns.ts
 11dfd70c8233	87	lib/cost-basis.ts
@@ -252,8 +255,8 @@ c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
 a2c5aeea0e4f	115	lib/escalera.ts
-42b8a904e9d9	844	lib/estrategias.ts
-0bc8985e0db3	1888	lib/estudio-estrategias-datos.ts
+3f2da827e13a	844	lib/estrategias.ts
+1d0db10efe7a	1888	lib/estudio-estrategias-datos.ts
 ca8f3802c4a6	21	lib/estudio-resumen.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
 450b470bb8bd	173	lib/exchange-reserves.ts
@@ -304,6 +307,7 @@ e5d7beaeb1fb	53	lib/jarvis-world.ts
 1235a48b5279	95	lib/key-levels.ts
 157c8fbc4c4c	55	lib/klines-history.ts
 d7b23d66a3bf	269	lib/klines-server.ts
+f4d88361647b	155	lib/lab-arena.ts
 3f7f00318500	173	lib/lab-evaluacion.ts
 fe550a7f3308	117	lib/lab-jarvis.ts
 9597d92c3eb0	164	lib/lab-riesgo.ts
@@ -414,9 +418,10 @@ d13ecf4702a3	63	scripts/claude-hooks.mjs
 b36fd1c34b30	183	scripts/herramientas.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
+c88ad361f676	292	scripts/investigacion/breaker-busqueda.ts
 a8d206c4cc1f	0	scripts/investigacion/datos-binance.py
 8e25f67c73e7	0	scripts/investigacion/datos.py
-5747b2a16fab	249	scripts/investigacion/estrategias.ts
+58553102d9e3	250	scripts/investigacion/estrategias.ts
 c83b5a866c3f	296	scripts/investigacion/linea-busqueda.ts
 36d231690dfe	238	scripts/investigacion/medir.ts
 2dea6b11e55f	236	scripts/investigacion/modelos.ts
@@ -454,6 +459,7 @@ c230ab327c5d	127	tests/binance-import.test.ts
 3c86102af0be	27	tests/binance-ws.test.ts
 bee17b9c8ee8	120	tests/bot-journal.test.ts
 4cf0e9d5e358	122	tests/breaker-blocks.test.ts
+5f0e5f698da3	174	tests/breaker-busqueda.test.ts
 0c6817af6bb4	138	tests/chart-patterns.test.ts
 e954e10a7eec	85	tests/cost-basis.test.ts
 6cc784f01e52	156	tests/dca-tracker.test.ts
@@ -507,6 +513,7 @@ cc263e715076	62	tests/jarvis-watch-run.test.ts
 b4b3605414e5	186	tests/jarvis.test.ts
 a3b57999655c	66	tests/key-levels.test.ts
 ddb22425e6c1	206	tests/klines-server-fallback.test.ts
+6719cefcd77b	113	tests/lab-arena.test.ts
 cf86a1b623ad	334	tests/lab.test.ts
 d6740b560f54	108	tests/level-engine.test.ts
 2948686ae71f	271	tests/linea-busqueda.test.ts
