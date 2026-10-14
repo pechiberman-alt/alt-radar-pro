@@ -140,7 +140,7 @@ a8e3e09ba000	132	app/layout.tsx
 db0be99a3f89	499	app/market-brain.tsx
 89b25149b415	141	app/market-structure-panel.tsx
 244b15230fb0	48	app/market-structure.css
-4b72b5fabb47	418	app/mobile-pro.css
+4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
 3da71069ee49	75	app/open-heatmap.css
 84f8f0693036	4	app/page.tsx

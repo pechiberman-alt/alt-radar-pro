@@ -86,12 +86,11 @@
     gap: 2px;
     border: 1px solid rgba(104, 181, 144, .24);
     border-radius: 17px;
-    background: rgba(5, 14, 10, .94);
+    /* Solid fill, no alpha: even at .985 a faint trace of the text behind the bar
+       showed through. The right edge is a little lighter so the bar still reads as
+       continuing past the edge of the screen. */
+    background: linear-gradient(90deg, #050e0a calc(100% - 30px), #0e261c);
     box-shadow: 0 18px 55px rgba(0, 0, 0, .72), inset 0 1px rgba(255, 255, 255, .035);
-    backdrop-filter: blur(24px) saturate(145%);
-    /* A right-edge fade hints that the bar keeps going, the same way a
-       carousel or a horizontally-scrolling menu signals more content. */
-    mask-image: linear-gradient(90deg, #000 calc(100% - 30px), transparent);
   }
   .mobile-nav::-webkit-scrollbar { display: none; }
   .mobile-nav button {
