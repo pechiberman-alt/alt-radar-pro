@@ -81,8 +81,8 @@ export default function LabPiso() {
         sale de la evaluación (después del {ESTUDIO_META.corte.split("-").reverse().join("/")}): verde con ventaja, ámbar sin conclusión, rojo sin ventaja, gris el
         control al azar.
       </p>
-      <svg className="piso-svg" viewBox="0 0 440 250" role="group" aria-label="Escritorios de los agentes">
-        <polygon className="piso-suelo" points={`${iso(-0.6, -0.6).x},${iso(-0.6, -0.6).y} ${iso(3.5, -0.6).x},${iso(3.5, -0.6).y} ${iso(3.5, 1.8).x},${iso(3.5, 1.8).y} ${iso(-0.6, 1.8).x},${iso(-0.6, 1.8).y}`} />
+      <svg className="piso-svg" viewBox="0 0 440 312" role="group" aria-label="Escritorios de los agentes">
+        <polygon className="piso-suelo" points={`${iso(-0.6, -0.6).x},${iso(-0.6, -0.6).y} ${iso(3.5, -0.6).x},${iso(3.5, -0.6).y} ${iso(3.5, 3.8).x},${iso(3.5, 3.8).y} ${iso(-0.6, 3.8).x},${iso(-0.6, 3.8).y}`} />
         {lugares.map(({ x, c, r }) => (
           <Escritorio key={x.id} a={x} c={c} r={r} activo={x.id === a?.id} elegir={() => setElegido(x.id)} />
         ))}

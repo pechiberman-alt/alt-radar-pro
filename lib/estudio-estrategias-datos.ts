@@ -349,6 +349,226 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasConOperaciones": 10
   },
   {
+    "estrategia": "ST_VWAP",
+    "agente": "Agente Supertrend + VWAP",
+    "nombre": "Supertrend + EMA 200 con VWAP semanal",
+    "regla": "Igual que el Agente Supertrend, y además exige el cierre del lado favorable del VWAP anclado al lunes (arriba para largos, abajo para cortos). Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 3503,
+      "ganadas": 1576,
+      "winRate": 0.4499,
+      "tasaTp1": 0.5589,
+      "tasaTp2": 0.3251,
+      "tasaTp3": 0.2001,
+      "tasaSl": 0.3917,
+      "profitFactor": 1.1498,
+      "expectancia": 0.0695,
+      "expectanciaIc": {
+        "low": 0.0373,
+        "high": 0.1017
+      },
+      "netoR": 243.3702,
+      "maxCaidaR": 143.3506
+    },
+    "evaluacion": {
+      "operaciones": 1630,
+      "ganadas": 666,
+      "winRate": 0.4086,
+      "tasaTp1": 0.5411,
+      "tasaTp2": 0.3098,
+      "tasaTp3": 0.1896,
+      "tasaSl": 0.4344,
+      "profitFactor": 0.966,
+      "expectancia": -0.0177,
+      "expectanciaIc": {
+        "low": -0.0652,
+        "high": 0.0297
+      },
+      "netoR": -28.8873,
+      "maxCaidaR": 65.1416
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 4,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_PERFIL",
+    "agente": "Agente Supertrend + Perfil",
+    "nombre": "Supertrend + EMA 200 con perfil de volumen",
+    "regla": "Igual que el Agente Supertrend, y además exige el cierre del lado favorable del POC del perfil de volumen de 200 velas (arriba para largos, abajo para cortos). Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 3382,
+      "ganadas": 1502,
+      "winRate": 0.4441,
+      "tasaTp1": 0.555,
+      "tasaTp2": 0.3223,
+      "tasaTp3": 0.1922,
+      "tasaSl": 0.3995,
+      "profitFactor": 1.1061,
+      "expectancia": 0.0499,
+      "expectanciaIc": {
+        "low": 0.0173,
+        "high": 0.0824
+      },
+      "netoR": 168.6914,
+      "maxCaidaR": 109.3977
+    },
+    "evaluacion": {
+      "operaciones": 1580,
+      "ganadas": 639,
+      "winRate": 0.4044,
+      "tasaTp1": 0.5399,
+      "tasaTp2": 0.3114,
+      "tasaTp3": 0.1962,
+      "tasaSl": 0.4361,
+      "profitFactor": 0.9734,
+      "expectancia": -0.0139,
+      "expectanciaIc": {
+        "low": -0.0625,
+        "high": 0.0346
+      },
+      "netoR": -22.0325,
+      "maxCaidaR": 69.4261
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 4,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_VWAP_PERFIL",
+    "agente": "Agente Supertrend + VWAP + Perfil",
+    "nombre": "Supertrend + EMA 200 con VWAP y perfil",
+    "regla": "Igual que el Agente Supertrend, y además exige el cierre del lado favorable del VWAP semanal y del POC de 200 velas a la vez. Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 3219,
+      "ganadas": 1462,
+      "winRate": 0.4542,
+      "tasaTp1": 0.5635,
+      "tasaTp2": 0.3302,
+      "tasaTp3": 0.2022,
+      "tasaSl": 0.392,
+      "profitFactor": 1.1692,
+      "expectancia": 0.0782,
+      "expectanciaIc": {
+        "low": 0.0444,
+        "high": 0.1119
+      },
+      "netoR": 251.5945,
+      "maxCaidaR": 97.671
+    },
+    "evaluacion": {
+      "operaciones": 1481,
+      "ganadas": 594,
+      "winRate": 0.4011,
+      "tasaTp1": 0.5388,
+      "tasaTp2": 0.3086,
+      "tasaTp3": 0.1911,
+      "tasaSl": 0.4369,
+      "profitFactor": 0.9556,
+      "expectancia": -0.0233,
+      "expectanciaIc": {
+        "low": -0.0732,
+        "high": 0.0265
+      },
+      "netoR": -34.5281,
+      "maxCaidaR": 62.1689
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 4,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_MTF",
+    "agente": "Agente Supertrend MTF",
+    "nombre": "Supertrend + EMA 200 con confirmación del marco superior (HTF)",
+    "regla": "Igual que el Agente Supertrend, y además el Supertrend del marco superior ya cerrado (diario en velas de 4 h; 4 h en velas de 1 h) tiene que ir en el mismo sentido. Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 2932,
+      "ganadas": 1296,
+      "winRate": 0.442,
+      "tasaTp1": 0.5597,
+      "tasaTp2": 0.3342,
+      "tasaTp3": 0.204,
+      "tasaSl": 0.411,
+      "profitFactor": 1.1169,
+      "expectancia": 0.0562,
+      "expectanciaIc": {
+        "low": 0.0205,
+        "high": 0.0919
+      },
+      "netoR": 164.8454,
+      "maxCaidaR": 118.6015
+    },
+    "evaluacion": {
+      "operaciones": 1426,
+      "ganadas": 571,
+      "winRate": 0.4004,
+      "tasaTp1": 0.5414,
+      "tasaTp2": 0.3093,
+      "tasaTp3": 0.183,
+      "tasaSl": 0.4488,
+      "profitFactor": 0.9197,
+      "expectancia": -0.0428,
+      "expectanciaIc": {
+        "low": -0.0933,
+        "high": 0.0077
+      },
+      "netoR": -61.0625,
+      "maxCaidaR": 103.7148
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 4,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_MTF_VOL",
+    "agente": "Agente Supertrend MTF + Volumen",
+    "nombre": "Supertrend MTF con volumen de ruptura",
+    "regla": "Igual que el Agente Supertrend MTF, y además el volumen de la vela de señal es al menos 1,5 veces el promedio de las 20 anteriores. Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 1923,
+      "ganadas": 873,
+      "winRate": 0.454,
+      "tasaTp1": 0.5642,
+      "tasaTp2": 0.3375,
+      "tasaTp3": 0.2033,
+      "tasaSl": 0.3874,
+      "profitFactor": 1.1838,
+      "expectancia": 0.0846,
+      "expectanciaIc": {
+        "low": 0.0409,
+        "high": 0.1283
+      },
+      "netoR": 162.6705,
+      "maxCaidaR": 88.3346
+    },
+    "evaluacion": {
+      "operaciones": 870,
+      "ganadas": 345,
+      "winRate": 0.3966,
+      "tasaTp1": 0.546,
+      "tasaTp2": 0.3011,
+      "tasaTp3": 0.1724,
+      "tasaSl": 0.431,
+      "profitFactor": 0.9097,
+      "expectancia": -0.0469,
+      "expectanciaIc": {
+        "low": -0.1101,
+        "high": 0.0163
+      },
+      "netoR": -40.7791,
+      "maxCaidaR": 61.416
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 5,
+    "monedasConOperaciones": 10
+  },
+  {
     "estrategia": "AZAR",
     "agente": "Agente Control (azar)",
     "nombre": "Entrada al azar (control)",
@@ -698,6 +918,226 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "VENTAJA",
     "monedasPositivas": 10,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_VWAP",
+    "agente": "Agente Supertrend + VWAP",
+    "nombre": "Supertrend + EMA 200 con VWAP semanal",
+    "regla": "Igual que el Agente Supertrend, y además exige el cierre del lado favorable del VWAP anclado al lunes (arriba para largos, abajo para cortos). Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 928,
+      "ganadas": 409,
+      "winRate": 0.4407,
+      "tasaTp1": 0.5313,
+      "tasaTp2": 0.305,
+      "tasaTp3": 0.194,
+      "tasaSl": 0.4159,
+      "profitFactor": 1.0809,
+      "expectancia": 0.0392,
+      "expectanciaIc": {
+        "low": -0.0235,
+        "high": 0.1019
+      },
+      "netoR": 36.3716,
+      "maxCaidaR": 89.4687
+    },
+    "evaluacion": {
+      "operaciones": 434,
+      "ganadas": 209,
+      "winRate": 0.4816,
+      "tasaTp1": 0.5876,
+      "tasaTp2": 0.3525,
+      "tasaTp3": 0.2281,
+      "tasaSl": 0.4009,
+      "profitFactor": 1.3623,
+      "expectancia": 0.1643,
+      "expectanciaIc": {
+        "low": 0.069,
+        "high": 0.2596
+      },
+      "netoR": 71.3203,
+      "maxCaidaR": 21.4123
+    },
+    "veredicto": "VENTAJA",
+    "monedasPositivas": 10,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_PERFIL",
+    "agente": "Agente Supertrend + Perfil",
+    "nombre": "Supertrend + EMA 200 con perfil de volumen",
+    "regla": "Igual que el Agente Supertrend, y además exige el cierre del lado favorable del POC del perfil de volumen de 200 velas (arriba para largos, abajo para cortos). Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 813,
+      "ganadas": 370,
+      "winRate": 0.4551,
+      "tasaTp1": 0.5498,
+      "tasaTp2": 0.3358,
+      "tasaTp3": 0.2153,
+      "tasaSl": 0.417,
+      "profitFactor": 1.1843,
+      "expectancia": 0.0878,
+      "expectanciaIc": {
+        "low": 0.019,
+        "high": 0.1566
+      },
+      "netoR": 71.3712,
+      "maxCaidaR": 54.6313
+    },
+    "evaluacion": {
+      "operaciones": 374,
+      "ganadas": 173,
+      "winRate": 0.4626,
+      "tasaTp1": 0.5642,
+      "tasaTp2": 0.3503,
+      "tasaTp3": 0.2353,
+      "tasaSl": 0.4171,
+      "profitFactor": 1.2862,
+      "expectancia": 0.1344,
+      "expectanciaIc": {
+        "low": 0.0309,
+        "high": 0.238
+      },
+      "netoR": 50.2829,
+      "maxCaidaR": 19.5738
+    },
+    "veredicto": "VENTAJA",
+    "monedasPositivas": 9,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_VWAP_PERFIL",
+    "agente": "Agente Supertrend + VWAP + Perfil",
+    "nombre": "Supertrend + EMA 200 con VWAP y perfil",
+    "regla": "Igual que el Agente Supertrend, y además exige el cierre del lado favorable del VWAP semanal y del POC de 200 velas a la vez. Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 804,
+      "ganadas": 366,
+      "winRate": 0.4552,
+      "tasaTp1": 0.551,
+      "tasaTp2": 0.3383,
+      "tasaTp3": 0.2177,
+      "tasaSl": 0.4192,
+      "profitFactor": 1.1888,
+      "expectancia": 0.0903,
+      "expectanciaIc": {
+        "low": 0.0208,
+        "high": 0.1598
+      },
+      "netoR": 72.612,
+      "maxCaidaR": 54.8946
+    },
+    "evaluacion": {
+      "operaciones": 371,
+      "ganadas": 171,
+      "winRate": 0.4609,
+      "tasaTp1": 0.5633,
+      "tasaTp2": 0.3504,
+      "tasaTp3": 0.2345,
+      "tasaSl": 0.4151,
+      "profitFactor": 1.2855,
+      "expectancia": 0.1338,
+      "expectanciaIc": {
+        "low": 0.03,
+        "high": 0.2375
+      },
+      "netoR": 49.6297,
+      "maxCaidaR": 19.5738
+    },
+    "veredicto": "VENTAJA",
+    "monedasPositivas": 9,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_MTF",
+    "agente": "Agente Supertrend MTF",
+    "nombre": "Supertrend + EMA 200 con confirmación del marco superior (HTF)",
+    "regla": "Igual que el Agente Supertrend, y además el Supertrend del marco superior ya cerrado (diario en velas de 4 h; 4 h en velas de 1 h) tiene que ir en el mismo sentido. Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 812,
+      "ganadas": 374,
+      "winRate": 0.4606,
+      "tasaTp1": 0.5579,
+      "tasaTp2": 0.3399,
+      "tasaTp3": 0.2106,
+      "tasaSl": 0.3978,
+      "profitFactor": 1.2139,
+      "expectancia": 0.0989,
+      "expectanciaIc": {
+        "low": 0.0309,
+        "high": 0.167
+      },
+      "netoR": 80.3315,
+      "maxCaidaR": 59.6996
+    },
+    "evaluacion": {
+      "operaciones": 375,
+      "ganadas": 173,
+      "winRate": 0.4613,
+      "tasaTp1": 0.5653,
+      "tasaTp2": 0.3467,
+      "tasaTp3": 0.2187,
+      "tasaSl": 0.4187,
+      "profitFactor": 1.2699,
+      "expectancia": 0.1284,
+      "expectanciaIc": {
+        "low": 0.0256,
+        "high": 0.2312
+      },
+      "netoR": 48.1445,
+      "maxCaidaR": 21.2185
+    },
+    "veredicto": "VENTAJA",
+    "monedasPositivas": 10,
+    "monedasConOperaciones": 10
+  },
+  {
+    "estrategia": "ST_MTF_VOL",
+    "agente": "Agente Supertrend MTF + Volumen",
+    "nombre": "Supertrend MTF con volumen de ruptura",
+    "regla": "Igual que el Agente Supertrend MTF, y además el volumen de la vela de señal es al menos 1,5 veces el promedio de las 20 anteriores. Stop en la línea del Supertrend. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 483,
+      "ganadas": 229,
+      "winRate": 0.4741,
+      "tasaTp1": 0.5611,
+      "tasaTp2": 0.3582,
+      "tasaTp3": 0.234,
+      "tasaSl": 0.3665,
+      "profitFactor": 1.4027,
+      "expectancia": 0.1749,
+      "expectanciaIc": {
+        "low": 0.0852,
+        "high": 0.2646
+      },
+      "netoR": 84.4737,
+      "maxCaidaR": 38.1101
+    },
+    "evaluacion": {
+      "operaciones": 227,
+      "ganadas": 116,
+      "winRate": 0.511,
+      "tasaTp1": 0.5859,
+      "tasaTp2": 0.37,
+      "tasaTp3": 0.2511,
+      "tasaSl": 0.3877,
+      "profitFactor": 1.5391,
+      "expectancia": 0.2368,
+      "expectanciaIc": {
+        "low": 0.1021,
+        "high": 0.3714
+      },
+      "netoR": 53.75,
+      "maxCaidaR": 13.421
+    },
+    "veredicto": "VENTAJA",
+    "monedasPositivas": 9,
     "monedasConOperaciones": 10
   },
   {

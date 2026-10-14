@@ -10,7 +10,7 @@
 import { escaleraHacia, recorrer, type Lado } from "./escalera.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
-export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "SUPERTREND" | "AZAR";
+export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "AZAR";
 
 /** Lo que una estrategia propone en la vela i: lado, stop y objetivo final (TP3). Sin señal, null. */
 export type Senal = { lado: Lado; stop: number; objetivo: number };
@@ -29,6 +29,14 @@ export type Indicadores = {
   /** Supertrend (ATR 10, multiplicador 3): la línea y la dirección (1 alcista, -1 bajista; NaN sin datos). */
   stLinea: number[];
   stDir: number[];
+  /** VWAP anclado al lunes 00:00 UTC de cada semana (precio típico por volumen, hasta la vela i inclusive). */
+  vwap: number[];
+  /** Punto de control (POC) del perfil de volumen de las últimas 200 velas: el precio donde más volumen se operó. */
+  poc: number[];
+  /** Dirección del Supertrend (10, 3) del marco superior (HTF) ya cerrado: diario si las velas son de 4 h o más, de 4 h si son menores. */
+  htfDir: number[];
+  /** Volumen de la vela dividido por el promedio de las 20 velas anteriores (NaN sin historia o sin volumen). */
+  volRel: number[];
 };
 
 export type Estrategia = {
@@ -130,6 +138,107 @@ export function supertrend(v: SwingCandle[], n = 10, m = 3): { linea: number[]; 
   return { linea, dir };
 }
 
+/** Semana de la vela (lunes a domingo, UTC): el VWAP se reinicia cada lunes. */
+const semanaDe = (t: number) => Math.floor((t - 4 * 86_400_000) / (7 * 86_400_000));
+
+/** VWAP anclado a la semana. En i usa solo velas de la misma semana hasta i; sin volumen, NaN. */
+export function vwapSemanal(v: SwingCandle[]): number[] {
+  const out = new Array<number>(v.length).fill(Number.NaN);
+  let semana = Number.NaN;
+  let pv = 0;
+  let vol = 0;
+  for (let i = 0; i < v.length; i += 1) {
+    const s = semanaDe(v[i].openTime);
+    if (s !== semana) {
+      semana = s;
+      pv = 0;
+      vol = 0;
+    }
+    pv += ((v[i].high + v[i].low + v[i].close) / 3) * v[i].volume;
+    vol += v[i].volume;
+    if (vol > 0) out[i] = pv / vol;
+  }
+  return out;
+}
+
+const PERFIL_VELAS = 200;
+const PERFIL_NIVELES = 24;
+
+/** POC del perfil de volumen de las últimas 200 velas (24 niveles; el volumen de cada vela va al nivel de su precio típico). */
+export function pocPerfil(v: SwingCandle[]): number[] {
+  const out = new Array<number>(v.length).fill(Number.NaN);
+  for (let i = PERFIL_VELAS - 1; i < v.length; i += 1) {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let j = i - PERFIL_VELAS + 1; j <= i; j += 1) {
+      lo = Math.min(lo, v[j].low);
+      hi = Math.max(hi, v[j].high);
+    }
+    if (!(hi > lo)) continue;
+    const ancho = (hi - lo) / PERFIL_NIVELES;
+    const nivel = new Array<number>(PERFIL_NIVELES).fill(0);
+    for (let j = i - PERFIL_VELAS + 1; j <= i; j += 1) {
+      const tipico = (v[j].high + v[j].low + v[j].close) / 3;
+      nivel[Math.min(PERFIL_NIVELES - 1, Math.floor((tipico - lo) / ancho))] += v[j].volume;
+    }
+    let mejor = 0;
+    for (let k = 1; k < PERFIL_NIVELES; k += 1) if (nivel[k] > nivel[mejor]) mejor = k;
+    if (nivel[mejor] > 0) out[i] = lo + (mejor + 0.5) * ancho;
+  }
+  return out;
+}
+
+/**
+ * Dirección del Supertrend del marco superior en cada vela. Solo cuenta la vela superior ya cerrada: dentro del día
+ * (o de las 4 h) en curso se usa la anterior, así que nada mira adelante.
+ */
+export function direccionHtf(v: SwingCandle[]): number[] {
+  const out = new Array<number>(v.length).fill(Number.NaN);
+  if (v.length < 2) return out;
+  const marco = v[1].openTime - v[0].openTime;
+  const cubo = marco >= 4 * 3_600_000 ? 86_400_000 : 4 * 3_600_000;
+  const sup: SwingCandle[] = [];
+  const claveDe = (i: number) => Math.floor(v[i].openTime / cubo);
+  const idx = new Array<number>(v.length);
+  let ultima = Number.NaN;
+  for (let i = 0; i < v.length; i += 1) {
+    const k = claveDe(i);
+    if (k !== ultima) {
+      ultima = k;
+      sup.push({ openTime: k * cubo, open: v[i].open, high: v[i].high, low: v[i].low, close: v[i].close, volume: v[i].volume } as SwingCandle);
+    } else {
+      const b = sup[sup.length - 1];
+      b.high = Math.max(b.high, v[i].high);
+      b.low = Math.min(b.low, v[i].low);
+      b.close = v[i].close;
+      b.volume += v[i].volume;
+    }
+    idx[i] = sup.length - 1;
+  }
+  const dir = supertrend(sup, 10, 3).dir;
+  for (let i = 0; i < v.length; i += 1) {
+    const cierraAqui = v[i].openTime + marco >= (claveDe(i) + 1) * cubo;
+    const d = cierraAqui ? idx[i] : idx[i] - 1;
+    if (d >= 0) out[i] = dir[d];
+  }
+  return out;
+}
+
+/** Volumen relativo: el de la vela contra el promedio de las 20 anteriores (sin incluirla), así que no mira adelante. */
+export function volumenRelativo(v: SwingCandle[], n = 20): number[] {
+  const out = new Array<number>(v.length).fill(Number.NaN);
+  let suma = 0;
+  for (let i = 0; i < v.length; i += 1) {
+    if (i >= n) {
+      const media = suma / n;
+      if (media > 0) out[i] = v[i].volume / media;
+      suma -= v[i - n].volume;
+    }
+    suma += v[i].volume;
+  }
+  return out;
+}
+
 export function indicadores(v: SwingCandle[]): Indicadores {
   const c = v.map((x) => x.close);
   const bbMedia = new Array<number>(v.length).fill(Number.NaN);
@@ -153,7 +262,7 @@ export function indicadores(v: SwingCandle[]): Indicadores {
   const senalParcial = primero < 0 ? [] : ema(macd.slice(primero), 9);
   const macdSenal = c.map((_, i) => (primero >= 0 && i >= primero ? senalParcial[i - primero] : Number.NaN));
   const st = supertrend(v, 10, 3);
-  return { ema20: ema(c, 20), ema50: ema(c, 50), ema200: ema(c, 200), rsi14: rsi(c, 14), atr14: atr(v, 14), bbMedia, bbAlta, bbBaja, macd, macdSenal, stLinea: st.linea, stDir: st.dir };
+  return { ema20: ema(c, 20), ema50: ema(c, 50), ema200: ema(c, 200), rsi14: rsi(c, 14), atr14: atr(v, 14), bbMedia, bbAlta, bbBaja, macd, macdSenal, stLinea: st.linea, stDir: st.dir, vwap: vwapSemanal(v), poc: pocPerfil(v), htfDir: direccionHtf(v), volRel: volumenRelativo(v) };
 }
 
 const ok = (...xs: number[]) => xs.every((x) => Number.isFinite(x));
@@ -273,6 +382,54 @@ export const ESTRATEGIAS: Estrategia[] = [
       const c = v[i].close;
       if (d[i - 1] === -1 && d[i] === 1 && c > e[i] && l[i] < c) return conRR("LONG", c, l[i], 2);
       if (d[i - 1] === 1 && d[i] === -1 && c < e[i] && l[i] > c) return conRR("SHORT", c, l[i], 2);
+      return null;
+    },
+  },
+  ...[
+    { id: "ST_VWAP", agente: "Agente Supertrend + VWAP", nombre: "Supertrend + EMA 200 con VWAP semanal", usaVwap: true, usaPerfil: false, extra: "el cierre del lado favorable del VWAP anclado al lunes (arriba para largos, abajo para cortos)" },
+    { id: "ST_PERFIL", agente: "Agente Supertrend + Perfil", nombre: "Supertrend + EMA 200 con perfil de volumen", usaVwap: false, usaPerfil: true, extra: "el cierre del lado favorable del POC del perfil de volumen de 200 velas (arriba para largos, abajo para cortos)" },
+    { id: "ST_VWAP_PERFIL", agente: "Agente Supertrend + VWAP + Perfil", nombre: "Supertrend + EMA 200 con VWAP y perfil", usaVwap: true, usaPerfil: true, extra: "el cierre del lado favorable del VWAP semanal y del POC de 200 velas a la vez" },
+  ].map(
+    (f): Estrategia => ({
+      id: f.id as EstrategiaId,
+      agente: f.agente,
+      nombre: f.nombre,
+      regla: `Igual que el Agente Supertrend, y además exige ${f.extra}. Stop en la línea del Supertrend. Objetivo 2 R.`,
+      senal: (v, ind, i) => {
+        const { stLinea: l, stDir: d, ema200: e, vwap: w, poc: p } = ind;
+        if (i < 1 || !ok(l[i], d[i], d[i - 1], e[i]) || (f.usaVwap && !ok(w[i])) || (f.usaPerfil && !ok(p[i]))) return null;
+        const c = v[i].close;
+        if (d[i - 1] === -1 && d[i] === 1 && c > e[i] && l[i] < c && (!f.usaVwap || c > w[i]) && (!f.usaPerfil || c > p[i])) return conRR("LONG", c, l[i], 2);
+        if (d[i - 1] === 1 && d[i] === -1 && c < e[i] && l[i] > c && (!f.usaVwap || c < w[i]) && (!f.usaPerfil || c < p[i])) return conRR("SHORT", c, l[i], 2);
+        return null;
+      },
+    }),
+  ),
+  {
+    id: "ST_MTF",
+    agente: "Agente Supertrend MTF",
+    nombre: "Supertrend + EMA 200 con confirmación del marco superior (HTF)",
+    regla: "Igual que el Agente Supertrend, y además el Supertrend del marco superior ya cerrado (diario en velas de 4 h; 4 h en velas de 1 h) tiene que ir en el mismo sentido. Stop en la línea del Supertrend. Objetivo 2 R.",
+    senal: (v, ind, i) => {
+      const { stLinea: l, stDir: d, ema200: e, htfDir: h } = ind;
+      if (i < 1 || !ok(l[i], d[i], d[i - 1], e[i], h[i])) return null;
+      const c = v[i].close;
+      if (d[i - 1] === -1 && d[i] === 1 && c > e[i] && l[i] < c && h[i] === 1) return conRR("LONG", c, l[i], 2);
+      if (d[i - 1] === 1 && d[i] === -1 && c < e[i] && l[i] > c && h[i] === -1) return conRR("SHORT", c, l[i], 2);
+      return null;
+    },
+  },
+  {
+    id: "ST_MTF_VOL",
+    agente: "Agente Supertrend MTF + Volumen",
+    nombre: "Supertrend MTF con volumen de ruptura",
+    regla: "Igual que el Agente Supertrend MTF, y además el volumen de la vela de señal es al menos 1,5 veces el promedio de las 20 anteriores. Stop en la línea del Supertrend. Objetivo 2 R.",
+    senal: (v, ind, i) => {
+      const { stLinea: l, stDir: d, ema200: e, htfDir: h, volRel: x } = ind;
+      if (i < 1 || !ok(l[i], d[i], d[i - 1], e[i], h[i], x[i]) || x[i] < 1.5) return null;
+      const c = v[i].close;
+      if (d[i - 1] === -1 && d[i] === 1 && c > e[i] && l[i] < c && h[i] === 1) return conRR("LONG", c, l[i], 2);
+      if (d[i - 1] === 1 && d[i] === -1 && c < e[i] && l[i] > c && h[i] === -1) return conRR("SHORT", c, l[i], 2);
       return null;
     },
   },
