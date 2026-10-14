@@ -12,6 +12,7 @@ import { respuestaLab } from "../lib/lab-jarvis.ts";
 import { operacionDePapel, TOPES, type LimitesRiesgo } from "../lib/lab-riesgo.ts";
 import { fijarBacktest, fijarError, fijarEvaluacion, fotoLab, guardarLimites, LAB_EVENT, registrarActividad } from "../lib/lab-run.ts";
 import { lineaFuente } from "../lib/registro.ts";
+import LabFondeo from "./lab-fondeo";
 import LabPiso from "./lab-piso";
 
 /**
@@ -231,6 +232,7 @@ export default function AiTradingLab() {
 
       {pestana === "agentes" && (
         <div className="lab-cuerpo lab-agentes">
+          <LabFondeo />
           <LabPiso />
           <LabAgenteSt />
           <h3 className="lab-sub">Los agentes de la araña</h3>

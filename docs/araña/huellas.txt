@@ -12,8 +12,8 @@ ebfa1b2412ea	73	CLAUDE.md
 f78d8e271837	683	app/account-panel.tsx
 064cf5eb7605	229	app/active-signals.tsx
 63b274d443fe	122	app/agenda-macro.tsx
-5bfce941a647	200	app/ai-trading-lab.css
-e4c2f43c2bed	402	app/ai-trading-lab.tsx
+5b998df29e38	213	app/ai-trading-lab.css
+ba05a9b882be	404	app/ai-trading-lab.tsx
 bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
@@ -130,6 +130,7 @@ e4aeb9c38840	264	app/jarvis-trading.css
 39c4819ab1a5	121	app/jarvis.css
 9f7dd2bcff90	1692	app/jarvis.tsx
 a0bec1d6e010	165	app/lab-agente-st.tsx
+88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
 e3b51a33d7a3	296	app/lab-piso.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -186,11 +187,12 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-68adbd16d4c5	285	docs/araña/objetivos.md
+870bb8abdbb3	287	docs/araña/objetivos.md
 db6358216fcf	188	docs/busqueda-breaker.md
+fc6042bacccc	116	docs/busqueda-fibonacci.md
 25e7d2744ee2	187	docs/busqueda-linea.md
 5656d4c4c99f	215	docs/busqueda-smc.md
-131e0c69490a	114	docs/estudio-estrategias.md
+615d9e91548e	120	docs/estudio-estrategias.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -256,8 +258,8 @@ c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
 a2c5aeea0e4f	115	lib/escalera.ts
-67f97c20defc	869	lib/estrategias.ts
-098d0ffc8cc1	2170	lib/estudio-estrategias-datos.ts
+786e5c1f3705	891	lib/estrategias.ts
+f5d17a2b3a5b	2311	lib/estudio-estrategias-datos.ts
 ca8f3802c4a6	21	lib/estudio-resumen.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
 450b470bb8bd	173	lib/exchange-reserves.ts
@@ -265,9 +267,11 @@ da42f6c9e464	311	lib/fair-value-gaps.ts
 484df63263f5	69	lib/fear-greed.ts
 6671236724d5	224	lib/fib-backtest.ts
 3738e2191067	114	lib/fib-zone.ts
+a46bc4f80884	173	lib/fibonacci-niveles.ts
 79444f1d6966	115	lib/flujo-db.ts
 7a92c06ed2a2	114	lib/flujo-run.ts
 0e13f43a62cd	163	lib/flujo.ts
+cb5956d08b7e	204	lib/fondeo.ts
 0b2d1bf961da	295	lib/footprint.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
@@ -390,7 +394,7 @@ e9e4bb168a91	53	lib/telegram-magnets.ts
 a250fc69b552	36	lib/telegram-server.ts
 26e6999dc403	166	lib/telegram-voice.ts
 05101ed6c6c5	55	lib/telegram-volume.ts
-8b9615f14489	243	lib/telegram.ts
+7f9f413355fc	249	lib/telegram.ts
 ba55aa5bdb5b	143	lib/token-unlocks.ts
 d0434e2eafe5	81	lib/trade-bubbles.ts
 759b1ffa8280	142	lib/trade-journal.ts
@@ -423,7 +427,8 @@ b36fd1c34b30	183	scripts/herramientas.mjs
 c88ad361f676	292	scripts/investigacion/breaker-busqueda.ts
 a8d206c4cc1f	0	scripts/investigacion/datos-binance.py
 8e25f67c73e7	0	scripts/investigacion/datos.py
-205b5a23f374	251	scripts/investigacion/estrategias.ts
+27df46f46d3c	251	scripts/investigacion/estrategias.ts
+b1afa97975ec	177	scripts/investigacion/fib-busqueda.ts
 c83b5a866c3f	296	scripts/investigacion/linea-busqueda.ts
 36d231690dfe	238	scripts/investigacion/medir.ts
 2dea6b11e55f	236	scripts/investigacion/modelos.ts
@@ -477,7 +482,9 @@ b0ba998c8335	119	tests/etf-flows-multi.test.ts
 eac12ecfb8fb	248	tests/fair-value-gaps.test.ts
 bcdc181f93e6	227	tests/fib-backtest.test.ts
 bc048058d368	97	tests/fib-zone.test.ts
+57c2fff66acf	171	tests/fibonacci-niveles.test.ts
 5598b8ef0544	128	tests/flujo.test.ts
+7c88ec003072	126	tests/fondeo.test.ts
 70e30489d116	109	tests/footprint-signals.test.ts
 d6031202b073	89	tests/footprint-sweeps.test.ts
 79b36d34e65f	119	tests/footprint-verdict.test.ts

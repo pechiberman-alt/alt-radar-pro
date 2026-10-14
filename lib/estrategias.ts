@@ -7,15 +7,22 @@
  * Cada señal se calcula con velas cerradas hasta la vela `i` inclusive; la entrada es la apertura de la vela
  * siguiente y el recorrido usa solo velas posteriores. Una operación por vez por moneda y estrategia.
  */
-import { escaleraHacia, recorrer, type Lado } from "./escalera.ts";
+import { escaleraHacia, escaleraValida, recorrer, type Escalera, type Lado } from "./escalera.ts";
+
+/** La escalera con TP1 y TP2 propios (ya llevados a la entrada real); null si no queda ordenada. */
+function escaleraPropia(lado: Lado, entrada: number, stop: number, tp1: number, tp2: number, tp3: number): Escalera | null {
+  const e: Escalera = { stop, tp1, tp2, tp3 };
+  return [entrada, stop, tp1, tp2, tp3].every(Number.isFinite) && escaleraValida(lado, entrada, e) ? e : null;
+}
 import { BREAK_ATR, findPivots, FLAT_ATR, MIN_SPAN, type Pivot, WICK_ATR } from "./trendlines.ts";
 import type { SwingCandle } from "./swing-entries.ts";
+import { CONFIGURACION_AGENTE_FIB, senalesFib } from "./fibonacci-niveles.ts";
 import { CONFIGURACION_BASE_SMC, DISPARO_DEL_AGENTE, senalesSmc, type FiltroSmc } from "./smc-liquidez.ts";
 
-export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "AZAR";
+export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "FIB_NIVELES" | "AZAR";
 
 /** Lo que una estrategia propone en la vela i: lado, stop y objetivo final (TP3). Sin señal, null. */
-export type Senal = { lado: Lado; stop: number; objetivo: number };
+export type Senal = { lado: Lado; stop: number; objetivo: number; /** Objetivos propios de la estrategia; sin ellos, TP1 y TP2 van a un tercio y dos tercios del camino al TP3. */ tp1?: number; tp2?: number };
 
 export type Indicadores = {
   ema20: number[];
@@ -479,6 +486,12 @@ const conRR = (lado: Lado, entrada: number, stop: number, rr: number): Senal => 
 
 /** Las señales del agente de liquidez, calculadas una vez por serie (son de toda la serie, pero cada una usa solo velas hasta su vela). */
 const SENALES_SMC = new WeakMap<SwingCandle[], Map<FiltroSmc, (i: number) => Senal | null>>();
+const SENALES_FIB = new WeakMap<SwingCandle[], (i: number) => Senal | null>();
+function senalFib(v: SwingCandle[], ind: Indicadores, i: number): Senal | null {
+  let f = SENALES_FIB.get(v);
+  if (!f) SENALES_FIB.set(v, (f = senalesFib(v, ind.atr14, CONFIGURACION_AGENTE_FIB)));
+  return f(i);
+}
 function senalSmc(v: SwingCandle[], ind: Indicadores, filtro: FiltroSmc, i: number): Senal | null {
   let porFiltro = SENALES_SMC.get(v);
   if (!porFiltro) SENALES_SMC.set(v, (porFiltro = new Map()));
@@ -709,6 +722,13 @@ export const ESTRATEGIAS: Estrategia[] = [
     senal: (v, ind, i) => senalSmc(v, ind, "TODO", i),
   },
   {
+    id: "FIB_NIVELES",
+    agente: "Agente Fibonacci + Niveles clave",
+    nombre: "Retroceso de Fibonacci 0,618–0,786 con extensiones 1 / 1,272 / 1,618 y un nivel clave en la zona",
+    regla: "Toma la última pierna de impulso (pivotes de 5 velas, al menos 2 ATR) y espera el retroceso al bolsillo dorado (0,618 a 0,786). Entra en la primera vela que lo toca y cierra a favor, sin cerrar más allá de la zona, solo si el máximo o el mínimo del día o de la semana anteriores cae dentro de la zona (a 0,25 ATR o menos). Stop a 0,25 ATR del origen de la pierna. Objetivos en la escalera de Fibonacci: TP1 en la extensión 1 (volver al extremo del impulso), TP2 en 1,272 y TP3 en 1,618. Una señal por pierna. Configuración fijada de antemano.",
+    senal: (v, ind, i) => senalFib(v, ind, i),
+  },
+  {
     id: "AZAR",
     agente: "Agente Control (azar)",
     nombre: "Entrada al azar (control)",
@@ -764,7 +784,9 @@ export function operarSenales(id: EstrategiaId, symbol: string, v: SwingCandle[]
     if (!(riesgo > 0) || !Number.isFinite(rr)) continue;
     const stop = s.lado === "LONG" ? entrada - riesgo : entrada + riesgo;
     const objetivo = s.lado === "LONG" ? entrada + rr * riesgo : entrada - rr * riesgo;
-    const esc = escaleraHacia(s.lado, entrada, stop, objetivo);
+    const propios = s.tp1 !== undefined && s.tp2 !== undefined;
+    const alR = (p: number) => p + (entrada - v[i].close); // la misma distancia desde la entrada real
+    const esc = propios ? escaleraPropia(s.lado, entrada, stop, alR(s.tp1 as number), alR(s.tp2 as number), objetivo) : escaleraHacia(s.lado, entrada, stop, objetivo);
     if (!esc) continue;
     // La vela de entrada cuenta: la operación vive desde su apertura (se pasa con hora anterior para que entre).
     const tramo = v.slice(i + 1, i + 1 + o.horizonte);
