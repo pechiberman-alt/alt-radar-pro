@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 561 · objetivos: 17 · sin objetivo: 0
-- Tablas D1: 48 · secretos: 4 · variables de entorno: 12 · rutas /api: 53 · hosts: 56
-- Código de navegador: 62 archivos con "use client" que alcanzan 184 · problemas: 0
-- Lib sin prueba directa: 24 de 176
+- Archivos: 576 · objetivos: 17 · sin objetivo: 0
+- Tablas D1: 49 · secretos: 4 · variables de entorno: 12 · rutas /api: 54 · hosts: 56
+- Código de navegador: 63 archivos con "use client" que alcanzan 188 · problemas: 0
+- Lib sin prueba directa: 25 de 183
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (81)
+### jarvis — JARVIS, la IA propia del software (83)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía. · Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -87,12 +87,14 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `lib/speech-text.ts` — What JARVIS writes, turned into what a Spanish voice should say.
 - `scripts/investigacion/README.md` — Investigación de la mesa
 - `scripts/investigacion/aprendizaje.ts` — ¿Puede la mesa aprender?
+- `scripts/investigacion/datos-binance.py`
 - `scripts/investigacion/datos.py`
 - `scripts/investigacion/estrategias.ts` — El estudio de estrategias del AI TRADING LAB: cada agente mide su estrategia (lib/estrategias.ts) en las 10 monedas de datos-investigacion/, con velas de 1 h y de 4 h, y con costos
 - `scripts/investigacion/medir.ts` — Mide las reglas de la mesa en tres períodos que no se superponen, con costos más altos y de más de una manera.
 - `scripts/investigacion/modelos.ts` — Modelos chicos y sin dependencias para la investigación del aprendizaje: regresión ridge, regresión logística con L2, árboles potenciados poco profundos y AUC.
 - `scripts/investigacion/perfiles.ts` — La mesa con otras velas base: 15 min, 1 h (la de la app), 2 h, 4 h, 6 h y 12 h, con las dos versiones de reglas y dos niveles de costo.
 - `scripts/investigacion/precalcular.ts` — Precalcula lo que la mesa veía en cada cierre de 4 velas base (solo velas cerradas) para un perfil de velas.
+- `scripts/investigacion/preregistro-flujo.ts` — Mide el preregistro del flujo (lib/preregistro-flujo.ts): el Agente Supertrend MTF + Volumen en 4 h con cada uno de los cuatro filtros fijados el 14/10/2026, con las mismas velas,
 - `scripts/investigacion/simulador.ts` — Simulador rápido de la mesa sobre lecturas precalculadas (ver precalcular.ts).
 - `scripts/investigacion/util.ts` — Datos y escalas de tiempo de la investigación de la mesa.
 
@@ -219,7 +221,7 @@ Texto: lectura de la cuenta y operaciones con claves del usuario, siempre desde 
 - `lib/futures-log-db.ts` — The real-account futures record, per account.
 - `lib/futures-log.ts` — The record of the person's REAL Binance USDⓈ-M futures activity.
 
-### telegram — Bot: alertas 24/7, comandos y chat con JARVIS (14)
+### telegram — Bot: alertas 24/7, comandos y chat con JARVIS (16)
 Texto: el canal que trabaja con la app cerrada: manda alertas, responde preguntas y comandos, y recibe notas de voz.
 Pendiente: Notas de voz: con Groq si está la clave; si no, Whisper de Workers AI dentro del cupo gratis diario.
 - `app/api/telegram/link/route.ts` — exporta: dynamic, GET, POST, PUT, DELETE
@@ -232,10 +234,12 @@ Pendiente: Notas de voz: con Groq si está la clave; si no, Whisper de Workers A
 - `lib/telegram-dispatch.ts` — Runs from the Worker cron every 5 minutes: collects what happened since the last run and sends each linked user what their preferences ask for.
 - `lib/telegram-jarvis.ts` — Telegram messages from JARVIS CORE: each signal it takes (with the plan and what it had learned about that kind of signal), each one it closes (with the result and the running reco
 - `lib/telegram-magnets.ts` — Liquidation-magnet alerts from the server, so they reach the phone with the app closed: BTC, ETH and SOL on 1h.
+- `lib/telegram-moneda.ts` — Las monedas que la persona pide por nombre en Telegram y JARVIS no vigila (por ejemplo ONDO): se detecta cuál pidió y se arma una lectura corta de 4 h con los mismos indicadores de
 - `lib/telegram-server.ts` — Lo que comparten las rutas de Telegram: el esquema de la tabla, el nombre del bot y el registro del webhook (solo se vuelve a registrar cuando Telegram tiene otra URL, así que vinc
 - `lib/telegram-voice.ts` — JARVIS on Telegram by voice.
 - `lib/telegram-volume.ts` — Unusual volume for Telegram, computed from public candles in the Worker so it works with every browser closed.
 - `lib/telegram.ts` — Telegram alerts: the pure parts.
+- `tests/telegram-moneda.test.ts` — pruebas: candidatos: la palabra suelta, la que está en mayúsculas y la que sigue a «de» o, lectura: usa solo velas cerradas y no inventa lo que falta, resumen del estudio: dice quién dio positivo, si sobrevive a la auditoría y que 
 
 ### alertas — Avisos de la app: push del navegador y centro de alertas (8)
 Texto: lo que llega al navegador o al celular cuando algo pasa.
@@ -365,34 +369,45 @@ Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada ar
 - `tests/herramientas.test.ts` — Las herramientas para gastar pocos tokens: el resumen de `npm run verificar` tiene que mostrar lo que falla y nada más, `npm run subir` tiene que frenar secretos, archivos protegid
 - `tests/mesa-medicion.test.ts` — pruebas: la fila de los tres períodos largos en la doc coincide con lo que muestra la ara, el PSR, el DSR con las reglas probadas y con 300 están escritos en la doc, el PBO está en la doc con el mismo número que muestra la araña (+1)
 
-### registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente (10)
+### registro — El registro unificado de operaciones: acierto, profit factor y expectancia de cada fuente (15)
 Texto: el único lugar donde la app calcula el acierto, el profit factor y la expectancia. Cada fuente (JARVIS, el bot de papel, el robot) con su muestra y su intervalo; lo que no se pudo leer dice «sin datos», no cero.
+- `app/api/registro/agente-st/route.ts` — exporta: dynamic, GET, POST
 - `app/api/registro/flujo/route.ts` — exporta: dynamic, GET, POST
 - `app/api/registro/route.ts` — exporta: dynamic, GET
+- `lib/agente-st-db.ts` — Las entradas del agente de papel Supertrend MTF + Volumen (lib/agente-st.ts), por cuenta: una fila por moneda y vela de señal (clave única), con su plan fijado al detectarla, su fo
+- `lib/agente-st-run.ts` — El agente de papel Supertrend MTF + Volumen para tu cuenta, desde el navegador (reglas en lib/agente-st.ts).
+- `lib/agente-st.ts` — El agente de papel «Supertrend MTF + Volumen» (PLAN_ST_1): la estrategia que el estudio del laboratorio midió en el pasado (lib/estrategias.ts, id ST_MTF_VOL) corriendo hacia adela
 - `lib/flujo-db.ts` — Las operaciones del flujo de órdenes, por cuenta: una fila por lectura (clave única por símbolo, lado y media hora), con su plan fijado al detectarla y su resultado cuando el naveg
 - `lib/flujo-run.ts` — El flujo de órdenes para tu cuenta, desde el navegador.
 - `lib/flujo.ts` — Las lecturas del flujo de órdenes como operaciones medidas.
 - `lib/registro-db.ts` — La lectura del registro unificado desde la base (lib/registro.ts hace la cuenta).
 - `lib/registro-run.ts` — El registro para la app y la araña: lo lee el navegador de GET /api/registro como mucho cada 5 minutos, y solo con la pestaña visible.
 - `lib/registro.ts` — El registro unificado de operaciones: el único lugar donde la app calcula el acierto, el profit factor y la expectancia.
+- `tests/agente-st.test.ts` — El agente de papel Supertrend MTF + Volumen: la señal sale de velas cerradas (nunca de las que vienen), solo largos y solo con BTC alcista; lo que manda el navegador se revisa y la
 - `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (13)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (19)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
+- `app/lab-agente-st.tsx` — El agente de papel Supertrend MTF + Volumen (lib/agente-st.ts): sus últimas entradas con el plan completo (SL, TP1, TP2 y TP3), qué niveles tocó cada una y la foto de condiciones c
 - `app/lab-piso.tsx` — El piso de estrategias del AI TRADING LAB: una vista isométrica con un escritorio por agente, cada uno estudiando UNA estrategia.
 - `docs/estudio-estrategias.md` — Estudio de estrategias del AI TRADING LAB
 - `lib/estrategias.ts` — El estudio de estrategias del AI TRADING LAB: cada agente tiene UNA estrategia clásica con parámetros fijos (no se buscan los que mejor dan: eso infla los resultados) y todas se mi
 - `lib/estudio-estrategias-datos.ts` — Resultado del estudio de estrategias (scripts/investigacion/estrategias.ts).
+- `lib/estudio-resumen.ts` — Un resumen corto y honesto del estudio de estrategias del laboratorio, para que JARVIS (Telegram y la app) hable de lo mismo que muestra el piso: qué estrategias tuvieron ventaja m
 - `lib/lab-evaluacion.ts` — La evaluación del AI TRADING LAB sobre un backtest de la mesa (lib/jarvis-backtest.ts): parte el período en DESARROLLO y EVALUACIÓN por fecha (corte fijado antes de mirar), y en ca
 - `lib/lab-jarvis.ts` — JARVIS sobre el AI TRADING LAB: contesta con los datos reales de la foto del laboratorio (lib/lab.ts) qué hace la araña, qué encontró, qué estrategias se evalúan, cuál rinde mejor
 - `lib/lab-riesgo.ts` — El gestor de riesgo central del AI TRADING LAB: una sola compuerta para toda operación simulada, en el motor de papel del navegador y en la API del servidor (no solo en la pantalla
 - `lib/lab-run.ts` — El AI TRADING LAB en el navegador: guarda los límites de riesgo que eligió la persona (dentro de los topes de lib/lab-riesgo.ts) y anota la actividad del laboratorio con su hora (r
 - `lib/lab.ts` — AI TRADING LAB: la foto del laboratorio armada con lo que la app ya tiene (la araña en vivo, el backtest, el papel, el registro y el gestor de riesgo).
+- `lib/preregistro-flujo.ts` — Preregistro del flujo real: cuatro filtros sobre el Agente Supertrend MTF + Volumen, fijados el 14/10/2026 ANTES de mirar datos de volumen taker, funding u open interest.
+- `lib/sobreajuste.ts` — Auditoría de sobreajuste: cuánto de un buen resultado puede ser suerte por haber probado muchas variantes.
 - `tests/estrategias.test.ts` — pruebas: indicadores: EMA y RSI conocidos, ninguna estrategia mira el futuro: la señal en i no cambia si se borran las vela, operar: entra a la apertura siguiente, una operación por vez, con la escalera de (+1)
 - `tests/lab.test.ts` — AI TRADING LAB: el gestor de riesgo central frena lo que pasa los límites y nadie lo afloja más allá de los topes; la evaluación del backtest respeta la cronología; el centro de la
+- `tests/preregistro-flujo.test.ts` — Tests del preregistro del flujo (lib/preregistro-flujo.ts): cada filtro usa solo datos conocidos al cierre de la vela de la señal (no mira el futuro) y un dato faltante no aprueba
+- `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 
 ### calidad — Pruebas (132)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
@@ -633,6 +648,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Tablas D1
 
+- `agente_st_senales` — crea: lib/agente-st-db.ts · usa: lib/agente-st-db.ts · índices: agente_st_senales_reciente
 - `ai_free_usage` — crea: lib/ai-brains.ts, tests/telegram-voice.test.ts · usa: lib/ai-brains.ts, tests/ai-brains.test.ts, tests/jarvis-mind.test.ts, tests/telegram-voice.test.ts · sin índice visible en el código
 - `ai_probe` — crea: lib/ai-probe.ts · usa: lib/ai-probe.ts · sin índice visible en el código
 - `ai_usage` — crea: lib/ai-analyst-server.ts · usa: lib/ai-analyst-server.ts, tests/ai-brains.test.ts · sin índice visible en el código
@@ -744,6 +760,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/push/subscribe` [POST, DELETE] — app/api/push/subscribe/route.ts · alertas
 - `/api/radar` [GET] — app/api/radar/route.ts · senales-radar
 - `/api/registro` [GET] — app/api/registro/route.ts · registro
+- `/api/registro/agente-st` [GET, POST] — app/api/registro/agente-st/route.ts · registro
 - `/api/registro/flujo` [GET, POST] — app/api/registro/flujo/route.ts · registro
 - `/api/robot/signal` [GET, POST] — app/api/robot/signal/route.ts · robots-papel
 - `/api/rolling` [GET] — app/api/rolling/route.ts · datos-mercado
@@ -818,9 +835,9 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-piso.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-piso.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/estudio-estrategias-datos.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/estudio-estrategias-datos.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

@@ -126,6 +126,7 @@ export function validarRecorridoFlujo(
   op: { lado: Lado; vela: number; entrada: number; stop: number; tp3: number },
   raw: unknown,
   ahora: number,
+  feePct: number = COMISION_FLUJO_PCT,
 ): { ok: true; recorrido: RecorridoFlujo } | { ok: false; error: string } {
   const bad = (error: string) => ({ ok: false as const, error });
   if (!raw || typeof raw !== "object") return bad("El recorrido no tiene forma.");
@@ -151,7 +152,11 @@ export function validarRecorridoFlujo(
     if (rec.slAt === null || salida !== op.stop) return bad("Un stop cierra al precio del stop.");
   } else if (desenlace === "TP3") {
     if (rec.tp3At === null || salida !== op.tp3) return bad("Un objetivo cierra al precio del TP3.");
+  } else {
+    // Por tiempo: el cierre quedó entre el stop y el TP3; si los hubiera cruzado, la operación habría terminado ahí.
+    const dentro = op.lado === "LONG" ? salida > op.stop && salida < op.tp3 : salida < op.stop && salida > op.tp3;
+    if (!dentro) return bad("Una salida por tiempo cierra entre el stop y el TP3.");
   }
-  const r = resultadoR(op.lado, op.entrada, op.stop, salida, COMISION_FLUJO_PCT);
+  const r = resultadoR(op.lado, op.entrada, op.stop, salida, feePct);
   return { ok: true, recorrido: { ...rec, desenlace, salida, r } };
 }

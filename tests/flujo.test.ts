@@ -88,6 +88,10 @@ test("recorrido: a stop closes at the stop's price, a target at the TP3's; open 
   assert.ok(sl.recorrido.r! < -1, "a stop costs one R plus the fee");
   assert.equal(validarRecorridoFlujo(OP, { slAt: 1_200_000, desenlace: "SL", cerradaA: 1_200_000, salida: 97, tp1At: null, tp2At: null, tp3At: null }, ahora).ok, false, "a stop at another price is refused");
   assert.equal(validarRecorridoFlujo(OP, { slAt: null, tp1At: 1_100_000, tp2At: 1_300_000, tp3At: 1_200_000, desenlace: "TP3", cerradaA: 1_200_000, salida: 103 }, ahora).ok, false, "TP2 after TP3 is refused");
+  const tiempo = (salida: number) => validarRecorridoFlujo(OP, { slAt: null, tp1At: null, tp2At: null, tp3At: null, desenlace: "TIEMPO", cerradaA: 1_200_000, salida }, ahora).ok;
+  assert.equal(tiempo(100.5), true, "a time exit between stop and TP3 is accepted");
+  assert.equal(tiempo(500), false, "a time exit beyond TP3 would have closed at TP3: refused, so R cannot be inflated");
+  assert.equal(tiempo(98), false, "a time exit at or below the stop would have been a stop");
 });
 
 test("no look at the future: an hour after now, or not after the candle, is refused", () => {

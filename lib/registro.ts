@@ -9,7 +9,7 @@ import { wilson } from "./jarvis-stats.ts";
 /** Por debajo de esta cantidad de operaciones cerradas el porcentaje sigue visible, pero marcado como muestra mínima. */
 export const MUESTRA_MINIMA = 15;
 
-export type FuenteId = "NUCLEO_ROMPE" | "NUCLEO_IMAN" | "NUCLEO_IA" | "NUCLEO_SOMBRA" | "PAPEL" | "ROBOT" | "FLUJO";
+export type FuenteId = "NUCLEO_ROMPE" | "NUCLEO_IMAN" | "NUCLEO_IA" | "NUCLEO_SOMBRA" | "PAPEL" | "ROBOT" | "FLUJO" | "AGENTE_ST";
 
 export type Conteo = {
   abiertas: number;
@@ -104,6 +104,7 @@ export const FUENTES: Record<FuenteId, { nombre: string; ambito: Ambito; enTotal
   PAPEL: { nombre: "Bot de papel · tu cuenta", ambito: "CUENTA", enTotal: true },
   ROBOT: { nombre: "Robot MM · tu cuenta", ambito: "CUENTA", enTotal: true },
   FLUJO: { nombre: "Flujo de órdenes · tu cuenta", ambito: "CUENTA", enTotal: true },
+  AGENTE_ST: { nombre: "Agente Supertrend MTF + Volumen · tu cuenta", ambito: "CUENTA", enTotal: true },
 };
 
 // ── Capital simulado: cuánto dinero virtual tendría cada bot si hubiera operado todo lo que registró ──

@@ -147,7 +147,7 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["patrones", "PATRONES"],
   ["tendencia", "TENDENCIA"],
   ["liquidez", "LIQUIDEZ"],
-  ["reales", "LIQ. REALES"],
+  ["reales", "LIQ. REALES (MUESTRA)"],
   ["volumen", "VOLUMEN"],
   ["tomas", "TOMAS DE LIQ."],
   ["scalp", "SCALP"],

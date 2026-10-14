@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ema, ESTRATEGIAS, indicadores, medir, MUESTRA_ESTUDIO, operar, rsi, veredicto, type Operacion } from "../lib/estrategias.ts";
+import { conAuditoria, ema, ESTRATEGIAS, indicadores, medir, MUESTRA_ESTUDIO, operar, rsi, veredicto, type Operacion } from "../lib/estrategias.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
 
 const H = 3_600_000;
@@ -77,6 +77,13 @@ test("veredicto: con muestra chica no se concluye; ventaja solo si el intervalo 
   assert.equal(veredicto(m(-0.2, -0.3, -0.1), null), "SIN VENTAJA");
   assert.equal(veredicto(m(0.2, -0.05, 0.45), null), "SIN CONCLUSIÓN");
   assert.equal(veredicto(m(0.5, 0.2, 0.8, 50), null), "SIN CONCLUSIÓN", "menos de 100 operaciones");
+});
+
+test("auditoría: una VENTAJA con DSR bajo o desconocido baja a CANDIDATA; el resto no cambia", () => {
+  assert.equal(conAuditoria("VENTAJA", 0.99), "VENTAJA");
+  assert.equal(conAuditoria("VENTAJA", 0.5), "CANDIDATA");
+  assert.equal(conAuditoria("VENTAJA", null), "CANDIDATA", "desconocido no es aprobado");
+  assert.equal(conAuditoria("SIN VENTAJA", 0.99), "SIN VENTAJA");
 });
 
 test("supertrend: en una subida sostenida queda alcista con la línea por debajo del precio, y da vuelta al caer fuerte", async () => {
@@ -156,4 +163,19 @@ test("volumen relativo: contra el promedio de las 20 anteriores, sin la vela mis
   assert.equal(x[30], 3, "30 contra un promedio de 10");
   assert.ok(Math.abs(x[31] - 10 / ((19 * 10 + 30) / 20)) < 1e-12, "el pico entra al promedio de la vela siguiente");
   assert.equal(volumenRelativo(v.slice(0, 31))[30], x[30]);
+});
+
+test("SNR: un nivel fresco da señal solo en su primera visita con rechazo, y después se gasta", async () => {
+  const { nivelesSnr } = await import("../lib/estrategias.ts");
+  const vela = (i: number, o: number, h: number, l: number, c: number) => ({ openTime: i * H, open: o, high: h, low: l, close: c, volume: 1 }) as SwingCandle;
+  // Pico de cierres en 110 (vela 2), baja y vuelve a visitar el 110 con la mecha dos veces.
+  const v = [vela(0, 100, 101, 99, 100), vela(1, 100, 108, 100, 108), vela(2, 108, 111, 108, 110), vela(3, 110, 110, 100, 102), vela(4, 102, 104, 100, 103), vela(5, 103, 112, 103, 108), vela(6, 108, 112, 105, 107)];
+  const { res, sop } = nivelesSnr(v);
+  assert.equal(res[5], 110, "la primera mecha sobre 110 que cierra abajo es la señal");
+  assert.ok(Number.isNaN(res[6]), "el nivel ya se gastó: la segunda visita no es señal");
+  assert.ok(Number.isNaN(res[3]) && Number.isNaN(res[2]), "ni en la vela del pico ni en la siguiente (se conoce una vela después y se toca desde la otra)");
+  // Un hueco al alza entre dos velas verdes es un soporte en la apertura de la segunda.
+  const g = [vela(0, 100, 101, 99, 100), vela(1, 100, 104, 100, 104), vela(2, 106, 110, 105, 109), vela(3, 109, 112, 108, 111), vela(4, 111, 112, 105.9, 108), vela(5, 108, 109, 107, 108)];
+  assert.equal(nivelesSnr(g).sop[4], 106, "la mecha llega a 106 y cierra por encima");
+  assert.ok(Number.isNaN(sop[5]));
 });

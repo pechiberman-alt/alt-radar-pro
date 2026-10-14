@@ -12,7 +12,7 @@ import { ESTUDIO_FILAS, ESTUDIO_META, type FilaEstudio } from "../lib/estudio-es
 
 type Agente = { id: string; agente: string; nombre: string; regla: string; filas: FilaEstudio[]; mejor: FilaEstudio };
 
-const ORDEN_VEREDICTO: Record<string, number> = { VENTAJA: 0, "SIN CONCLUSIÓN": 1, CONTROL: 2, "SIN VENTAJA": 3 };
+const ORDEN_VEREDICTO: Record<string, number> = { VENTAJA: 0, CANDIDATA: 1, "SIN CONCLUSIÓN": 2, CONTROL: 3, "SIN VENTAJA": 4 };
 
 function agentes(): Agente[] {
   const por = new Map<string, FilaEstudio[]>();
@@ -144,13 +144,14 @@ export default function LabPiso() {
         {ranking.map((f) => (
           <li key={`${f.estrategia}-${f.marco}`} className={`piso-${tono(f.veredicto)}`}>
             <b>{f.agente.replace("Agente ", "")}</b> {f.marco} · {r2(f.evaluacion.expectancia)} · acierto {pct(f.evaluacion.winRate)} · TP1 {pct(f.evaluacion.tasaTp1)} · TP2 {pct(f.evaluacion.tasaTp2)} · TP3 {pct(f.evaluacion.tasaTp3)} · SL {pct(f.evaluacion.tasaSl)} · n=
-            {f.evaluacion.operaciones} · <span>{f.veredicto}</span>
+            {f.evaluacion.operaciones} · DSR {pct(f.dsrDeclarado)} · <span>{f.veredicto}</span>
           </li>
         ))}
       </ol>
       <p className="lab-nota">
         Acertar más no es ganar más: las de reversión tocan TP1 seguido y aun así pierden. Para que un agente pase a papel en vivo tiene que mostrar VENTAJA acá y
-        después sostenerla hacia adelante. Medición del pasado: no garantiza resultados y no es asesoramiento financiero.
+        después sostenerla hacia adelante. CANDIDATA: pasa la regla simple pero no la auditoría de sobreajuste (se probaron muchas variantes sobre
+        los mismos datos), así que solo la medición en papel la puede confirmar. Medición del pasado: no garantiza resultados y no es asesoramiento financiero.
       </p>
     </section>
   );

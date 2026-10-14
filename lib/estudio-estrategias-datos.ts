@@ -16,6 +16,9 @@ export type FilaEstudio = {
   veredicto: string;
   monedasPositivas: number;
   monedasConOperaciones: number;
+  psr: number | null;
+  dsrTabla: number | null;
+  dsrDeclarado: number | null;
 };
 
 export const ESTUDIO_META = {
@@ -36,7 +39,15 @@ export const ESTUDIO_META = {
     "ZECUSDT"
   ],
   "costoPorLadoPct": 0.07,
-  "horizonteVelas": 48
+  "horizonteVelas": 48,
+  "auditoria": {
+    "variantesTabla": 28,
+    "ensayosDeclarados": 200,
+    "varianzaSharpes": 0.0159,
+    "diasEvaluacion": 740,
+    "pRealityCheck": 0.8546,
+    "pSpa": 0.2176
+  }
 } as const;
 
 export const ESTUDIO_FILAS: FilaEstudio[] = [
@@ -82,7 +93,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 6,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.9494,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "CRUCE_EMA",
@@ -126,7 +140,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN VENTAJA",
     "monedasPositivas": 2,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "RSI",
@@ -170,7 +187,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN VENTAJA",
     "monedasPositivas": 0,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "BOLLINGER",
@@ -214,7 +234,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN VENTAJA",
     "monedasPositivas": 0,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "RETROCESO",
@@ -258,7 +281,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN VENTAJA",
     "monedasPositivas": 1,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "MACD",
@@ -302,7 +328,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN VENTAJA",
     "monedasPositivas": 1,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "SUPERTREND",
@@ -346,7 +375,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 4,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.1324,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_VWAP",
@@ -390,7 +422,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 4,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.2706,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_PERFIL",
@@ -434,7 +469,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 4,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.3189,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_VWAP_PERFIL",
@@ -478,7 +516,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 4,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.2225,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_MTF",
@@ -522,7 +563,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 4,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.0842,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_MTF_VOL",
@@ -566,7 +610,104 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 5,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.1147,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "SNR",
+    "agente": "Agente SNR",
+    "nombre": "SNR: primera visita a un nivel fresco",
+    "regla": "Soportes y resistencias de un solo precio (pico y valle de la línea de cierres, y huecos entre velas del mismo color). La primera mecha que toca un nivel fresco y cierra del lado del rechazo da la entrada. Stop en el extremo de esa vela. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 53349,
+      "ganadas": 16090,
+      "winRate": 0.3016,
+      "tasaTp1": 0.4784,
+      "tasaTp2": 0.3705,
+      "tasaTp3": 0.2984,
+      "tasaSl": 0.6928,
+      "profitFactor": 0.3837,
+      "expectancia": -0.8055,
+      "expectanciaIc": {
+        "low": -1.1668,
+        "high": -0.4442
+      },
+      "netoR": -42974.4741,
+      "maxCaidaR": 42984.6674
+    },
+    "evaluacion": {
+      "operaciones": 23588,
+      "ganadas": 7200,
+      "winRate": 0.3052,
+      "tasaTp1": 0.4812,
+      "tasaTp2": 0.3764,
+      "tasaTp3": 0.3069,
+      "tasaSl": 0.6868,
+      "profitFactor": 0.4485,
+      "expectancia": -0.5958,
+      "expectanciaIc": {
+        "low": -0.6153,
+        "high": -0.5762
+      },
+      "netoR": -14052.6168,
+      "maxCaidaR": 14056.0528
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 0,
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "SNR_HTF",
+    "agente": "Agente SNR + Storyline",
+    "nombre": "SNR con la tendencia del marco superior a favor",
+    "regla": "Soportes y resistencias de un solo precio (pico y valle de la línea de cierres, y huecos entre velas del mismo color). La primera mecha que toca un nivel fresco y cierra del lado del rechazo da la entrada y la tendencia del marco superior (Supertrend diario) va en el mismo sentido (la «storyline»). Stop en el extremo de esa vela. Objetivo 2 R.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 38746,
+      "ganadas": 11903,
+      "winRate": 0.3072,
+      "tasaTp1": 0.4809,
+      "tasaTp2": 0.3757,
+      "tasaTp3": 0.3045,
+      "tasaSl": 0.6877,
+      "profitFactor": 0.4247,
+      "expectancia": -0.6922,
+      "expectanciaIc": {
+        "low": -1.0452,
+        "high": -0.3392
+      },
+      "netoR": -26819.1131,
+      "maxCaidaR": 26827.6376
+    },
+    "evaluacion": {
+      "operaciones": 16713,
+      "ganadas": 5136,
+      "winRate": 0.3073,
+      "tasaTp1": 0.4823,
+      "tasaTp2": 0.3808,
+      "tasaTp3": 0.3094,
+      "tasaSl": 0.6846,
+      "profitFactor": 0.4526,
+      "expectancia": -0.5882,
+      "expectanciaIc": {
+        "low": -0.6117,
+        "high": -0.5647
+      },
+      "netoR": -9830.4227,
+      "maxCaidaR": 9835.1122
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 0,
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "AZAR",
@@ -610,7 +751,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "CONTROL",
     "monedasPositivas": 7,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": null,
+    "dsrTabla": null,
+    "dsrDeclarado": null
   },
   {
     "estrategia": "RUPTURA",
@@ -654,7 +798,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 7,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.5923,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "CRUCE_EMA",
@@ -698,7 +845,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 5,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.5294,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "RSI",
@@ -742,7 +892,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN VENTAJA",
     "monedasPositivas": 3,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.051,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "BOLLINGER",
@@ -786,7 +939,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN VENTAJA",
     "monedasPositivas": 3,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.0284,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "RETROCESO",
@@ -830,7 +986,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 6,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.314,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "MACD",
@@ -874,7 +1033,10 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "SIN CONCLUSIÓN",
     "monedasPositivas": 5,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.5066,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "SUPERTREND",
@@ -916,9 +1078,12 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
       "netoR": 73.8814,
       "maxCaidaR": 21.4123
     },
-    "veredicto": "VENTAJA",
+    "veredicto": "CANDIDATA",
     "monedasPositivas": 10,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.9987,
+    "dsrTabla": 0.0056,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_VWAP",
@@ -960,9 +1125,12 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
       "netoR": 71.3203,
       "maxCaidaR": 21.4123
     },
-    "veredicto": "VENTAJA",
+    "veredicto": "CANDIDATA",
     "monedasPositivas": 10,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.9982,
+    "dsrTabla": 0.0046,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_PERFIL",
@@ -1004,9 +1172,12 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
       "netoR": 50.2829,
       "maxCaidaR": 19.5738
     },
-    "veredicto": "VENTAJA",
+    "veredicto": "CANDIDATA",
     "monedasPositivas": 9,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.9858,
+    "dsrTabla": 0.0017,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_VWAP_PERFIL",
@@ -1048,9 +1219,12 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
       "netoR": 49.6297,
       "maxCaidaR": 19.5738
     },
-    "veredicto": "VENTAJA",
+    "veredicto": "CANDIDATA",
     "monedasPositivas": 9,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.9852,
+    "dsrTabla": 0.0018,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_MTF",
@@ -1092,9 +1266,12 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
       "netoR": 48.1445,
       "maxCaidaR": 21.2185
     },
-    "veredicto": "VENTAJA",
+    "veredicto": "CANDIDATA",
     "monedasPositivas": 10,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.9822,
+    "dsrTabla": 0.0013,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "ST_MTF_VOL",
@@ -1136,9 +1313,106 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
       "netoR": 53.75,
       "maxCaidaR": 13.421
     },
-    "veredicto": "VENTAJA",
+    "veredicto": "CANDIDATA",
     "monedasPositivas": 9,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": 0.9985,
+    "dsrTabla": 0.1543,
+    "dsrDeclarado": 0.0077
+  },
+  {
+    "estrategia": "SNR",
+    "agente": "Agente SNR",
+    "nombre": "SNR: primera visita a un nivel fresco",
+    "regla": "Soportes y resistencias de un solo precio (pico y valle de la línea de cierres, y huecos entre velas del mismo color). La primera mecha que toca un nivel fresco y cierra del lado del rechazo da la entrada. Stop en el extremo de esa vela. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 13448,
+      "ganadas": 4090,
+      "winRate": 0.3041,
+      "tasaTp1": 0.4802,
+      "tasaTp2": 0.3716,
+      "tasaTp3": 0.2988,
+      "tasaSl": 0.6928,
+      "profitFactor": 0.6627,
+      "expectancia": -0.2816,
+      "expectanciaIc": {
+        "low": -0.3018,
+        "high": -0.2615
+      },
+      "netoR": -3787.2769,
+      "maxCaidaR": 3795.3241
+    },
+    "evaluacion": {
+      "operaciones": 5758,
+      "ganadas": 1785,
+      "winRate": 0.31,
+      "tasaTp1": 0.4778,
+      "tasaTp2": 0.3784,
+      "tasaTp3": 0.305,
+      "tasaSl": 0.687,
+      "profitFactor": 0.6369,
+      "expectancia": -0.314,
+      "expectanciaIc": {
+        "low": -0.3453,
+        "high": -0.2827
+      },
+      "netoR": -1807.8936,
+      "maxCaidaR": 1828.2416
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 0,
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "SNR_HTF",
+    "agente": "Agente SNR + Storyline",
+    "nombre": "SNR con la tendencia del marco superior a favor",
+    "regla": "Soportes y resistencias de un solo precio (pico y valle de la línea de cierres, y huecos entre velas del mismo color). La primera mecha que toca un nivel fresco y cierra del lado del rechazo da la entrada y la tendencia del marco superior (Supertrend diario) va en el mismo sentido (la «storyline»). Stop en el extremo de esa vela. Objetivo 2 R.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 9597,
+      "ganadas": 3009,
+      "winRate": 0.3135,
+      "tasaTp1": 0.4853,
+      "tasaTp2": 0.3819,
+      "tasaTp3": 0.3083,
+      "tasaSl": 0.6837,
+      "profitFactor": 0.6904,
+      "expectancia": -0.2554,
+      "expectanciaIc": {
+        "low": -0.2794,
+        "high": -0.2314
+      },
+      "netoR": -2451.1815,
+      "maxCaidaR": 2492.1018
+    },
+    "evaluacion": {
+      "operaciones": 4154,
+      "ganadas": 1330,
+      "winRate": 0.3202,
+      "tasaTp1": 0.4831,
+      "tasaTp2": 0.3844,
+      "tasaTp3": 0.3161,
+      "tasaSl": 0.6777,
+      "profitFactor": 0.6636,
+      "expectancia": -0.2882,
+      "expectanciaIc": {
+        "low": -0.3256,
+        "high": -0.2509
+      },
+      "netoR": -1197.3715,
+      "maxCaidaR": 1221.553
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 0,
+    "monedasConOperaciones": 10,
+    "psr": 0,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "AZAR",
@@ -1182,6 +1456,9 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     },
     "veredicto": "CONTROL",
     "monedasPositivas": 4,
-    "monedasConOperaciones": 10
+    "monedasConOperaciones": 10,
+    "psr": null,
+    "dsrTabla": null,
+    "dsrDeclarado": null
   }
 ];

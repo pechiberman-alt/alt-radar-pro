@@ -6,6 +6,7 @@
  * itself: spot prices of the majors, open signals from the ledger, Fear &
  * Greed, recent high-impact news and the archived market structure.
  */
+import type { LecturaMoneda } from "./telegram-moneda.ts";
 
 export type ServerSnapshot = {
   at: string;
@@ -15,6 +16,14 @@ export type ServerSnapshot = {
   structure: Record<string, number | string | null> | null;
   news: { title: string; category: string; impact: string; tone: string; source: string }[];
   note: string;
+  /** Monedas que la persona pidió por nombre y JARVIS no vigila: su lectura de 4 h con los indicadores del estudio. */
+  pedidas?: LecturaMoneda[];
+  /** Pedidas que Binance no reconoce: el bot tiene que decirlo, no inventar. */
+  noEncontradas?: string[];
+  /** Qué estrategias tuvieron ventaja medida en el estudio del laboratorio (el pasado, con costos). */
+  estudio?: string;
+  /** El agente de papel Supertrend MTF + Volumen de la cuenta: entradas abiertas y cerradas, con su muestra. */
+  agenteSt?: { abiertas: number; cerradas: number; ganadas: number; netoR: number; muestra: string };
 };
 
 export function buildServerSnapshot(parts: Omit<ServerSnapshot, "at" | "note">, now = Date.now()): ServerSnapshot {
