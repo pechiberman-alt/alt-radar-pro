@@ -42,7 +42,7 @@ export const ESTUDIO_META = {
   "horizonteVelas": 48,
   "auditoria": {
     "variantesTabla": 35,
-    "ensayosDeclarados": 300,
+    "ensayosDeclarados": 400,
     "varianzaSharpes": 0.0169,
     "diasEvaluacion": 740,
     "pRealityCheck": 0.8834,
@@ -1459,7 +1459,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasConOperaciones": 10,
     "psr": 0.9985,
     "dsrTabla": 0.0926,
-    "dsrDeclarado": 0.0022
+    "dsrDeclarado": 0.0012
   },
   {
     "estrategia": "SNR",
