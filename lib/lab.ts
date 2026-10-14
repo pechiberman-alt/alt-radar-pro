@@ -89,7 +89,7 @@ export function tareasDe(f: FotoLab): Tarea[] {
       estado: corriendo ? "corriendo" : e.estado === "sin datos" ? "sin datos" : "hecha",
       progreso: corriendo && typeof e.progreso === "number" ? Math.min(1, Math.max(0, e.progreso)) : e.estado === "sin datos" ? null : corriendo ? null : 1,
       detalle: corriendo
-        ? `Leídas ${e.leidas ?? "sin dato"} de ${e.total ?? "sin dato"} monedas.`
+        ? `${e.leidas ?? 0} monedas leídas hasta ahora.`
         : e.estado === "sin datos"
           ? "Sin escaneo todavía."
           : `${e.leidas ?? 0} monedas leídas, ${e.aprobadas ?? 0} con plan aprobado${e.haceMin !== null ? `, hace ${e.haceMin} min` : ""}.`,

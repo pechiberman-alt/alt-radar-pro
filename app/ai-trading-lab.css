@@ -86,3 +86,33 @@
   .lab-preguntas button{flex:1 1 100%}
   .lab-aviso,.lab-error,.lab-nota{margin-left:12px;margin-right:12px;padding-left:0}
 }
+/* Piso de estrategias (app/lab-piso.tsx): escritorios isométricos, uno por agente, coloreados por su veredicto medido. */
+.piso{margin:0 0 14px}
+.piso-svg{display:block;width:100%;max-width:560px;height:auto;margin:6px auto 10px}
+.piso-suelo{fill:#06101f;stroke:var(--lab-borde);stroke-width:1}
+.piso-mesa{cursor:pointer;outline:none}
+.piso-mesa:focus-visible .piso-tapa{stroke:#fff;stroke-width:2}
+.piso-tapa{fill:#0b1f42;stroke:var(--lab-borde);stroke-width:1}
+.piso-lado{fill:#081733}
+.piso-lado-d{fill:#06122a}
+.piso-pantalla{fill:#030a14;stroke:var(--lab-cian);stroke-width:1}
+.piso-agente{fill:#335a8a}
+.piso-rotulo{font:600 8.5px var(--font-mono);letter-spacing:.4px;fill:var(--soft)}
+.piso-gana .piso-tapa{fill:#0d3326;stroke:#3fd68f}.piso-gana .piso-agente,.piso-gana .piso-pantalla{fill:#3fd68f}
+.piso-duda .piso-tapa{fill:#33280d;stroke:#d9a441}.piso-duda .piso-agente{fill:#d9a441}
+.piso-pierde .piso-tapa{fill:#3a1016;stroke:#ff6b6b}.piso-pierde .piso-agente{fill:#ff6b6b}
+.piso-control .piso-tapa{fill:#1a2230;stroke:#7d8a99}.piso-control .piso-agente{fill:#7d8a99}
+.piso-activa .piso-tapa{stroke-width:2.5}
+@media (prefers-reduced-motion:no-preference){.piso-activa .piso-agente{animation:lab-brillo 1.2s infinite}}
+.piso-ficha{margin:0 0 12px;padding:10px 12px;border:1px solid var(--lab-borde);border-left-width:3px;border-radius:6px;background:#071223}
+.piso-ficha header{display:flex;justify-content:space-between;gap:8px;color:#fff}
+.piso-ficha.piso-gana{border-left-color:#3fd68f}.piso-ficha.piso-duda{border-left-color:#d9a441}.piso-ficha.piso-pierde{border-left-color:#ff6b6b}.piso-ficha.piso-control{border-left-color:#7d8a99}
+.piso-ficha p{margin:6px 0}
+.piso-tabla-wrap{overflow-x:auto}
+.piso-tabla{width:100%;border-collapse:collapse;font:10px var(--font-mono)}
+.piso-tabla th,.piso-tabla td{padding:4px 6px;border-bottom:1px solid var(--lab-borde);text-align:right;white-space:nowrap}
+.piso-tabla th:first-child,.piso-tabla td:first-child{text-align:left}
+.piso-ranking{margin:0 0 8px;padding-left:20px}
+.piso-ranking li{margin:3px 0}
+.piso-ranking .piso-gana span{color:#3fd68f}.piso-ranking .piso-duda span{color:#d9a441}.piso-ranking .piso-pierde span{color:#ff6b6b}.piso-ranking .piso-control span{color:#7d8a99}
+.lab-agentes>.piso,.lab-agentes>.lab-sub{grid-column:1/-1}
