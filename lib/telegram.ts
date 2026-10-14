@@ -8,6 +8,7 @@
  * dispatcher (telegram-dispatch.ts) does the I/O.
  */
 
+import { esDeFondeo } from "./fondeo.ts";
 import { MIN_SAMPLE, planLines, ratesText, type KindStats } from "./signal-plan.ts";
 import { dec, SPIKE_DISCLAIMER, spikeSentence, type VolumeSpike } from "./volume-spike.ts";
 
@@ -56,6 +57,8 @@ export type TelegramEvent = {
   text: string;
   /** For signals: the score the user's threshold is compared against. */
   score?: number;
+  /** The market the event is about, when it is about one: gold and NASDAQ (fondeo accounts) go out first. */
+  symbol?: string;
 };
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -79,6 +82,7 @@ export function signalEvent(s: {
   const history = s.stats && s.stats.n > 0 ? ratesText(s.stats) : null;
   return {
     key: `signal:${s.id}`,
+    symbol: s.symbol,
     category: "SEÑAL",
     priority: s.score,
     score: s.score,
@@ -126,6 +130,7 @@ export function volumeEvent(symbol: string, timeframe: string, spike: VolumeSpik
   return {
     // One per candle: the same candle seen again on the next run is not news.
     key: `volume:${symbol}:${timeframe}:${spike.openTime}`,
+    symbol,
     category: "VOLUMEN",
     priority: 68,
     text:
@@ -165,7 +170,8 @@ export function selectForUser(
     .filter((e) => prefs.categories[e.category])
     .filter((e) => e.category !== "SEÑAL" || (e.score ?? 0) >= prefs.signalMinScore)
     .filter((e) => !alreadySent.has(e.key))
-    .sort((a, b) => b.priority - a.priority);
+    // Oro y NASDAQ (cuentas de fondeo) primero; dentro de cada grupo, por prioridad.
+    .sort((a, b) => Number(esDeFondeo(b.symbol ?? "")) - Number(esDeFondeo(a.symbol ?? "")) || b.priority - a.priority);
   const rest = eligible.slice(cap);
   return { send: eligible.slice(0, cap), rest, suppressed: rest.length };
 }

@@ -41,12 +41,12 @@ export const ESTUDIO_META = {
   "costoPorLadoPct": 0.07,
   "horizonteVelas": 48,
   "auditoria": {
-    "variantesTabla": 41,
-    "ensayosDeclarados": 550,
-    "varianzaSharpes": 0.034,
+    "variantesTabla": 44,
+    "ensayosDeclarados": 600,
+    "varianzaSharpes": 0.0318,
     "diasEvaluacion": 740,
-    "pRealityCheck": 0.8834,
-    "pSpa": 0.3312
+    "pRealityCheck": 0.8844,
+    "pSpa": 0.3404
   }
 } as const;
 
@@ -894,8 +894,55 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 5,
     "monedasConOperaciones": 10,
     "psr": 0.8417,
-    "dsrTabla": 0.115,
-    "dsrDeclarado": 0.0186
+    "dsrTabla": 0.1239,
+    "dsrDeclarado": 0.0223
+  },
+  {
+    "estrategia": "FIB_NIVELES",
+    "agente": "Agente Fibonacci + Niveles clave",
+    "nombre": "Retroceso de Fibonacci 0,618–0,786 con extensiones 1 / 1,272 / 1,618 y un nivel clave en la zona",
+    "regla": "Toma la última pierna de impulso (pivotes de 5 velas, al menos 2 ATR) y espera el retroceso al bolsillo dorado (0,618 a 0,786). Entra en la primera vela que lo toca y cierra a favor, sin cerrar más allá de la zona, solo si el máximo o el mínimo del día o de la semana anteriores cae dentro de la zona (a 0,25 ATR o menos). Stop a 0,25 ATR del origen de la pierna. Objetivos en la escalera de Fibonacci: TP1 en la extensión 1 (volver al extremo del impulso), TP2 en 1,272 y TP3 en 1,618. Una señal por pierna. Configuración fijada de antemano.",
+    "marco": "1h",
+    "desarrollo": {
+      "operaciones": 1493,
+      "ganadas": 590,
+      "winRate": 0.3952,
+      "tasaTp1": 0.3135,
+      "tasaTp2": 0.213,
+      "tasaTp3": 0.1393,
+      "tasaSl": 0.5131,
+      "profitFactor": 0.9648,
+      "expectancia": -0.0203,
+      "expectanciaIc": {
+        "low": -0.0786,
+        "high": 0.038
+      },
+      "netoR": -30.2961,
+      "maxCaidaR": 58.8753
+    },
+    "evaluacion": {
+      "operaciones": 620,
+      "ganadas": 213,
+      "winRate": 0.3435,
+      "tasaTp1": 0.3048,
+      "tasaTp2": 0.2258,
+      "tasaTp3": 0.1274,
+      "tasaSl": 0.5581,
+      "profitFactor": 0.753,
+      "expectancia": -0.1568,
+      "expectanciaIc": {
+        "low": -0.2433,
+        "high": -0.0702
+      },
+      "netoR": -97.1896,
+      "maxCaidaR": 102.4059
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 2,
+    "monedasConOperaciones": 10,
+    "psr": 0.003,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "AZAR",
@@ -1270,7 +1317,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 3,
     "monedasConOperaciones": 10,
     "psr": 0.1358,
-    "dsrTabla": 0,
+    "dsrTabla": 0.0001,
     "dsrDeclarado": 0
   },
   {
@@ -1552,7 +1599,7 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 9,
     "monedasConOperaciones": 10,
     "psr": 0.9985,
-    "dsrTabla": 0.0005,
+    "dsrTabla": 0.0008,
     "dsrDeclarado": 0
   },
   {
@@ -1740,8 +1787,8 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 6,
     "monedasConOperaciones": 10,
     "psr": 0.8716,
-    "dsrTabla": 0.0226,
-    "dsrDeclarado": 0.0006
+    "dsrTabla": 0.0262,
+    "dsrDeclarado": 0.0008
   },
   {
     "estrategia": "SMC_TODO",
@@ -1787,8 +1834,55 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 3,
     "monedasConOperaciones": 3,
     "psr": 0.8243,
-    "dsrTabla": 0.6522,
-    "dsrDeclarado": 0.5693
+    "dsrTabla": 0.6563,
+    "dsrDeclarado": 0.5765
+  },
+  {
+    "estrategia": "FIB_NIVELES",
+    "agente": "Agente Fibonacci + Niveles clave",
+    "nombre": "Retroceso de Fibonacci 0,618–0,786 con extensiones 1 / 1,272 / 1,618 y un nivel clave en la zona",
+    "regla": "Toma la última pierna de impulso (pivotes de 5 velas, al menos 2 ATR) y espera el retroceso al bolsillo dorado (0,618 a 0,786). Entra en la primera vela que lo toca y cierra a favor, sin cerrar más allá de la zona, solo si el máximo o el mínimo del día o de la semana anteriores cae dentro de la zona (a 0,25 ATR o menos). Stop a 0,25 ATR del origen de la pierna. Objetivos en la escalera de Fibonacci: TP1 en la extensión 1 (volver al extremo del impulso), TP2 en 1,272 y TP3 en 1,618. Una señal por pierna. Configuración fijada de antemano.",
+    "marco": "4h",
+    "desarrollo": {
+      "operaciones": 830,
+      "ganadas": 302,
+      "winRate": 0.3639,
+      "tasaTp1": 0.3217,
+      "tasaTp2": 0.2313,
+      "tasaTp3": 0.1578,
+      "tasaSl": 0.5446,
+      "profitFactor": 0.9442,
+      "expectancia": -0.0329,
+      "expectanciaIc": {
+        "low": -0.1125,
+        "high": 0.0467
+      },
+      "netoR": -27.303,
+      "maxCaidaR": 63.5931
+    },
+    "evaluacion": {
+      "operaciones": 349,
+      "ganadas": 118,
+      "winRate": 0.3381,
+      "tasaTp1": 0.2865,
+      "tasaTp2": 0.2092,
+      "tasaTp3": 0.1461,
+      "tasaSl": 0.5587,
+      "profitFactor": 0.8552,
+      "expectancia": -0.0904,
+      "expectanciaIc": {
+        "low": -0.2135,
+        "high": 0.0328
+      },
+      "netoR": -31.5364,
+      "maxCaidaR": 45.7664
+    },
+    "veredicto": "SIN CONCLUSIÓN",
+    "monedasPositivas": 5,
+    "monedasConOperaciones": 10,
+    "psr": 0.1248,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
   },
   {
     "estrategia": "AZAR",
@@ -2022,6 +2116,53 @@ export const ESTUDIO_FILAS: FilaEstudio[] = [
     "monedasPositivas": 2,
     "monedasConOperaciones": 9,
     "psr": 0.029,
+    "dsrTabla": 0,
+    "dsrDeclarado": 0
+  },
+  {
+    "estrategia": "FIB_NIVELES",
+    "agente": "Agente Fibonacci + Niveles clave",
+    "nombre": "Retroceso de Fibonacci 0,618–0,786 con extensiones 1 / 1,272 / 1,618 y un nivel clave en la zona",
+    "regla": "Toma la última pierna de impulso (pivotes de 5 velas, al menos 2 ATR) y espera el retroceso al bolsillo dorado (0,618 a 0,786). Entra en la primera vela que lo toca y cierra a favor, sin cerrar más allá de la zona, solo si el máximo o el mínimo del día o de la semana anteriores cae dentro de la zona (a 0,25 ATR o menos). Stop a 0,25 ATR del origen de la pierna. Objetivos en la escalera de Fibonacci: TP1 en la extensión 1 (volver al extremo del impulso), TP2 en 1,272 y TP3 en 1,618. Una señal por pierna. Configuración fijada de antemano.",
+    "marco": "15m",
+    "desarrollo": {
+      "operaciones": 458,
+      "ganadas": 150,
+      "winRate": 0.3275,
+      "tasaTp1": 0.3275,
+      "tasaTp2": 0.238,
+      "tasaTp3": 0.1528,
+      "tasaSl": 0.5611,
+      "profitFactor": 0.7398,
+      "expectancia": -0.1763,
+      "expectanciaIc": {
+        "low": -0.2817,
+        "high": -0.0708
+      },
+      "netoR": -80.7379,
+      "maxCaidaR": 96.6981
+    },
+    "evaluacion": {
+      "operaciones": 1289,
+      "ganadas": 468,
+      "winRate": 0.3631,
+      "tasaTp1": 0.3631,
+      "tasaTp2": 0.2583,
+      "tasaTp3": 0.1606,
+      "tasaSl": 0.5384,
+      "profitFactor": 0.8439,
+      "expectancia": -0.1039,
+      "expectanciaIc": {
+        "low": -0.1696,
+        "high": -0.0382
+      },
+      "netoR": -133.9211,
+      "maxCaidaR": 163.1463
+    },
+    "veredicto": "SIN VENTAJA",
+    "monedasPositivas": 2,
+    "monedasConOperaciones": 10,
+    "psr": 0.0063,
     "dsrTabla": 0,
     "dsrDeclarado": 0
   },
