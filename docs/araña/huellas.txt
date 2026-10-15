@@ -2,6 +2,7 @@
 f42159e92767	17	.claude/settings.json
 b531751b31a2	27	.github/workflows/claude.yml
 bb0a5e82d04f	66	.github/workflows/deploy-cloudflare.yml
+62406163de3b	44	.github/workflows/ia-editor.yml
 4169d03b3661	0	.gitignore
 fe5716951a62	10	.mcp.json
 6b5886c6306e	5	.openai/hosting.json
@@ -189,12 +190,13 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-ba01d2d01b63	289	docs/araña/objetivos.md
+b2faf60ceda0	290	docs/araña/objetivos.md
 db6358216fcf	188	docs/busqueda-breaker.md
 fc6042bacccc	116	docs/busqueda-fibonacci.md
 25e7d2744ee2	187	docs/busqueda-linea.md
 5656d4c4c99f	215	docs/busqueda-smc.md
 615d9e91548e	120	docs/estudio-estrategias.md
+73897aeae6f3	48	docs/ia-editor.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
@@ -280,6 +282,7 @@ cb5956d08b7e	204	lib/fondeo.ts
 1dee6c89644e	274	lib/futures-log.ts
 dfc52ea472c0	115	lib/futures-risk.ts
 86351172d0c2	288	lib/hands-free.ts
+4df24a38c7bb	141	lib/ia-editor.ts
 619425206c2d	149	lib/inducement.ts
 cd4af39e8ba8	322	lib/institutional-flows.ts
 f83a7c4a72ca	222	lib/jarvis-analyst.ts
@@ -426,6 +429,7 @@ aaa393c36db1	0	public/window.svg
 3c7e2c2b834c	1340	scripts/arana.mjs
 d13ecf4702a3	63	scripts/claude-hooks.mjs
 b36fd1c34b30	183	scripts/herramientas.mjs
+4347662f5847	175	scripts/ia-editor.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
 c88ad361f676	292	scripts/investigacion/breaker-busqueda.ts
@@ -499,6 +503,7 @@ a3b08c3b70ce	282	tests/hands-free.test.ts
 42f4e5fce8fd	17	tests/helpers/fake-d1.ts
 27b5bf9632d2	26	tests/helpers/setups.ts
 12c25e790757	159	tests/herramientas.test.ts
+3140cac232eb	119	tests/ia-editor.test.ts
 adcae854588e	101	tests/inducement.test.ts
 edf787ad8d65	124	tests/institutional-flows.test.ts
 aaee341fbbff	431	tests/investigacion.test.ts

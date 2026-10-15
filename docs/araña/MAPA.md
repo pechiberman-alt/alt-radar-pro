@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 606 · objetivos: 17 · sin objetivo: 0
-- Tablas D1: 49 · secretos: 5 · variables de entorno: 12 · rutas /api: 54 · hosts: 57
+- Archivos: 611 · objetivos: 17 · sin objetivo: 0
+- Tablas D1: 49 · secretos: 5 · variables de entorno: 25 · rutas /api: 54 · hosts: 58
 - Código de navegador: 66 archivos con "use client" que alcanzan 199 · problemas: 0
-- Lib sin prueba directa: 24 de 192
+- Lib sin prueba directa: 24 de 193
 
 ## Objetivos
 
@@ -296,10 +296,11 @@ Texto: operaciones simuladas para medir ideas. No mueven dinero real.
 ### d1-presupuesto — Base D1 y presupuesto gratis (0)
 Texto: transversal. Plan gratuito: 5 millones de filas leídas por día, ya superado más de una vez.
 
-### despliegue — Worker, CI y migraciones (36)
+### despliegue — Worker, CI y migraciones (40)
 Texto: cómo llega el código a producción, cómo corre en el Worker y la configuración del proyecto.
 - `.github/workflows/claude.yml`
 - `.github/workflows/deploy-cloudflare.yml`
+- `.github/workflows/ia-editor.yml`
 - `.gitignore`
 - `.openai/hosting.json`
 - `README.md` — ALT RADAR PRO
@@ -307,6 +308,7 @@ Texto: cómo llega el código a producción, cómo corre en el Worker y la confi
 - `app/api/version/route.ts` — exporta: dynamic, GET
 - `db/index.ts` — exporta: getDb
 - `db/schema.ts` — exporta: signalRecords, automationState, brainObservations, brainSecurityEvents, users, sessions (+2)
+- `docs/ia-editor.md` — Editor por IA (modelo gratis)
 - `drizzle.config.ts` — exporta: default
 - `drizzle/0000_wild_nitro.sql`
 - `drizzle/0001_vengeful_husk.sql`
@@ -325,10 +327,12 @@ Texto: cómo llega el código a producción, cómo corre en el Worker y la confi
 - `examples/d1/app/api/notes/route.ts` — exporta: GET, POST
 - `examples/d1/db/schema.ts` — exporta: notes
 - `lib/app-settings.ts` — App-level secrets stored in D1, encrypted, so the owner can configure the Telegram bot and the AI key from the app instead of the Cloudflare dashboard.
+- `lib/ia-editor.ts` — La lógica pura del editor por IA (scripts/ia-editor.mjs, .github/workflows/ia-editor.yml): lee el comentario del dueño en un issue («/ia» más el pedido), decide qué archivos puede
 - `next-env.d.ts`
 - `next.config.ts` — exporta: default
 - `package.json`
 - `postcss.config.mjs` — exporta: default
+- `scripts/ia-editor.mjs` — El editor por IA: lo corre .github/workflows/ia-editor.yml cuando el dueño comenta «/ia …» en un issue.
 - `scripts/write-build-info.mjs` — Stamps every build with an id both the client bundle and the server share, so an app instance can tell it is running old code.
 - `tsconfig.json`
 - `vite.config.ts` — exporta: default
@@ -438,7 +442,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/smc-liquidez.test.ts` — Pruebas del agente de liquidez + IFVG + breaker (lib/smc-liquidez.ts): las zonas altas (FVG y OB) con casos armados a mano, su vencimiento, la toma de liquidez, el IFVG, la grilla,
 - `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 
-### calidad — Pruebas (133)
+### calidad — Pruebas (134)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agentes-mcp.test.ts` — Ruflo (el MCP de los agentes) arranca código de terceros con `npx`.
@@ -480,6 +484,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/hands-free.test.ts` — pruebas: the wake word is found in any spelling the engine tends to produce, and the rest, a result the engine delivers again is heard once, however often it comes back, the same words coming back under a new index within a few seconds are not said t (+1)
 - `tests/helpers/fake-d1.ts` — A D1 stand-in over node:sqlite (in memory), with the calls the app uses: prepare/bind/run/first/all and batch.
 - `tests/helpers/setups.ts` — exporta: setupAt
+- `tests/ia-editor.test.ts` — Pruebas del editor por IA (lib/ia-editor.ts): qué rutas se pueden tocar, cómo se lee el comentario del dueño, que se valide la respuesta del modelo y que un cambio dudoso se rechac
 - `tests/inducement.test.ts` — pruebas: bullish: BOS on the close above the swing high, the first real pullback is the I, swept and then structure failed: a close below the leg origin, not swept yet: pending, no outcome (+1)
 - `tests/institutional-flows.test.ts` — pruebas: parseFlowDays drops rows that are not reported sessions, parseFlowDays returns days oldest first regardless of source order, a holiday does not extend a streak across it (+1)
 - `tests/investigacion.test.ts` — pruebas: auc counts well-ordered pairs, ties count half, and no negatives means nothing t, resolverSPD solves a small symmetric system and cuantil picks order statistics, ridge recovers a linear relation, a huge penalty falls back to the mean, a const (+1)
@@ -740,11 +745,24 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - variable `ASSETS` — en: worker/index.ts
 - variable `CLAUDE_PROJECT_DIR` — en: scripts/claude-hooks.mjs
 - variable `CODEX_SANDBOX` — en: vite.config.ts
+- variable `COMENTARIO` — en: scripts/ia-editor.mjs
 - variable `COMISION_PCT` — en: scripts/investigacion/simulador.ts
 - variable `ENCRYPTION_KEY` — en: lib/app-settings.ts
+- variable `GITHUB_REF_NAME` — en: scripts/ia-editor.mjs
+- variable `GITHUB_REPOSITORY` — en: scripts/ia-editor.mjs
 - variable `GITHUB_SHA` — en: scripts/arana.mjs, scripts/write-build-info.mjs
+- variable `GITHUB_TOKEN` — en: scripts/ia-editor.mjs
+- variable `HOME` — en: scripts/ia-editor.mjs
+- variable `IA_API_KEY` — en: scripts/ia-editor.mjs
+- variable `IA_API_URL` — en: scripts/ia-editor.mjs
+- variable `IA_MODELO` — en: scripts/ia-editor.mjs
+- variable `IA_RESPUESTA_ARCHIVO` — en: scripts/ia-editor.mjs
+- variable `IA_SECO` — en: scripts/ia-editor.mjs
 - variable `IMAGES` — en: worker/index.ts
+- variable `ISSUE_NUMBER` — en: scripts/ia-editor.mjs
+- variable `LANG` — en: scripts/ia-editor.mjs
 - variable `MINIFLARE_REGISTRY_PATH` — en: vite.config.ts
+- variable `PATH` — en: scripts/ia-editor.mjs
 - variable `WRANGLER_LOG_PATH` — en: vite.config.ts
 - variable `WRANGLER_WRITE_LOGS` — en: vite.config.ts
 
@@ -820,7 +838,8 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `api.coingecko.com` — app/api/market-structure/route.ts, app/api/radar/route.ts, app/radar-app.tsx, app/unlock-desk.tsx, lib/spot-plan-client.ts, lib/token-unlocks.ts (+1)
 - `api.coinlore.net` — app/api/market-structure/route.ts, app/api/radar/route.ts, app/radar-app.tsx, lib/automation.ts, worker/index.ts
 - `api.exchange.coinbase.com` — lib/klines-server.ts
-- `api.groq.com` — lib/ai-brains.ts, lib/telegram-voice.ts, tests/arana.test.ts
+- `api.github.com` — scripts/ia-editor.mjs
+- `api.groq.com` — lib/ai-brains.ts, lib/telegram-voice.ts, scripts/ia-editor.mjs, tests/arana.test.ts
 - `api.hyperliquid.xyz` — lib/market-providers.ts
 - `api.kraken.com` — app/api/orderbook/route.ts, lib/klines-server.ts
 - `api.llama.fi` — lib/exchange-reserves.ts
@@ -848,7 +867,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `feeds.content.dowjones.io` — lib/news-intelligence.ts
 - `feeds.skynews.com` — lib/news-intelligence.ts
 - `futures.kraken.com` — lib/market-providers.ts
-- `github.com` — tests/herramientas.test.ts
+- `github.com` — scripts/ia-editor.mjs, tests/herramientas.test.ts
 - `news.un.org` — lib/news-intelligence.ts
 - `nextjs.org` — next-env.d.ts
 - `nfs.faireconomy.media` — app/api/calendar/route.ts, lib/econ-calendar.ts
