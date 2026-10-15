@@ -7,13 +7,15 @@ import LabAgenteSt from "./lab-agente-st";
 import { BACKTEST_DAYS, runBacktestFor } from "../lib/jarvis-backtest-run.ts";
 import { PAPER_EVENT, paperTrades } from "../lib/jarvis-paper-run.ts";
 import { agentesDe, centroDe, type EstadoMotor, type FotoLab } from "../lib/lab.ts";
-import { DESLIZAMIENTO_DEFECTO_PCT, evaluarBacktest, FRACCION_EVALUACION, type MetricasTramo } from "../lib/lab-evaluacion.ts";
+import { DESLIZAMIENTO_DEFECTO_PCT, evaluarBacktest, FRACCION_EVALUACION, type Evaluacion, type MetricasTramo } from "../lib/lab-evaluacion.ts";
 import { respuestaLab } from "../lib/lab-jarvis.ts";
 import { operacionDePapel, TOPES, type LimitesRiesgo } from "../lib/lab-riesgo.ts";
 import { fijarBacktest, fijarError, fijarEvaluacion, fotoLab, guardarLimites, LAB_EVENT, registrarActividad } from "../lib/lab-run.ts";
 import { lineaFuente } from "../lib/registro.ts";
 import LabFondeo from "./lab-fondeo";
 import PracticaGatillo from "./practica-gatillo";
+import { lecturaTramo, veredictoNovato } from "../lib/lectura-novato.ts";
+import { MONEDAS_PRACTICA } from "../lib/practica-gatillo.ts";
 import AprenderLab from "./aprender-lab";
 import LabPiso from "./lab-piso";
 
@@ -121,6 +123,25 @@ function Arana({ estado, progreso }: { estado: EstadoMotor; progreso: number | n
         </div>
       ) : null}
     </figure>
+  );
+}
+
+/** El veredicto en castellano de una corrida: lo primero que ve quien no sabe leer las métricas. */
+function Veredicto({ ev }: { ev: Evaluacion }) {
+  const v = veredictoNovato(ev);
+  return (
+    <div className={`lab-veredicto lab-v-${v.fuerza.replace(/ /g, "-").toLowerCase()}`} role="status">
+      <p className="lab-veredicto-fuerza">{v.fuerza}</p>
+      <p className="lab-veredicto-titulo">{v.titulo}</p>
+      <ul>
+        {v.porque.map((x) => (
+          <li key={x}>{x}</li>
+        ))}
+      </ul>
+      <p className="lab-veredicto-hacer">
+        <strong>Qué hacer:</strong> {v.queHacer}
+      </p>
+    </div>
   );
 }
 
@@ -282,7 +303,12 @@ export default function AiTradingLab() {
           >
             <label>
               Moneda
-              <input value={moneda} onChange={(e) => setMoneda(e.target.value.replace(/[^a-z0-9]/gi, "").slice(0, 12))} inputMode="text" autoCapitalize="characters" />
+              <input list="lab-monedas" value={moneda} onChange={(e) => setMoneda(e.target.value.replace(/[^a-z0-9]/gi, "").slice(0, 12))} inputMode="text" autoCapitalize="characters" />
+              <datalist id="lab-monedas">
+                {MONEDAS_PRACTICA.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
             </label>
             <label>
               Período
@@ -316,10 +342,27 @@ export default function AiTradingLab() {
               <p className="lab-nota">
                 {ev.symbol.replace(/USDT$/, "")} · reglas v{ev.reglas} · {ev.fuente} · corrida <code>{ev.id}</code>
               </p>
+              <Veredicto ev={ev} />
               <div className="lab-tramos">
                 <Tramo m={ev.desarrollo} />
                 <Tramo m={ev.evaluacion} />
               </div>
+              <details className="lab-lectura">
+                <summary>¿Qué quieren decir estos números?</summary>
+                {[ev.desarrollo, ev.evaluacion].map((m) => {
+                  const l = lecturaTramo(m);
+                  return (
+                    <div key={m.tramo}>
+                      <h4>{l.titulo}</h4>
+                      <ul>
+                        {l.frases.map((x) => (
+                          <li key={x}>{x}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </details>
               <ul className="lab-calidad">
                 {ev.calidad.map((q) => (
                   <li key={q}>{q}</li>

@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 611 · objetivos: 17 · sin objetivo: 0
+- Archivos: 613 · objetivos: 17 · sin objetivo: 0
 - Tablas D1: 49 · secretos: 5 · variables de entorno: 25 · rutas /api: 54 · hosts: 58
-- Código de navegador: 66 archivos con "use client" que alcanzan 199 · problemas: 0
-- Lib sin prueba directa: 24 de 193
+- Código de navegador: 66 archivos con "use client" que alcanzan 200 · problemas: 0
+- Lib sin prueba directa: 24 de 194
 
 ## Objetivos
 
@@ -397,7 +397,7 @@ Texto: el único lugar donde la app calcula el acierto, el profit factor y la ex
 - `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (42)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (44)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -425,6 +425,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/lab-riesgo.ts` — El gestor de riesgo central del AI TRADING LAB: una sola compuerta para toda operación simulada, en el motor de papel del navegador y en la API del servidor (no solo en la pantalla
 - `lib/lab-run.ts` — El AI TRADING LAB en el navegador: guarda los límites de riesgo que eligió la persona (dentro de los topes de lib/lab-riesgo.ts) y anota la actividad del laboratorio con su hora (r
 - `lib/lab.ts` — AI TRADING LAB: la foto del laboratorio armada con lo que la app ya tiene (la araña en vivo, el backtest, el papel, el registro y el gestor de riesgo).
+- `lib/lectura-novato.ts` — La lectura para novatos: traduce las métricas del backtest (lib/lab-evaluacion.ts) a frases en castellano que alguien sin experiencia entienda, sin inventar nada.
 - `lib/linea-busqueda.ts` — La búsqueda de la mejor confirmación y configuración de la ruptura de línea de tendencia (TENDENCIA_LINEA, en lib/estrategias.ts).
 - `lib/practica-gatillo.ts` — La práctica del gatillo: la persona ve las velas hasta una vela `i` y decide si la estrategia elegida dispara al cierre de esa vela y hacia dónde (LONG, SHORT o no hay gatillo).
 - `lib/preregistro-flujo.ts` — Preregistro del flujo real: cuatro filtros sobre el Agente Supertrend MTF + Volumen, fijados el 14/10/2026 ANTES de mirar datos de volumen taker, funding u open interest.
@@ -437,6 +438,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/fondeo.test.ts` — Pruebas de las cuentas de fondeo y el Agente Fondeo (lib/fondeo.ts): instrumentos y prioridad, topes de las reglas, el estado de la cuenta, la compuerta (margen diario y total, col
 - `tests/lab-arena.test.ts` — Pruebas de la arena del piso de estrategias (lib/lab-arena.ts): el orden de mayor a menor R por operación, la conexión de cada agente con el cerebro, la muestra mínima, el interval
 - `tests/lab.test.ts` — AI TRADING LAB: el gestor de riesgo central frena lo que pasa los límites y nadie lo afloja más allá de los topes; la evaluación del backtest respeta la cronología; el centro de la
+- `tests/lectura-novato.test.ts` — Pruebas de la lectura para novatos (lib/lectura-novato.ts): que el veredicto mire primero la muestra, que detecte el caso de ganar en desarrollo y perder en evaluación, que nunca p
 - `tests/linea-busqueda.test.ts` — Pruebas de la búsqueda de confirmación y configuración de la línea de tendencia (lib/linea-busqueda.ts): cada confirmación con su caso que la cumple y el que no, la ventana del ret
 - `tests/preregistro-flujo.test.ts` — Tests del preregistro del flujo (lib/preregistro-flujo.ts): cada filtro usa solo datos conocidos al cierre de la vela de la señal (no mira el futuro) y un dato faltante no aprueba
 - `tests/smc-liquidez.test.ts` — Pruebas del agente de liquidez + IFVG + breaker (lib/smc-liquidez.ts): las zonas altas (FVG y OB) con casos armados a mano, su vencimiento, la toma de liquidez, el IFVG, la grilla,

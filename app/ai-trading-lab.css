@@ -234,3 +234,19 @@
 .aprender-glosario { margin-top: 16px; }
 .aprender-glosario dt { margin-top: 8px; }
 .aprender-glosario dd { margin: 2px 0 0 0; }
+
+/* Veredicto y lectura del backtest (lib/lectura-novato.ts) */
+.lab-veredicto{margin:12px 0;padding:12px;border:1px solid var(--lab-borde);border-left-width:4px;border-radius:6px;background:#071223}
+.lab-veredicto-fuerza{margin:0;font:700 10px var(--font-mono);letter-spacing:1.2px;color:var(--lab-cian)}
+.lab-veredicto-titulo{margin:4px 0 8px;font:600 13px var(--font-mono);color:#fff}
+.lab-veredicto ul{margin:0 0 8px;padding-left:18px}
+.lab-veredicto li{margin:4px 0}
+.lab-veredicto-hacer{margin:0}
+.lab-v-no-se-sostiene,.lab-v-sin-ventaja{border-left-color:#e5484d}
+.lab-v-no-alcanza,.lab-v-sin-datos{border-left-color:#f5c542}
+.lab-v-para-seguir-mirando{border-left-color:#2fbf71}
+.lab-lectura{margin:12px 0}
+.lab-lectura summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.lab-lectura h4{margin:10px 0 4px}
+.lab-lectura ul{padding-left:18px}
+.lab-lectura li{margin:5px 0}

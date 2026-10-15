@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ESTRATEGIAS, type EstrategiaId, type Operacion } from "../lib/estrategias.ts";
 import { loadRows } from "../lib/market-fetch.ts";
+import { NIVELES_GATILLO, nivelDe } from "../lib/lectura-novato.ts";
 import {
   COSTO_PRACTICA_PCT,
   HORIZONTE_PRACTICA,
@@ -71,7 +72,8 @@ function Velas({ velas, desde, hasta, marca, lineas }: { velas: SwingCandle[]; d
 export default function PracticaGatillo() {
   const [moneda, setMoneda] = useState(MONEDAS_PRACTICA[0]);
   const [marco, setMarco] = useState(MARCOS_PRACTICA[1].id);
-  const [estrategiaId, setEstrategiaId] = useState(ESTRATEGIAS[0].id);
+  // Se arranca por el control al azar: practicar contra el ruido primero es lo que da sentido al resto.
+  const [estrategiaId, setEstrategiaId] = useState<EstrategiaId>((NIVELES_GATILLO[0].id as EstrategiaId) ?? ESTRATEGIAS[0].id);
   // Las velas van marcadas con la moneda y el marco que las pidieron: si cambia la elección, no se muestran las anteriores.
   const [datos, setDatos] = useState<{ clave: string; velas: SwingCandle[] } | null>(null);
   const [fallo, setFallo] = useState<{ clave: string; texto: string } | null>(null);
@@ -82,6 +84,7 @@ export default function PracticaGatillo() {
 
   const marcoInfo = MARCOS_PRACTICA.find((m) => m.id === marco) ?? MARCOS_PRACTICA[1];
   const estrategia = ESTRATEGIAS.find((e) => e.id === estrategiaId) ?? ESTRATEGIAS[0];
+  const nivel = nivelDe(estrategiaId);
   const clave = `${moneda}|${marco}`;
   const velas = datos && datos.clave === clave ? datos.velas : null;
   const error = fallo && fallo.clave === clave ? fallo.texto : null;
@@ -173,11 +176,22 @@ export default function PracticaGatillo() {
         <label>
           Gatillo
           <select value={estrategiaId} onChange={(e) => { setEstrategiaId(e.target.value as EstrategiaId); reiniciar(); }}>
-            {ESTRATEGIAS.map((e) => <option key={e.id} value={e.id}>{e.agente}</option>)}
+            {[1, 2, 3].map((n) => (
+              <optgroup key={n} label={n === 1 ? "1 · Para empezar" : n === 2 ? "2 · Un poco más difícil" : "3 · Varias condiciones"}>
+                {NIVELES_GATILLO.filter((x) => x.nivel === n).map((x) => {
+                  const e = ESTRATEGIAS.find((y) => y.id === x.id);
+                  return e ? <option key={e.id} value={e.id}>{e.agente}</option> : null;
+                })}
+              </optgroup>
+            ))}
+            <optgroup label="Los demás">
+              {ESTRATEGIAS.filter((e) => !nivelDe(e.id)).map((e) => <option key={e.id} value={e.id}>{e.agente}</option>)}
+            </optgroup>
           </select>
         </label>
       </div>
       <p className="practica-regla"><strong>Regla:</strong> {estrategia.regla}</p>
+      {nivel && <p className="practica-regla"><strong>Nivel {nivel.nivel}:</strong> {nivel.porQue}</p>}
       {estrategia.id === "AZAR" && (
         <p className="practica-regla">Este gatillo entra al azar. Si tu acierto es mejor que con este control, tu ojo no detecta nada: es ruido.</p>
       )}
