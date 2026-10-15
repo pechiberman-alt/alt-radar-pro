@@ -226,3 +226,11 @@
 @media (max-width: 600px) {
   .practica-controles label { flex: 1 1 100%; }
 }
+
+/* APRENDER (app/aprender-lab.tsx): lecciones, preguntas con explicación y glosario */
+.aprender-pregunta { margin: 12px 0; }
+.aprender-pregunta p { margin: 6px 0; }
+.aprender-pregunta .lab-preguntas { display: flex; flex-wrap: wrap; gap: 8px; }
+.aprender-glosario { margin-top: 16px; }
+.aprender-glosario dt { margin-top: 8px; }
+.aprender-glosario dd { margin: 2px 0 0 0; }

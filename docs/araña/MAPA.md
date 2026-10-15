@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 603 · objetivos: 17 · sin objetivo: 0
+- Archivos: 606 · objetivos: 17 · sin objetivo: 0
 - Tablas D1: 49 · secretos: 5 · variables de entorno: 12 · rutas /api: 54 · hosts: 57
-- Código de navegador: 65 archivos con "use client" que alcanzan 197 · problemas: 0
-- Lib sin prueba directa: 24 de 191
+- Código de navegador: 66 archivos con "use client" que alcanzan 199 · problemas: 0
+- Lib sin prueba directa: 24 de 192
 
 ## Objetivos
 
@@ -393,10 +393,11 @@ Texto: el único lugar donde la app calcula el acierto, el profit factor y la ex
 - `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (39)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (42)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
+- `app/aprender-lab.tsx` — APRENDER: las lecciones del laboratorio para quien recién empieza.
 - `app/lab-agente-st.tsx` — El agente de papel Supertrend MTF + Volumen (lib/agente-st.ts): sus últimas entradas con el plan completo (SL, TP1, TP2 y TP3), qué niveles tocó cada una y la foto de condiciones c
 - `app/lab-fondeo.tsx` — Cuenta de fondeo y Agente Fondeo en el panel: la persona carga las reglas de su cuenta y su estado (saldo, resultado de hoy, riesgo abierto) y, al tocar «Leer la mesa», el agente p
 - `app/lab-mini-arana.tsx` — La mini araña del piso de estrategias: la misma araña del laboratorio (app/ai-trading-lab.tsx) en chico, una por agente, pintada con el color de su veredicto.
@@ -407,6 +408,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `docs/busqueda-linea.md` — Búsqueda de confirmación y configuración: línea de tendencia
 - `docs/busqueda-smc.md` — Búsqueda del gatillo y la configuración: zonas altas + toma de liquidez + IFVG + breaker
 - `docs/estudio-estrategias.md` — Estudio de estrategias del AI TRADING LAB
+- `lib/aprender.ts` — El contenido de APRENDER, la pestaña para quien recién empieza en el AI TRADING LAB: qué es una vela, qué es un gatillo, cómo se miden el riesgo y los costos, por qué el winrate so
 - `lib/breaker-busqueda.ts` — La búsqueda de la mejor confirmación y configuración del breaker block (BREAKER_BLOCK): un order block (la última vela contraria antes de un impulso que rompió estructura, ver lib/
 - `lib/estrategias.ts` — El estudio de estrategias del AI TRADING LAB: cada agente tiene UNA estrategia clásica con parámetros fijos (no se buscan los que mejor dan: eso infla los resultados) y todas se mi
 - `lib/estudio-estrategias-datos.ts` — Resultado del estudio de estrategias (scripts/investigacion/estrategias.ts).
@@ -424,6 +426,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/preregistro-flujo.ts` — Preregistro del flujo real: cuatro filtros sobre el Agente Supertrend MTF + Volumen, fijados el 14/10/2026 ANTES de mirar datos de volumen taker, funding u open interest.
 - `lib/smc-liquidez.ts` — El agente «Liquidez + IFVG + Breaker en zona de alta temporalidad» (SMC_LIQUIDEZ) y su búsqueda de disparo y configuración.
 - `lib/sobreajuste.ts` — Auditoría de sobreajuste: cuánto de un buen resultado puede ser suerte por haber probado muchas variantes.
+- `tests/aprender.test.ts` — Pruebas del contenido de APRENDER (lib/aprender.ts): cada lección tiene texto y preguntas, cada respuesta correcta existe dentro de sus opciones, los ids no se repiten, el glosario
 - `tests/breaker-busqueda.test.ts` — Pruebas de la búsqueda del breaker block (lib/breaker-busqueda.ts): el caso armado a mano que lo forma, cada confirmación con su caso que la cumple y el que no, la zona que falla a
 - `tests/estrategias.test.ts` — pruebas: indicadores: EMA y RSI conocidos, ninguna estrategia mira el futuro: la señal en i no cambia si se borran las vela, operar: entra a la apertura siguiente, una operación por vez, con la escalera de (+1)
 - `tests/fibonacci-niveles.test.ts` — Pruebas del agente Fibonacci + extensión + niveles clave (lib/fibonacci-niveles.ts): la pierna armada a mano, la señal en la zona con su stop y su extensión, que el nivel clave la
@@ -864,7 +867,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-fondeo.tsx, app/lab-piso.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-fondeo.tsx, app/lab-piso.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa
