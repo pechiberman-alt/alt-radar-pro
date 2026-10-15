@@ -250,3 +250,20 @@
 .lab-lectura h4{margin:10px 0 4px}
 .lab-lectura ul{padding-left:18px}
 .lab-lectura li{margin:5px 0}
+
+/* Universos de monedas (app/lab-universos.tsx) */
+.universos{margin:0 0 14px}
+.universo{margin:10px 0;padding:10px;border:1px solid var(--lab-borde);border-left-width:4px;border-radius:6px;background:#071223}
+.universo-medible{border-left-color:#2fbf71}
+.universo-solo-vivo{border-left-color:#f5c542}
+.universo h4{margin:0 0 4px;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.universo-marca{font:600 9px var(--font-mono);letter-spacing:1px;color:var(--lab-cian);text-transform:uppercase}
+.universo p{margin:4px 0}
+.universo-monedas{display:flex;flex-wrap:wrap;gap:6px}
+.universo-monedas span{padding:2px 7px;border:1px solid var(--lab-borde);border-radius:4px;font:600 10px var(--font-mono)}
+.universo-con{color:#2fbf71;border-color:#2fbf71}
+.universo-sin{color:var(--soft);opacity:.75;text-decoration:line-through}
+.universo-estado{font-size:.95em}
+.universo-criterio{opacity:.85;font-size:.9em}
+.universo-bajar summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.universo-bajar pre{overflow-x:auto;padding:8px;background:#04101f;border:1px solid var(--lab-borde);border-radius:4px}

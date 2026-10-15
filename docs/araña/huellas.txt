@@ -13,8 +13,8 @@ ebfa1b2412ea	73	CLAUDE.md
 f78d8e271837	683	app/account-panel.tsx
 064cf5eb7605	229	app/active-signals.tsx
 63b274d443fe	122	app/agenda-macro.tsx
-d40e3029a55d	253	app/ai-trading-lab.css
-9cad0e897029	461	app/ai-trading-lab.tsx
+28e695ecf73d	270	app/ai-trading-lab.css
+4570599a9482	463	app/ai-trading-lab.tsx
 bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
@@ -135,6 +135,7 @@ a0bec1d6e010	165	app/lab-agente-st.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
 e3b51a33d7a3	296	app/lab-piso.tsx
+dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
 a8e3e09ba000	132	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
@@ -190,7 +191,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d0c329fdbf6f	291	docs/araña/objetivos.md
+8a7340f01c19	292	docs/araña/objetivos.md
 db6358216fcf	188	docs/busqueda-breaker.md
 fc6042bacccc	116	docs/busqueda-fibonacci.md
 25e7d2744ee2	187	docs/busqueda-linea.md
@@ -408,6 +409,7 @@ d0434e2eafe5	81	lib/trade-bubbles.ts
 759b1ffa8280	142	lib/trade-journal.ts
 3ae6c5a6865e	265	lib/trading-profiles.ts
 09d30197f4dc	283	lib/trendlines.ts
+763fbbce015d	105	lib/universos.ts
 31e36836f747	96	lib/upstream-cache.ts
 93845159d10c	27	lib/visible-interval.ts
 41692b83da6c	76	lib/volume-spike.ts
@@ -603,6 +605,7 @@ be4820285ec6	54	tests/timeframes.test.ts
 7abc9c547923	67	tests/trade-bubbles.test.ts
 1780efc99a76	93	tests/trade-journal.test.ts
 7c6e53012303	190	tests/trendlines.test.ts
+f0ea4f541999	85	tests/universos.test.ts
 2919de6f3d64	157	tests/upstream-cache.test.ts
 dafba0404d8e	92	tests/volume-spike.test.ts
 59f941b19b0f	77	tests/web-push.test.ts

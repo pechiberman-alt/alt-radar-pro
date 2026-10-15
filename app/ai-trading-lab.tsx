@@ -13,6 +13,7 @@ import { operacionDePapel, TOPES, type LimitesRiesgo } from "../lib/lab-riesgo.t
 import { fijarBacktest, fijarError, fijarEvaluacion, fotoLab, guardarLimites, LAB_EVENT, registrarActividad } from "../lib/lab-run.ts";
 import { lineaFuente } from "../lib/registro.ts";
 import LabFondeo from "./lab-fondeo";
+import LabUniversos from "./lab-universos";
 import PracticaGatillo from "./practica-gatillo";
 import { lecturaTramo, veredictoNovato } from "../lib/lectura-novato.ts";
 import { MONEDAS_PRACTICA } from "../lib/practica-gatillo.ts";
@@ -258,6 +259,7 @@ export default function AiTradingLab() {
       {pestana === "agentes" && (
         <div className="lab-cuerpo lab-agentes">
           <LabFondeo />
+          <LabUniversos />
           <LabPiso />
           <LabAgenteSt />
           <h3 className="lab-sub">Los agentes de la araña</h3>
