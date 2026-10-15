@@ -7,6 +7,7 @@ import {
   INSTRUMENTOS_FONDEO,
   NASDAQ_SIMBOLO,
   REGLAS_FONDEO_DEFECTO,
+  SIMBOLOS_AXI,
   agenteFondeo,
   esDeFondeo,
   estadoFondeo,
@@ -122,4 +123,12 @@ test("Telegram: oro y NASDAQ salen primero aunque su prioridad sea menor, y no q
   assert.equal(send[0].key, "oro");
   assert.ok(!rest.some((e) => e.key === "oro"));
   assert.equal(rest.length, 1);
+});
+
+test("los símbolos de Axi quedan anotados aparte de los de Binance: son mercados distintos", () => {
+  assert.equal(SIMBOLOS_AXI.XAU, "XAUUSD.c");
+  assert.equal(SIMBOLOS_AXI.NASDAQ, "USTECH");
+  // El de Binance sigue sin confirmar: el de Axi no lo reemplaza.
+  assert.equal(NASDAQ_SIMBOLO, null);
+  assert.notEqual(SIMBOLOS_AXI.XAU, "XAUUSDT");
 });
