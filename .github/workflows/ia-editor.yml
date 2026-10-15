@@ -1,0 +1,43 @@
+name: IA editor (modelo gratis)
+
+# Se activa comentando «/ia …» en un ISSUE (no en un PR), también desde la app de GitHub del celular. Abre un PR para revisar:
+# nunca mergea. Guía: docs/ia-editor.md.
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ia-editor
+  cancel-in-progress: false
+
+jobs:
+  editar:
+    # El repo es público: solo el dueño puede activarlo, y solo en issues.
+    if: startsWith(github.event.comment.body, '/ia') && github.event.comment.author_association == 'OWNER' && github.event.issue.pull_request == null
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          # El token no queda guardado en el repo: el lint y las pruebas corren código escrito por el modelo.
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Editar con la IA y abrir el PR
+        env:
+          # El texto del comentario va por el entorno, nunca pegado en el comando.
+          COMENTARIO: ${{ github.event.comment.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IA_API_KEY: ${{ secrets.IA_API_KEY }}
+          IA_API_URL: ${{ vars.IA_API_URL }}
+          IA_MODELO: ${{ vars.IA_MODELO }}
+        run: node --experimental-strip-types scripts/ia-editor.mjs

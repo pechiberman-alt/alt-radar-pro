@@ -194,8 +194,9 @@ Reglas:
 
 ## despliegue — Worker, CI y migraciones
 Texto: cómo llega el código a producción, cómo corre en el Worker y la configuración del proyecto.
-Archivos: worker/**, wrangler*.jsonc, .github/workflows/**, drizzle/**, db/**, scripts/write-build-info.mjs, package.json, lib/app-settings*.ts, app/api/version/**, *.config.ts, *.config.mjs, tsconfig.json, next-env.d.ts, .gitignore, .openai/**, examples/**, README.md, THIRD_PARTY_NOTICES.md
+Archivos: worker/**, wrangler*.jsonc, .github/workflows/**, drizzle/**, db/**, scripts/write-build-info.mjs, package.json, lib/app-settings*.ts, app/api/version/**, *.config.ts, *.config.mjs, tsconfig.json, next-env.d.ts, .gitignore, .openai/**, examples/**, README.md, THIRD_PARTY_NOTICES.md, lib/ia-editor.ts, scripts/ia-editor.mjs, docs/ia-editor.md
 Reglas:
+- Editor por IA (.github/workflows/ia-editor.yml, scripts/ia-editor.mjs, lib/ia-editor.ts, docs/ia-editor.md): el dueño comenta «/ia …» en un issue y un modelo gratis propone el cambio; se abre un PR para revisar, nunca se mergea solo. Solo edita archivos existentes de app/, lib/, tests/ y docs/ que se le mostraron; nunca workflows, scripts, dependencias, migraciones, claves ni el mapa. El lint y las pruebas corren sin el token ni la clave en el entorno. No agregar caminos que mergeen, desplieguen o toquen estas protecciones.
 - No tocar .github/workflows/ ni wrangler*.jsonc salvo pedido explícito.
 - Antes de proponer un cambio: npm ci, npm run lint, npm run test:unit (con TZ=UTC) y npm run build. Los tres pasan.
 - Al mergear a main, el CI despliega solo (lint, tests, build, migraciones D1, deploy).
