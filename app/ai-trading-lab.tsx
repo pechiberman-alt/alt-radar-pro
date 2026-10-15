@@ -12,6 +12,7 @@ import { respuestaLab } from "../lib/lab-jarvis.ts";
 import { operacionDePapel, TOPES, type LimitesRiesgo } from "../lib/lab-riesgo.ts";
 import { fijarBacktest, fijarError, fijarEvaluacion, fotoLab, guardarLimites, LAB_EVENT, registrarActividad } from "../lib/lab-run.ts";
 import { lineaFuente } from "../lib/registro.ts";
+import LabAxiDiario from "./lab-axi-diario";
 import LabFondeo from "./lab-fondeo";
 import LabUniversos from "./lab-universos";
 import PracticaGatillo from "./practica-gatillo";
@@ -259,6 +260,7 @@ export default function AiTradingLab() {
       {pestana === "agentes" && (
         <div className="lab-cuerpo lab-agentes">
           <LabFondeo />
+          <LabAxiDiario />
           <LabUniversos />
           <LabPiso />
           <LabAgenteSt />
