@@ -148,7 +148,7 @@ db0be99a3f89	499	app/market-brain.tsx
 84f8f0693036	4	app/page.tsx
 f87f234d88cd	47	app/portfolio-risk.css
 0bfe99958b31	314	app/portfolio-risk.tsx
-2e515cdd3dac	231	app/practica-gatillo.tsx
+fa18557c692e	235	app/practica-gatillo.tsx
 25d79b0882b3	10	app/prebreak-desk.css
 5a1397c81f2a	138	app/prebreak-desk.tsx
 1a2057124d9d	491	app/premium.css

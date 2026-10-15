@@ -72,8 +72,9 @@ export default function PracticaGatillo() {
   const [moneda, setMoneda] = useState(MONEDAS_PRACTICA[0]);
   const [marco, setMarco] = useState(MARCOS_PRACTICA[1].id);
   const [estrategiaId, setEstrategiaId] = useState(ESTRATEGIAS[0].id);
-  const [velas, setVelas] = useState<SwingCandle[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Las velas van marcadas con la moneda y el marco que las pidieron: si cambia la elección, no se muestran las anteriores.
+  const [datos, setDatos] = useState<{ clave: string; velas: SwingCandle[] } | null>(null);
+  const [fallo, setFallo] = useState<{ clave: string; texto: string } | null>(null);
   const [semilla, setSemilla] = useState(1);
   const [pos, setPos] = useState(0);
   const [respuesta, setRespuesta] = useState<Respuesta | null>(null);
@@ -81,19 +82,22 @@ export default function PracticaGatillo() {
 
   const marcoInfo = MARCOS_PRACTICA.find((m) => m.id === marco) ?? MARCOS_PRACTICA[1];
   const estrategia = ESTRATEGIAS.find((e) => e.id === estrategiaId) ?? ESTRATEGIAS[0];
+  const clave = `${moneda}|${marco}`;
+  const velas = datos && datos.clave === clave ? datos.velas : null;
+  const error = fallo && fallo.clave === clave ? fallo.texto : null;
 
   useEffect(() => {
     const ctl = new AbortController();
+    const pedida = `${moneda}|${marco}`;
     (async () => {
       const rows = await loadRows(moneda, marco, 500, ctl.signal);
       if (ctl.signal.aborted) return;
       if (!rows) {
-        setVelas(null);
-        setError("No llegaron velas. Revisá la conexión y probá otra vez.");
+        setFallo({ clave: pedida, texto: "No llegaron velas. Revisá la conexión y probá otra vez." });
         return;
       }
-      setError(null);
-      setVelas(aVelas(rows));
+      setFallo(null);
+      setDatos({ clave: pedida, velas: aVelas(rows) });
     })();
     return () => ctl.abort();
   }, [moneda, marco]);
