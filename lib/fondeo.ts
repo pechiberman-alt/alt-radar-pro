@@ -22,6 +22,17 @@ export type InstrumentoFondeo = {
  */
 export const NASDAQ_SIMBOLO: string | null = null;
 
+/**
+ * Los símbolos confirmados en Axi (MT5), leídos de la cuenta con get_mt5_available_markets el 15/10/2026. Son de OTRO
+ * mercado que los de Binance: XAUUSD.c es un CFD de oro y USTECH un CFD sobre el índice, con su propio precio, su propio
+ * spread y su propio horario. NUNCA se mezclan con XAUUSDT de Binance en una misma medición: serían dos series distintas
+ * leídas como si fueran una. Acá solo quedan anotados; el agente de papel sigue leyendo Binance.
+ */
+export const SIMBOLOS_AXI = Object.freeze({
+  XAU: "XAUUSD.c",
+  NASDAQ: "USTECH",
+}) as Readonly<Record<"XAU" | "NASDAQ", string>>;
+
 export const INSTRUMENTOS_FONDEO: readonly InstrumentoFondeo[] = Object.freeze([
   { clave: "XAU", nombre: "Oro", symbol: "XAUUSDT", prioridad: 1 },
   { clave: "NASDAQ", nombre: "NASDAQ", symbol: NASDAQ_SIMBOLO, prioridad: 2 },
