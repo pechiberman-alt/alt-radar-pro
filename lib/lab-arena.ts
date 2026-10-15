@@ -1,4 +1,5 @@
 import type { FilaEstudio } from "./estudio-estrategias-datos.ts";
+import { AGENTES_PAPEL } from "./agentes-papel.ts";
 
 /**
  * La arena del piso de estrategias del AI TRADING LAB: pone a todos los agentes en una misma tabla para que se vea quién
@@ -17,7 +18,11 @@ export const MUESTRA_MINIMA = 15;
  */
 export type Conexion = "PAPEL" | "ESTUDIO" | "CONTROL";
 
-export const AGENTES_EN_PAPEL: readonly string[] = ["ST_MTF_VOL"];
+/**
+ * Los que corren hacia adelante en papel: todos los agentes del estudio (lib/agentes-papel.ts). Leen las mismas velas de 4 h,
+ * así que sumarlos no cuesta ninguna descarga más. El control al azar no corre: su resultado futuro no diría nada de ninguna regla.
+ */
+export const AGENTES_EN_PAPEL: readonly string[] = AGENTES_PAPEL;
 
 export const conexionCerebro = (estrategia: string): Conexion => (estrategia === "AZAR" ? "CONTROL" : AGENTES_EN_PAPEL.includes(estrategia) ? "PAPEL" : "ESTUDIO");
 

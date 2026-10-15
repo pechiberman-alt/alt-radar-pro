@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 616 · objetivos: 17 · sin objetivo: 0
+- Archivos: 620 · objetivos: 17 · sin objetivo: 0
 - Tablas D1: 49 · secretos: 5 · variables de entorno: 25 · rutas /api: 54 · hosts: 58
-- Código de navegador: 67 archivos con "use client" que alcanzan 202 · problemas: 0
-- Lib sin prueba directa: 24 de 195
+- Código de navegador: 67 archivos con "use client" que alcanzan 204 · problemas: 0
+- Lib sin prueba directa: 24 de 197
 
 ## Objetivos
 
@@ -397,7 +397,7 @@ Texto: el único lugar donde la app calcula el acierto, el profit factor y la ex
 - `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (47)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (51)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -413,6 +413,8 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `docs/busqueda-linea.md` — Búsqueda de confirmación y configuración: línea de tendencia
 - `docs/busqueda-smc.md` — Búsqueda del gatillo y la configuración: zonas altas + toma de liquidez + IFVG + breaker
 - `docs/estudio-estrategias.md` — Estudio de estrategias del AI TRADING LAB
+- `lib/agentes-explicado.ts` — Qué mira cada agente, en palabras de todos los días.
+- `lib/agentes-papel.ts` — Todos los agentes del estudio corriendo hacia adelante en papel (PLAN_AGENTES_1).
 - `lib/aprender.ts` — El contenido de APRENDER, la pestaña para quien recién empieza en el AI TRADING LAB: qué es una vela, qué es un gatillo, cómo se miden el riesgo y los costos, por qué el winrate so
 - `lib/breaker-busqueda.ts` — La búsqueda de la mejor confirmación y configuración del breaker block (BREAKER_BLOCK): un order block (la última vela contraria antes de un impulso que rompió estructura, ver lib/
 - `lib/estrategias.ts` — El estudio de estrategias del AI TRADING LAB: cada agente tiene UNA estrategia clásica con parámetros fijos (no se buscan los que mejor dan: eso infla los resultados) y todas se mi
@@ -433,6 +435,8 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/smc-liquidez.ts` — El agente «Liquidez + IFVG + Breaker en zona de alta temporalidad» (SMC_LIQUIDEZ) y su búsqueda de disparo y configuración.
 - `lib/sobreajuste.ts` — Auditoría de sobreajuste: cuánto de un buen resultado puede ser suerte por haber probado muchas variantes.
 - `lib/universos.ts` — Los universos de monedas: grupos con los que trabajan los agentes (gemas, pumpeo, infraestructura y DeFi, las 10 del estudio).
+- `tests/agentes-explicado.test.ts` — Pruebas de las explicaciones de los agentes (lib/agentes-explicado.ts): que todos los agentes del estudio tengan la suya, que estén en castellano simple y que ninguna prometa ganan
+- `tests/agentes-papel.test.ts` — Pruebas de los agentes en papel (lib/agentes-papel.ts): que no se mire el futuro, que la entrada sea la apertura siguiente con la escalera completa, que la clave no duplique entrad
 - `tests/aprender.test.ts` — Pruebas del contenido de APRENDER (lib/aprender.ts): cada lección tiene texto y preguntas, cada respuesta correcta existe dentro de sus opciones, los ids no se repiten, el glosario
 - `tests/breaker-busqueda.test.ts` — Pruebas de la búsqueda del breaker block (lib/breaker-busqueda.ts): el caso armado a mano que lo forma, cada confirmación con su caso que la cumple y el que no, la zona que falla a
 - `tests/estrategias.test.ts` — pruebas: indicadores: EMA y RSI conocidos, ninguna estrategia mira el futuro: la señal en i no cambia si se borran las vela, operar: entra a la apertura siguiente, una operación por vez, con la escalera de (+1)

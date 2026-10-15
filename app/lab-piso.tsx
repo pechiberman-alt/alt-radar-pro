@@ -8,8 +8,6 @@ import {
   conexionCerebro,
   controlDelMarco,
   marcosDisponibles,
-  nombreCorto,
-  partirNombre,
   posicion,
   repartirAnillos,
   textoCombatiente,
@@ -19,6 +17,7 @@ import {
   type Combatiente,
 } from "../lib/lab-arena.ts";
 import MiniArana from "./lab-mini-arana.tsx";
+import { explicadoDe } from "../lib/agentes-explicado.ts";
 
 /**
  * El piso de estrategias del AI TRADING LAB. El cerebro (JARVIS) va al centro y cada agente lo rodea con su mini araña, uno por
@@ -54,36 +53,31 @@ const r2 = (v: number | null) => {
 const n2 = (v: number | null) => (v === null ? "—" : v.toFixed(2).replace(".", ","));
 
 // El piso: el cerebro al centro y dos anillos de agentes.
-const ANCHO = 380;
-const ALTO = 412;
-const CENTRO = { x: ANCHO / 2, y: 200 };
-const RADIO_NODO = 19;
+const ANCHO = 360;
+const ALTO = 360;
+const CENTRO = { x: ANCHO / 2, y: ALTO / 2 };
+const RADIO_NODO = 20;
 
+/**
+ * Un agente en la rueda: solo su mini araña con el color del veredicto. Sin rótulo: con 19 agentes los nombres se pisan en una
+ * pantalla de celular, que es donde más se mira. El nombre, el número y la explicación van en la ficha de abajo al tocarlo.
+ */
 function Nodo({ a, x, y, activo, elegir }: { a: Agente; x: number; y: number; activo: boolean; elegir: () => void }) {
-  const ev = a.mejor.evaluacion;
-  const renglones = partirNombre(nombreCorto(a.agente));
-  const yTexto = y + RADIO_NODO + 9;
   return (
     <g
       className={`piso-nodo piso-${tono(a.mejor.veredicto)}${activo ? " piso-activa" : ""}`}
       role="button"
       tabIndex={0}
-      aria-label={`${a.agente}: ${a.mejor.veredicto}`}
+      aria-label={`${a.agente}: ${a.mejor.veredicto}, ${r2(a.mejor.evaluacion.expectancia)} por operación en ${a.mejor.marco}`}
       aria-pressed={activo}
       onClick={elegir}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), elegir())}
     >
+      {/* Área de toque cómoda en el celular, más grande que el dibujo. */}
+      <circle className="piso-nodo-toque" cx={x} cy={y} r={RADIO_NODO + 7} />
       {activo && <circle className="piso-nodo-aro" cx={x} cy={y} r={RADIO_NODO + 4} />}
       <circle className="piso-nodo-disco" cx={x} cy={y} r={RADIO_NODO} />
-      <MiniArana x={x} y={y + 0.5} escala={1.15} activa={activo} />
-      {renglones.map((t, k) => (
-        <text key={k} className="piso-rotulo" x={x} y={yTexto + k * 8.5} textAnchor="middle">
-          {t}
-        </text>
-      ))}
-      <text className={`piso-valor piso-valor-${tonoNumero(a.mejor.veredicto)}`} x={x} y={yTexto + renglones.length * 8.5 + 1} textAnchor="middle">
-        {r2(ev.expectancia)} · {a.mejor.marco}
-      </text>
+      <MiniArana x={x} y={y + 0.5} escala={1.3} activa={activo} />
     </g>
   );
 }
@@ -131,11 +125,12 @@ export default function LabPiso() {
   const [marco, setMarco] = useState<string>("todos");
   const [verTodas, setVerTodas] = useState(false);
   const a = lista.find((x) => x.id === elegido) ?? lista[0];
+  const exp = a ? explicadoDe(a.id) : null;
   // El control al azar no es un agente: va aparte y sin conexión al cerebro.
   // Los que mejor rinden, cerca del cerebro (anillo de adentro): ordenados por R por operación de su mejor temporalidad.
   const agentesAnillo = lista.filter((x) => x.id !== "AZAR").sort((p, q) => (q.mejor.evaluacion.expectancia ?? -9) - (p.mejor.evaluacion.expectancia ?? -9));
   const azar = lista.find((x) => x.id === "AZAR");
-  const lugares = repartirAnillos(agentesAnillo.length, CENTRO, 84, 152);
+  const lugares = repartirAnillos(agentesAnillo.length, CENTRO, 82, 146);
   const nodos = agentesAnillo.map((ag, k) => ({ ag, px: lugares[k].x, py: lugares[k].y }));
 
   const marcos = marcosDisponibles(ESTUDIO_FILAS);
@@ -168,8 +163,8 @@ export default function LabPiso() {
         </li>
       </ul>
       <svg className="piso-svg" viewBox={`0 0 ${ANCHO} ${ALTO}`} role="group" aria-label="Los agentes alrededor del cerebro">
-        <circle className="piso-guia" cx={CENTRO.x} cy={CENTRO.y} r={84} />
-        <circle className="piso-guia" cx={CENTRO.x} cy={CENTRO.y} r={152} />
+        <circle className="piso-guia" cx={CENTRO.x} cy={CENTRO.y} r={82} />
+        <circle className="piso-guia" cx={CENTRO.x} cy={CENTRO.y} r={146} />
         {nodos.map(({ ag, px, py }) => (
           <line
             key={`c-${ag.id}`}
@@ -184,7 +179,7 @@ export default function LabPiso() {
         {nodos.map(({ ag, px, py }) => (
           <Nodo key={ag.id} a={ag} x={px} y={py} activo={ag.id === a?.id} elegir={() => setElegido(ag.id)} />
         ))}
-        {azar && <Nodo a={azar} x={42} y={ALTO - 50} activo={azar.id === a?.id} elegir={() => setElegido(azar.id)} />}
+        {azar && <Nodo a={azar} x={30} y={ALTO - 30} activo={azar.id === a?.id} elegir={() => setElegido(azar.id)} />}
       </svg>
       <ul className="piso-leyenda" aria-label="Cómo leer el piso">
         <li>
@@ -193,18 +188,47 @@ export default function LabPiso() {
         <li>
           <i className="piso-leyenda-linea piso-leyenda-estudio" /> Solo estudio: el cerebro lee su resultado medido
         </li>
-        <li>El borde es el veredicto; el número, su R por operación en su mejor temporalidad (verde o rojo solo si el veredicto es decisivo)</li>
+        <li>Cada araña es un agente y su color es el veredicto. Tocala para ver qué mira y qué midió.</li>
       </ul>
       {a && (
         <article className={`piso-ficha piso-${tono(a.mejor.veredicto)}`} aria-live="polite">
           <header>
             <b>{a.agente}</b> <span>{a.mejor.veredicto}</span>
           </header>
-          <p>
-            {a.nombre}. {a.regla}
-          </p>
+          {exp && (
+            <>
+              <p className="piso-mira">
+                <b>Qué mira:</b> {exp.mira}
+              </p>
+              <p className="piso-idea">
+                <b>La idea:</b> {exp.idea}
+              </p>
+            </>
+          )}
+          <dl className="piso-clave" aria-label="Lo que midió en la evaluación">
+            <div>
+              <dt>Operaciones</dt>
+              <dd>
+                {a.mejor.evaluacion.operaciones}
+                {a.mejor.evaluacion.operaciones < 15 ? " (muestra mínima)" : ""}
+              </dd>
+            </div>
+            <div>
+              <dt>Acierto</dt>
+              <dd>{pct(a.mejor.evaluacion.winRate)}</dd>
+            </div>
+            <div>
+              <dt>Gana o pierde por operación</dt>
+              <dd className={`piso-valor-${tonoNumero(a.mejor.veredicto)}`}>{r2(a.mejor.evaluacion.expectancia)}</dd>
+            </div>
+            <div>
+              <dt>Peor racha</dt>
+              <dd>{n2(a.mejor.evaluacion.maxCaidaR)} R</dd>
+            </div>
+          </dl>
           <p className="piso-conexion">{CONEXION_TEXTO[conexionCerebro(a.id)]}.</p>
-          <div className="piso-tabla-wrap">
+          <details className="piso-tabla-wrap">
+            <summary>Ver las cuatro temporalidades</summary>
             <table className="piso-tabla">
               <thead>
                 <tr>
@@ -233,7 +257,7 @@ export default function LabPiso() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </details>
           <small>
             Intervalo del 90 % de R por operación ({a.mejor.marco}):{" "}
             {a.mejor.evaluacion.expectanciaIc ? `${r2(a.mejor.evaluacion.expectanciaIc.low)} a ${r2(a.mejor.evaluacion.expectanciaIc.high)}` : "sin dato"} · caída máxima{" "}

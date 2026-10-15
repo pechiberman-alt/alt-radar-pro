@@ -267,3 +267,14 @@
 .universo-criterio{opacity:.85;font-size:.9em}
 .universo-bajar summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
 .universo-bajar pre{overflow-x:auto;padding:8px;background:#04101f;border:1px solid var(--lab-borde);border-radius:4px}
+
+/* Piso rediseñado para celular: arañas sin rótulo y ficha legible (app/lab-piso.tsx) */
+.piso-nodo-toque{fill:transparent;cursor:pointer}
+.piso-nodo{cursor:pointer}
+.piso-mira,.piso-idea{margin:6px 0;line-height:1.55}
+.piso-clave{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+.piso-clave>div{padding:8px;border:1px solid var(--lab-borde);border-radius:6px;background:#04101f;min-width:0}
+.piso-clave dt{font:600 9px var(--font-mono);letter-spacing:.8px;color:var(--soft);text-transform:uppercase}
+.piso-clave dd{margin:3px 0 0;font:600 15px var(--font-mono);color:#fff;overflow-wrap:anywhere}
+.piso-tabla-wrap>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font:600 10px var(--font-mono);letter-spacing:.8px;color:var(--lab-cian)}
+@media (max-width:420px){.piso-clave{grid-template-columns:1fr}}
