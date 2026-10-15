@@ -16,6 +16,7 @@
 import { escaleraHacia, type Escalera, type Lado } from "./escalera.ts";
 import { ESTRATEGIAS, indicadores, type EstrategiaId } from "./estrategias.ts";
 import type { SwingCandle } from "./swing-entries.ts";
+import { simbolosFondeo } from "./fondeo.ts";
 
 export const PLAN_AGENTES = "PLAN_AGENTES_1";
 export const MARCO_AGENTES = "4h";
@@ -29,6 +30,23 @@ export const VENTANA_ENTRADA_AGENTES_MS = 30 * 60_000;
 export const MONEDAS_AGENTES = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "TRXUSDT", "BCHUSDT", "ZECUSDT"];
 /** Velas de 4 h que se piden por moneda: alcanzan para la EMA 200 y el marco superior de cualquier agente. */
 export const VELAS_AGENTES = 1500;
+
+/**
+ * Los instrumentos de fondeo (oro y, cuando haya símbolo, NASDAQ) corren los mismos agentes pero con su propio plan, porque
+ * NO tienen estudio detrás: sus reglas se midieron en cripto, nunca en oro ni en índices. Su medición empieza de cero el día
+ * que se enciende. Separarlos del plan de cripto es lo que impide que un número de allá se lea como si fuera de acá.
+ * Nada de esto opera: es papel, igual que el resto.
+ */
+export const PLAN_FONDEO = "PLAN_FONDEO_1";
+export const SIN_ESTUDIO_PREVIO = true;
+/** Los símbolos de fondeo con símbolo confirmado. NASDAQ entra solo cuando la persona lo defina (lib/fondeo.ts). */
+export const SIMBOLOS_FONDEO_PAPEL = simbolosFondeo();
+/** Todos los símbolos que corren hacia adelante: las 10 del estudio más los de fondeo. */
+export const SIMBOLOS_PAPEL = [...MONEDAS_AGENTES, ...SIMBOLOS_FONDEO_PAPEL];
+/** El plan al que pertenece un símbolo: cripto con estudio detrás, o fondeo sin estudio. */
+export const planDe = (symbol: string) => (SIMBOLOS_FONDEO_PAPEL.includes(symbol) ? PLAN_FONDEO : PLAN_AGENTES);
+/** Si lo que mida ese símbolo arranca sin ninguna medición previa. */
+export const sinEstudioPrevio = (symbol: string) => SIMBOLOS_FONDEO_PAPEL.includes(symbol);
 
 /**
  * Los agentes que corren en papel: todas las estrategias del estudio salvo el control al azar, que no tiene sentido correr
@@ -143,7 +161,7 @@ export function validarSenalPapel(raw: unknown, ahora: number): SenalPapel | nul
   const objetivo = num(o.objetivo);
   const vela = num(o.vela);
   const detectada = num(o.detectada);
-  if (!(AGENTES_PAPEL as string[]).includes(estrategia) || !MONEDAS_AGENTES.includes(symbol)) return null;
+  if (!(AGENTES_PAPEL as string[]).includes(estrategia) || !SIMBOLOS_PAPEL.includes(symbol)) return null;
   if (!lado || entrada === null || stop === null || objetivo === null || vela === null || detectada === null) return null;
   if (Math.abs(detectada - ahora) > 2 * 60_000) return null;
   if (!Number.isInteger(vela) || vela % MARCO_AGENTES_MS !== 0) return null;

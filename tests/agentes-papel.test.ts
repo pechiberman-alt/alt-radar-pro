@@ -11,7 +11,13 @@ import {
   leerClavePapel,
   leerSenalesPapel,
   validarSenalPapel,
+  PLAN_AGENTES,
+  PLAN_FONDEO,
+  SIMBOLOS_FONDEO_PAPEL,
+  planDe,
+  sinEstudioPrevio,
 } from "../lib/agentes-papel.ts";
+import { NASDAQ_SIMBOLO } from "../lib/fondeo.ts";
 import { ESTRATEGIAS } from "../lib/estrategias.ts";
 import { generadorSemilla } from "../lib/practica-gatillo.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
@@ -190,4 +196,24 @@ test("una foto de consenso con basura no rompe nada y queda en cero", () => {
   assert.deepEqual(s.consenso, { acuerdo: 0, contra: 0, con: [] });
   // Sin consenso tampoco falla.
   assert.equal(validarSenalPapel(base(ahora), ahora)?.consenso, undefined);
+});
+
+test("el oro corre hacia adelante con su propio plan: no tiene estudio detrás y no se mezcla con cripto", () => {
+  assert.ok(SIMBOLOS_FONDEO_PAPEL.includes("XAUUSDT"), "el oro tiene que correr");
+  assert.equal(planDe("XAUUSDT"), PLAN_FONDEO);
+  assert.equal(planDe("BTCUSDT"), PLAN_AGENTES);
+  assert.notEqual(PLAN_FONDEO, PLAN_AGENTES);
+  assert.equal(sinEstudioPrevio("XAUUSDT"), true);
+  assert.equal(sinEstudioPrevio("BTCUSDT"), false);
+});
+
+test("NASDAQ no corre hasta que la persona confirme su símbolo: no se inventa", () => {
+  assert.equal(NASDAQ_SIMBOLO, null);
+  assert.ok(!SIMBOLOS_FONDEO_PAPEL.some((s) => s.includes("NAS") || s.includes("NQ")));
+});
+
+test("el servidor acepta una entrada de oro y sigue rechazando un símbolo de fuera", () => {
+  const ahora = T0 + MARCO_AGENTES_MS + 60_000;
+  assert.ok(validarSenalPapel({ ...base(ahora), symbol: "XAUUSDT" }, ahora));
+  assert.equal(validarSenalPapel({ ...base(ahora), symbol: "PEPEUSDT" }, ahora), null);
 });

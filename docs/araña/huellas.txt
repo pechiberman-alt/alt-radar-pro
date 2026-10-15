@@ -191,7 +191,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-ded1eeb287ae	296	docs/araña/objetivos.md
+615ab0afe738	297	docs/araña/objetivos.md
 db6358216fcf	188	docs/busqueda-breaker.md
 fc6042bacccc	116	docs/busqueda-fibonacci.md
 25e7d2744ee2	187	docs/busqueda-linea.md
@@ -221,11 +221,11 @@ e0459b113cf2	42	eslint.config.mjs
 766d1eb792e8	10	examples/d1/db/schema.ts
 36621536c9b3	85	lib/account-events.ts
 6b197acd00d5	559	lib/account-journal.ts
-29b09319eb17	155	lib/agente-st-db.ts
-4069289e6c39	190	lib/agente-st-run.ts
+ebe735c6febb	155	lib/agente-st-db.ts
+22efb8b3e5db	192	lib/agente-st-run.ts
 f997c496526e	156	lib/agente-st.ts
 90f7c7bab0c0	103	lib/agentes-explicado.ts
-a79631e6d5b5	170	lib/agentes-papel.ts
+3e02dc9c63a4	188	lib/agentes-papel.ts
 f3bdeb0d1172	66	lib/ai-analyst-server.ts
 009e4bbb2f90	158	lib/ai-analyst.ts
 d42a4a08e452	193	lib/ai-brains.ts
@@ -459,7 +459,7 @@ a6bc231bf554	374	tests/account-journal.test.ts
 91a6b8fd954c	168	tests/agente-st.test.ts
 8f97cc0b92d6	37	tests/agentes-explicado.test.ts
 beea37118afc	51	tests/agentes-mcp.test.ts
-32cb3b241272	194	tests/agentes-papel.test.ts
+e08b579f6073	220	tests/agentes-papel.test.ts
 bc528d50d94b	74	tests/ai-analyst.test.ts
 8236d721ebba	168	tests/ai-brains.test.ts
 57f3eea79cb8	38	tests/ai-numbers.test.ts
