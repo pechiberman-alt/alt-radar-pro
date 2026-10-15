@@ -12,6 +12,7 @@ import {
 } from "./agente-st.ts";
 import { escaleraValida, recorrer, type Escalera } from "./escalera.ts";
 import { leerSenalesPapel } from "./agentes-papel.ts";
+import { consensoDe, fotoConsenso } from "./consenso.ts";
 import { BROWSER_BASES } from "./market-fetch.ts";
 import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
 
@@ -76,14 +77,27 @@ export async function escanearAgenteSt(ahora = Date.now()): Promise<number> {
       const f = filas[filas.length - 2];
       const compras = f && Number(f[5]) > 0 && Number.isFinite(Number(f[9])) ? Number(f[9]) / Number(f[5]) : null;
       // Los demás agentes del estudio leen ESTAS MISMAS velas de 4 h: sumarlos no cuesta ninguna descarga más.
-      for (const p of leerSenalesPapel(symbol, velas, ahora)) {
+      const planes = leerSenalesPapel(symbol, velas, ahora);
+      // Con quién coincidió cada uno. No decide nada: viaja con la entrada para poder estudiarlo después.
+      const acuerdos = consensoDe(planes.map((x) => ({ estrategia: x.estrategia, symbol, vela: x.vela, lado: x.lado })));
+      for (const p of planes) {
         const r = await fetch("/api/registro/agente-st", {
           method: "POST",
           credentials: "same-origin",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             accion: "senal-agente",
-            senal: { estrategia: p.estrategia, symbol, lado: p.lado, vela: p.vela, detectada: ahora, entrada: p.entrada, stop: p.stop, objetivo: p.objetivo },
+            senal: {
+              estrategia: p.estrategia,
+              symbol,
+              lado: p.lado,
+              vela: p.vela,
+              detectada: ahora,
+              entrada: p.entrada,
+              stop: p.stop,
+              objetivo: p.objetivo,
+              consenso: fotoConsenso(acuerdos.get(`${p.estrategia}|${symbol}|${p.vela}`) ?? { acuerdo: 0, contra: 0, con: [] }),
+            },
           }),
         });
         if (r.status === 401) {
