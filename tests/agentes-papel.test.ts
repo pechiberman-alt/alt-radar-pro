@@ -172,3 +172,22 @@ test("las monedas de los agentes en papel son las 10 del estudio", () => {
   assert.equal(MONEDAS_AGENTES.length, 10);
   for (const m of MONEDAS_AGENTES) assert.match(m, /USDT$/);
 });
+
+test("el servidor limpia la foto de consenso: solo agentes reales, números sanos y lista corta", () => {
+  const ahora = T0 + MARCO_AGENTES_MS + 60_000;
+  const s = validarSenalPapel(
+    { ...base(ahora), consenso: { acuerdo: 3, contra: 1, con: ["RUPTURA", "INVENTADO", "SUPERTREND"] } },
+    ahora,
+  );
+  assert.ok(s);
+  assert.deepEqual(s.consenso, { acuerdo: 3, contra: 1, con: ["RUPTURA", "SUPERTREND"] });
+});
+
+test("una foto de consenso con basura no rompe nada y queda en cero", () => {
+  const ahora = T0 + MARCO_AGENTES_MS + 60_000;
+  const s = validarSenalPapel({ ...base(ahora), consenso: { acuerdo: -5, contra: 999, con: "no es lista" } }, ahora);
+  assert.ok(s);
+  assert.deepEqual(s.consenso, { acuerdo: 0, contra: 0, con: [] });
+  // Sin consenso tampoco falla.
+  assert.equal(validarSenalPapel(base(ahora), ahora)?.consenso, undefined);
+});

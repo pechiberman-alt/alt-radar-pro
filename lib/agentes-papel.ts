@@ -102,6 +102,8 @@ export function leerSenalesPapel(symbol: string, velas: SwingCandle[], ahora: nu
 
 export type SenalPapel = {
   clave: string;
+  /** Con quiénes coincidió en esa moneda y vela. No filtra nada: se guarda para estudiarlo después. */
+  consenso?: { acuerdo: number; contra: number; con: string[] };
   estrategia: string;
   symbol: string;
   lado: Lado;
@@ -154,5 +156,14 @@ export function validarSenalPapel(raw: unknown, ahora: number): SenalPapel | nul
   if (!(rr >= RR_MIN) || !(rr <= RR_MAX)) return null;
   const e = escaleraHacia(lado, entrada, stop, objetivo);
   if (!e) return null;
-  return { clave: clavePapel(estrategia, symbol, lado, vela), estrategia, symbol, lado, vela, detectada, entrada, stop, objetivo, tp1: e.tp1, tp2: e.tp2, tp3: e.tp3 };
+  const c = o.consenso && typeof o.consenso === "object" ? (o.consenso as Record<string, unknown>) : null;
+  const entero = (v: unknown) => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 50 ? v : 0);
+  const consenso = c
+    ? {
+        acuerdo: entero(c.acuerdo),
+        contra: entero(c.contra),
+        con: (Array.isArray(c.con) ? c.con : []).filter((x): x is string => typeof x === "string" && (AGENTES_PAPEL as string[]).includes(x)).slice(0, 8),
+      }
+    : undefined;
+  return { clave: clavePapel(estrategia, symbol, lado, vela), consenso, estrategia, symbol, lado, vela, detectada, entrada, stop, objetivo, tp1: e.tp1, tp2: e.tp2, tp3: e.tp3 };
 }
