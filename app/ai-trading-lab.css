@@ -278,3 +278,25 @@
 .piso-clave dd{margin:3px 0 0;font:600 15px var(--font-mono);color:#fff;overflow-wrap:anywhere}
 .piso-tabla-wrap>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font:600 10px var(--font-mono);letter-spacing:.8px;color:var(--lab-cian)}
 @media (max-width:420px){.piso-clave{grid-template-columns:1fr}}
+/* Diario de la cuenta real de Axi (app/lab-axi-diario.tsx): en USC. La tabla se desplaza dentro de su caja, nunca la página. */
+.axi-diario{display:grid;gap:10px;min-width:0}
+.axi-nota,.axi-vacio,.axi-aviso{margin:0;font-size:13px;line-height:1.5;color:var(--soft)}
+.axi-carga{display:grid;gap:8px;min-width:0}
+.axi-carga textarea{width:100%;min-width:0;box-sizing:border-box;font:12px var(--font-mono);background:#04101f;color:#fff;border:1px solid var(--lab-borde);border-radius:6px;padding:8px}
+.axi-botones{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.axi-botones button{min-height:44px;padding:0 14px;font:600 12px var(--font-mono);background:#04101f;color:var(--lab-cian);border:1px solid var(--lab-borde);border-radius:6px;cursor:pointer}
+.axi-botones button:disabled{opacity:.5;cursor:default}
+.axi-archivo{font-size:13px;color:var(--soft);max-width:100%}
+.axi-rechazos{margin:0;padding-left:18px;font-size:12px;color:var(--soft)}
+.axi-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.axi-cards article{padding:10px;border:1px solid var(--lab-borde);border-radius:6px;background:#04101f;min-width:0}
+.axi-cards h4{margin:0 0 4px;font:600 9px var(--font-mono);letter-spacing:.8px;color:var(--soft);text-transform:uppercase}
+.axi-cards small{display:block;margin-top:4px;font-size:12px;line-height:1.4;color:var(--soft)}
+.axi-grande{margin:0;font:600 17px var(--font-mono);color:#fff;overflow-wrap:anywhere}
+.axi-periodo{margin:0;font:600 12px var(--font-mono);color:#fff;overflow-wrap:anywhere}
+.axi-subtitulo{margin:10px 0 0;font:600 10px var(--font-mono);letter-spacing:1.2px;color:var(--lab-azul);text-transform:uppercase}
+.axi-tabla{overflow-x:auto;min-width:0;border:1px solid var(--lab-borde);border-radius:6px}
+.axi-tabla table{width:100%;border-collapse:collapse;font:12px var(--font-mono);color:#fff}
+.axi-tabla th,.axi-tabla td{padding:6px 8px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--lab-borde)}
+.axi-tabla th{font-size:9px;letter-spacing:.8px;color:var(--soft);text-transform:uppercase}
+.axi-mov td{color:var(--soft)}

@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 623 · objetivos: 17 · sin objetivo: 0
-- Tablas D1: 49 · secretos: 5 · variables de entorno: 25 · rutas /api: 54 · hosts: 58
-- Código de navegador: 67 archivos con "use client" que alcanzan 205 · problemas: 0
-- Lib sin prueba directa: 24 de 198
+- Archivos: 631 · objetivos: 18 · sin objetivo: 0
+- Tablas D1: 50 · secretos: 5 · variables de entorno: 25 · rutas /api: 55 · hosts: 58
+- Código de navegador: 68 archivos con "use client" que alcanzan 207 · problemas: 0
+- Lib sin prueba directa: 24 de 200
 
 ## Objetivos
 
@@ -87,6 +87,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `lib/speech-text.ts` — What JARVIS writes, turned into what a Spanish voice should say.
 - `scripts/investigacion/README.md` — Investigación de la mesa
 - `scripts/investigacion/aprendizaje.ts` — ¿Puede la mesa aprender?
+- `scripts/investigacion/axi-estudio.ts` — Mide los agentes del estudio sobre un instrumento de Axi (CFD), con las mismas reglas, la misma escalera y el mismo corte 70/30 que el estudio de cripto.
 - `scripts/investigacion/breaker-busqueda.ts` — La búsqueda de la mejor confirmación y configuración del breaker block (lib/breaker-busqueda.ts) en 1 h, 4 h y 15 min, con las 10 monedas de datos-investigacion/ y los costos del e
 - `scripts/investigacion/datos-binance.py`
 - `scripts/investigacion/datos.py`
@@ -95,7 +96,6 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `scripts/investigacion/linea-busqueda.ts` — La búsqueda de la mejor confirmación y configuración de la ruptura de línea de tendencia (TENDENCIA_LINEA, lib/linea-busqueda.ts) en 1 h, 4 h y 15 min, con las 10 monedas de datos-
 - `scripts/investigacion/medir.ts` — Mide las reglas de la mesa en tres períodos que no se superponen, con costos más altos y de más de una manera.
 - `scripts/investigacion/modelos.ts` — Modelos chicos y sin dependencias para la investigación del aprendizaje: regresión ridge, regresión logística con L2, árboles potenciados poco profundos y AUC.
-- `scripts/investigacion/oro.ts` — Mide los agentes del estudio sobre ORO (XAUUSD.c de Axi, CFD), con las mismas reglas, la misma escalera y el mismo corte 70/30 que el estudio de cripto.
 - `scripts/investigacion/perfiles.ts` — La mesa con otras velas base: 15 min, 1 h (la de la app), 2 h, 4 h, 6 h y 12 h, con las dos versiones de reglas y dos niveles de costo.
 - `scripts/investigacion/precalcular.ts` — Precalcula lo que la mesa veía en cada cierre de 4 velas base (solo velas cerradas) para un perfil de velas.
 - `scripts/investigacion/preregistro-flujo.ts` — Mide el preregistro del flujo (lib/preregistro-flujo.ts): el Agente Supertrend MTF + Volumen en 4 h con cada uno de los cuatro filtros fijados el 14/10/2026, con las mismas velas,
@@ -398,7 +398,18 @@ Texto: el único lugar donde la app calcula el acierto, el profit factor y la ex
 - `tests/flujo.test.ts` — Las lecturas del flujo de órdenes como operaciones: el plan sale de los niveles que ya calcula el libro, con una regla fijada antes de medir; lo que llega del navegador se revisa y
 - `tests/registro.test.ts` — El registro unificado es el único lugar que calcula el acierto, el profit factor y la expectancia.
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (53)
+### axi-real — Tu cuenta real de Axi (solo lectura): el diario de sus ejecuciones (7)
+Texto: lo que pasó en tu cuenta de Axi (MT5, en centavos USC), tal como lo informa el conector. La app no se conecta a Axi ni opera: las ejecuciones llegan pegadas o subidas como JSON. Es un diario aparte del de Binance: otras monedas y otro modelo.
+Pendiente: Entrar al registro unificado (FUENTES y lib/registro-db.ts) cuando una operación de Axi tenga stop y tamaño de contrato, para calcular R. · Sincronización automática con Axi: requiere decidir cómo se guarda el acceso. No está hecho. · Unirlo con el diario de Binance (lib/account-journal.ts): decisión aparte, por las monedas.
+- `app/api/axi/diario/route.ts` — exporta: dynamic, GET, POST, DELETE
+- `app/lab-axi-diario.tsx` — Tu cuenta real de Axi en el panel (solo lectura, en USC): las ejecuciones que ya están en tu diario, su resumen por mes y cómo cargar más.
+- `docs/axi-diario.md` — Diario de tu cuenta real de Axi
+- `lib/axi-db.ts` — Lo que se guarda del diario de Axi en D1: una fila por ejecución de tu cuenta, con clave (user_id, deal_id), así que importar dos veces lo mismo no duplica nada.
+- `lib/axi-diario.ts` — El diario de tu cuenta de Axi (MT5 en centavos, USC): las ejecuciones que devuelve el conector de Axi, validadas una por una y resumidas.
+- `tests/axi-db.test.ts` — Pruebas del almacenamiento del diario de Axi (lib/axi-db.ts): que importar dos veces no duplique, que cada persona vea solo lo suyo, que el tope de 500 se cumpla sin COUNT(*) y que
+- `tests/axi-diario.test.ts` — Pruebas del diario de Axi (lib/axi-diario.ts): que cada ejecución del conector se valide o se rechace con su motivo, que un dato faltante no se complete con cero, que el neto sea p
+
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (54)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -413,6 +424,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `docs/busqueda-fibonacci.md` — Búsqueda de configuración: Fibonacci + extensión + niveles clave
 - `docs/busqueda-linea.md` — Búsqueda de confirmación y configuración: línea de tendencia
 - `docs/busqueda-smc.md` — Búsqueda del gatillo y la configuración: zonas altas + toma de liquidez + IFVG + breaker
+- `docs/estudio-axi.md` — Estudio de Axi: oro y NASDAQ
 - `docs/estudio-estrategias.md` — Estudio de estrategias del AI TRADING LAB
 - `lib/agentes-explicado.ts` — Qué mira cada agente, en palabras de todos los días.
 - `lib/agentes-papel.ts` — Todos los agentes del estudio corriendo hacia adelante en papel (PLAN_AGENTES_1).
@@ -702,6 +714,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app_settings` — crea: lib/app-settings.ts · usa: lib/app-settings.ts, tests/app-settings.test.ts, tests/binance-account.test.ts · sin índice visible en el código
 - `arana_ultimo` — crea: lib/arana-ultimo-db.ts · usa: lib/arana-ultimo-db.ts · sin índice visible en el código
 - `automation_state` — crea: db/schema.ts, lib/automation.ts, tests/signal-plan-db.test.ts (+1) · usa: app/api/signals/route.ts, lib/automation.ts, lib/scalping-automation.ts, lib/signal-plan-db.ts, tests/signal-plan-db.test.ts, tests/telegram-signals.test.ts · sin índice visible en el código
+- `axi_deals` — crea: lib/axi-db.ts · usa: lib/axi-db.ts · índices: axi_deals_tiempo
 - `binance_credentials` — crea: db/schema.ts, lib/auth.ts · usa: app/api/binance/credentials/route.ts, app/api/binance/link/route.ts · sin índice visible en el código
 - `binance_debug_log` — crea: lib/binance-debug-log.ts · usa: lib/binance-debug-log.ts, tests/binance-debug-log.test.ts · sin índice visible en el código
 - `binance_futures_log` — crea: lib/futures-log-db.ts · usa: lib/futures-log-db.ts · sin índice visible en el código
@@ -789,6 +802,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/auth/logout` [POST] — app/api/auth/logout/route.ts · seguridad
 - `/api/auth/me` [GET] — app/api/auth/me/route.ts · seguridad
 - `/api/auth/register` [POST] — app/api/auth/register/route.ts · seguridad
+- `/api/axi/diario` [GET, POST, DELETE] — app/api/axi/diario/route.ts · axi-real
 - `/api/backtest/fibonacci` [GET] — app/api/backtest/fibonacci/route.ts · senales-radar
 - `/api/binance/client-log` [POST] — app/api/binance/client-log/route.ts · binance-usuario
 - `/api/binance/credentials` [GET] — app/api/binance/credentials/route.ts · binance-usuario
@@ -898,7 +912,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-fondeo.tsx, app/lab-piso.tsx, app/lab-universos.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-axi-diario.tsx, app/lab-fondeo.tsx, app/lab-piso.tsx, app/lab-universos.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa
