@@ -12,8 +12,8 @@ ebfa1b2412ea	73	CLAUDE.md
 f78d8e271837	683	app/account-panel.tsx
 064cf5eb7605	229	app/active-signals.tsx
 63b274d443fe	122	app/agenda-macro.tsx
-d8e0ff61faff	229	app/ai-trading-lab.css
-b28cff5fddb4	411	app/ai-trading-lab.tsx
+87d32bb0749a	237	app/ai-trading-lab.css
+4d62caae7038	418	app/ai-trading-lab.tsx
 bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
@@ -72,6 +72,7 @@ aa86804bf9da	24	app/api/telegram/test/route.ts
 9f8f9a0bdfc4	176	app/api/telegram/webhook/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
+8889c819ef92	86	app/aprender-lab.tsx
 6fcf458df190	49	app/arana-desk.css
 452d0d94c40a	168	app/arana-desk.tsx
 1c85572f45c3	376	app/arana-vivo.tsx
@@ -188,7 +189,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-8b4ba8bcea58	288	docs/araña/objetivos.md
+ba01d2d01b63	289	docs/araña/objetivos.md
 db6358216fcf	188	docs/busqueda-breaker.md
 fc6042bacccc	116	docs/busqueda-fibonacci.md
 25e7d2744ee2	187	docs/busqueda-linea.md
@@ -229,6 +230,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 509da5ba4297	47	lib/alert-bus.ts
 dbd75245f8b8	366	lib/alerts.ts
 db6ae19f1b13	157	lib/app-settings.ts
+4998b2cb2829	188	lib/aprender.ts
 8bc8d3dc5620	41	lib/arana-ultimo-db.ts
 8e5f0ea3f30d	35	lib/arana-ultimo.ts
 b32e56319e6e	45	lib/arana-vivo-auto.ts
@@ -453,6 +455,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
+c5f7f005ea47	56	tests/aprender.test.ts
 e8ec72c5deb7	89	tests/arana-ultimo.test.ts
 41f8e61920bb	44	tests/arana-vivo-auto.test.ts
 b9e32500d850	247	tests/arana-vivo.test.ts
