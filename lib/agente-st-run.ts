@@ -11,7 +11,7 @@ import {
   COMISION_ST_PCT, HORIZONTE_ST, leerSenalSt, MARCO_ST, MARCO_ST_MS, MONEDAS_ST, VELAS_BTC_ST, VELAS_ST, VENTANA_ENTRADA_ST_MS,
 } from "./agente-st.ts";
 import { escaleraValida, recorrer, type Escalera } from "./escalera.ts";
-import { leerSenalesPapel } from "./agentes-papel.ts";
+import { leerSenalesPapel, SIMBOLOS_FONDEO_PAPEL } from "./agentes-papel.ts";
 import { consensoDe, fotoConsenso } from "./consenso.ts";
 import { BROWSER_BASES } from "./market-fetch.ts";
 import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
@@ -67,7 +67,9 @@ export async function escanearAgenteSt(ahora = Date.now()): Promise<number> {
     if (btc.length < 1500 || btc[btc.length - 1].openTime !== vela) return 0; // Binance todavía no sirve la vela nueva: se reintenta
     let registradas = 0;
     let completo = true;
-    for (const symbol of MONEDAS_ST) {
+    // Las 10 del estudio más los instrumentos de fondeo (oro; NASDAQ cuando tenga símbolo). Los de fondeo NO tienen estudio
+    // detrás: corren los mismos agentes y empiezan a medirse de cero, con su propio plan para que los números no se mezclen.
+    for (const symbol of [...MONEDAS_ST, ...SIMBOLOS_FONDEO_PAPEL]) {
       const filas = symbol === "BTCUSDT" ? btcFilas : await ultimasVelas(symbol, VELAS_ST);
       const velas: SwingCandle[] = parseSwingKlines(filas);
       if (velas.length < 300 || velas[velas.length - 1].openTime !== vela) {
@@ -107,7 +109,7 @@ export async function escanearAgenteSt(ahora = Date.now()): Promise<number> {
         if (r.ok && ((await r.json()) as { registrada?: boolean }).registrada) registradas += 1;
         else if (!r.ok) completo = false;
       }
-      const plan = leerSenalSt(symbol, velas, btc, ahora, compras);
+      const plan = MONEDAS_ST.includes(symbol) ? leerSenalSt(symbol, velas, btc, ahora, compras) : null;
       if (!plan) continue;
       const res = await fetch("/api/registro/agente-st", {
         method: "POST",
