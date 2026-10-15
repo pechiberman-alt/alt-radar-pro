@@ -1,7 +1,8 @@
 /**
  * El agente de papel Supertrend MTF + Volumen para tu cuenta, desde el navegador (reglas en lib/agente-st.ts). Cada 4
  * horas, durante la primera media hora de la vela nueva, lee las velas de 4 h de las 10 monedas del estudio (datos
- * públicos de Binance, desde tu navegador), busca la entrada de la última vela cerrada y la registra con su plan completo
+ * públicos de Binance, desde tu navegador), busca la entrada de la última vela cerrada —la suya y la de todos los agentes del estudio (lib/agentes-papel.ts), que leen
+ * esas mismas velas— y la registra con su plan completo
  * (SL, TP1, TP2 y TP3) y su foto de condiciones. Las abiertas se miden con las velas que ya cerraron y se mandan a tu
  * cuenta. Solo corre con la pestaña visible y con sesión: si no estás ahí cuando abre la vela, esa entrada no se registra
  * (no se rellena después, porque ya no sería la entrada que se midió). Solo papel: no manda órdenes.
@@ -10,6 +11,7 @@ import {
   COMISION_ST_PCT, HORIZONTE_ST, leerSenalSt, MARCO_ST, MARCO_ST_MS, MONEDAS_ST, VELAS_BTC_ST, VELAS_ST, VENTANA_ENTRADA_ST_MS,
 } from "./agente-st.ts";
 import { escaleraValida, recorrer, type Escalera } from "./escalera.ts";
+import { leerSenalesPapel } from "./agentes-papel.ts";
 import { BROWSER_BASES } from "./market-fetch.ts";
 import { parseSwingKlines, type SwingCandle } from "./swing-entries.ts";
 
@@ -73,6 +75,24 @@ export async function escanearAgenteSt(ahora = Date.now()): Promise<number> {
       }
       const f = filas[filas.length - 2];
       const compras = f && Number(f[5]) > 0 && Number.isFinite(Number(f[9])) ? Number(f[9]) / Number(f[5]) : null;
+      // Los demás agentes del estudio leen ESTAS MISMAS velas de 4 h: sumarlos no cuesta ninguna descarga más.
+      for (const p of leerSenalesPapel(symbol, velas, ahora)) {
+        const r = await fetch("/api/registro/agente-st", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            accion: "senal-agente",
+            senal: { estrategia: p.estrategia, symbol, lado: p.lado, vela: p.vela, detectada: ahora, entrada: p.entrada, stop: p.stop, objetivo: p.objetivo },
+          }),
+        });
+        if (r.status === 401) {
+          sinSesionHasta = Date.now() + SIN_SESION_MS;
+          return registradas;
+        }
+        if (r.ok && ((await r.json()) as { registrada?: boolean }).registrada) registradas += 1;
+        else if (!r.ok) completo = false;
+      }
       const plan = leerSenalSt(symbol, velas, btc, ahora, compras);
       if (!plan) continue;
       const res = await fetch("/api/registro/agente-st", {

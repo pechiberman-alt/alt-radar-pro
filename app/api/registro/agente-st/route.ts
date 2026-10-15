@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
 import { ensureAuthSchema, getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
-import { abiertasSt, evaluarSt, recientesSt, registrarSenalSt } from "@/lib/agente-st-db";
+import { abiertasSt, evaluarSt, recientesSt, registrarSenalPapel, registrarSenalSt } from "@/lib/agente-st-db";
 import { validarSenalSt } from "@/lib/agente-st";
+import { validarSenalPapel } from "@/lib/agentes-papel";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
  * Las entradas del agente de papel Supertrend MTF + Volumen de tu cuenta (PLAN_ST_1, lib/agente-st.ts).
  * GET: las que siguen abiertas (para que el navegador las mida con las velas) y las últimas 20 con sus niveles y su foto.
  * POST {accion: "senal", senal}: una entrada nueva con su plan y su foto; una misma moneda y vela no se repite.
+ * POST {accion: "senal-agente", senal}: lo mismo para los demás agentes del estudio (PLAN_AGENTES_1, lib/agentes-papel.ts).
  * POST {accion: "evaluar", recorridos}: los recorridos que midió el navegador, revisados; el R lo calcula el servidor.
  * Hace falta sesión: sin ella no hay cuenta donde guardar. Solo papel: no manda órdenes.
  */
@@ -37,6 +39,12 @@ export async function POST(request: Request) {
     const l = validarSenalSt(body.senal, Date.now());
     if (!l) return Response.json({ error: "La entrada no es válida o está fuera de hora." }, { status: 400 });
     const nueva = await registrarSenalSt(env.DB, user.id, l);
+    return Response.json({ registrada: nueva, clave: l.clave });
+  }
+  if (body.accion === "senal-agente") {
+    const l = validarSenalPapel(body.senal, Date.now());
+    if (!l) return Response.json({ error: "La entrada no es válida o está fuera de hora." }, { status: 400 });
+    const nueva = await registrarSenalPapel(env.DB, user.id, l);
     return Response.json({ registrada: nueva, clave: l.clave });
   }
   if (body.accion === "evaluar") {

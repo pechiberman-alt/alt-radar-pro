@@ -6,6 +6,7 @@
 import type { Lado } from "./escalera.ts";
 import { validarRecorridoFlujo, type RecorridoFlujo } from "./flujo.ts";
 import { COMISION_ST_PCT, PLAN_ST, type SenalSt } from "./agente-st.ts";
+import { PLAN_AGENTES, type SenalPapel } from "./agentes-papel.ts";
 
 export const LISTA_ST = 50;
 
@@ -39,6 +40,23 @@ export async function registrarSenalSt(db: D1Database, userId: number, s: SenalS
        VALUES (?1, ?2, ?3, ?4, '4h', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
     )
     .bind(userId, s.clave, s.symbol, s.lado, s.vela, s.detectada, s.entrada, s.stop, s.tp1, s.tp2, s.tp3, JSON.stringify(s.foto), PLAN_ST)
+    .run();
+  return res.meta.changes === 1;
+}
+
+/**
+ * Guarda la entrada de un agente del estudio que corre hacia adelante (PLAN_AGENTES_1). Misma tabla, mismo marco y misma
+ * comisión que el agente ST: lo que cambia es la regla, y eso queda en la clave y en el plan. Sin foto de condiciones: esa
+ * la guarda solo el agente ST, que la usa para estudiar qué separa sus ganadoras de sus perdedoras.
+ */
+export async function registrarSenalPapel(db: D1Database, userId: number, s: SenalPapel): Promise<boolean> {
+  await ensureAgenteSt(db);
+  const res = await db
+    .prepare(
+      `INSERT OR IGNORE INTO agente_st_senales (user_id, clave, symbol, lado, marco, vela, detectada, entrada, sl, tp1, tp2, tp3, foto, plan)
+       VALUES (?1, ?2, ?3, ?4, '4h', ?5, ?6, ?7, ?8, ?9, ?10, ?11, '{}', ?12)`,
+    )
+    .bind(userId, s.clave, s.symbol, s.lado, s.vela, s.detectada, s.entrada, s.stop, s.tp1, s.tp2, s.tp3, PLAN_AGENTES)
     .run();
   return res.meta.changes === 1;
 }

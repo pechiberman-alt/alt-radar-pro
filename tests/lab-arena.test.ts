@@ -2,6 +2,7 @@
 // conexión de cada agente con el cerebro, la muestra mínima, el intervalo que cruza el cero, la raya del control
 // al azar y la escala de las barras. Con filas armadas a mano y con las reales del estudio.
 import assert from "node:assert/strict";
+import { AGENTES_PAPEL } from "../lib/agentes-papel.ts";
 import test from "node:test";
 import { ESTUDIO_FILAS, type FilaEstudio } from "../lib/estudio-estrategias-datos.ts";
 import { AGENTES_EN_PAPEL, combatientes, conexionCerebro, controlDelMarco, marcosDisponibles, MUESTRA_MINIMA, nombreCorto, partirNombre, posicion, repartirAnillos, textoCombatiente, tonoBarra, tonoNumero, topeEscala } from "../lib/lab-arena.ts";
@@ -37,11 +38,13 @@ test("cruzaCero: un intervalo con el cero adentro no dice si gana o pierde; sin 
   assert.deepEqual(por, { A: true, B: false, C: false, D: true });
 });
 
-test("conexión con el cerebro: solo Supertrend MTF + Volumen corre en papel, el azar es el control y el resto es estudio", () => {
-  assert.deepEqual(AGENTES_EN_PAPEL, ["ST_MTF_VOL"]);
-  assert.equal(conexionCerebro("ST_MTF_VOL"), "PAPEL");
+test("conexión con el cerebro: todos los agentes del estudio corren en papel y el azar es el control", () => {
+  // Antes corría uno solo. Ahora corren todos (lib/agentes-papel.ts): leen las mismas velas, así que no cuesta más bajarlas.
+  assert.deepEqual([...AGENTES_EN_PAPEL].sort(), [...AGENTES_PAPEL].sort());
+  assert.ok(!AGENTES_EN_PAPEL.includes("AZAR"), "el control al azar no corre hacia adelante");
+  for (const id of ["ST_MTF_VOL", "RUPTURA", "FIB_NIVELES"]) assert.equal(conexionCerebro(id), "PAPEL", id);
   assert.equal(conexionCerebro("AZAR"), "CONTROL");
-  assert.equal(conexionCerebro("RUPTURA"), "ESTUDIO");
+  assert.equal(conexionCerebro("NO_EXISTE"), "ESTUDIO");
 });
 
 test("la raya del control sale del azar de esa temporalidad, y es null si ahí no hay control", () => {
