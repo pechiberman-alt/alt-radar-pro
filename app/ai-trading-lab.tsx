@@ -13,6 +13,7 @@ import { operacionDePapel, TOPES, type LimitesRiesgo } from "../lib/lab-riesgo.t
 import { fijarBacktest, fijarError, fijarEvaluacion, fotoLab, guardarLimites, LAB_EVENT, registrarActividad } from "../lib/lab-run.ts";
 import { lineaFuente } from "../lib/registro.ts";
 import LabFondeo from "./lab-fondeo";
+import PracticaGatillo from "./practica-gatillo";
 import LabPiso from "./lab-piso";
 
 /**
@@ -21,10 +22,11 @@ import LabPiso from "./lab-piso";
  * Solo simulación: no hay ningún camino a una orden real. Sin dato de avance, el avance es indeterminado.
  */
 
-type Pestana = "centro" | "agentes" | "backtest" | "riesgo" | "jarvis" | "actividad";
+type Pestana = "centro" | "agentes" | "practica" | "backtest" | "riesgo" | "jarvis" | "actividad";
 const PESTANAS: [Pestana, string][] = [
   ["centro", "CENTRO"],
   ["agentes", "AGENTES"],
+  ["practica", "PRÁCTICA DEL GATILLO"],
   ["backtest", "BACKTEST"],
   ["riesgo", "PAPEL Y RIESGO"],
   ["jarvis", "JARVIS"],
@@ -257,6 +259,11 @@ export default function AiTradingLab() {
         </div>
       )}
 
+      {pestana === "practica" && (
+        <div className="lab-cuerpo">
+          <PracticaGatillo />
+        </div>
+      )}
       {pestana === "backtest" && (
         <div className="lab-cuerpo">
           <form
