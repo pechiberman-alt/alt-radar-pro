@@ -83,3 +83,29 @@ test("la charla sale de los datos: coincidencias, desacuerdos y resultados con s
   const perdedor = o.escritorios.find((e) => e.id === "BOLLINGER")!;
   assert.match(tituloSemana(perdedor), /menos perdió/);
 });
+
+test("el plan del servidor: lee sus claves, no tiene el agente ST, y habla por Telegram y con la IA con sus datos", async () => {
+  const { oficinaParaIa, textoOficinaTelegram, textoAgenteTelegram, buscarAgente } = await import("../lib/oficina.ts");
+  const { parseCommand } = await import("../lib/telegram.ts");
+  const filas = [
+    f("sv:AMD_IFVG:SOLUSDT:4h:LONG:1", "ABIERTA", null, null, "SOLUSDT"),
+    f("sv:RSI:BTCUSDT:4h:SHORT:2", "TP3", 1.9, H),
+    f("st:BTCUSDT:4h:LONG:3", "TP3", 2, H),
+  ];
+  const o = armarOficina(filas, AHORA, "SERVIDOR");
+  assert.ok(!o.escritorios.some((e) => e.id === ID_ST), "el agente ST no corre en el servidor");
+  assert.deepEqual(o.escritorios.find((e) => e.id === "AMD_IFVG")!.abiertas.map((a) => a.symbol), ["SOLUSDT"]);
+  assert.equal(o.escritorios.find((e) => e.id === "RSI")!.total.neto, 1.9);
+  const ia = oficinaParaIa(o, "SERVIDOR") as { escritorios: { agente: string; netoR: unknown }[]; plan: string };
+  assert.match(ia.plan, /Kraken/);
+  assert.equal(ia.escritorios.find((e) => e.agente === "Agente Reversión")!.netoR, "1,9", "los números llegan en formato argentino");
+  const tg = textoOficinaTelegram(o);
+  assert.match(tg, /AMD \+ IFVG · SOL ▲/);
+  assert.match(tg, /No es asesoramiento financiero/);
+  assert.match(textoAgenteTelegram(o, "amd"), /Agente AMD \+ IFVG/);
+  assert.match(textoAgenteTelegram(o, "nadie"), /No encontré ese agente/);
+  assert.equal(buscarAgente(o, "REVERSIÓN")?.id, buscarAgente(o, "reversion")?.id, "sin importar acentos ni mayúsculas");
+  assert.match(textoOficinaTelegram(armarOficina(null, AHORA, "SERVIDOR")), /sin datos/);
+  assert.deepEqual(parseCommand("/oficina"), { cmd: "oficina", arg: "" });
+  assert.deepEqual(parseCommand("/agente amd"), { cmd: "agente", arg: "amd" });
+});

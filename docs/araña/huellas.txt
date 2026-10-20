@@ -56,7 +56,7 @@ ef3e2bf85432	160	app/api/klines/route.ts
 c1dc8c2ca83f	93	app/api/liquidity-history/route.ts
 a9e76218b723	216	app/api/market-structure/route.ts
 3356888e120f	49	app/api/market/derivatives/route.ts
-d895af4a4939	20	app/api/oficina/route.ts
+65dc19f78112	24	app/api/oficina/route.ts
 bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
@@ -72,7 +72,7 @@ da2c7912c051	259	app/api/signals/route.ts
 4a88734ea8ff	41	app/api/structure-trend/route.ts
 b0b1c9f33895	75	app/api/telegram/link/route.ts
 aa86804bf9da	24	app/api/telegram/test/route.ts
-9f8f9a0bdfc4	176	app/api/telegram/webhook/route.ts
+523d3a9780ea	183	app/api/telegram/webhook/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
 8889c819ef92	86	app/aprender-lab.tsx
@@ -132,13 +132,13 @@ e4aeb9c38840	264	app/jarvis-trading.css
 7fda8eaa8d60	220	app/jarvis-voice-player.ts
 719061eef9e9	192	app/jarvis-watch.tsx
 39c4819ab1a5	121	app/jarvis.css
-9f7dd2bcff90	1692	app/jarvis.tsx
+dcb4fa8be44a	1697	app/jarvis.tsx
 a0bec1d6e010	165	app/lab-agente-st.tsx
 b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
-63815bfd11ca	92	app/lab-oficina.css
-e4d51e17348e	296	app/lab-oficina.tsx
+831a9f7e1c5e	105	app/lab-oficina.css
+951d3a841aa3	388	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -196,7 +196,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d4c3f9cc2a90	315	docs/araña/objetivos.md
+57a92ec8fc3f	317	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 c06f06eff751	43	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -234,6 +234,9 @@ e0459b113cf2	42	eslint.config.mjs
 f997c496526e	156	lib/agente-st.ts
 26e0d855918d	107	lib/agentes-explicado.ts
 3e02dc9c63a4	188	lib/agentes-papel.ts
+b53ef68c2a35	104	lib/agentes-servidor-db.ts
+f6460772c0c5	23	lib/agentes-servidor-run.ts
+20d0aa7dd377	100	lib/agentes-servidor.ts
 f3bdeb0d1172	66	lib/ai-analyst-server.ts
 009e4bbb2f90	158	lib/ai-analyst.ts
 d42a4a08e452	193	lib/ai-brains.ts
@@ -332,7 +335,7 @@ e5d7beaeb1fb	53	lib/jarvis-world.ts
 719ced4be828	299	lib/jarvis.ts
 1235a48b5279	95	lib/key-levels.ts
 157c8fbc4c4c	55	lib/klines-history.ts
-d7b23d66a3bf	269	lib/klines-server.ts
+d59479511e96	271	lib/klines-server.ts
 b8cc36e6f2d7	160	lib/lab-arena.ts
 3f7f00318500	173	lib/lab-evaluacion.ts
 fe550a7f3308	117	lib/lab-jarvis.ts
@@ -365,7 +368,9 @@ c8b7add6b81c	621	lib/mesa-sombra.ts
 617b5248112d	242	lib/mm-robot.ts
 fd19498c8d8b	115	lib/mtf-zones.ts
 1cbbe9f25773	380	lib/news-intelligence.ts
-ba361069f244	197	lib/oficina.ts
+c19d69cbdafa	25	lib/oficina-db.ts
+5368f7df9343	23	lib/oficina-run.ts
+d89c564405cf	278	lib/oficina.ts
 780c578e3481	522	lib/order-blocks.ts
 3f86ab0657ef	438	lib/order-flow-brain.ts
 757d33d6a6c9	249	lib/order-flow.ts
@@ -380,9 +385,9 @@ bb49b1192e80	96	lib/preregistro-flujo.ts
 357bfd64bf54	170	lib/pump-pressure.ts
 067ef991f873	300	lib/pump-radar.ts
 519f91b497f6	533	lib/radar.ts
-881cbcf28d12	186	lib/registro-db.ts
+edbca7d4a3ce	195	lib/registro-db.ts
 62a90a1d0b2d	43	lib/registro-run.ts
-0910d824bf3b	270	lib/registro.ts
+1c7681695bb8	272	lib/registro.ts
 efc446c0f3ed	90	lib/reversal-zones.ts
 bc992c13bd28	130	lib/risk-calc.ts
 00e3d377935b	129	lib/robot-ledger-db.ts
@@ -409,8 +414,8 @@ b0595f550a8b	175	lib/structure-archive.ts
 bf7335d9b46e	223	lib/supply-demand.ts
 604f5d668d1b	320	lib/swing-entries.ts
 c9fd83f39ff3	171	lib/swing-liquidity-filter.ts
-43d8a7f1ba3a	279	lib/telegram-ai-server.ts
-f1a112b70191	77	lib/telegram-ai.ts
+bff8d579fd5d	283	lib/telegram-ai-server.ts
+848f1c4d5a15	79	lib/telegram-ai.ts
 c86debc3fff0	234	lib/telegram-dispatch.ts
 454b972683d0	122	lib/telegram-jarvis.ts
 e9e4bb168a91	53	lib/telegram-magnets.ts
@@ -418,7 +423,7 @@ e9e4bb168a91	53	lib/telegram-magnets.ts
 a250fc69b552	36	lib/telegram-server.ts
 26e6999dc403	166	lib/telegram-voice.ts
 05101ed6c6c5	55	lib/telegram-volume.ts
-7f9f413355fc	249	lib/telegram.ts
+3268110e4175	251	lib/telegram.ts
 ba55aa5bdb5b	143	lib/token-unlocks.ts
 d0434e2eafe5	81	lib/trade-bubbles.ts
 759b1ffa8280	142	lib/trade-journal.ts
@@ -474,6 +479,7 @@ a6bc231bf554	374	tests/account-journal.test.ts
 8f97cc0b92d6	37	tests/agentes-explicado.test.ts
 beea37118afc	51	tests/agentes-mcp.test.ts
 e08b579f6073	220	tests/agentes-papel.test.ts
+ed22a474c8ba	162	tests/agentes-servidor.test.ts
 bc528d50d94b	74	tests/ai-analyst.test.ts
 8236d721ebba	168	tests/ai-brains.test.ts
 57f3eea79cb8	38	tests/ai-numbers.test.ts
@@ -582,7 +588,7 @@ a9cc32e63faf	283	tests/mesa-sombra.test.ts
 1c697054fe3b	153	tests/mm-robot.test.ts
 6ab801ccfb7e	104	tests/mtf-zones.test.ts
 40823676548f	84	tests/news-sentiment.test.ts
-1e3e5d19032f	86	tests/oficina.test.ts
+48a3c7b8fcfd	112	tests/oficina.test.ts
 6d903521a84e	209	tests/order-blocks.test.ts
 225b8a9ad252	350	tests/order-flow-brain.test.ts
 fc5082678796	301	tests/order-flow.test.ts
@@ -637,5 +643,5 @@ dafba0404d8e	92	tests/volume-spike.test.ts
 21b30109f4c3	79	tests/xau-alerts.test.ts
 b41bd6678407	33	tsconfig.json
 037c2ff06898	75	vite.config.ts
-34e733d85cef	162	worker/index.ts
-8845060ba517	37	wrangler.production.jsonc
+1c9cde04d60c	172	worker/index.ts
+668a6bd5328d	37	wrangler.production.jsonc

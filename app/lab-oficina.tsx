@@ -8,7 +8,14 @@
  * se leen una vez al abrir. La escena es CSS 3D; el movimiento es decorativo y se apaga con «reducir movimiento». Solo papel.
  */
 import { useEffect, useMemo, useState } from "react";
+import { forAi } from "../lib/ai-numbers.ts";
+import { ESTRATEGIAS } from "../lib/estrategias.ts";
 import { armarOficina, charla, MESAS, nombreActivo, propuestas, tituloSemana, type Escritorio, type FilaOficina, type Frase, type MesaId, type Oficina } from "../lib/oficina.ts";
+
+type Plan = "SERVIDOR" | "CUENTA";
+type EstadoMoneda = { symbol: string; at: number; venue: string | null; registradas: number; avanzadas: number; error: string | null };
+type Respuesta = { servidor: { filas: FilaOficina[]; estado: EstadoMoneda[] } | null; cuenta: FilaOficina[] | null; sesion: boolean };
+type Linea = { de: "vos" | "agente"; texto: string; cerebro?: string };
 
 const POR_FILA = 4;
 const CAMBIO_FRASE_MS = 4500;
@@ -78,11 +85,16 @@ function Planta({ x, y }: { x: number; y: number }) {
 }
 
 export default function LabOficina() {
-  const [oficina, setOficina] = useState<Oficina>(() => armarOficina(null, 0));
-  const [estado, setEstado] = useState<"cargando" | "listo" | "sin-sesion" | "error">("cargando");
+  const [datos, setDatos] = useState<Respuesta | null>(null);
+  const [plan, setPlan] = useState<Plan>("SERVIDOR");
+  const [ahora, setAhora] = useState(0);
+  const [estado, setEstado] = useState<"cargando" | "listo" | "error">("cargando");
   const [elegido, setElegido] = useState<string | null>(null);
   const [giro, setGiro] = useState(-40);
   const [turno, setTurno] = useState(0);
+  const [chat, setChat] = useState<Record<string, Linea[]>>({});
+  const [pregunta, setPregunta] = useState("");
+  const [pensando, setPensando] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -90,14 +102,11 @@ export default function LabOficina() {
       try {
         const r = await fetch("/api/oficina", { credentials: "same-origin", cache: "no-store" });
         if (!vivo) return;
-        if (r.status === 401) {
-          setEstado("sin-sesion");
-          return;
-        }
         if (!r.ok) throw new Error(String(r.status));
-        const { filas } = (await r.json()) as { filas: FilaOficina[] };
+        const d = (await r.json()) as Respuesta;
         if (!vivo) return;
-        setOficina(armarOficina(filas, Date.now()));
+        setDatos(d);
+        setAhora(Date.now());
         setEstado("listo");
       } catch {
         if (vivo) setEstado("error");
@@ -108,6 +117,13 @@ export default function LabOficina() {
     };
   }, []);
 
+  const oficina: Oficina = useMemo(
+    () => armarOficina(plan === "SERVIDOR" ? (datos?.servidor?.filas ?? null) : (datos?.cuenta ?? null), ahora, plan),
+    [datos, plan, ahora],
+  );
+  const fallas = (datos?.servidor?.estado ?? []).filter((e) => e.error);
+  const ultimaVuelta = Math.max(0, ...(datos?.servidor?.estado ?? []).map((e) => e.at));
+
   // La charla pasa de una frase a otra; con «reducir movimiento» queda quieta en la primera (el feed de abajo las tiene todas).
   useEffect(() => {
     if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
@@ -115,9 +131,57 @@ export default function LabOficina() {
     return () => window.clearInterval(id);
   }, []);
 
+  /** Hablar con un agente: la misma IA que JARVIS, con sus datos; sin IA, responde con sus propias frases (motor local). */
+  async function preguntar(e: Escritorio) {
+    const texto = pregunta.trim();
+    if (!texto) return;
+    const anotar = (l: Linea) => setChat((c) => ({ ...c, [e.id]: [...(c[e.id] ?? []), l] }));
+    anotar({ de: "vos", texto });
+    setPregunta("");
+    setPensando(true);
+    const propias = frases.filter((f) => f.quien === e.id).map((f) => f.texto);
+    const local = (por: string) => anotar({ de: "agente", texto: propias.length ? propias.join(" ") : "Todavía no tengo operaciones para contarte.", cerebro: `motor local (${por})` });
+    try {
+      const regla = ESTRATEGIAS.find((x) => x.id === e.id)?.regla ?? e.mira;
+      const r = await fetch("/api/analyst/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo. Respondé en primera persona, corto y en español rioplatense, solo con tus datos (en el resumen, «agente»). Si un dato no está, decilo. No cambiás tu regla, no das órdenes y no es asesoramiento financiero. Pregunta: ${texto}`,
+          snapshot: {
+            asistente: "AGENTE DE LA OFICINA",
+            agente: forAi({
+              nombre: e.agente,
+              regla,
+              plan: plan === "SERVIDOR" ? "servidor 24/7, velas de Kraken, papel" : "tu cuenta, navegador, papel",
+              cerradas: e.total.cerradas,
+              acierto: e.total.winRate,
+              rPorOperacion: e.total.expectancia,
+              netoR: e.total.neto,
+              muestra: e.total.muestra,
+              semana: { cerradas: e.semana.cerradas, netoR: e.semana.neto },
+              abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`),
+              loQueDice: propias,
+              loQueAprendeLaOficina: oficina.aprendizaje.texto,
+            }),
+          },
+          history: (chat[e.id] ?? []).slice(-6).map((l) => ({ role: l.de === "vos" ? "user" : "assistant", content: l.texto })),
+        }),
+      });
+      if (r.status === 401) return local("iniciá sesión para la IA");
+      const d = (await r.json().catch(() => ({}))) as { text?: string; label?: string };
+      if (!r.ok || !d.text) return local("la IA no respondió");
+      anotar({ de: "agente", texto: d.text, cerebro: d.label });
+    } catch {
+      local("sin conexión");
+    } finally {
+      setPensando(false);
+    }
+  }
+
   const { puestos, filas, bloques } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
-  const frases = useMemo(() => charla(oficina), [oficina]);
-  const propias = useMemo(() => propuestas(oficina), [oficina]);
+  const frases = charla(oficina);
+  const propias = propuestas(oficina);
   const hablan = frases.filter((f) => f.quien !== "JARVIS");
   const actual: Frase | null = hablan.length ? hablan[turno % hablan.length] : null;
   const elegidoE = oficina.escritorios.find((e) => e.id === elegido) ?? null;
@@ -134,13 +198,22 @@ export default function LabOficina() {
           Cada agente en su escritorio, en tres mesas. Hablan con lo que muestran sus datos y aprenden entre ellos comparando cuándo
           les va mejor: acompañados o solos. Todo es papel. Tocá un escritorio para ver su ficha.
         </p>
+        <div className="of-planes" role="tablist" aria-label="Qué agentes ver">
+          <button type="button" role="tab" aria-selected={plan === "SERVIDOR"} onClick={() => setPlan("SERVIDOR")}>SERVIDOR 24/7</button>
+          <button type="button" role="tab" aria-selected={plan === "CUENTA"} onClick={() => setPlan("CUENTA")}>TU CUENTA</button>
+        </div>
+        <p className="of-tenue">
+          {plan === "SERVIDOR"
+            ? `Corren solos en el servidor, con la app cerrada, sobre velas de 4 h de Kraken (otra serie que Binance: su medición arrancó de cero). Oro y plata no están acá: solo los da Binance.${ultimaVuelta ? ` Última vuelta: ${new Date(ultimaVuelta).toLocaleString("es-AR")}.` : " Todavía no corrió ninguna vuelta."}${fallas.length ? ` ${fallas.length} ${fallas.length === 1 ? "moneda no respondió" : "monedas no respondieron"}: ${fallas.map((f) => f.symbol.replace(/USDT$/, "")).join(", ")}.` : ""}`
+            : "Tus agentes del navegador: corren con la app abierta, sobre velas de Binance, con oro y plata."}
+        </p>
         <label className="of-giro">
           Girar la vista
           <input type="range" min={-80} max={0} value={giro} onChange={(ev) => setGiro(Number(ev.target.value))} />
         </label>
         {estado === "cargando" && <p className="of-tenue">Leyendo los resultados de los agentes…</p>}
-        {estado === "sin-sesion" && <p className="of-tenue">Iniciá sesión para ver los resultados de tus agentes. Sin sesión, los escritorios no tienen números.</p>}
         {estado === "error" && <p className="of-tenue">No se pudieron leer los resultados: sin datos (no es cero).</p>}
+        {estado === "listo" && plan === "CUENTA" && !datos?.sesion && <p className="of-tenue">Iniciá sesión para ver tus agentes. El servidor 24/7 se ve sin sesión.</p>}
         {oficina.incompleta && <p className="of-tenue">Se leyeron las últimas 1.000 entradas: lo más viejo no entra.</p>}
       </header>
 
@@ -233,7 +306,26 @@ export default function LabOficina() {
             <p>Abiertas: {elegidoE.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}</p>
           )}
           {frases.filter((f) => f.quien === elegidoE.id).map((f) => <p key={f.texto} className="of-dice">«{f.texto}»</p>)}
-          <small>Papel, velas de 4 h. No es asesoramiento financiero.</small>
+          <div className="of-conversa" aria-live="polite">
+            {(chat[elegidoE.id] ?? []).map((l, k) => (
+              <p key={k} className={`of-msg of-msg-${l.de}`}>
+                {l.texto}
+                {l.cerebro ? <small> · {l.cerebro}</small> : null}
+              </p>
+            ))}
+            {pensando && <p className="of-msg of-msg-agente of-tenue">Pensando…</p>}
+          </div>
+          <form
+            className="of-preguntar"
+            onSubmit={(ev) => {
+              ev.preventDefault();
+              void preguntar(elegidoE);
+            }}
+          >
+            <input value={pregunta} onChange={(ev) => setPregunta(ev.target.value)} placeholder={`Preguntale a ${nombreCorto(elegidoE.agente)}…`} maxLength={300} aria-label={`Pregunta para ${elegidoE.agente}`} />
+            <button type="submit" disabled={pensando || !pregunta.trim()}>Preguntar</button>
+          </form>
+          <small>Papel, velas de 4 h{plan === "SERVIDOR" ? " de Kraken" : ""}. No es asesoramiento financiero.</small>
         </article>
       )}
 
