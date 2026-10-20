@@ -14,7 +14,7 @@
  * stop y objetivo, cuenta el stop. La regla no cambia para mejorar los números: solo por un PR revisado. Pura: sin red ni base.
  */
 import { escaleraHacia, type Escalera, type Lado } from "./escalera.ts";
-import { ESTRATEGIAS, indicadores, type EstrategiaId } from "./estrategias.ts";
+import { ESTRATEGIAS, indicadores, operaEn, type EstrategiaId } from "./estrategias.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 import { simbolosFondeo } from "./fondeo.ts";
 
@@ -100,7 +100,7 @@ export function leerSenalesPapel(symbol: string, velas: SwingCandle[], ahora: nu
   const out: PlanPapel[] = [];
   for (const id of AGENTES_PAPEL) {
     const e = ESTRATEGIAS.find((x) => x.id === id);
-    if (!e) continue;
+    if (!e || !operaEn(e, symbol)) continue;
     const s = e.senal(cerradas, ind, i);
     if (!s) continue;
     // Igual que el estudio: el riesgo y el objetivo mantienen su distancia en R desde la apertura de entrada.
