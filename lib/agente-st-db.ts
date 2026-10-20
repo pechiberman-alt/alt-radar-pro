@@ -132,9 +132,9 @@ export async function filasOficina(db: D1Database, userId: number, limite: numbe
   await ensureAgenteSt(db);
   return (
     await db
-      .prepare("SELECT clave, symbol, lado, r, desenlace, cerrada, detectada FROM agente_st_senales WHERE user_id = ?1 ORDER BY detectada DESC LIMIT ?2")
+      .prepare("SELECT clave, symbol, lado, r, desenlace, cerrada, detectada, foto FROM agente_st_senales WHERE user_id = ?1 ORDER BY detectada DESC LIMIT ?2")
       .bind(userId, limite)
-      .all<{ clave: string; symbol: string; lado: string; r: number | null; desenlace: string; cerrada: number | null; detectada: number }>()
+      .all<{ clave: string; symbol: string; lado: string; r: number | null; desenlace: string; cerrada: number | null; detectada: number; foto: string | null }>()
   ).results;
 }
 

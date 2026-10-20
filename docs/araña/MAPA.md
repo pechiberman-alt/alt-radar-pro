@@ -420,7 +420,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `app/lab-fondeo.tsx` — Cuenta de fondeo y Agente Fondeo en el panel: la persona carga las reglas de su cuenta y su estado (saldo, resultado de hoy, riesgo abierto) y, al tocar «Leer la mesa», el agente p
 - `app/lab-mini-arana.tsx` — La mini araña del piso de estrategias: la misma araña del laboratorio (app/ai-trading-lab.tsx) en chico, una por agente, pintada con el color de su veredicto.
 - `app/lab-oficina.css` — La oficina 3D del fondo (app/lab-oficina.tsx).
-- `app/lab-oficina.tsx` — La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en tres mesas (tendencia, reversión y estructura), con dos pizarras en las paredes (posicione
+- `app/lab-oficina.tsx` — La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en tres mesas (tendencia, reversión y estructura), con pizarras en la pared (posiciones abier
 - `app/lab-piso.tsx` — El piso de estrategias del AI TRADING LAB.
 - `app/lab-universos.tsx` — Los universos de monedas en el panel: qué grupo vigila cada agente y, sobre todo, cuáles se pueden medir en el pasado y cuáles no.
 - `app/practica-gatillo.tsx` — La práctica del gatillo: se ven las velas hasta una vela y se decide si la estrategia dispara ahí (LONG, SHORT o no hay gatillo).

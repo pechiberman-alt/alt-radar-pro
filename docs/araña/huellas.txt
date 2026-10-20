@@ -137,8 +137,8 @@ a0bec1d6e010	165	app/lab-agente-st.tsx
 b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
-845dd43300d2	56	app/lab-oficina.css
-912c44bcc322	219	app/lab-oficina.tsx
+63815bfd11ca	92	app/lab-oficina.css
+e4d51e17348e	296	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -229,7 +229,7 @@ e0459b113cf2	42	eslint.config.mjs
 766d1eb792e8	10	examples/d1/db/schema.ts
 36621536c9b3	85	lib/account-events.ts
 6b197acd00d5	559	lib/account-journal.ts
-6b1ee1864340	166	lib/agente-st-db.ts
+54958781f9f3	166	lib/agente-st-db.ts
 22efb8b3e5db	192	lib/agente-st-run.ts
 f997c496526e	156	lib/agente-st.ts
 26e0d855918d	107	lib/agentes-explicado.ts
@@ -365,7 +365,7 @@ c8b7add6b81c	621	lib/mesa-sombra.ts
 617b5248112d	242	lib/mm-robot.ts
 fd19498c8d8b	115	lib/mtf-zones.ts
 1cbbe9f25773	380	lib/news-intelligence.ts
-99d8818d56d9	107	lib/oficina.ts
+ba361069f244	197	lib/oficina.ts
 780c578e3481	522	lib/order-blocks.ts
 3f86ab0657ef	438	lib/order-flow-brain.ts
 757d33d6a6c9	249	lib/order-flow.ts
@@ -582,7 +582,7 @@ a9cc32e63faf	283	tests/mesa-sombra.test.ts
 1c697054fe3b	153	tests/mm-robot.test.ts
 6ab801ccfb7e	104	tests/mtf-zones.test.ts
 40823676548f	84	tests/news-sentiment.test.ts
-bd13312cb399	61	tests/oficina.test.ts
+1e3e5d19032f	86	tests/oficina.test.ts
 6d903521a84e	209	tests/order-blocks.test.ts
 225b8a9ad252	350	tests/order-flow-brain.test.ts
 fc5082678796	301	tests/order-flow.test.ts

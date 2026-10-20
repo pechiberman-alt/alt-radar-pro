@@ -2,14 +2,16 @@
 
 /**
  * La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en tres mesas (tendencia, reversión y
- * estructura), con dos pizarras en las paredes (posiciones abiertas y reunión de la semana) y una sala de reuniones. Los
- * números salen del registro unificado por agente (lib/oficina.ts) y se leen una vez al abrir la oficina. La escena es CSS 3D:
- * el movimiento es decorativo y se apaga con «reducir movimiento». Solo papel: ningún escritorio manda órdenes.
+ * estructura), con pizarras en la pared (posiciones abiertas y reunión de la semana) y una sala de reuniones. Los agentes
+ * «hablan»: cada globo es una frase armada con un dato (lib/oficina.ts, charla), nunca inventada. Aprenden entre ellos por el
+ * consenso, que informa y no filtra; las propuestas son para la persona. Los números salen del registro unificado por agente y
+ * se leen una vez al abrir. La escena es CSS 3D; el movimiento es decorativo y se apaga con «reducir movimiento». Solo papel.
  */
 import { useEffect, useMemo, useState } from "react";
-import { armarOficina, MESAS, nombreActivo, type Escritorio, type FilaOficina, type MesaId, type Oficina } from "../lib/oficina.ts";
+import { armarOficina, charla, MESAS, nombreActivo, propuestas, tituloSemana, type Escritorio, type FilaOficina, type Frase, type MesaId, type Oficina } from "../lib/oficina.ts";
 
 const POR_FILA = 4;
+const CAMBIO_FRASE_MS = 4500;
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)} %`);
 const r2 = (v: number | null) => {
   if (v === null) return "—";
@@ -19,6 +21,12 @@ const r2 = (v: number | null) => {
 const n2 = (v: number | null) => (v === null ? "—" : v.toFixed(2).replace(".", ","));
 const tono = (e: Escritorio) => (e.semana.cerradas === 0 ? "quieto" : e.semana.neto > 0 ? "gana" : e.semana.neto < 0 ? "pierde" : "quieto");
 const nombreCorto = (agente: string) => agente.replace(/^Agente\s+/, "");
+/** El monitor: verde si solo tiene largos, rojo si solo cortos, ámbar si tiene de los dos, apagado si nada. */
+const pantalla = (e: Escritorio) => {
+  const l = e.abiertas.some((a) => a.lado === "LONG");
+  const c = e.abiertas.some((a) => a.lado === "SHORT");
+  return l && c ? "mixto" : l ? "largo" : c ? "corto" : "apagado";
+};
 
 type Puesto = { e: Escritorio; x: number; y: number };
 
@@ -26,14 +34,14 @@ type Puesto = { e: Escritorio; x: number; y: number };
 function ubicar(escritorios: Escritorio[]): { puestos: Puesto[]; filas: number; bloques: { mesa: MesaId; y: number; filas: number }[] } {
   const puestos: Puesto[] = [];
   const bloques: { mesa: MesaId; y: number; filas: number }[] = [];
-  let y = 1;
+  let y = 1.2;
   for (const m of MESAS) {
     const suyos = escritorios.filter((e) => e.mesa === m.id);
     if (!suyos.length) continue;
     const filas = Math.ceil(suyos.length / POR_FILA);
     bloques.push({ mesa: m.id, y, filas });
     suyos.forEach((e, k) => puestos.push({ e, x: 1 + (k % POR_FILA) * 1.5, y: y + Math.floor(k / POR_FILA) * 1.6 }));
-    y += filas * 1.6 + 0.9;
+    y += filas * 1.6 + 1.1;
   }
   return { puestos, filas: y + 3, bloques };
 }
@@ -41,6 +49,7 @@ function ubicar(escritorios: Escritorio[]): { puestos: Puesto[]; filas: number; 
 function Persona({ tonoCamisa }: { tonoCamisa: string }) {
   return (
     <span className={`of-persona of-${tonoCamisa}`} aria-hidden="true">
+      <span className="of-pelo" />
       <span className="of-cabeza" />
       <span className="of-cuerpo" />
     </span>
@@ -56,11 +65,24 @@ function Pizarra({ titulo, filas, vacio }: { titulo: string; filas: string[]; va
   );
 }
 
+/** Una planta de pie, mirando a la cámara. Decoración. */
+function Planta({ x, y }: { x: number; y: number }) {
+  return (
+    <span className="of-planta-lugar" style={{ ["--x" as string]: x, ["--y" as string]: y }} aria-hidden="true">
+      <span className="of-parado of-planta">
+        <span className="of-hojas" />
+        <span className="of-maceta" />
+      </span>
+    </span>
+  );
+}
+
 export default function LabOficina() {
   const [oficina, setOficina] = useState<Oficina>(() => armarOficina(null, 0));
   const [estado, setEstado] = useState<"cargando" | "listo" | "sin-sesion" | "error">("cargando");
   const [elegido, setElegido] = useState<string | null>(null);
   const [giro, setGiro] = useState(-40);
+  const [turno, setTurno] = useState(0);
 
   useEffect(() => {
     let vivo = true;
@@ -86,11 +108,22 @@ export default function LabOficina() {
     };
   }, []);
 
+  // La charla pasa de una frase a otra; con «reducir movimiento» queda quieta en la primera (el feed de abajo las tiene todas).
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const id = window.setInterval(() => setTurno((t) => t + 1), CAMBIO_FRASE_MS);
+    return () => window.clearInterval(id);
+  }, []);
+
   const { puestos, filas, bloques } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
+  const frases = useMemo(() => charla(oficina), [oficina]);
+  const propias = useMemo(() => propuestas(oficina), [oficina]);
+  const hablan = frases.filter((f) => f.quien !== "JARVIS");
+  const actual: Frase | null = hablan.length ? hablan[turno % hablan.length] : null;
   const elegidoE = oficina.escritorios.find((e) => e.id === elegido) ?? null;
   const enDirecto = oficina.escritorios.flatMap((e) => e.abiertas.map((a) => ({ e, a }))).sort((x, y) => y.a.detectada - x.a.detectada);
-  const lineasDirecto = enDirecto.slice(0, 8).map(({ e, a }) => `${nombreCorto(e.agente)} · ${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`);
-  const lineasReunion = oficina.reunion.slice(0, 6).map((e) => `${nombreCorto(e.agente)} · ${r2(e.semana.neto)} · n=${e.semana.cerradas}`);
+  const lineasDirecto = enDirecto.slice(0, 7).map(({ e, a }) => `${nombreCorto(e.agente)} · ${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`);
+  const lineasReunion = oficina.reunion.slice(0, 7).map((e) => `${nombreCorto(e.agente)} · ${r2(e.semana.neto)} · n=${e.semana.cerradas}`);
   const mejor = oficina.reunion[0] ?? null;
 
   return (
@@ -98,8 +131,8 @@ export default function LabOficina() {
       <header className="of-cabecera">
         <h3 id="of-titulo" className="lab-sub">La oficina del fondo</h3>
         <p>
-          Cada agente en su escritorio, como un fondo con tres mesas. Todo es papel: nadie opera dinero real. Tocá un escritorio para
-          ver su ficha.
+          Cada agente en su escritorio, en tres mesas. Hablan con lo que muestran sus datos y aprenden entre ellos comparando cuándo
+          les va mejor: acompañados o solos. Todo es papel. Tocá un escritorio para ver su ficha.
         </p>
         <label className="of-giro">
           Girar la vista
@@ -113,37 +146,53 @@ export default function LabOficina() {
 
       <div className="of-escena" style={{ ["--giro" as string]: `${giro}deg`, ["--filas" as string]: filas }}>
         <div className="of-piso">
+          <span className="of-luz" style={{ ["--y" as string]: 3 }} aria-hidden="true" />
+          <span className="of-luz" style={{ ["--y" as string]: filas - 5 }} aria-hidden="true" />
           <div className="of-pared of-pared-fondo">
             <Pizarra titulo="EN DIRECTO" filas={lineasDirecto} vacio="Sin posiciones abiertas" />
+            <span className="of-ventana" aria-hidden="true" />
             <Pizarra titulo="REUNIÓN DE LA SEMANA" filas={lineasReunion} vacio="Nadie cerró en 7 días" />
           </div>
           {bloques.map((b) => (
-            <div key={b.mesa} className="of-alfombra" style={{ ["--y" as string]: b.y - 0.35, ["--alto" as string]: b.filas * 1.6 }}>
+            <div key={b.mesa} className={`of-alfombra of-alf-${b.mesa.toLowerCase()}`} style={{ ["--y" as string]: b.y - 0.4, ["--alto" as string]: b.filas * 1.6 }}>
               <span>{MESAS.find((m) => m.id === b.mesa)?.nombre}</span>
             </div>
           ))}
-          {puestos.map(({ e, x, y }) => (
-            <button
-              key={e.id}
-              type="button"
-              className={`of-puesto${elegido === e.id ? " of-activo" : ""}${e.abiertas.length ? " of-operando" : ""}`}
-              style={{ ["--x" as string]: x, ["--y" as string]: y }}
-              aria-pressed={elegido === e.id}
-              aria-label={`${e.agente}: ${e.abiertas.length} abiertas, ${e.semana.cerradas} cerradas esta semana`}
-              onClick={() => setElegido(elegido === e.id ? null : e.id)}
-            >
-              <span className="of-mueble">
-                <span className="of-tapa" />
-                <span className="of-frente" />
-                <span className="of-lado" />
-                <span className="of-monitor">{e.abiertas.length ? e.abiertas.length : ""}</span>
-              </span>
-              <span className="of-parado">
-                <Persona tonoCamisa={tono(e)} />
-              </span>
-            </button>
-          ))}
-          <div className="of-sala" style={{ ["--y" as string]: filas - 2.4 }}>
+          <Planta x={0.15} y={0.6} />
+          <Planta x={6.9} y={0.6} />
+          <Planta x={6.9} y={filas - 3.2} />
+          {puestos.map(({ e, x, y }) => {
+            const habla = actual?.quien === e.id;
+            const visible = habla || elegido === e.id;
+            return (
+              <button
+                key={e.id}
+                type="button"
+                className={`of-puesto of-pant-${pantalla(e)}${elegido === e.id ? " of-activo" : ""}${habla ? " of-habla" : ""}`}
+                style={{ ["--x" as string]: x, ["--y" as string]: y }}
+                aria-pressed={elegido === e.id}
+                aria-label={`${e.agente}: ${e.abiertas.length} abiertas, ${e.semana.cerradas} cerradas esta semana`}
+                onClick={() => setElegido(elegido === e.id ? null : e.id)}
+              >
+                <span className="of-mueble">
+                  <span className="of-tapa" />
+                  <span className="of-frente" />
+                  <span className="of-lado" />
+                  <span className="of-monitor">{e.abiertas.length ? e.abiertas.length : ""}</span>
+                </span>
+                <span className="of-parado">
+                  <Persona tonoCamisa={tono(e)} />
+                  {visible && (
+                    <span className={`of-globo${habla ? "" : " of-globo-nombre"}`}>
+                      <b>{nombreCorto(e.agente)}</b>
+                      {habla && actual ? <span>{actual.texto}</span> : null}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+          <div className="of-sala" style={{ ["--y" as string]: filas - 2.5 }}>
             <span className="of-mesa-redonda" />
             {oficina.reunion.slice(0, 4).map((e, k) => (
               <span key={e.id} className="of-parado of-silla" style={{ ["--k" as string]: k }}>
@@ -153,6 +202,11 @@ export default function LabOficina() {
             <span className="of-sala-nombre">Sala de reuniones</span>
           </div>
         </div>
+        {actual && (
+          <p className="of-subtitulo" aria-live="polite">
+            <b>{actual.nombre}:</b> {actual.texto}
+          </p>
+        )}
       </div>
 
       {elegidoE && (
@@ -176,14 +230,50 @@ export default function LabOficina() {
             <div><dt>Semana</dt><dd>{elegidoE.semana.cerradas ? `${r2(elegidoE.semana.neto)} · n=${elegidoE.semana.cerradas}` : "sin cierres"}</dd></div>
           </dl>
           {elegidoE.abiertas.length > 0 && (
-            <p>
-              Abiertas:{" "}
-              {elegidoE.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}
-            </p>
+            <p>Abiertas: {elegidoE.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}</p>
           )}
+          {frases.filter((f) => f.quien === elegidoE.id).map((f) => <p key={f.texto} className="of-dice">«{f.texto}»</p>)}
           <small>Papel, velas de 4 h. No es asesoramiento financiero.</small>
         </article>
       )}
+
+      <div className="of-listas">
+        <div>
+          <h4>La charla</h4>
+          <ul className="of-chat">
+            {frases.map((f) => (
+              <li key={`${f.quien}-${f.texto}`} className={`of-chat-${f.tipo}`}>
+                <b>{f.nombre}</b> {f.texto}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h4>Reunión de la semana</h4>
+          {mejor ? (
+            <>
+              <p>
+                {tituloSemana(mejor)}: <b>{nombreCorto(mejor.agente)}</b>, {r2(mejor.semana.neto)} con {mejor.semana.cerradas}{" "}
+                {mejor.semana.cerradas === 1 ? "cierre" : "cierres"}
+                {mejor.semana.muestra === "MINIMA" ? " (muestra mínima)" : ""}.
+              </p>
+              <ol>{oficina.reunion.map((e) => <li key={e.id}>{nombreCorto(e.agente)} · {r2(e.semana.neto)} · n={e.semana.cerradas}</li>)}</ol>
+            </>
+          ) : (
+            <p className="of-tenue">Nadie cerró operaciones en los últimos 7 días.</p>
+          )}
+          <h4>Propuestas para vos</h4>
+          {propias.length ? (
+            <ul>{propias.map((p) => <li key={`${p.quien}-${p.texto}`}><b>{nombreCorto(p.agente)}:</b> {p.texto}</li>)}</ul>
+          ) : (
+            <p className="of-tenue">Ningún agente llegó a 15 cierres: por ahora la única propuesta es seguir midiendo.</p>
+          )}
+          <p className="of-tenue">
+            Nada de esto se aplica solo: pausar o revisar un agente lo decidís vos, y un cambio de regla va por el laboratorio en
+            sombra. {oficina.sinMovimiento} agentes sin cierres esta semana.
+          </p>
+        </div>
+      </div>
 
       <div className="of-listas">
         <div>
@@ -195,22 +285,9 @@ export default function LabOficina() {
           )}
         </div>
         <div>
-          <h4>Reunión de la semana</h4>
-          {mejor ? (
-            <>
-              <p>
-                Mejor neto: <b>{nombreCorto(mejor.agente)}</b>, {r2(mejor.semana.neto)} con {mejor.semana.cerradas} {mejor.semana.cerradas === 1 ? "cierre" : "cierres"}
-                {mejor.semana.muestra === "MINIMA" ? " (muestra mínima: no alcanza para llamarlo campeón)" : ""}.
-              </p>
-              <ol>{oficina.reunion.map((e) => <li key={e.id}>{nombreCorto(e.agente)} · {r2(e.semana.neto)} · n={e.semana.cerradas}</li>)}</ol>
-            </>
-          ) : (
-            <p className="of-tenue">Nadie cerró operaciones en los últimos 7 días.</p>
-          )}
-          <p className="of-tenue">
-            {oficina.sinMovimiento} agentes sin cierres esta semana. La reunión no cambia reglas: los cambios los proponés y los aprobás
-            vos, a mano, en el laboratorio en sombra.
-          </p>
+          <h4>Lo que aprenden entre ellos</h4>
+          <p>{oficina.aprendizaje.texto}</p>
+          <p className="of-tenue">Cada agente decide solo, con su regla. Solo queda anotado con quién coincidió, para ver si coincidir ayuda.</p>
         </div>
       </div>
     </section>
