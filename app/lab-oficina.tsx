@@ -10,7 +10,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { forAi } from "../lib/ai-numbers.ts";
 import { ESTRATEGIAS } from "../lib/estrategias.ts";
-import { armarOficina, charla, MESAS, nombreActivo, propuestas, tituloSemana, type Escritorio, type FilaOficina, type Frase, type MesaId, type Oficina } from "../lib/oficina.ts";
+import { armarOficina, charla, MESAS, nombreActivo, oficinaParaIa, propuestas, tituloSemana, usdTxt, type Escritorio, type FilaOficina, type Frase, type MesaId, type Oficina } from "../lib/oficina.ts";
+import MiniArana from "./lab-mini-arana";
 
 type Plan = "SERVIDOR" | "CUENTA";
 type EstadoMoneda = { symbol: string; at: number; venue: string | null; registradas: number; avanzadas: number; error: string | null };
@@ -84,6 +85,56 @@ function Planta({ x, y }: { x: number; y: number }) {
   );
 }
 
+/** La curva de un capital simulado. Sin puntos suficientes, una raya: nada que mostrar todavía. */
+function Curva({ puntos, ancho = 220, alto = 56, etiqueta }: { puntos: number[]; ancho?: number; alto?: number; etiqueta: string }) {
+  if (puntos.length < 2) return <svg className="of-curva" viewBox={`0 0 ${ancho} ${alto}`} role="img" aria-label={`${etiqueta}: sin cierres todavía`}><line x1="0" y1={alto / 2} x2={ancho} y2={alto / 2} className="of-curva-base" /></svg>;
+  const min = Math.min(...puntos);
+  const max = Math.max(...puntos);
+  const rango = max - min || 1;
+  const xy = puntos.map((v, i) => `${((i / (puntos.length - 1)) * ancho).toFixed(1)},${(alto - 4 - ((v - min) / rango) * (alto - 8)).toFixed(1)}`);
+  const sube = puntos[puntos.length - 1] >= puntos[0];
+  const base = alto - 4 - ((puntos[0] - min) / rango) * (alto - 8);
+  return (
+    <svg className={`of-curva ${sube ? "of-curva-sube" : "of-curva-baja"}`} viewBox={`0 0 ${ancho} ${alto}`} role="img" aria-label={`${etiqueta}: de ${Math.round(puntos[0])} a ${Math.round(puntos[puntos.length - 1])} dólares simulados`}>
+      <line x1="0" y1={base} x2={ancho} y2={base} className="of-curva-base" />
+      <polyline points={xy.join(" ")} />
+    </svg>
+  );
+}
+
+/** JARVIS en la sala de reuniones: un holograma que proyecta la curva del fondo. */
+function Holograma({ puntos, activo, elegir }: { puntos: number[]; activo: boolean; elegir: () => void }) {
+  return (
+    <button type="button" className={`of-jarvis${activo ? " of-activo" : ""}`} onClick={elegir} aria-pressed={activo} aria-label="JARVIS: el fondo simulado y lo que aprende la oficina">
+      <span className="of-parado of-jarvis-pie">
+        <span className="of-jarvis-panel">
+          <Curva puntos={puntos} ancho={120} alto={46} etiqueta="Curva del fondo" />
+        </span>
+        <span className="of-jarvis-orbe" />
+        <span className="of-jarvis-haz" />
+      </span>
+    </button>
+  );
+}
+
+/** La araña en su tela, en la esquina de la pared: vigila la red de corridas del servidor. */
+function Arana({ activa, elegir, falla }: { activa: boolean; elegir: () => void; falla: boolean }) {
+  return (
+    <button type="button" className={`of-arana${activa ? " of-activo" : ""}${falla ? " of-arana-alerta" : ""}`} onClick={elegir} aria-pressed={activa} aria-label="La araña: cómo salió la última vuelta de cada moneda">
+      <svg viewBox="0 0 60 80" aria-hidden="true">
+        <g className="of-tela">
+          <path d="M0 0 L60 0 M0 0 L0 60 M0 0 L45 45 M0 0 L58 22 M0 0 L22 58" />
+          <path d="M0 14 Q 8 8 14 0 M0 28 Q 16 16 28 0 M0 42 Q 24 24 42 0" />
+        </g>
+        <line className="of-hilo" x1="30" y1="20" x2="30" y2="52" />
+        <g className="of-arana-cuerpo">
+          <MiniArana x={30} y={56} escala={1.2} activa />
+        </g>
+      </svg>
+    </button>
+  );
+}
+
 export default function LabOficina() {
   const [datos, setDatos] = useState<Respuesta | null>(null);
   const [plan, setPlan] = useState<Plan>("SERVIDOR");
@@ -131,41 +182,26 @@ export default function LabOficina() {
     return () => window.clearInterval(id);
   }, []);
 
-  /** Hablar con un agente: la misma IA que JARVIS, con sus datos; sin IA, responde con sus propias frases (motor local). */
-  async function preguntar(e: Escritorio) {
+  /**
+   * Hablar con alguien de la oficina (un agente o JARVIS): la misma IA que JARVIS, con sus datos y en primera persona. Sin IA,
+   * responde con lo que ya dice (motor local). Nadie cambia una regla ni da órdenes desde acá.
+   */
+  async function preguntar(quien: { id: string; nombre: string; instruccion: string; datos: unknown; local: string[] }) {
     const texto = pregunta.trim();
     if (!texto) return;
-    const anotar = (l: Linea) => setChat((c) => ({ ...c, [e.id]: [...(c[e.id] ?? []), l] }));
+    const anotar = (l: Linea) => setChat((c) => ({ ...c, [quien.id]: [...(c[quien.id] ?? []), l] }));
     anotar({ de: "vos", texto });
     setPregunta("");
     setPensando(true);
-    const propias = frases.filter((f) => f.quien === e.id).map((f) => f.texto);
-    const local = (por: string) => anotar({ de: "agente", texto: propias.length ? propias.join(" ") : "Todavía no tengo operaciones para contarte.", cerebro: `motor local (${por})` });
+    const local = (por: string) => anotar({ de: "agente", texto: quien.local.length ? quien.local.join(" ") : "Todavía no tengo datos para contarte.", cerebro: `motor local (${por})` });
     try {
-      const regla = ESTRATEGIAS.find((x) => x.id === e.id)?.regla ?? e.mira;
       const r = await fetch("/api/analyst/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo. Respondé en primera persona, corto y en español rioplatense, solo con tus datos (en el resumen, «agente»). Si un dato no está, decilo. No cambiás tu regla, no das órdenes y no es asesoramiento financiero. Pregunta: ${texto}`,
-          snapshot: {
-            asistente: "AGENTE DE LA OFICINA",
-            agente: forAi({
-              nombre: e.agente,
-              regla,
-              plan: plan === "SERVIDOR" ? "servidor 24/7, velas de Kraken, papel" : "tu cuenta, navegador, papel",
-              cerradas: e.total.cerradas,
-              acierto: e.total.winRate,
-              rPorOperacion: e.total.expectancia,
-              netoR: e.total.neto,
-              muestra: e.total.muestra,
-              semana: { cerradas: e.semana.cerradas, netoR: e.semana.neto },
-              abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`),
-              loQueDice: propias,
-              loQueAprendeLaOficina: oficina.aprendizaje.texto,
-            }),
-          },
-          history: (chat[e.id] ?? []).slice(-6).map((l) => ({ role: l.de === "vos" ? "user" : "assistant", content: l.texto })),
+          question: `${quien.instruccion} Respondé en primera persona, corto y en español rioplatense, solo con los datos del resumen. Si un dato no está, decilo. No cambiás reglas, no das órdenes y no es asesoramiento financiero. Pregunta: ${texto}`,
+          snapshot: { asistente: quien.nombre, datos: quien.datos },
+          history: (chat[quien.id] ?? []).slice(-6).map((l) => ({ role: l.de === "vos" ? "user" : "assistant", content: l.texto })),
         }),
       });
       if (r.status === 401) return local("iniciá sesión para la IA");
@@ -178,6 +214,60 @@ export default function LabOficina() {
       setPensando(false);
     }
   }
+
+  const planTxt = plan === "SERVIDOR" ? "servidor 24/7, velas de Kraken, papel" : "tu cuenta, navegador, papel";
+  const personaAgente = (e: Escritorio) => ({
+    id: e.id,
+    nombre: e.agente,
+    instruccion: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo.`,
+    local: frases.filter((f) => f.quien === e.id).map((f) => f.texto),
+    datos: forAi({
+      nombre: e.agente,
+      regla: ESTRATEGIAS.find((x) => x.id === e.id)?.regla ?? e.mira,
+      plan: planTxt,
+      cerradas: e.total.cerradas,
+      acierto: e.total.winRate,
+      rPorOperacion: e.total.expectancia,
+      muestra: e.total.muestra,
+      pnlSimuladoUsd: e.capital.netoUsd,
+      semana: { cerradas: e.semana.cerradas, netoR: e.semana.neto },
+      abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`),
+      comoSeVe: e.conciencia,
+      lecciones: e.lecciones.map((l) => l.texto),
+    }),
+  });
+  const personaJarvis = () => ({
+    id: "JARVIS",
+    nombre: "JARVIS",
+    instruccion: "Sos JARVIS y coordinás la oficina del fondo: ves a todos los agentes, el fondo simulado y lo que aprenden.",
+    local: [oficina.aprendizaje.texto, `El fondo simulado va ${usdTxt(oficina.fondo.netoUsd, true)} con ${oficina.fondo.cierres} cierres.`],
+    datos: oficinaParaIa(oficina, plan),
+  });
+
+  /** El chat de la ficha que esté abierta. */
+  const bloqueChat = (quien: ReturnType<typeof personaJarvis>) => (
+    <>
+      <div className="of-conversa" aria-live="polite">
+        {(chat[quien.id] ?? []).map((l, k) => (
+          <p key={k} className={`of-msg of-msg-${l.de}`}>
+            {l.texto}
+            {l.cerebro ? <small> · {l.cerebro}</small> : null}
+          </p>
+        ))}
+        {pensando && <p className="of-msg of-msg-agente of-tenue">Pensando…</p>}
+      </div>
+      <form
+        className="of-preguntar"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          void preguntar(quien);
+        }}
+      >
+        <input value={pregunta} onChange={(ev) => setPregunta(ev.target.value)} placeholder={`Preguntale a ${nombreCorto(quien.nombre)}…`} maxLength={300} aria-label={`Pregunta para ${quien.nombre}`} />
+        <button type="submit" disabled={pensando || !pregunta.trim()}>Preguntar</button>
+      </form>
+    </>
+  );
 
   const { puestos, filas, bloques } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
   const frases = charla(oficina);
@@ -211,6 +301,19 @@ export default function LabOficina() {
             ? `Corren solos en el servidor, con la app cerrada, sobre velas de 4 h de Kraken (otra serie que Binance: su medición arrancó de cero). Oro y plata no están acá: solo los da Binance.${ultimaVuelta ? ` Última vuelta: ${new Date(ultimaVuelta).toLocaleString("es-AR")}.` : " Todavía no corrió ninguna vuelta."}${fallas.length ? ` ${fallas.length} ${fallas.length === 1 ? "moneda no respondió" : "monedas no respondieron"}: ${fallas.map((f) => f.symbol.replace(/USDT$/, "")).join(", ")}.` : ""}`
             : "Tus agentes del navegador: corren con la app abierta, sobre velas de Binance, con oro y plata."}
         </p>
+        <div className="of-fondo">
+          <div>
+            <span className="of-fondo-titulo">Fondo simulado</span>
+            <b className={`of-fondo-pnl ${oficina.fondo.netoUsd > 0 ? "of-sube" : oficina.fondo.netoUsd < 0 ? "of-baja" : ""}`}>{usdTxt(oficina.fondo.netoUsd, true)}</b>
+            <span>
+              {usdTxt(oficina.fondo.inicialUsd)} → {usdTxt(oficina.fondo.actualUsd)} · {oficina.fondo.retornoPct >= 0 ? "+" : ""}
+              {oficina.fondo.retornoPct.toFixed(2).replace(".", ",")} %
+              {oficina.fondo.maxCaidaPct !== null ? ` · peor caída ${oficina.fondo.maxCaidaPct.toFixed(2).replace(".", ",")} %` : ""} · {oficina.fondo.cierres} cierres
+            </span>
+          </div>
+          <Curva puntos={oficina.fondo.curva} etiqueta="Curva del fondo simulado" />
+          <small className="of-tenue">Ficticio: USD 1.000 por agente y 1 % de riesgo por operación sobre sus resultados de papel. No es dinero real.</small>
+        </div>
         <label className="of-giro">
           Girar la vista
           <input type="range" min={-80} max={0} value={giro} onChange={(ev) => setGiro(Number(ev.target.value))} />
@@ -229,6 +332,7 @@ export default function LabOficina() {
             <Pizarra titulo="EN DIRECTO" filas={lineasDirecto} vacio="Sin posiciones abiertas" />
             <span className="of-ventana" aria-hidden="true" />
             <Pizarra titulo="REUNIÓN DE LA SEMANA" filas={lineasReunion} vacio="Nadie cerró en 7 días" />
+            <Arana activa={elegido === "ARANA"} elegir={() => setElegido(elegido === "ARANA" ? null : "ARANA")} falla={plan === "SERVIDOR" && fallas.length > 0} />
           </div>
           {bloques.map((b) => (
             <div key={b.mesa} className={`of-alfombra of-alf-${b.mesa.toLowerCase()}`} style={{ ["--y" as string]: b.y - 0.4, ["--alto" as string]: b.filas * 1.6 }}>
@@ -271,6 +375,7 @@ export default function LabOficina() {
           })}
           <div className="of-sala" style={{ ["--y" as string]: filas - 2.5 }}>
             <span className="of-mesa-redonda" />
+            <Holograma puntos={oficina.fondo.curva} activo={elegido === "JARVIS"} elegir={() => setElegido(elegido === "JARVIS" ? null : "JARVIS")} />
             {oficina.reunion.slice(0, 4).map((e, k) => (
               <span key={e.id} className="of-parado of-silla" style={{ ["--k" as string]: k }}>
                 <Persona tonoCamisa={tono(e)} />
@@ -306,7 +411,12 @@ export default function LabOficina() {
             <div><dt>Factor de ganancia</dt><dd>{n2(elegidoE.total.profitFactor)}</dd></div>
             <div><dt>Por operación</dt><dd>{r2(elegidoE.total.expectancia)}</dd></div>
             <div><dt>Semana</dt><dd>{elegidoE.semana.cerradas ? `${r2(elegidoE.semana.neto)} · n=${elegidoE.semana.cerradas}` : "sin cierres"}</dd></div>
+            <div>
+              <dt>PnL simulado</dt>
+              <dd className={elegidoE.capital.netoUsd > 0 ? "of-sube" : elegidoE.capital.netoUsd < 0 ? "of-baja" : ""}>{usdTxt(elegidoE.capital.netoUsd, true)}</dd>
+            </div>
           </dl>
+          <Curva puntos={elegidoE.capital.curva} etiqueta={`Capital simulado de ${elegidoE.agente}`} />
           {elegidoE.abiertas.length > 0 && (
             <p>Abiertas: {elegidoE.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}</p>
           )}
@@ -321,26 +431,57 @@ export default function LabOficina() {
               </li>
             ))}
           </ul>
-          <div className="of-conversa" aria-live="polite">
-            {(chat[elegidoE.id] ?? []).map((l, k) => (
-              <p key={k} className={`of-msg of-msg-${l.de}`}>
-                {l.texto}
-                {l.cerebro ? <small> · {l.cerebro}</small> : null}
-              </p>
-            ))}
-            {pensando && <p className="of-msg of-msg-agente of-tenue">Pensando…</p>}
-          </div>
-          <form
-            className="of-preguntar"
-            onSubmit={(ev) => {
-              ev.preventDefault();
-              void preguntar(elegidoE);
-            }}
-          >
-            <input value={pregunta} onChange={(ev) => setPregunta(ev.target.value)} placeholder={`Preguntale a ${nombreCorto(elegidoE.agente)}…`} maxLength={300} aria-label={`Pregunta para ${elegidoE.agente}`} />
-            <button type="submit" disabled={pensando || !pregunta.trim()}>Preguntar</button>
-          </form>
+          {bloqueChat(personaAgente(elegidoE))}
           <small>Papel, velas de 4 h{plan === "SERVIDOR" ? " de Kraken" : ""}. No es asesoramiento financiero.</small>
+        </article>
+      )}
+
+      {elegido === "JARVIS" && (
+        <article className="of-ficha of-ficha-jarvis" aria-live="polite">
+          <header>
+            <b>JARVIS</b>
+            <span>Coordina la oficina</span>
+          </header>
+          <p>Ve a todos los agentes, el fondo simulado y lo que aprenden. No opera ni cambia reglas: informa y te propone.</p>
+          <dl>
+            <div><dt>Fondo simulado</dt><dd>{usdTxt(oficina.fondo.actualUsd)}</dd></div>
+            <div><dt>PnL</dt><dd className={oficina.fondo.netoUsd > 0 ? "of-sube" : oficina.fondo.netoUsd < 0 ? "of-baja" : ""}>{usdTxt(oficina.fondo.netoUsd, true)}</dd></div>
+            <div><dt>Peor caída</dt><dd>{oficina.fondo.maxCaidaPct === null ? "—" : `${oficina.fondo.maxCaidaPct.toFixed(2).replace(".", ",")} %`}</dd></div>
+            <div><dt>Agentes con cierres</dt><dd>{oficina.ranking.length} de {oficina.escritorios.length}</dd></div>
+            <div><dt>Propuestas para vos</dt><dd>{propias.length}</dd></div>
+          </dl>
+          <Curva puntos={oficina.fondo.curva} ancho={320} alto={80} etiqueta="Curva del fondo simulado" />
+          <p className="of-dice">«{oficina.aprendizaje.texto}»</p>
+          {bloqueChat(personaJarvis())}
+          <small>El fondo es ficticio: USD 1.000 por agente y 1 % de riesgo por operación. No es asesoramiento financiero.</small>
+        </article>
+      )}
+
+      {elegido === "ARANA" && (
+        <article className="of-ficha" aria-live="polite">
+          <header>
+            <b>La araña</b>
+            <span>Vigila la red</span>
+          </header>
+          {plan === "SERVIDOR" ? (
+            <>
+              <p>Cada vela de 4 h el servidor recorre las monedas de a una. Así salió la última vuelta de cada una:</p>
+              {(datos?.servidor?.estado ?? []).length ? (
+                <ul className="of-lecciones">
+                  {[...(datos?.servidor?.estado ?? [])].sort((a, b) => a.symbol.localeCompare(b.symbol)).map((e) => (
+                    <li key={e.symbol}>
+                      <b>{nombreActivo(e.symbol)}</b> · {new Date(e.at).toLocaleString("es-AR")} ·{" "}
+                      {e.error ? <span className="of-baja">no respondió ({e.error})</span> : `${e.venue === "KRAKEN" ? "Kraken" : e.venue}: ${e.registradas} entradas nuevas, ${e.avanzadas} avances`}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="of-tenue">Todavía no corrió ninguna vuelta: la primera es al cerrar la próxima vela de 4 h.</p>
+              )}
+            </>
+          ) : (
+            <p>En tu cuenta, la red la teje tu navegador: los agentes corren mientras la app está abierta y visible.</p>
+          )}
         </article>
       )}
 
@@ -350,7 +491,7 @@ export default function LabOficina() {
         {oficina.ranking.length ? (
           <table className="of-tabla">
             <thead>
-              <tr><th>Agente</th><th>Cierres</th><th>Acierto (IC 90 %)</th><th>PF</th><th>Por op.</th></tr>
+              <tr><th>Agente</th><th>Cierres</th><th>Acierto (IC 90 %)</th><th>PF</th><th>Por op.</th><th>PnL simulado</th></tr>
             </thead>
             <tbody>
               {oficina.ranking.map((e) => (
@@ -363,6 +504,7 @@ export default function LabOficina() {
                   </td>
                   <td>{n2(e.total.profitFactor)}</td>
                   <td>{r2(e.total.expectancia)}</td>
+                  <td className={e.capital.netoUsd > 0 ? "of-sube" : e.capital.netoUsd < 0 ? "of-baja" : ""}>{usdTxt(e.capital.netoUsd, true)}</td>
                 </tr>
               ))}
             </tbody>

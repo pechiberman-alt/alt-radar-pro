@@ -109,3 +109,33 @@ test("el plan del servidor: lee sus claves, no tiene el agente ST, y habla por T
   assert.deepEqual(parseCommand("/oficina"), { cmd: "oficina", arg: "" });
   assert.deepEqual(parseCommand("/agente amd"), { cmd: "agente", arg: "amd" });
 });
+
+test("PnL simulado: USD 1.000 por agente y 1 % por operación, como el registro; el fondo suma a todos y su curva va en orden de cierre", async () => {
+  const { usdTxt, textoOficinaTelegram } = await import("../lib/oficina.ts");
+  const { CAPITAL_INICIAL_USD, RIESGO_POR_OPERACION_PCT } = await import("../lib/registro.ts");
+  const uno = (CAPITAL_INICIAL_USD * RIESGO_POR_OPERACION_PCT) / 100;
+  const filas = [
+    f("sv:RSI:BTCUSDT:4h:LONG:1", "TP3", 2, 3 * H),
+    f("sv:MACD:BTCUSDT:4h:LONG:2", "SL", -1, 2 * H),
+    f("sv:RSI:ETHUSDT:4h:LONG:3", "SL", -1, H),
+    f("sv:RSI:SOLUSDT:4h:LONG:4", "ABIERTA", null, null),
+  ];
+  const o = armarOficina(filas, AHORA, "SERVIDOR");
+  const rsi = o.escritorios.find((e) => e.id === "RSI")!;
+  assert.equal(rsi.capital.netoUsd, 1 * uno, "2 − 1 = 1 R");
+  assert.equal(rsi.capital.actualUsd, CAPITAL_INICIAL_USD + uno);
+  assert.equal(o.fondo.agentes, o.escritorios.length);
+  assert.equal(o.fondo.inicialUsd, o.escritorios.length * CAPITAL_INICIAL_USD);
+  assert.equal(o.fondo.netoUsd, 0, "RSI +1 R y MACD −1 R");
+  assert.equal(o.fondo.cierres, 3, "la abierta no cuenta");
+  const i = o.fondo.inicialUsd;
+  assert.deepEqual(o.fondo.curva, [i, i + 2 * uno, i + uno, i], "en el orden en que cerraron");
+  assert.equal(o.fondo.maxCaidaUsd, 2 * uno);
+  assert.match(textoOficinaTelegram(o), /Fondo simulado/);
+  assert.equal(usdTxt(1234.5, true), "+USD 1.234,50");
+  assert.equal(usdTxt(-10, true), "−USD 10,00");
+  const vacia = armarOficina(null, AHORA, "SERVIDOR");
+  assert.equal(vacia.fondo.cierres, 0);
+  assert.equal(vacia.fondo.maxCaidaPct, null, "sin cierres no hay caída: desconocido, no cero");
+});
+
