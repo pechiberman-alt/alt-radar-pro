@@ -371,9 +371,9 @@
 
 /* ── Zonas de reversión ── */
 .liq-rev{stroke-width:1;stroke-dasharray:4 3}
-.liq-rev.up{fill:rgba(57,242,154,.07);stroke:rgba(57,242,154,.55)}
-.liq-rev.down{fill:rgba(255,89,100,.07);stroke:rgba(255,89,100,.55)}
-.liq-rev-label{font:9px var(--font-mono);letter-spacing:.4px}
+.liq-rev.up{fill:rgba(57,242,154,.12);stroke:rgba(57,242,154,.7)}
+.liq-rev.down{fill:rgba(255,89,100,.12);stroke:rgba(255,89,100,.7)}
+.liq-rev-label{font:600 9.5px var(--font-mono);letter-spacing:.4px;paint-order:stroke;stroke:#050b14;stroke-width:3px}
 .liq-rev-label.up{fill:var(--green)}.liq-rev-label.down{fill:var(--red)}
 
 /* ── Wyckoff ── */
@@ -739,3 +739,4 @@
 .mg-row.down .mg-bar i{background:linear-gradient(90deg,#5a1e24,#ff5964)}
 .mg-row.up .mg-bar i{background:linear-gradient(90deg,#1f4d38,#39f29a)}
 .mg-list .mg-row em{grid-column:3;grid-row:2;font:normal 9px var(--font-mono);color:var(--muted);white-space:nowrap}
+
