@@ -143,8 +143,8 @@ af77131cadb2	27	app/lab-mini-arana.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
 be29e9072c2e	133	app/layout.tsx
-29692a8ad894	742	app/liquidation-heatmap-desk.css
-163457f406a6	4227	app/liquidation-heatmap-desk.tsx
+fe4bed636486	743	app/liquidation-heatmap-desk.css
+823a71d0c75f	4246	app/liquidation-heatmap-desk.tsx
 39b0534ede8e	3145	app/live-bookmap.tsx
 4fb2595a8caa	4	app/market-brain.css
 db0be99a3f89	499	app/market-brain.tsx
@@ -389,7 +389,7 @@ bb49b1192e80	96	lib/preregistro-flujo.ts
 edbca7d4a3ce	195	lib/registro-db.ts
 62a90a1d0b2d	43	lib/registro-run.ts
 1c7681695bb8	272	lib/registro.ts
-efc446c0f3ed	90	lib/reversal-zones.ts
+94c18816a5e3	95	lib/reversal-zones.ts
 bc992c13bd28	130	lib/risk-calc.ts
 00e3d377935b	129	lib/robot-ledger-db.ts
 c5570578ba7f	168	lib/robot-ledger.ts
@@ -510,7 +510,7 @@ c230ab327c5d	127	tests/binance-import.test.ts
 bee17b9c8ee8	120	tests/bot-journal.test.ts
 4cf0e9d5e358	122	tests/breaker-blocks.test.ts
 5f0e5f698da3	174	tests/breaker-busqueda.test.ts
-0c6817af6bb4	138	tests/chart-patterns.test.ts
+d54fc2ec5b6e	154	tests/chart-patterns.test.ts
 525800a5a3c7	76	tests/consenso.test.ts
 e954e10a7eec	85	tests/cost-basis.test.ts
 6cc784f01e52	156	tests/dca-tracker.test.ts

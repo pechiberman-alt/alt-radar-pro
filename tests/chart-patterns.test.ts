@@ -135,3 +135,19 @@ test("a zone price sits inside is skipped; resistance and support are split", ()
   assert.equal(zones.length, 1);
   assert.equal(zones[0].side, "RESISTENCIA");
 });
+
+test("fillSides: a side without confluence gets its best single-reason level, named as one reason", () => {
+  const atoms = [
+    { kind: "liquidez", low: 95, high: 95, weight: 1 },
+    { kind: "order block", low: 94.8, high: 95.3, weight: 1 },
+    { kind: "order block", low: 108, high: 108.4, weight: 1 },
+    { kind: "liquidez", low: 104, high: 104, weight: 1.5 },
+  ];
+  assert.equal(findReversalZones(100, atoms).length, 1, "without the option, one reason is not a zone");
+  const zones = findReversalZones(100, atoms, { fillSides: true });
+  assert.deepEqual(zones.map((z) => z.side), ["RESISTENCIA", "SOPORTE"]);
+  const sell = zones[0];
+  assert.deepEqual(sell.kinds, ["liquidez"], "the heavier single reason wins");
+  assert.equal(sell.stars, 1, "one reason is one star, whatever its weight");
+  assert.equal(zones[1].kinds.length, 2, "a side with confluence keeps only its confluence");
+});

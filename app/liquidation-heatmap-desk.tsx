@@ -101,10 +101,11 @@ const LV_HORIZON = 24;
 /**
  * What someone starting out sees: price, the nearest floors and ceilings,
  * where the liquidation fuel sits (the side profile, without the coloured
- * columns), the trend, volume and one measured setup. Everything else is one
- * click away, and leaving the mode restores the layers that were on before.
+ * columns), the trend, volume, one measured setup and the buy and sell zones.
+ * Everything else is one click away, and leaving the mode restores the layers
+ * that were on before.
  */
-const SIMPLE_ON = new Set(["sr", "liqvol", "calor", "tendencia", "volumen"]);
+const SIMPLE_ON = new Set(["sr", "liqvol", "calor", "tendencia", "volumen", "reversion"]);
 /**
  * Fewer layers on by default. Order blocks, gaps and Fibonacci are the noisiest
  * and their levels already feed the reversal zones, so a reader who never
@@ -143,7 +144,8 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["idm", "INDUCCIÓN"],
   ["robot", "ROBOT MM"],
   ["calor", "CALOR"],
-  ["reversion", "REVERSIÓN"],
+  // The key stays "reversion" so saved layer choices keep working.
+  ["reversion", "COMPRA / VENTA"],
   ["patrones", "PATRONES"],
   ["tendencia", "TENDENCIA"],
   ["liquidez", "LIQUIDEZ"],
@@ -1401,7 +1403,8 @@ export default function LiquidationHeatmapDesk() {
   // The level engine: structure on this and the larger frames, day and week
   // references, volume profile, round numbers and liquidity, grouped and scored.
   const levelInput = useMemo(() => {
-    if (!layers.sr || scalpSeries.length < 30) return null;
+    // Also built for the buy/sell zones: day and week references are one of their reasons.
+    if (!(layers.sr || layers.reversion) || scalpSeries.length < 30) return null;
     const frameMs = FRAME_MS[timeframe] ?? 3_600_000;
     return {
       current: { frame: timeframe, candles: scalpSeries, frameMs, weight: 1 },
@@ -1409,7 +1412,7 @@ export default function LiquidationHeatmapDesk() {
       daily,
       span: ["1m", "3m", "5m", "15m", "30m"].includes(timeframe) ? 5 : 3,
     };
-  }, [layers.sr, scalpSeries, timeframe, htfCandles, daily]);
+  }, [layers.sr, layers.reversion, scalpSeries, timeframe, htfCandles, daily]);
   const levels = useMemo<Level[]>(() => {
     if (!levelInput) return [];
     const last = scalpSeries[scalpSeries.length - 1];
@@ -1425,7 +1428,7 @@ export default function LiquidationHeatmapDesk() {
     return buildLevels([...sourcesAt({ ...levelInput, now }), ...liquidity], last.close, atrOf(scalpSeries), { perSide: 4 });
   }, [levelInput, scalpSeries, data, htfPools]);
   // Does it work here? The engine replayed on this coin's own history.
-  const levelReplay = useMemo(() => (levelInput && scalpSeries.length >= 200 ? replayLevels(levelInput) : null), [levelInput, scalpSeries.length]);
+  const levelReplay = useMemo(() => (layers.sr && levelInput && scalpSeries.length >= 200 ? replayLevels(levelInput) : null), [layers.sr, levelInput, scalpSeries.length]);
   const levelTag = (l: Level) => l.sources.slice(0, 3).map((x) => x.kind).join(" + ");
 
   // LIQ+VOL, with the liquidation model's flush when the model is loaded,
@@ -1580,19 +1583,24 @@ export default function LiquidationHeatmapDesk() {
         }
       }
     }
-    return findReversalZones(p, atoms).filter((z) => z.high >= layout.lo && z.low <= layout.hi);
-  }, [layout, livePrice, pools, orderBlocks, breakerBlocks, gaps, fibZone, wyckoff]);
+    // Key levels (structure, day and week references, volume profile, round numbers) count once per level, as one kind:
+    // their liquidity sources are already in as pools and magnets, so they are left out here to not count twice.
+    for (const l of levels) {
+      if (l.sources.some((x) => x.kind !== "IMÁN" && !x.kind.startsWith("POOL"))) atoms.push({ kind: "nivel clave", weight: 1, low: l.low, high: l.high });
+    }
+    return findReversalZones(p, atoms, { fillSides: true }).filter((z) => z.high >= layout.lo && z.low <= layout.hi);
+  }, [layout, livePrice, pools, orderBlocks, breakerBlocks, gaps, fibZone, wyckoff, levels]);
 
   const labelSlots = useMemo(() => {
-    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), breaker: new Set<number>(), gap: new Set<number>(), rev: new Set<number>(), fib: [] as { y: number; text: string }[], wy: false, flag: new Set<string>() };
+    if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), breaker: new Set<number>(), gap: new Set<number>(), rev: new Set<number>(), revBelow: new Set<number>(), fib: [] as { y: number; text: string }[], wy: false, flag: new Set<string>() };
     const MIN_GAP_PX = 15;
     const taken: number[] = [];
-    const claim = (price: number) => {
-      const y = layout.y(price);
+    const claimY = (y: number) => {
       if (taken.some((other) => Math.abs(other - y) < MIN_GAP_PX)) return false;
       taken.push(y);
       return true;
     };
+    const claim = (price: number) => claimY(layout.y(price));
 
     // Magnet lines are claimed first: they are the levels the panel's own
     // summary cards name, so losing their caption would contradict the cards.
@@ -1602,10 +1610,15 @@ export default function LiquidationHeatmapDesk() {
 
     // Reversal zones next: they are the synthesis, the level a reader most
     // needs named. Hidden layers claim nothing, so turning one off frees space.
+    // The S/R captions are always drawn (x past the magnet captions), so their lines are taken for the zone names.
+    if (layers.sr) for (const l of levels) taken.push(layout.y(l.price) - 3);
+    // A buy or sell zone is what the reader asked to see marked: if the line above the band is taken, its name goes below it.
     const rev = new Set<number>();
+    const revBelow = new Set<number>();
     if (layers.reversion) {
       for (const [i, z] of [...reversalZones.entries()].sort((a, b) => b[1].score - a[1].score)) {
         if (claim(z.high)) rev.add(i);
+        else if (claimY(layout.y(z.low) + 14)) revBelow.add(i);
       }
     }
     // Patterns next: the Wyckoff title sits under its box, flag titles at their
@@ -1652,8 +1665,8 @@ export default function LiquidationHeatmapDesk() {
         }, []);
       for (const m of merged) if (claim(m.price)) fib.push({ y: layout.y(m.price), text: m.text });
     }
-    return { pool, ob, breaker, gap, rev, fib, wy, flag };
-  }, [layout, pools, orderBlocks, breakerBlocks, gaps, reversalZones, fibZone, layers, wyckoff, flags]);
+    return { pool, ob, breaker, gap, rev, revBelow, fib, wy, flag };
+  }, [layout, pools, orderBlocks, breakerBlocks, gaps, reversalZones, fibZone, layers, wyckoff, flags, levels]);
 
   const keyLevels = useMemo(() => {
     if (!layout) return [];
@@ -1986,7 +1999,7 @@ export default function LiquidationHeatmapDesk() {
                 </span>
               )}
               <span className={reversalZones.length ? "rev" : "none"}>
-                REVERSIÓN · {reversalZones.filter((z) => z.side === "SOPORTE").length}↑ {reversalZones.filter((z) => z.side === "RESISTENCIA").length}↓
+                ZONAS · {reversalZones.filter((z) => z.side === "SOPORTE").length} de compra · {reversalZones.filter((z) => z.side === "RESISTENCIA").length} de venta
               </span>
             </div>
           )}
@@ -2320,9 +2333,9 @@ export default function LiquidationHeatmapDesk() {
                   return (
                     <g key={`rev-${i}`}>
                       <rect x={MARGIN.left} y={top} width={layout.candleAreaW} height={h} className={`liq-rev ${cls}`} />
-                      {labelSlots.rev.has(i) && (
-                        <text x={MARGIN.left + 5} y={top - 3} className={`liq-rev-label ${cls}`}>
-                          {"★".repeat(z.stars)} {z.side === "SOPORTE" ? "REVERSIÓN ↑" : "REVERSIÓN ↓"}
+                      {(labelSlots.rev.has(i) || labelSlots.revBelow.has(i)) && (
+                        <text x={MARGIN.left + 5} y={labelSlots.rev.has(i) ? top - 3 : top + h + 11} className={`liq-rev-label ${cls}`}>
+                          {"★".repeat(z.stars)} {z.side === "SOPORTE" ? "ZONA DE COMPRA" : "ZONA DE VENTA"}{z.kinds.length < 2 ? " (1 motivo)" : ""} {priceLabel(z.low)}–{priceLabel(z.high)}
                         </text>
                       )}
                     </g>
@@ -3469,19 +3482,25 @@ export default function LiquidationHeatmapDesk() {
               that also hid the candles. In a list each line has its own row. */}
           {(reversalZones.length > 0 || flags.length > 0 || wyckoff) && (
             <div className="liq-patterns">
-              <h4>PATRONES Y ZONAS DE REVERSIÓN</h4>
+              <h4>ZONAS DE COMPRA Y DE VENTA, Y PATRONES</h4>
 
               {reversalZones.length > 0 && (
                 <div className="pt-block">
-                  <span className="pt-sub">MEJORES ZONAS DE REVERSIÓN · por confluencia</span>
+                  <span className="pt-sub">ZONAS DE COMPRA Y DE VENTA · por confluencia de detectores</span>
                   {reversalZones.map((z, i) => (
                     <div key={`rz-${i}`} className={`pt-row ${z.side === "SOPORTE" ? "up" : "down"}`}>
                       <b>{"★".repeat(z.stars)}</b>
                       <u>{priceLabel(z.low)}–{priceLabel(z.high)}</u>
-                      <em>{z.side.toLowerCase()} · a {z.distancePct.toFixed(2)}%</em>
-                      <small>{z.kinds.join(" + ")}</small>
+                      <em>{z.side === "SOPORTE" ? "zona de compra" : "zona de venta"} · a {z.distancePct.toFixed(2).replace(".", ",")} %</em>
+                      <small>{z.kinds.length < 2 ? `${z.kinds[0]} · un solo motivo, sin confluencia` : z.kinds.join(" + ")}</small>
                     </div>
                   ))}
+                  <p className="pt-note">
+                    Zona de compra: debajo del precio, donde varios detectores esperan que aparezcan compradores. Zona de venta: arriba, donde
+                    esperan vendedores. Más estrellas, más razones distintas en el mismo precio; si de un lado
+                    no hay confluencia, se marca el mejor nivel de un solo motivo y se dice. No es una orden ni una garantía de giro: si una
+                    vela cierra del otro lado, la zona deja de valer. No es asesoramiento financiero.
+                  </p>
                 </div>
               )}
 
