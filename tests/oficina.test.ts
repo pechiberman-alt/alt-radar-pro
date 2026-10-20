@@ -58,3 +58,28 @@ test("los metales se nombran por su nombre", () => {
   assert.equal(nombreActivo("XAGUSDT"), "Plata");
   assert.equal(nombreActivo("SOLUSDT"), "SOL");
 });
+
+test("la charla sale de los datos: coincidencias, desacuerdos y resultados con su muestra; nadie inventa", async () => {
+  const { charla, propuestas, acuerdoDe, tituloSemana } = await import("../lib/oficina.ts");
+  const ab = (est: string, symbol: string, lado: string, n: number): FilaOficina => ({ clave: `ag:${est}:${symbol}:4h:${lado}:${n}`, symbol, lado, r: null, desenlace: "ABIERTA", cerrada: null, detectada: AHORA - n });
+  const filas = [
+    ab("MACD", "TRXUSDT", "SHORT", 1), ab("RETROCESO", "TRXUSDT", "SHORT", 2),
+    ab("RSI", "BCHUSDT", "LONG", 3), ab("SNR", "BCHUSDT", "SHORT", 4),
+    ...Array.from({ length: 15 }, (_, k) => ({ ...f(`ag:BOLLINGER:BTCUSDT:4h:LONG:${10 + k}`, "SL", -1, H), foto: JSON.stringify({ acuerdo: k % 2, contra: 0, con: [] }) })),
+  ];
+  const o = armarOficina(filas, AHORA);
+  const frases = charla(o);
+  assert.ok(frases.some((x) => x.tipo === "acuerdo" && x.texto.includes("TRX corto")));
+  assert.ok(frases.some((x) => x.tipo === "debate" && x.texto.includes("BCH")));
+  assert.ok(frases.some((x) => x.quien === "BOLLINGER" && x.texto.includes("15 cierres") && x.texto.includes("Que me revisen")));
+  assert.ok(frases.some((x) => x.quien === "JARVIS" && x.tipo === "aprendizaje"));
+  // Con 15 cierres perdedores hay propuesta para la persona; nunca se aplica sola (es solo texto).
+  assert.deepEqual(propuestas(o).map((p) => p.quien), ["BOLLINGER"]);
+  // El consenso: 8 solitarias y 7 acompañadas no alcanzan la muestra mínima de cada lado.
+  assert.equal(o.aprendizaje.muestraMinima, true);
+  assert.equal(acuerdoDe('{"acuerdo":2}'), 2);
+  assert.equal(acuerdoDe("{}"), null);
+  assert.equal(acuerdoDe("no es json"), null);
+  const perdedor = o.escritorios.find((e) => e.id === "BOLLINGER")!;
+  assert.match(tituloSemana(perdedor), /menos perdió/);
+});
