@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 646 · objetivos: 18 · sin objetivo: 0
+- Archivos: 648 · objetivos: 18 · sin objetivo: 0
 - Tablas D1: 52 · secretos: 5 · variables de entorno: 25 · rutas /api: 56 · hosts: 58
-- Código de navegador: 69 archivos con "use client" que alcanzan 212 · problemas: 0
-- Lib sin prueba directa: 26 de 207
+- Código de navegador: 69 archivos con "use client" que alcanzan 213 · problemas: 0
+- Lib sin prueba directa: 26 de 208
 
 ## Objetivos
 
@@ -410,7 +410,7 @@ Pendiente: Entrar al registro unificado (FUENTES y lib/registro-db.ts) cuando un
 - `tests/axi-db.test.ts` — Pruebas del almacenamiento del diario de Axi (lib/axi-db.ts): que importar dos veces no duplique, que cada persona vea solo lo suyo, que el tope de 500 se cumpla sin COUNT(*) y que
 - `tests/axi-diario.test.ts` — Pruebas del diario de Axi (lib/axi-diario.ts): que cada ejecución del conector se valide o se rechace con su motivo, que un dato faltante no se complete con cero, que el neto sea p
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (68)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (70)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -432,6 +432,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `docs/estudio-axi.md` — Estudio de Axi: oro y NASDAQ
 - `docs/estudio-estrategias.md` — Estudio de estrategias del AI TRADING LAB
 - `lib/agentes-explicado.ts` — Qué mira cada agente, en palabras de todos los días.
+- `lib/agentes-mente.ts` — La «mente» de cada agente de la oficina: identidad, memoria, lecciones, autoevaluación y conversaciones entre ellos.
 - `lib/agentes-papel.ts` — Todos los agentes del estudio corriendo hacia adelante en papel (PLAN_AGENTES_1).
 - `lib/agentes-servidor-db.ts` — La base de los agentes de papel del servidor (PLAN_SERVIDOR_1, lib/agentes-servidor.ts): una tabla global (no es de ninguna cuenta), con índice por moneda y estado para leer las ab
 - `lib/agentes-servidor-run.ts` — La corrida del cron de los agentes del servidor (lib/agentes-servidor.ts): a la moneda de turno le trae las velas de 4 h de Kraken (nunca de Binance, para que la serie no cambie),
@@ -462,6 +463,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/sobreajuste.ts` — Auditoría de sobreajuste: cuánto de un buen resultado puede ser suerte por haber probado muchas variantes.
 - `lib/universos.ts` — Los universos de monedas: grupos con los que trabajan los agentes (gemas, pumpeo, infraestructura y DeFi, las 10 del estudio).
 - `tests/agentes-explicado.test.ts` — Pruebas de las explicaciones de los agentes (lib/agentes-explicado.ts): que todos los agentes del estudio tengan la suya, que estén en castellano simple y que ninguna prometa ganan
+- `tests/agentes-mente.test.ts` — Pruebas de la mente de los agentes (lib/agentes-mente.ts): las lecciones salen de sus cierres con su muestra y solo son firmes con 15 casos de cada lado; la autoevaluación dice que
 - `tests/agentes-papel.test.ts` — Pruebas de los agentes en papel (lib/agentes-papel.ts): que no se mire el futuro, que la entrada sea la apertura siguiente con la escalera completa, que la clave no duplique entrad
 - `tests/agentes-servidor.test.ts` — Pruebas de los agentes de papel del servidor (lib/agentes-servidor.ts): el turno de cada moneda, la clave, que las entradas son las mismas de los agentes del navegador y no miran e
 - `tests/amd-ifvg.test.ts` — Pruebas del agente AMD + IFVG (lib/amd-ifvg.ts): el patrón completo dispara en la vela del IFVG con su stop y objetivo, el corto es el espejo, un rango alto no es acumulación, y ni

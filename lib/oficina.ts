@@ -14,6 +14,7 @@ import { explicadoDe } from "./agentes-explicado.ts";
 import { leerClavePapel } from "./agentes-papel.ts";
 import { leerClaveServidor } from "./agentes-servidor.ts";
 import { forAi } from "./ai-numbers.ts";
+import { acuerdoDe, concienciaDe, conversaciones, leccionesDe, type Dialogo, type Leccion } from "./agentes-mente.ts";
 import { compararConsenso, type Comparacion, type ResultadoConsenso } from "./consenso.ts";
 import { ESTRATEGIAS } from "./estrategias.ts";
 import { contar, estadistica, MUESTRA_MINIMA, type Estadistica, type OperacionLeida } from "./registro.ts";
@@ -23,6 +24,8 @@ export const LIMITE_OFICINA = 1000;
 export const SEMANA_MS = 7 * 86_400_000;
 /** El agente Supertrend MTF + Volumen con su filtro de régimen de BTC (PLAN_ST_1): corre aparte, con claves «st:». */
 export const ID_ST = "ST_REGIMEN";
+
+export { acuerdoDe } from "./agentes-mente.ts";
 
 export type FilaOficina = { clave: string; symbol: string; lado: string; r: number | null; desenlace: string; cerrada: number | null; detectada: number; foto?: string | null };
 
@@ -55,6 +58,10 @@ export type Escritorio = {
   /** Lo cerrado en los últimos 7 días. */
   semana: Estadistica;
   abiertas: Abierta[];
+  /** Lo que aprendió de sus cierres: se recalcula con cada cierre; nunca cambia su regla. */
+  lecciones: Leccion[];
+  /** Lo que sabe y no sabe de sí mismo, según su muestra. */
+  conciencia: string;
 };
 
 export type Oficina = {
@@ -68,6 +75,10 @@ export type Oficina = {
   sinDatos: boolean;
   /** Lo que aprenden entre ellos: entradas acompañadas contra solitarias, con muestra mínima. */
   aprendizaje: Comparacion;
+  /** Conversaciones entre agentes, armadas con sus datos. */
+  conversaciones: Dialogo[];
+  /** Los que tienen cierres, ordenados por el piso del intervalo de su acierto (premia la muestra, no la suerte). */
+  ranking: Escritorio[];
 };
 
 /** De qué agente es una entrada; null si la clave no tiene una forma conocida. */
@@ -100,12 +111,16 @@ export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "
   const escritorios: Escritorio[] = plantel(plan === "CUENTA").map((p) => {
     const suyas = por.get(p.id) ?? [];
     const semana = suyas.filter((f) => f.desenlace !== "ABIERTA" && typeof f.cerrada === "number" && f.cerrada >= desde && f.cerrada <= ahora);
+    const total = estadistica(contar(suyas.map(leida)));
+    const lecciones = leccionesDe(suyas);
     return {
       ...p,
       mesa: mesaDe(p.id),
-      total: estadistica(contar(suyas.map(leida))),
+      total,
       semana: estadistica(contar(semana.map(leida))),
       abiertas: suyas.filter((f) => f.desenlace === "ABIERTA").map((f) => ({ symbol: f.symbol, lado: f.lado, detectada: f.detectada })),
+      lecciones,
+      conciencia: concienciaDe(p.agente, mesaDe(p.id), total, lecciones),
     };
   });
   const reunion = escritorios.filter((e) => e.semana.cerradas > 0).sort((a, b) => b.semana.neto - a.semana.neto || a.agente.localeCompare(b.agente));
@@ -115,7 +130,12 @@ export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "
     const acuerdo = acuerdoDe(f.foto);
     if (acuerdo !== null) conConsenso.push({ acuerdo, r: f.r });
   }
+  const ranking = escritorios
+    .filter((e) => e.total.cerradas > 0)
+    .sort((a, b) => (b.total.intervalo?.low ?? 0) - (a.total.intervalo?.low ?? 0) || b.total.cerradas - a.total.cerradas);
   return {
+    conversaciones: filas === null ? [] : conversaciones(escritorios),
+    ranking,
     aprendizaje: compararConsenso(conConsenso),
     escritorios,
     reunion,
@@ -128,16 +148,6 @@ export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "
 /** Cómo se nombra un activo en la oficina: los metales por su nombre, la cripto por su ticker. */
 export const nombreActivo = (symbol: string): string => (symbol === "XAUUSDT" ? "Oro" : symbol === "XAGUSDT" ? "Plata" : symbol.replace(/USDT$/, ""));
 
-/** Con cuántos coincidió una entrada, leído de su foto de consenso; null si la foto no lo trae (no se supone cero). */
-export function acuerdoDe(foto: string | null | undefined): number | null {
-  if (!foto) return null;
-  try {
-    const o = JSON.parse(foto) as { acuerdo?: unknown };
-    return typeof o.acuerdo === "number" && Number.isInteger(o.acuerdo) && o.acuerdo >= 0 ? o.acuerdo : null;
-  } catch {
-    return null;
-  }
-}
 
 const lado = (l: string) => (l === "LONG" ? "largo" : "corto");
 const r2 = (v: number) => `${v > 0 ? "+" : ""}${(Math.round(v * 100) / 100 || 0).toFixed(2).replace(".", ",")} R`;
@@ -215,11 +225,16 @@ export function oficinaParaIa(o: Oficina, plan: "CUENTA" | "SERVIDOR") {
     escritorios: activos.slice(0, 20).map((e) => ({
       agente: e.agente,
       cerradas: e.total.cerradas,
+      aciertoPct: e.total.winRate === null ? null : Math.round(e.total.winRate * 1000) / 10,
+      aciertoIc90Pct: e.total.intervalo ? [Math.round(e.total.intervalo.low * 1000) / 10, Math.round(e.total.intervalo.high * 1000) / 10] : null,
       netoR: Math.round(e.total.neto * 100) / 100,
       rPorOperacion: e.total.expectancia === null ? null : Math.round(e.total.expectancia * 1000) / 1000,
       muestra: e.total.muestra === "MINIMA" ? "muestra mínima (menos de 15)" : e.total.muestra === "SIN DATOS" ? "sin cierres" : "razonable",
       abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`),
+      lecciones: e.lecciones.map((l) => `${l.texto}${l.firme ? " (firme)" : ""}`),
+      comoSeVe: e.conciencia,
     })),
+    conversaciones: o.conversaciones.map((d) => `${d.tema}: ${d.lineas.map((l) => `${l.nombre}: ${l.texto}`).join(" / ")}`),
     charla: charla(o).slice(0, 12).map((f) => `${f.nombre}: ${f.texto}`),
     aprendizaje: o.aprendizaje.texto,
     propuestas: propuestas(o).map((p) => `${corto(p.agente)}: ${p.texto}`),
@@ -242,6 +257,9 @@ export function textoOficinaTelegram(o: Oficina, estado: { error: string | null 
     mejor
       ? `<b>Reunión de la semana</b>\n${tituloSemana(mejor)}: ${esc(corto(mejor.agente))}, ${r2(mejor.semana.neto)} con ${mejor.semana.cerradas} ${mejor.semana.cerradas === 1 ? "cierre" : "cierres"}${mejor.semana.muestra === "MINIMA" ? " (muestra mínima)" : ""}.`
       : "<b>Reunión de la semana</b>\nNadie cerró en 7 días.",
+    o.ranking.length
+      ? `<b>Acierto de cada uno</b> (ordenado por el piso del intervalo)\n${o.ranking.slice(0, 8).map((e) => `• ${esc(corto(e.agente))}: ${e.total.winRate === null ? "—" : `${Math.round(e.total.winRate * 100)} %`} · n=${e.total.cerradas}${e.total.muestra === "MINIMA" ? " (muestra mínima)" : ""} · ${r2(e.total.expectancia ?? 0)} por op.`).join("\n")}`
+      : "<b>Acierto de cada uno</b>\nNadie cerró todavía.",
     `<b>Lo que aprenden</b>\n${esc(o.aprendizaje.texto)}`,
   ];
   const props = propuestas(o);
@@ -272,6 +290,8 @@ export function textoAgenteTelegram(o: Oficina, nombre: string): string {
       : "Todavía sin cierres.",
     e.abiertas.length ? `Abiertas: ${e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}` : "Sin posiciones abiertas.",
     ...dice,
+    `<b>Cómo se ve</b>\n${esc(e.conciencia)}`,
+    ...(e.lecciones.length ? [`<b>Lo que aprendió</b>\n${e.lecciones.map((l) => `• ${esc(l.texto)}${l.firme ? " (firme)" : ""}`).join("\n")}`] : []),
     "<i>Papel, servidor 24/7, velas de Kraken. No es asesoramiento financiero.</i>",
   ].join("\n");
 }

@@ -137,8 +137,8 @@ a0bec1d6e010	165	app/lab-agente-st.tsx
 b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
-831a9f7e1c5e	105	app/lab-oficina.css
-951d3a841aa3	388	app/lab-oficina.tsx
+f46c989ac6a4	123	app/lab-oficina.css
+6c82475159ea	448	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -196,7 +196,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-57a92ec8fc3f	317	docs/araña/objetivos.md
+78a46a2df241	318	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 c06f06eff751	43	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -233,6 +233,7 @@ e0459b113cf2	42	eslint.config.mjs
 22efb8b3e5db	192	lib/agente-st-run.ts
 f997c496526e	156	lib/agente-st.ts
 26e0d855918d	107	lib/agentes-explicado.ts
+2ed6e17c30cf	159	lib/agentes-mente.ts
 3e02dc9c63a4	188	lib/agentes-papel.ts
 b53ef68c2a35	104	lib/agentes-servidor-db.ts
 f6460772c0c5	23	lib/agentes-servidor-run.ts
@@ -370,7 +371,7 @@ fd19498c8d8b	115	lib/mtf-zones.ts
 1cbbe9f25773	380	lib/news-intelligence.ts
 c19d69cbdafa	25	lib/oficina-db.ts
 5368f7df9343	23	lib/oficina-run.ts
-d89c564405cf	278	lib/oficina.ts
+cb4e1c16d71c	298	lib/oficina.ts
 780c578e3481	522	lib/order-blocks.ts
 3f86ab0657ef	438	lib/order-flow-brain.ts
 757d33d6a6c9	249	lib/order-flow.ts
@@ -478,6 +479,7 @@ a6bc231bf554	374	tests/account-journal.test.ts
 91a6b8fd954c	168	tests/agente-st.test.ts
 8f97cc0b92d6	37	tests/agentes-explicado.test.ts
 beea37118afc	51	tests/agentes-mcp.test.ts
+4cc52ac09665	80	tests/agentes-mente.test.ts
 e08b579f6073	220	tests/agentes-papel.test.ts
 ed22a474c8ba	162	tests/agentes-servidor.test.ts
 bc528d50d94b	74	tests/ai-analyst.test.ts
