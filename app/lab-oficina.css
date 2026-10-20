@@ -120,3 +120,48 @@
 .of-dialogo{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-bottom:1px solid var(--lab-borde)}
 .of-dialogo-tema{color:#f2b84b;font-size:11px}
 @media (max-width:520px){.of-tabla th:nth-child(4),.of-tabla td:nth-child(4){display:none}}
+/* PnL simulado: el fondo y la curva. */
+.of-fondo{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;align-items:center;margin:10px 0;padding:10px 12px;border:1px solid var(--lab-borde);border-radius:8px;background:#071223;font:12px/1.5 var(--font-mono);color:#cfe1f5}
+.of-fondo>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.of-fondo small{grid-column:1/-1}
+.of-fondo-titulo{font-size:11px;color:#9fb3c8}
+.of-fondo-pnl{font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums;color:#fff}
+.of-sube{color:#4ade80!important}
+.of-baja{color:#f87171!important}
+.of-curva{display:block;width:220px;max-width:100%;height:auto;overflow:visible}
+.of-curva polyline{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.of-curva-sube polyline{stroke:#4ade80}
+.of-curva-baja polyline{stroke:#f87171}
+.of-curva-base{stroke:#334155;stroke-dasharray:3 4;stroke-width:1}
+.of-ficha .of-curva{width:100%;max-width:360px;margin:6px 0}
+@media (max-width:520px){.of-fondo{grid-template-columns:1fr}.of-curva{width:100%}}
+/* JARVIS: holograma en la sala de reuniones. */
+.of-jarvis{all:unset;position:absolute;left:50%;top:50%;width:var(--u);height:var(--u);margin:calc(var(--u) * -.5) 0 0 calc(var(--u) * -.5);transform-style:preserve-3d;cursor:pointer}
+.of-jarvis-pie{top:calc(var(--u) * -2.4);height:calc(var(--u) * 2.9);width:calc(var(--u) * 2.4);margin-left:calc(var(--u) * -1.2);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:calc(var(--u) * .06)}
+.of-jarvis-panel{display:block;width:calc(var(--u) * 2.3);padding:calc(var(--u) * .08);border:1px solid rgba(34,211,238,.7);border-radius:4px;background:rgba(14,116,144,.28);box-shadow:0 0 calc(var(--u) * .5) rgba(34,211,238,.45)}
+.of-jarvis-panel .of-curva{width:100%}
+.of-jarvis-orbe{width:calc(var(--u) * .62);height:calc(var(--u) * .62);border-radius:50%;background:radial-gradient(circle at 40% 35%,#e0fbff,#22d3ee 45%,#0e7490 80%);box-shadow:0 0 calc(var(--u) * .6) #22d3ee,0 0 calc(var(--u) * 1.2) rgba(34,211,238,.45);animation:of-orbe 3.6s ease-in-out infinite}
+.of-jarvis-haz{width:calc(var(--u) * .5);height:calc(var(--u) * .5);background:linear-gradient(180deg,rgba(34,211,238,.55),transparent);clip-path:polygon(35% 0,65% 0,100% 100%,0 100%)}
+.of-jarvis.of-activo .of-jarvis-orbe,.of-jarvis:focus-visible .of-jarvis-orbe{outline:3px solid #fff;outline-offset:3px}
+@keyframes of-orbe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+/* La araña: en su tela, en la esquina de la pared, bajando por su hilo. */
+.of-arana{all:unset;position:absolute;left:calc(var(--u) * -.1);top:calc(var(--u) * -.1);width:calc(var(--u) * 1.3);height:calc(var(--u) * 1.75);cursor:pointer}
+.of-arana svg{width:100%;height:100%;overflow:visible}
+.of-tela path{fill:none;stroke:rgba(226,232,240,.55);stroke-width:.8}
+.of-hilo{stroke:rgba(226,232,240,.7);stroke-width:.6}
+.of-arana .mini-torso,.of-arana .mini-cabeza{fill:#0b1f42;stroke:var(--lab-cian);stroke-width:1.2}
+.of-arana .mini-pata{fill:none;stroke:var(--lab-cian);stroke-width:1.2}
+.of-arana .mini-ojo{fill:#f2b84b}
+.of-arana-cuerpo{animation:of-baja 7s ease-in-out infinite}
+.of-arana-alerta .mini-torso{stroke:#f87171}
+.of-arana.of-activo svg,.of-arana:focus-visible svg{outline:3px solid var(--lab-cian);outline-offset:2px}
+@keyframes of-baja{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+.of-ficha-jarvis{border-color:#22d3ee;box-shadow:0 0 0 1px rgba(34,211,238,.25),0 0 24px rgba(34,211,238,.12)}
+@media (prefers-reduced-motion:reduce){.of-jarvis-orbe,.of-arana-cuerpo{animation:none}}
+.of-hilo{transform-box:view-box;transform-origin:30px 20px;animation:of-hilo 7s ease-in-out infinite}
+@keyframes of-hilo{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.56)}}
+@media (prefers-reduced-motion:reduce){.of-hilo{animation:none}}
+/* La araña vive en la esquina derecha de la pared: en el celular la izquierda queda fuera de la escena. */
+.of-arana{left:auto;right:calc(var(--u) * -.1)}
+.of-arana svg{transform:scaleX(-1)}
+@container (max-width:520px){.of-subtitulo{top:8px;bottom:auto;left:8px;right:8px;padding:6px 10px;font-size:11px}}

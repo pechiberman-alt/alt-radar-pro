@@ -17,7 +17,7 @@ import { forAi } from "./ai-numbers.ts";
 import { acuerdoDe, concienciaDe, conversaciones, leccionesDe, type Dialogo, type Leccion } from "./agentes-mente.ts";
 import { compararConsenso, type Comparacion, type ResultadoConsenso } from "./consenso.ts";
 import { ESTRATEGIAS } from "./estrategias.ts";
-import { contar, estadistica, MUESTRA_MINIMA, type Estadistica, type OperacionLeida } from "./registro.ts";
+import { CAPITAL_INICIAL_USD, contar, estadistica, MUESTRA_MINIMA, RIESGO_POR_OPERACION_PCT, simularCapital, type Capital, type Estadistica, type OperacionLeida } from "./registro.ts";
 
 /** Entradas que se leen por visita: por índice y con tope (plan gratuito de D1). Si se llega al tope, se dice. */
 export const LIMITE_OFICINA = 1000;
@@ -62,6 +62,22 @@ export type Escritorio = {
   lecciones: Leccion[];
   /** Lo que sabe y no sabe de sí mismo, según su muestra. */
   conciencia: string;
+  /** PnL simulado: USD 1.000 y 1 % de riesgo fijo por operación (el mismo supuesto del registro). No es dinero real. */
+  capital: Capital;
+};
+
+/** El fondo simulado: la suma de los agentes, cada uno con su capital de papel. */
+export type Fondo = {
+  agentes: number;
+  inicialUsd: number;
+  actualUsd: number;
+  netoUsd: number;
+  retornoPct: number;
+  maxCaidaUsd: number | null;
+  maxCaidaPct: number | null;
+  /** El capital del fondo después de cada cierre, en orden (recortado a 60 puntos). */
+  curva: number[];
+  cierres: number;
 };
 
 export type Oficina = {
@@ -79,6 +95,7 @@ export type Oficina = {
   conversaciones: Dialogo[];
   /** Los que tienen cierres, ordenados por el piso del intervalo de su acierto (premia la muestra, no la suerte). */
   ranking: Escritorio[];
+  fondo: Fondo;
 };
 
 /** De qué agente es una entrada; null si la clave no tiene una forma conocida. */
@@ -111,7 +128,9 @@ export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "
   const escritorios: Escritorio[] = plantel(plan === "CUENTA").map((p) => {
     const suyas = por.get(p.id) ?? [];
     const semana = suyas.filter((f) => f.desenlace !== "ABIERTA" && typeof f.cerrada === "number" && f.cerrada >= desde && f.cerrada <= ahora);
-    const total = estadistica(contar(suyas.map(leida)));
+    const conteo = contar(suyas.map(leida));
+    const total = estadistica(conteo);
+    const cierresSuyos = suyas.flatMap((f) => (f.desenlace !== "ABIERTA" && typeof f.r === "number" && Number.isFinite(f.r) && typeof f.cerrada === "number" ? [{ r: f.r, cerradaA: f.cerrada, abiertaA: f.detectada }] : []));
     const lecciones = leccionesDe(suyas);
     return {
       ...p,
@@ -121,6 +140,7 @@ export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "
       abiertas: suyas.filter((f) => f.desenlace === "ABIERTA").map((f) => ({ symbol: f.symbol, lado: f.lado, detectada: f.detectada })),
       lecciones,
       conciencia: concienciaDe(p.agente, mesaDe(p.id), total, lecciones),
+      capital: simularCapital(conteo, cierresSuyos, suyas.length ? Math.min(...suyas.map((f) => f.detectada)) : null),
     };
   });
   const reunion = escritorios.filter((e) => e.semana.cerradas > 0).sort((a, b) => b.semana.neto - a.semana.neto || a.agente.localeCompare(b.agente));
@@ -134,6 +154,7 @@ export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "
     .filter((e) => e.total.cerradas > 0)
     .sort((a, b) => (b.total.intervalo?.low ?? 0) - (a.total.intervalo?.low ?? 0) || b.total.cerradas - a.total.cerradas);
   return {
+    fondo: fondoDe(escritorios, filas ?? []),
     conversaciones: filas === null ? [] : conversaciones(escritorios),
     ranking,
     aprendizaje: compararConsenso(conConsenso),
@@ -228,6 +249,7 @@ export function oficinaParaIa(o: Oficina, plan: "CUENTA" | "SERVIDOR") {
       aciertoPct: e.total.winRate === null ? null : Math.round(e.total.winRate * 1000) / 10,
       aciertoIc90Pct: e.total.intervalo ? [Math.round(e.total.intervalo.low * 1000) / 10, Math.round(e.total.intervalo.high * 1000) / 10] : null,
       netoR: Math.round(e.total.neto * 100) / 100,
+      pnlSimuladoUsd: Math.round(e.capital.netoUsd * 100) / 100,
       rPorOperacion: e.total.expectancia === null ? null : Math.round(e.total.expectancia * 1000) / 1000,
       muestra: e.total.muestra === "MINIMA" ? "muestra mínima (menos de 15)" : e.total.muestra === "SIN DATOS" ? "sin cierres" : "razonable",
       abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`),
@@ -237,6 +259,7 @@ export function oficinaParaIa(o: Oficina, plan: "CUENTA" | "SERVIDOR") {
     conversaciones: o.conversaciones.map((d) => `${d.tema}: ${d.lineas.map((l) => `${l.nombre}: ${l.texto}`).join(" / ")}`),
     charla: charla(o).slice(0, 12).map((f) => `${f.nombre}: ${f.texto}`),
     aprendizaje: o.aprendizaje.texto,
+    fondoSimulado: { agentes: o.fondo.agentes, capitalInicialUsd: o.fondo.inicialUsd, capitalActualUsd: Math.round(o.fondo.actualUsd * 100) / 100, pnlUsd: Math.round(o.fondo.netoUsd * 100) / 100, retornoPct: Math.round(o.fondo.retornoPct * 100) / 100, caidaMaximaPct: o.fondo.maxCaidaPct === null ? null : Math.round(o.fondo.maxCaidaPct * 100) / 100, supuesto: "USD 1.000 por agente y 1 % de riesgo fijo por operación; es papel, no dinero real" },
     propuestas: propuestas(o).map((p) => `${corto(p.agente)}: ${p.texto}`),
     regla: "Cada agente decide solo con su regla fija. Nada se cambia ni se pausa sin que la persona lo apruebe. Es papel, no asesoramiento financiero.",
   });
@@ -261,6 +284,7 @@ export function textoOficinaTelegram(o: Oficina, estado: { error: string | null 
       ? `<b>Acierto de cada uno</b> (ordenado por el piso del intervalo)\n${o.ranking.slice(0, 8).map((e) => `• ${esc(corto(e.agente))}: ${e.total.winRate === null ? "—" : `${Math.round(e.total.winRate * 100)} %`} · n=${e.total.cerradas}${e.total.muestra === "MINIMA" ? " (muestra mínima)" : ""} · ${r2(e.total.expectancia ?? 0)} por op.`).join("\n")}`
       : "<b>Acierto de cada uno</b>\nNadie cerró todavía.",
     `<b>Lo que aprenden</b>\n${esc(o.aprendizaje.texto)}`,
+    `<b>Fondo simulado</b>\n${usdTxt(o.fondo.inicialUsd)} → ${usdTxt(o.fondo.actualUsd)} (${usdTxt(o.fondo.netoUsd, true)}, ${o.fondo.retornoPct >= 0 ? "+" : ""}${o.fondo.retornoPct.toFixed(2).replace(".", ",")} %) con ${o.fondo.cierres} cierres.\n<i>USD 1.000 por agente y 1 % de riesgo por operación: es papel, no dinero real.</i>`,
   ];
   const props = propuestas(o);
   partes.push(props.length ? `<b>Propuestas para vos</b>\n${props.map((p) => `• ${esc(corto(p.agente))}: ${esc(p.texto)}`).join("\n")}` : "<b>Propuestas</b>\nNingún agente llegó a 15 cierres: seguir midiendo.");
@@ -288,6 +312,7 @@ export function textoAgenteTelegram(o: Oficina, nombre: string): string {
     t.cerradas
       ? `Cerradas: ${t.cerradas} · acierto ${t.winRate === null ? "—" : `${Math.round(t.winRate * 100)} %`}${t.muestra === "MINIMA" ? " (muestra mínima)" : ""} · ${r2(t.expectancia ?? 0)} por operación · neto ${r2(t.neto)}`
       : "Todavía sin cierres.",
+    `PnL simulado: ${usdTxt(e.capital.netoUsd, true)} (${usdTxt(e.capital.inicialUsd)} → ${usdTxt(e.capital.actualUsd)})`,
     e.abiertas.length ? `Abiertas: ${e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}` : "Sin posiciones abiertas.",
     ...dice,
     `<b>Cómo se ve</b>\n${esc(e.conciencia)}`,
@@ -295,3 +320,49 @@ export function textoAgenteTelegram(o: Oficina, nombre: string): string {
     "<i>Papel, servidor 24/7, velas de Kraken. No es asesoramiento financiero.</i>",
   ].join("\n");
 }
+
+const PUNTOS_FONDO = 60;
+
+/**
+ * El fondo simulado: cada agente arranca con CAPITAL_INICIAL_USD y arriesga RIESGO_POR_OPERACION_PCT fijo, como en el registro.
+ * La curva suma los cierres de todos en el orden en que cerraron. Es papel: sirve para comparar, no es dinero real.
+ */
+export function fondoDe(escritorios: Escritorio[], filas: FilaOficina[]): Fondo {
+  const ids = new Set(escritorios.map((e) => e.id));
+  const riesgoUsd = (CAPITAL_INICIAL_USD * RIESGO_POR_OPERACION_PCT) / 100;
+  const inicialUsd = escritorios.length * CAPITAL_INICIAL_USD;
+  const cierres = filas
+    .filter((f) => f.desenlace !== "ABIERTA" && typeof f.r === "number" && Number.isFinite(f.r) && typeof f.cerrada === "number" && ids.has(agenteDeClave(f.clave) ?? ""))
+    .sort((a, b) => (a.cerrada as number) - (b.cerrada as number));
+  const puntos = [inicialUsd];
+  let eq = inicialUsd;
+  let pico = inicialUsd;
+  let maxCaidaUsd: number | null = cierres.length ? 0 : null;
+  let maxCaidaPct: number | null = cierres.length ? 0 : null;
+  for (const c of cierres) {
+    eq += (c.r as number) * riesgoUsd;
+    puntos.push(eq);
+    pico = Math.max(pico, eq);
+    if (pico - eq > (maxCaidaUsd ?? 0)) {
+      maxCaidaUsd = pico - eq;
+      maxCaidaPct = pico > 0 ? ((pico - eq) / pico) * 100 : null;
+    }
+  }
+  const paso = puntos.length > PUNTOS_FONDO ? (puntos.length - 1) / (PUNTOS_FONDO - 1) : 1;
+  const curva = puntos.length > PUNTOS_FONDO ? Array.from({ length: PUNTOS_FONDO }, (_, i) => puntos[Math.round(i * paso)]) : puntos;
+  const netoUsd = escritorios.reduce((a, e) => a + e.capital.netoUsd, 0);
+  return {
+    agentes: escritorios.length,
+    inicialUsd,
+    actualUsd: inicialUsd + netoUsd,
+    netoUsd,
+    retornoPct: inicialUsd > 0 ? (netoUsd / inicialUsd) * 100 : 0,
+    maxCaidaUsd,
+    maxCaidaPct,
+    curva,
+    cierres: cierres.length,
+  };
+}
+
+/** Dólares simulados en formato argentino, con signo cuando es un resultado. */
+export const usdTxt = (v: number, signo = false) => `${signo && v > 0 ? "+" : v < 0 ? "−" : ""}USD ${Math.abs(v).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
