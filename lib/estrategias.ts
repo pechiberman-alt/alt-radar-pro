@@ -20,7 +20,7 @@ import type { SwingCandle } from "./swing-entries.ts";
 import { CONFIGURACION_AGENTE_FIB, senalesFib } from "./fibonacci-niveles.ts";
 import { CONFIGURACION_BASE_SMC, DISPARO_DEL_AGENTE, senalesSmc, type FiltroSmc } from "./smc-liquidez.ts";
 
-export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "FIB_NIVELES" | "AMD_IFVG" | "AZAR";
+export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "FIB_NIVELES" | "AMD_IFVG" | "METALES_D55" | "AZAR";
 
 /** Lo que una estrategia propone en la vela i: lado, stop y objetivo final (TP3). Sin señal, null. */
 export type Senal = { lado: Lado; stop: number; objetivo: number; /** Objetivos propios de la estrategia; sin ellos, TP1 y TP2 van a un tercio y dos tercios del camino al TP3. */ tp1?: number; tp2?: number };
@@ -63,7 +63,14 @@ export type Estrategia = {
   nombre: string;
   regla: string;
   senal: (v: SwingCandle[], ind: Indicadores, i: number) => Senal | null;
+  /** Si está, el agente solo opera estos símbolos (por ejemplo, el de metales); si no, opera todos. */
+  simbolos?: readonly string[];
 };
+
+/** Los metales: oro y plata de Binance, el oro de Kraken (PAXG, una onza por token) y el oro de Axi del estudio. */
+export const SIMBOLOS_METALES = ["XAUUSDT", "XAGUSDT", "PAXGUSDT", "XAUUSDAXI"] as const;
+/** Si un agente opera ese símbolo. */
+export const operaEn = (e: Pick<Estrategia, "simbolos">, symbol: string): boolean => !e.simbolos || e.simbolos.includes(symbol);
 
 // ── Indicadores (cada valor en i usa solo velas hasta i) ──
 
@@ -744,6 +751,21 @@ export const ESTRATEGIAS: Estrategia[] = [
     senal: (v, ind, i) => senalAmd(v, ind, i),
   },
   {
+    id: "METALES_D55",
+    agente: "Agente Metales",
+    nombre: "Ruptura larga de 55 velas, solo en oro y plata",
+    regla: "Solo opera oro y plata. Compra cuando el cierre supera el máximo de las 55 velas anteriores; nunca vende en corto. Stop a 1,5 ATR. Objetivo 2 R. Es la ruptura que mejor midió en el oro de Axi en 1 h con el costo real. En 4 h, en el oro de Axi: +0,02 R por operación en desarrollo (n=105) y +0,59 R en evaluación (n=41, la suba de 2025-2026); perdió en 2021 y 2022. Gana cuando el oro sube en tendencia (docs/estudio-axi.md). La plata no tiene medición.",
+    simbolos: SIMBOLOS_METALES,
+    senal: (v, ind, i) => {
+      const t = ind.atr14[i];
+      if (i < 56 || !ok(t)) return null;
+      let alto = -Infinity;
+      for (let j = i - 55; j < i; j += 1) alto = Math.max(alto, v[j].high);
+      const c = v[i].close;
+      return c > alto ? conRR("LONG", c, c - 1.5 * t, 2) : null;
+    },
+  },
+  {
     id: "AZAR",
     agente: "Agente Control (azar)",
     nombre: "Entrada al azar (control)",
@@ -826,6 +848,7 @@ export function operarSenales(id: EstrategiaId, symbol: string, v: SwingCandle[]
 
 /** Todas las operaciones de una estrategia en una moneda, una por vez, con la escalera de la app. */
 export function operar(e: Estrategia, symbol: string, v: SwingCandle[], o: OpcionesEstudio): Operacion[] {
+  if (!operaEn(e, symbol)) return [];
   const ind = indicadores(v);
   return operarSenales(e.id, symbol, v, (i) => e.senal(v, ind, i), o);
 }

@@ -85,6 +85,10 @@ export const EXPLICADO: Record<string, Explicado> = {
     mira: "Ese barrido, pero exigiendo además varias confirmaciones de tendencia y de volumen.",
     idea: "Pedir todo junto deja muchas menos entradas, con la idea de que sean mejores.",
   },
+  METALES_D55: {
+    mira: "Que el oro o la plata cierren por encima de lo más alto de las últimas 55 velas. Solo compra.",
+    idea: "Los metales suelen moverse en tendencias largas: cuando rompen máximos, a veces siguen. Se probó en oro; en plata no hay medición.",
+  },
   AMD_IFVG: {
     mira: "Un precio quieto en un rango, un tirón falso que barre un lado, y la vuelta que deja un hueco cerrado al revés.",
     idea: "El tirón falso junta las órdenes de los apurados; cuando el precio vuelve adentro del rango, suele ir para el otro lado.",

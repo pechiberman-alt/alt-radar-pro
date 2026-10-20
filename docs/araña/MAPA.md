@@ -4,7 +4,7 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 648 · objetivos: 18 · sin objetivo: 0
+- Archivos: 649 · objetivos: 18 · sin objetivo: 0
 - Tablas D1: 52 · secretos: 5 · variables de entorno: 25 · rutas /api: 56 · hosts: 58
 - Código de navegador: 69 archivos con "use client" que alcanzan 213 · problemas: 0
 - Lib sin prueba directa: 26 de 208
@@ -483,9 +483,10 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 - `tests/universos.test.ts` — Pruebas de los universos de monedas (lib/universos.ts): que no se diga que un universo se puede medir cuando no hay velas descargadas, que las monedas con datos sean exactamente la
 
-### calidad — Pruebas (134)
+### calidad — Pruebas (135)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
+- `tests/agente-metales.test.ts` — Pruebas del Agente Metales (METALES_D55 en lib/estrategias.ts): solo opera oro y plata (en papel y en el estudio), solo compra, dispara cuando el cierre supera el máximo de las 55
 - `tests/agentes-mcp.test.ts` — Ruflo (el MCP de los agentes) arranca código de terceros con `npx`.
 - `tests/ai-analyst.test.ts` — pruebas: the snapshot keeps only the strongest signals and the majors, bounded, numbers are rounded, not dropped, the instructions forbid invented numbers and orders, and carry the app (+1)
 - `tests/ai-brains.test.ts` — pruebas: answers are read in every shape these APIs use, without the model, Cloudflare, the free brain on Workers AI: Qwen3 without thinking out loud; spent allowance a (+1)

@@ -29,7 +29,7 @@ const leida = (f: FilaAgente): OperacionLeida => ({ r: f.r, abierta: false });
 const est = (fs: FilaAgente[]): Estadistica => estadistica(contar(fs.map(leida)));
 export const pctTxt = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)} %`);
 const rTxt = (v: number | null) => (v === null ? "—" : `${v > 0 ? "+" : ""}${(Math.round(v * 100) / 100 || 0).toFixed(2).replace(".", ",")} R`);
-const activo = (s: string) => (s === "XAUUSDT" ? "oro" : s === "XAGUSDT" ? "plata" : s.replace(/USDT$/, ""));
+const activo = (s: string) => (s === "XAUUSDT" ? "oro" : s === "XAGUSDT" ? "plata" : s === "PAXGUSDT" ? "oro (PAXG)" : s.replace(/USDT$/, ""));
 /** Cómo se describe un grupo: acierto, R por operación y su muestra. */
 export const resumenGrupo = (e: Estadistica) => `${pctTxt(e.winRate)} de acierto y ${rTxt(e.expectancia)} por operación (n=${e.cerradas}${e.cerradas < MUESTRA_MINIMA ? ", muestra mínima" : ""})`;
 
@@ -69,12 +69,13 @@ export function leccionesDe(filas: FilaAgente[]): Leccion[] {
   return out;
 }
 
-export type MesaMente = "TENDENCIA" | "REVERSION" | "ESTRUCTURA";
+export type MesaMente = "TENDENCIA" | "REVERSION" | "ESTRUCTURA" | "METALES";
 /** El carácter de cada mesa: cómo mira el mercado, en una frase. Es su identidad, no una predicción. */
 export const CARACTER: Record<MesaMente, string> = {
   TENDENCIA: "Soy paciente: voy con la corriente y no intento adivinar giros.",
   REVERSION: "Soy contrera: espero que el precio se pase de rosca y entro a la vuelta.",
   ESTRUCTURA: "Soy detective: leo rangos, barridas y huecos que deja el precio.",
+  METALES: "Soy del oro y la plata: espero que rompan máximos y voy solo comprado.",
 };
 
 /** Lo que el agente sabe y no sabe de sí mismo, según su muestra. Honesto: con pocos cierres, dice que no sabe. */
@@ -108,13 +109,13 @@ const linea = (a: AgenteMente, texto: string) => ({ quien: a.id, nombre: corto(a
 export function conversaciones(agentes: AgenteMente[]): Dialogo[] {
   const out: Dialogo[] = [];
   // 1. Dentro de cada mesa: el que mejor va y el que peor va, si los dos tienen cierres.
-  for (const mesa of ["TENDENCIA", "REVERSION", "ESTRUCTURA"] as const) {
+  for (const mesa of ["TENDENCIA", "REVERSION", "ESTRUCTURA", "METALES"] as const) {
     const con = agentes.filter((a) => a.mesa === mesa && a.total.cerradas > 0 && a.total.expectancia !== null).sort((a, b) => (b.total.expectancia ?? 0) - (a.total.expectancia ?? 0));
     if (con.length < 2) continue;
     const [mejor, peor] = [con[0], con[con.length - 1]];
     const chico = mejor.total.cerradas < MUESTRA_MINIMA || peor.total.cerradas < MUESTRA_MINIMA;
     out.push({
-      tema: `Mesa de ${mesa === "TENDENCIA" ? "tendencia" : mesa === "REVERSION" ? "reversión" : "estructura"}`,
+      tema: `Mesa de ${mesa === "TENDENCIA" ? "tendencia" : mesa === "REVERSION" ? "reversión" : mesa === "METALES" ? "metales" : "estructura"}`,
       lineas: [
         linea(mejor, `Voy ${resumenGrupo(mejor.total)}.`),
         linea(peor, `Yo voy ${resumenGrupo(peor.total)}. Miramos parecido y nos va distinto.`),

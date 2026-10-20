@@ -2,11 +2,11 @@
  * Los agentes de papel corriendo las 24 horas en el servidor (PLAN_SERVIDOR_1), con la app cerrada. Son los mismos agentes del
  * estudio (lib/agentes-papel.ts, leerSenalesPapel), con sus reglas sin cambiar, en velas de 4 h. Binance responde 403 a los
  * crons del Worker, así que las velas salen de Kraken (en dólares, no USDT; Coinbase no tiene velas de 4 h): es OTRA serie que
- * la del navegador, y por eso es otro plan que arranca de cero y nunca se suma al de tu cuenta. El oro y la plata solo están
- * en Binance: no corren acá. Costo: el del estudio (0,07 % por lado), porque Kraken es solo la fuente de precios.
+ * la del navegador, y por eso es otro plan que arranca de cero y nunca se suma al de tu cuenta. El oro corre como PAXG (Kraken
+ * PAXGUSD, también el fin de semana); la plata no tiene fuente acá. Costo: el del estudio (0,07 % por lado), porque Kraken es solo la fuente de precios.
  *
  * El plan gratis de Cloudflare da pocos milisegundos de CPU por corrida: una moneda por corrida, en los minutos 1, 3, …, 19
- * de cada hora múltiplo de 4 (UTC), justo después de que cierra la vela. Cada corrida registra las entradas nuevas de esa moneda
+ * de cada hora múltiplo de 4 (UTC; hasta el 21 con el oro), justo después de que cierra la vela. Cada corrida registra las entradas nuevas de esa moneda
  * (si la vela de entrada abrió hace menos de media hora) y recorre sus abiertas con velas ya cerradas. Pura: sin red ni base.
  */
 import { consensoDe, fotoConsenso } from "./consenso.ts";
@@ -15,12 +15,13 @@ import { COMISION_AGENTES_PCT, HORIZONTE_AGENTES, leerSenalesPapel, MARCO_AGENTE
 import type { SwingCandle } from "./swing-entries.ts";
 
 export const PLAN_SERVIDOR = "PLAN_SERVIDOR_1";
-export const MONEDAS_SERVIDOR = MONEDAS_AGENTES;
+/** Las 10 del estudio y el oro: PAXG en Kraken (un token por onza; cotiza también el fin de semana, así que es otra serie que el oro de broker). La plata no tiene fuente en el servidor. */
+export const MONEDAS_SERVIDOR = [...MONEDAS_AGENTES, "PAXGUSDT"];
 /** Kraken guarda las últimas 720 velas de cada intervalo: alcanzan para la EMA 200 y los marcos superiores. */
 export const VELAS_SERVIDOR = 720;
 export const MIN_VELAS_SERVIDOR = 300;
 /** El cron del Worker (wrangler.production.jsonc). Tiene que coincidir con el que dispara la corrida. */
-export const CRON_SERVIDOR = "1-19/2 0,4,8,12,16,20 * * *";
+export const CRON_SERVIDOR = "1-21/2 0,4,8,12,16,20 * * *";
 
 export const claveServidor = (estrategia: string, symbol: string, lado: Lado, vela: number) => `sv:${estrategia}:${symbol}:4h:${lado}:${vela}`;
 

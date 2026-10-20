@@ -18,8 +18,9 @@ test("una moneda por corrida, en los minutos impares 1 a 19 de las horas múltip
   assert.equal(monedaDeTurno(Date.UTC(2026, 9, 20, 4, 19)), MONEDAS_SERVIDOR[9]);
   assert.equal(monedaDeTurno(Date.UTC(2026, 9, 20, 0, 2)), null);
   assert.equal(monedaDeTurno(Date.UTC(2026, 9, 20, 1, 1)), null);
-  assert.equal(monedaDeTurno(Date.UTC(2026, 9, 20, 0, 21)), null);
-  const vistas = new Set(Array.from({ length: 10 }, (_, k) => monedaDeTurno(Date.UTC(2026, 9, 20, 8, 1 + 2 * k))));
+  assert.equal(monedaDeTurno(Date.UTC(2026, 9, 20, 0, 21)), "PAXGUSDT", "el oro va último, vía PAXG");
+  assert.equal(monedaDeTurno(Date.UTC(2026, 9, 20, 0, 23)), null);
+  const vistas = new Set(Array.from({ length: MONEDAS_SERVIDOR.length }, (_, k) => monedaDeTurno(Date.UTC(2026, 9, 20, 8, 1 + 2 * k))));
   assert.equal(vistas.size, MONEDAS_SERVIDOR.length, "cada moneda una vez por vela");
 });
 

@@ -26,6 +26,22 @@ de NASDAQ tienen dato. Con eso no se pueden medir, así que el script las excluy
 El estudio de oro publicado antes incluía esas cinco reglas. Sus números no valen y no cuentan para ninguna conclusión. Para medirlas
 hace falta un historial con volumen, o medirlas hacia adelante en papel cuando la fuente lo traiga.
 
+## Agente Metales (METALES_D55), agregado el 2026-10-20
+
+Ruptura de 55 velas, solo en largo, stop a 1,5 ATR, objetivo 2 R, solo oro y plata. La regla se eligió mirando el estudio de
+rupturas del oro de Axi en 1 h (mismo instrumento y período), así que estos números de 4 h no son una prueba limpia. Costo de
+0,07 % por lado:
+
+| Tramo | n | Acierto | PF | R por operación | IC 90 % |
+|---|---|---|---|---|---|
+| Desarrollo (hasta 2025-04-14) | 105 | 41,0 % | 1,02 | +0,016 | −0,222 a +0,255 |
+| Evaluación | 41 | 58,5 % | 2,28 | +0,592 | +0,214 a +0,970 |
+
+Por año: 2021 −0,64 R (n=5), 2022 −0,26 R (n=23), 2023 −0,01 R (n=30), 2024 +0,35 R (n=30), 2025 +0,44 R (n=42), 2026 +0,40 R
+(n=16). Gana cuando el oro sube en tendencia y no gana cuando no: la evaluación cae en la suba de 2025-2026. Veredicto del estudio:
+SIN CONCLUSIÓN (menos de 100 operaciones y DSR de 2,6 % con todos los ensayos declarados). La plata no tiene medición. La única
+prueba limpia es la de papel hacia adelante, que empieza con este agente.
+
 ## Límites
 
 - Un solo instrumento por tabla: no hay contraste entre activos, así que una ventaja acá se apoya en menos evidencia.
