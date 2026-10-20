@@ -14,7 +14,7 @@ f78d8e271837	683	app/account-panel.tsx
 064cf5eb7605	229	app/active-signals.tsx
 63b274d443fe	122	app/agenda-macro.tsx
 9ea588d09362	303	app/ai-trading-lab.css
-4b4f1a37b96d	465	app/ai-trading-lab.tsx
+7ab6ca216253	473	app/ai-trading-lab.tsx
 bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
@@ -56,6 +56,7 @@ ef3e2bf85432	160	app/api/klines/route.ts
 c1dc8c2ca83f	93	app/api/liquidity-history/route.ts
 a9e76218b723	216	app/api/market-structure/route.ts
 3356888e120f	49	app/api/market/derivatives/route.ts
+d895af4a4939	20	app/api/oficina/route.ts
 bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
 9814ef4afcd9	64	app/api/push/subscribe/route.ts
@@ -136,10 +137,12 @@ a0bec1d6e010	165	app/lab-agente-st.tsx
 b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
+845dd43300d2	56	app/lab-oficina.css
+912c44bcc322	219	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
-a8e3e09ba000	132	app/layout.tsx
+be29e9072c2e	133	app/layout.tsx
 29692a8ad894	742	app/liquidation-heatmap-desk.css
 163457f406a6	4227	app/liquidation-heatmap-desk.tsx
 39b0534ede8e	3145	app/live-bookmap.tsx
@@ -193,8 +196,9 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-59a16144f410	312	docs/araña/objetivos.md
+d4c3f9cc2a90	315	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
+c06f06eff751	43	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
 fc6042bacccc	116	docs/busqueda-fibonacci.md
 25e7d2744ee2	187	docs/busqueda-linea.md
@@ -225,10 +229,10 @@ e0459b113cf2	42	eslint.config.mjs
 766d1eb792e8	10	examples/d1/db/schema.ts
 36621536c9b3	85	lib/account-events.ts
 6b197acd00d5	559	lib/account-journal.ts
-ebe735c6febb	155	lib/agente-st-db.ts
+6b1ee1864340	166	lib/agente-st-db.ts
 22efb8b3e5db	192	lib/agente-st-run.ts
 f997c496526e	156	lib/agente-st.ts
-90f7c7bab0c0	103	lib/agentes-explicado.ts
+26e0d855918d	107	lib/agentes-explicado.ts
 3e02dc9c63a4	188	lib/agentes-papel.ts
 f3bdeb0d1172	66	lib/ai-analyst-server.ts
 009e4bbb2f90	158	lib/ai-analyst.ts
@@ -238,6 +242,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 054288014395	51	lib/ai-probe.ts
 509da5ba4297	47	lib/alert-bus.ts
 dbd75245f8b8	366	lib/alerts.ts
+3cea7aee65d0	116	lib/amd-ifvg.ts
 db6ae19f1b13	157	lib/app-settings.ts
 4998b2cb2829	188	lib/aprender.ts
 8bc8d3dc5620	41	lib/arana-ultimo-db.ts
@@ -273,7 +278,7 @@ c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
 a2c5aeea0e4f	115	lib/escalera.ts
-786e5c1f3705	891	lib/estrategias.ts
+26fbef583326	906	lib/estrategias.ts
 f5d17a2b3a5b	2311	lib/estudio-estrategias-datos.ts
 ca8f3802c4a6	21	lib/estudio-resumen.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
@@ -286,7 +291,7 @@ a46bc4f80884	173	lib/fibonacci-niveles.ts
 79444f1d6966	115	lib/flujo-db.ts
 7a92c06ed2a2	114	lib/flujo-run.ts
 0e13f43a62cd	163	lib/flujo.ts
-87cd93dfda16	215	lib/fondeo.ts
+c6aaa6fce865	216	lib/fondeo.ts
 0b2d1bf961da	295	lib/footprint.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
@@ -360,6 +365,7 @@ c8b7add6b81c	621	lib/mesa-sombra.ts
 617b5248112d	242	lib/mm-robot.ts
 fd19498c8d8b	115	lib/mtf-zones.ts
 1cbbe9f25773	380	lib/news-intelligence.ts
+99d8818d56d9	107	lib/oficina.ts
 780c578e3481	522	lib/order-blocks.ts
 3f86ab0657ef	438	lib/order-flow-brain.ts
 757d33d6a6c9	249	lib/order-flow.ts
@@ -443,6 +449,7 @@ d13ecf4702a3	63	scripts/claude-hooks.mjs
 b36fd1c34b30	183	scripts/herramientas.mjs
 4347662f5847	175	scripts/ia-editor.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
+e5ff7be3ef14	137	scripts/investigacion/amd-estudio.ts
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
 bc4d23a74d94	123	scripts/investigacion/axi-estudio.ts
 c88ad361f676	292	scripts/investigacion/breaker-busqueda.ts
@@ -472,6 +479,7 @@ bc528d50d94b	74	tests/ai-analyst.test.ts
 57f3eea79cb8	38	tests/ai-numbers.test.ts
 eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
+1fc53db1796f	87	tests/amd-ifvg.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
 c5f7f005ea47	56	tests/aprender.test.ts
@@ -511,7 +519,7 @@ bcdc181f93e6	227	tests/fib-backtest.test.ts
 bc048058d368	97	tests/fib-zone.test.ts
 57c2fff66acf	171	tests/fibonacci-niveles.test.ts
 5598b8ef0544	128	tests/flujo.test.ts
-8a001ba7ca48	135	tests/fondeo.test.ts
+990d14ba61b0	144	tests/fondeo.test.ts
 70e30489d116	109	tests/footprint-signals.test.ts
 d6031202b073	89	tests/footprint-sweeps.test.ts
 79b36d34e65f	119	tests/footprint-verdict.test.ts
@@ -574,6 +582,7 @@ a9cc32e63faf	283	tests/mesa-sombra.test.ts
 1c697054fe3b	153	tests/mm-robot.test.ts
 6ab801ccfb7e	104	tests/mtf-zones.test.ts
 40823676548f	84	tests/news-sentiment.test.ts
+bd13312cb399	61	tests/oficina.test.ts
 6d903521a84e	209	tests/order-blocks.test.ts
 225b8a9ad252	350	tests/order-flow-brain.test.ts
 fc5082678796	301	tests/order-flow.test.ts
