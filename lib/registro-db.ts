@@ -12,6 +12,7 @@ import { ensurePaperSchema } from "./jarvis-paper-db.ts";
 import { ensureRobotLedger } from "./robot-ledger-db.ts";
 import { resultadosSt } from "./agente-st-db.ts";
 import { resultadosFlujo } from "./flujo-db.ts";
+import { filasServidor } from "./agentes-servidor-db.ts";
 import { armarRegistro, type Cierre, CONTEO_CERO, contar, type Conteo, type EntradaRegistro, type OperacionLeida, type Registro, sumarConteos } from "./registro.ts";
 import { sharedJson } from "./shared-cache.ts";
 
@@ -142,6 +143,12 @@ async function leerAgenteSt(db: D1Database, userId: number): Promise<Lectura> {
   return { conteo: contar(operacionesDeRobot(filas)), incompleta: filas.length >= LIMITE_HISTORIA, ...cierresDeFilas(filas) };
 }
 
+/** Los agentes del servidor (global): las últimas LIMITE_HISTORIA entradas, por fecha. */
+async function leerAgentesServidor(db: D1Database): Promise<Lectura> {
+  const filas = await filasServidor(db, LIMITE_HISTORIA);
+  return { conteo: contar(operacionesDeRobot(filas)), incompleta: filas.length >= LIMITE_HISTORIA, ...cierresDeFilas(filas) };
+}
+
 async function leerRobot(db: D1Database, userId: number): Promise<Lectura> {
   await ensureRobotLedger(db);
   const filas = (
@@ -163,6 +170,7 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
   const robot = userId === null ? null : await seguro("robot", () => leerRobot(db, userId));
   const flujo = userId === null ? null : await seguro("flujo", () => leerFlujo(db, userId));
   const agenteSt = userId === null ? null : await seguro("agente supertrend", () => leerAgenteSt(db, userId));
+  const servidor = await seguro("agentes del servidor", () => sharedJson("agentes-servidor-registro-v1", 300, () => leerAgentesServidor(db)));
   // Sin la serie del núcleo, el capital final sigue saliendo exacto de los contadores; solo falta la curva.
   const nucleoCierres = nucleo ? await seguro("núcleo cierres", async () => cierresDeNucleo(await leerCierresNucleo(db))) : null;
   const serie = (claves: string[]) => (nucleoCierres ? juntar(claves.map((k) => nucleoCierres[k])) : { cierres: null, desde: null });
@@ -180,6 +188,7 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
     { id: "ROBOT", conteo: robot?.conteo ?? null, incompleta: robot?.incompleta, cierres: robot?.cierres, desde: robot?.desde },
     { id: "FLUJO", conteo: flujo?.conteo ?? null, incompleta: flujo?.incompleta, cierres: flujo?.cierres, desde: flujo?.desde },
     { id: "AGENTE_ST", conteo: agenteSt?.conteo ?? null, incompleta: agenteSt?.incompleta, cierres: agenteSt?.cierres, desde: agenteSt?.desde },
+    { id: "AGENTES_SERVIDOR", conteo: servidor?.conteo ?? null, incompleta: servidor?.incompleta, cierres: servidor?.cierres, desde: servidor?.desde },
   ];
   return armarRegistro(entradas, ahora);
 }

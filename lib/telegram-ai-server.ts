@@ -17,6 +17,8 @@ import { buildServerSnapshot, markdownToTelegramHtml, splitForTelegram, type Ser
 import { cached } from "./upstream-cache.ts";
 import { resultadosSt } from "./agente-st-db.ts";
 import { resumenEstudio } from "./estudio-resumen.ts";
+import { oficinaParaIa } from "./oficina.ts";
+import { oficinaServidor } from "./oficina-db.ts";
 import { parseSwingKlines } from "./swing-entries.ts";
 import { candidatosMoneda, lecturaMoneda, type LecturaMoneda } from "./telegram-moneda.ts";
 import { coreContext } from "./jarvis-core.ts";
@@ -74,16 +76,18 @@ async function monedaPedida(base: string, now: number): Promise<{ existe: boolea
 }
 
 /** Lo que se suma al resumen del servidor según la pregunta y la cuenta: monedas pedidas, el estudio y el agente de papel. */
-export async function datosExtraTelegram(db: D1Database, userId: number, question: string, now = Date.now()): Promise<Pick<ServerSnapshot, "pedidas" | "noEncontradas" | "estudio" | "agenteSt">> {
-  const [pedidas, filas] = await Promise.all([
+export async function datosExtraTelegram(db: D1Database, userId: number, question: string, now = Date.now()): Promise<Pick<ServerSnapshot, "pedidas" | "noEncontradas" | "estudio" | "agenteSt" | "oficina">> {
+  const [pedidas, filas, oficina] = await Promise.all([
     Promise.all(candidatosMoneda(question).map(async (b) => ({ b, ...(await monedaPedida(b, now)) }))),
     resultadosSt(db, userId, 50).catch(() => []),
+    oficinaServidor(db, now).catch(() => null),
   ]);
   const cerradas = filas.filter((f) => f.r !== null);
   return {
     pedidas: pedidas.flatMap((x) => (x.lectura ? [x.lectura] : [])),
     noEncontradas: pedidas.filter((x) => !x.existe).map((x) => x.b),
     estudio: resumenEstudio(),
+    oficina: oficina ? oficinaParaIa(oficina.oficina, "SERVIDOR") : undefined,
     agenteSt: {
       abiertas: filas.filter((f) => f.desenlace === "ABIERTA").length,
       cerradas: cerradas.length,

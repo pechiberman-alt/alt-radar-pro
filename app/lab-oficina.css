@@ -89,3 +89,16 @@
 @media (prefers-reduced-motion:reduce){.of-habla .of-persona{animation:none}}
 .of-listas h4:not(:first-child){margin-top:16px}
 @container (max-width:520px){.of-piso{transform:translateY(calc(var(--u) * 1.2)) rotateX(55deg) rotateZ(var(--giro)) scale(1.18)}}
+.of-planes{display:flex;gap:8px;margin:8px 0 4px}
+.of-planes button{min-height:44px;padding:0 14px;border:1px solid var(--lab-borde);border-radius:6px;background:#071223;font:600 10.5px var(--font-mono);letter-spacing:.8px;color:var(--lab-cian);cursor:pointer}
+.of-planes button[aria-selected="true"]{border-color:var(--lab-azul);background:#0b1f42;color:#fff}
+.of-planes button:focus-visible,.of-preguntar input:focus-visible,.of-preguntar button:focus-visible{outline:2px solid var(--lab-cian);outline-offset:2px}
+.of-conversa{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.of-msg{margin:0;padding:8px 10px;border-radius:10px;max-width:92%}
+.of-msg-vos{align-self:flex-end;background:#1d4ed8;color:#fff}
+.of-msg-agente{align-self:flex-start;background:#13243d;color:#e2e8f0}
+.of-msg small{color:#9fb3c8}
+.of-preguntar{display:flex;gap:8px;margin:10px 0 6px}
+.of-preguntar input{flex:1;min-width:0;min-height:44px;padding:0 10px;border:1px solid var(--lab-borde);border-radius:6px;background:#050b14;color:#fff;font:13px var(--font-mono)}
+.of-preguntar button{min-height:44px;padding:0 14px;border:1px solid var(--lab-azul);border-radius:6px;background:#0b1f42;color:#fff;font:600 11px var(--font-mono);cursor:pointer}
+.of-preguntar button:disabled{opacity:.5;cursor:default}

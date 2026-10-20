@@ -145,7 +145,9 @@ function pick(candles: SwingCandle[], limit: number, startTime?: number): SwingC
  * skipped as stale — a market that stopped trading on one exchange (Kraken
  * returns only the hours that had trades) must not pass for today's price.
  */
-type Opts = { limit?: number; startTime?: number; minCandles?: number; allowThin?: boolean; market?: "spot" | "futures"; outside?: boolean; maxAgeMs?: number; now?: number };
+type Opts = { limit?: number; startTime?: number; minCandles?: number; allowThin?: boolean; market?: "spot" | "futures"; outside?: boolean; maxAgeMs?: number; now?: number;
+  /** Solo Kraken y Coinbase, nunca Binance: para una medición que tiene que leer siempre la misma serie (lib/agentes-servidor.ts). */
+  soloAfuera?: boolean };
 /** What every source answered on the way, for the error and for `binance`. */
 type Trail = { errors: string[]; blocked: boolean; failed: boolean };
 const statusOf = (t: Trail): BinanceStatus => (t.blocked ? "BLOQUEADO" : t.failed ? "FALLA" : "OK");
@@ -247,14 +249,14 @@ export async function fetchKlinesServer(symbol: string, interval: string, opts: 
   const futuresOnly = marketOf(symbol) === "futures";
   const spot = () => fromBinance(GLOBAL_BASES, "/api/v3/klines", query, minCandles, t);
   const futures = () => fromBinance(FUTURES_BASES_SERVER, "/fapi/v1/klines", query, minCandles, t);
-  const steps = futuresOnly ? [futures] : opts.market === "futures" ? [futures, spot] : [spot, futures];
-  if (opts.outside && !futuresOnly) {
+  const steps = opts.soloAfuera ? [] : futuresOnly ? [futures] : opts.market === "futures" ? [futures, spot] : [spot, futures];
+  if ((opts.outside || opts.soloAfuera) && !futuresOnly) {
     steps.push(
       () => fromKraken(symbol, interval, limit, minCandles, opts.startTime, t),
       () => fromCoinbase(symbol, interval, limit, minCandles, opts.startTime, t),
     );
   }
-  if (opts.allowThin && !futuresOnly) steps.push(() => fromBinance(THIN_BASES, "/api/v3/klines", query, minCandles, t));
+  if (opts.allowThin && !futuresOnly && !opts.soloAfuera) steps.push(() => fromBinance(THIN_BASES, "/api/v3/klines", query, minCandles, t));
   for (const step of steps) {
     const r = await step();
     if (r && opts.maxAgeMs && !opts.startTime && (opts.now ?? Date.now()) - r.candles[r.candles.length - 1].openTime > opts.maxAgeMs) {

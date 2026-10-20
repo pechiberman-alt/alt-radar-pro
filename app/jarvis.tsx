@@ -1,5 +1,6 @@
 "use client";
 
+import { oficinaParaJarvis } from "../lib/oficina-run.ts";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { openInMap, showSection } from "@/lib/account-events";
 import { eligible } from "@/lib/decoupling";
@@ -902,6 +903,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
               brainRef.current = "local";
               return speak(text, tag);
             };
+            // La oficina de los agentes 24/7, para que JARVIS hable de cada agente con sus datos (una lectura cada 5 minutos).
+            const oficina = await oficinaParaJarvis();
             let r: Response;
             try {
               r = await fetch("/api/analyst/ai", {
@@ -923,6 +926,8 @@ function JarvisInner({ getContext, screen }: JarvisProps) {
                     backtest: subject && lastBacktest()?.symbol === subject ? backtestForAi(lastBacktest()!) : null,
                     // The simulated multi-agent lab: state, agents, risk and the registry, with its sample sizes.
                     laboratorio: labParaIa(labFoto),
+                    // Los agentes de papel 24/7 del servidor: posiciones, charla, lo que aprenden y propuestas, con su muestra.
+                    oficina,
                   },
                   history: lines.slice(-6).map((l) => ({ role: l.who === "yo" ? "user" : "assistant", content: l.text })),
                 }),

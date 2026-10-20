@@ -24,6 +24,8 @@ export type ServerSnapshot = {
   estudio?: string;
   /** El agente de papel Supertrend MTF + Volumen de la cuenta: entradas abiertas y cerradas, con su muestra. */
   agenteSt?: { abiertas: number; cerradas: number; ganadas: number; netoR: number; muestra: string };
+  /** La oficina de los agentes 24/7 del servidor (lib/oficina.ts, oficinaParaIa): para hablar de cada agente con sus datos. */
+  oficina?: unknown;
 };
 
 export function buildServerSnapshot(parts: Omit<ServerSnapshot, "at" | "note">, now = Date.now()): ServerSnapshot {

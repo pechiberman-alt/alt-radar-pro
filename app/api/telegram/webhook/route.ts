@@ -11,6 +11,8 @@ import { coreStatusSpeech, GRADE_LABEL } from "@/lib/jarvis-core";
 import { coreSnapshot } from "@/lib/jarvis-core-db";
 import { learnSpeech } from "@/lib/jarvis-learn";
 import { sharedJson } from "@/lib/shared-cache";
+import { textoAgenteTelegram, textoOficinaTelegram } from "@/lib/oficina";
+import { oficinaServidor } from "@/lib/oficina-db";
 import type { TgVoice } from "@/lib/telegram-voice";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +24,8 @@ const HELP =
   "/resultados — cuántas señales llegaron a TP1, TP2, TP3 o al SL, por tipo\n" +
   "/jarvis — estado del núcleo 24/7, señales abiertas y registro\n" +
   "/aprendizaje — qué aprendió JARVIS estudiando el mercado\n" +
+  "/oficina — los agentes 24/7: qué tienen abierto, la reunión de la semana y lo que aprenden\n" +
+  "/agente amd — hablar con un agente: su ficha y lo que dice\n" +
   "/alerta BTC 90000 — te aviso cuando llegue a ese precio · /alertas · /borrar N\n" +
   "/nuevo — empezar una conversación nueva\n" +
   "/stop — dejar de recibir alertas\n\n" +
@@ -165,6 +169,9 @@ export async function POST(request: NextRequest) {
         `🤖 <b>JARVIS · núcleo 24/7</b>\n${esc(coreStatusSpeech(snap, now))}${lines.length ? `\n\n<b>Abiertas</b>\n${lines.join("\n")}` : ""}\n<i>No es asesoramiento financiero.</i>`,
       );
     }
+  } else if (cmd === "oficina" || cmd === "agente") {
+    const { oficina, estado } = await oficinaServidor(env.DB);
+    await sendMessage(token, chat, cmd === "oficina" || !arg ? textoOficinaTelegram(oficina, estado) : textoAgenteTelegram(oficina, arg));
   } else if (cmd === "resultados") {
     const stats = await getPlanStatsCached(env.DB, Date.now()).catch(() => []);
     await sendMessage(token, chat, resultsMessage(stats, STATS_DAYS));

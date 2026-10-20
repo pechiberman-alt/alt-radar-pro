@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 640 · objetivos: 18 · sin objetivo: 0
-- Tablas D1: 50 · secretos: 5 · variables de entorno: 25 · rutas /api: 56 · hosts: 58
-- Código de navegador: 69 archivos con "use client" que alcanzan 210 · problemas: 0
-- Lib sin prueba directa: 24 de 202
+- Archivos: 646 · objetivos: 18 · sin objetivo: 0
+- Tablas D1: 52 · secretos: 5 · variables de entorno: 25 · rutas /api: 56 · hosts: 58
+- Código de navegador: 69 archivos con "use client" que alcanzan 212 · problemas: 0
+- Lib sin prueba directa: 26 de 207
 
 ## Objetivos
 
@@ -410,7 +410,7 @@ Pendiente: Entrar al registro unificado (FUENTES y lib/registro-db.ts) cuando un
 - `tests/axi-db.test.ts` — Pruebas del almacenamiento del diario de Axi (lib/axi-db.ts): que importar dos veces no duplique, que cada persona vea solo lo suyo, que el tope de 500 se cumpla sin COUNT(*) y que
 - `tests/axi-diario.test.ts` — Pruebas del diario de Axi (lib/axi-diario.ts): que cada ejecución del conector se valide o se rechace con su motivo, que un dato faltante no se complete con cero, que el neto sea p
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (62)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (68)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -433,6 +433,9 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `docs/estudio-estrategias.md` — Estudio de estrategias del AI TRADING LAB
 - `lib/agentes-explicado.ts` — Qué mira cada agente, en palabras de todos los días.
 - `lib/agentes-papel.ts` — Todos los agentes del estudio corriendo hacia adelante en papel (PLAN_AGENTES_1).
+- `lib/agentes-servidor-db.ts` — La base de los agentes de papel del servidor (PLAN_SERVIDOR_1, lib/agentes-servidor.ts): una tabla global (no es de ninguna cuenta), con índice por moneda y estado para leer las ab
+- `lib/agentes-servidor-run.ts` — La corrida del cron de los agentes del servidor (lib/agentes-servidor.ts): a la moneda de turno le trae las velas de 4 h de Kraken (nunca de Binance, para que la serie no cambie),
+- `lib/agentes-servidor.ts` — Los agentes de papel corriendo las 24 horas en el servidor (PLAN_SERVIDOR_1), con la app cerrada.
 - `lib/amd-ifvg.ts` — El agente «AMD + IFVG» (AMD_IFVG): acumulación, manipulación y distribución en la temporalidad de la serie, con la entrada en el IFVG de la última pata.
 - `lib/aprender.ts` — El contenido de APRENDER, la pestaña para quien recién empieza en el AI TRADING LAB: qué es una vela, qué es un gatillo, cómo se miden el riesgo y los costos, por qué el winrate so
 - `lib/breaker-busqueda.ts` — La búsqueda de la mejor confirmación y configuración del breaker block (BREAKER_BLOCK): un order block (la última vela contraria antes de un impulso que rompió estructura, ver lib/
@@ -450,6 +453,8 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/lab.ts` — AI TRADING LAB: la foto del laboratorio armada con lo que la app ya tiene (la araña en vivo, el backtest, el papel, el registro y el gestor de riesgo).
 - `lib/lectura-novato.ts` — La lectura para novatos: traduce las métricas del backtest (lib/lab-evaluacion.ts) a frases en castellano que alguien sin experiencia entienda, sin inventar nada.
 - `lib/linea-busqueda.ts` — La búsqueda de la mejor confirmación y configuración de la ruptura de línea de tendencia (TENDENCIA_LINEA, en lib/estrategias.ts).
+- `lib/oficina-db.ts` — La oficina del servidor (los agentes 24/7, lib/agentes-servidor.ts) leída una vez cada 5 minutos para todos: la pantalla, Telegram y JARVIS usan la misma lectura.
+- `lib/oficina-run.ts` — La oficina del servidor para JARVIS en la app: una lectura de /api/oficina cada 5 minutos como mucho, ya resumida para la IA (lib/oficina.ts, oficinaParaIa).
 - `lib/oficina.ts` — La oficina del fondo: cada agente de papel en su escritorio, agrupados en mesas como un fondo de comercio.
 - `lib/practica-gatillo.ts` — La práctica del gatillo: la persona ve las velas hasta una vela `i` y decide si la estrategia elegida dispara al cierre de esa vela y hacia dónde (LONG, SHORT o no hay gatillo).
 - `lib/preregistro-flujo.ts` — Preregistro del flujo real: cuatro filtros sobre el Agente Supertrend MTF + Volumen, fijados el 14/10/2026 ANTES de mirar datos de volumen taker, funding u open interest.
@@ -458,6 +463,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/universos.ts` — Los universos de monedas: grupos con los que trabajan los agentes (gemas, pumpeo, infraestructura y DeFi, las 10 del estudio).
 - `tests/agentes-explicado.test.ts` — Pruebas de las explicaciones de los agentes (lib/agentes-explicado.ts): que todos los agentes del estudio tengan la suya, que estén en castellano simple y que ninguna prometa ganan
 - `tests/agentes-papel.test.ts` — Pruebas de los agentes en papel (lib/agentes-papel.ts): que no se mire el futuro, que la entrada sea la apertura siguiente con la escalera completa, que la clave no duplique entrad
+- `tests/agentes-servidor.test.ts` — Pruebas de los agentes de papel del servidor (lib/agentes-servidor.ts): el turno de cada moneda, la clave, que las entradas son las mismas de los agentes del navegador y no miran e
 - `tests/amd-ifvg.test.ts` — Pruebas del agente AMD + IFVG (lib/amd-ifvg.ts): el patrón completo dispara en la vela del IFVG con su stop y objetivo, el corto es el espejo, un rango alto no es acumulación, y ni
 - `tests/aprender.test.ts` — Pruebas del contenido de APRENDER (lib/aprender.ts): cada lección tiene texto y preguntas, cada respuesta correcta existe dentro de sus opciones, los ids no se repiten, el glosario
 - `tests/breaker-busqueda.test.ts` — Pruebas de la búsqueda del breaker block (lib/breaker-busqueda.ts): el caso armado a mano que lo forma, cada confirmación con su caso que la cumple y el que no, la zona que falla a
@@ -717,6 +723,8 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 ## Tablas D1
 
 - `agente_st_senales` — crea: lib/agente-st-db.ts · usa: lib/agente-st-db.ts · índices: agente_st_senales_reciente
+- `agentes_servidor` — crea: lib/agentes-servidor-db.ts · usa: lib/agentes-servidor-db.ts · índices: agentes_servidor_abiertas, agentes_servidor_reciente
+- `agentes_servidor_estado` — crea: lib/agentes-servidor-db.ts · usa: lib/agentes-servidor-db.ts · sin índice visible en el código
 - `ai_free_usage` — crea: lib/ai-brains.ts, tests/telegram-voice.test.ts · usa: lib/ai-brains.ts, tests/ai-brains.test.ts, tests/jarvis-mind.test.ts, tests/telegram-voice.test.ts · sin índice visible en el código
 - `ai_probe` — crea: lib/ai-probe.ts · usa: lib/ai-probe.ts · sin índice visible en el código
 - `ai_usage` — crea: lib/ai-analyst-server.ts · usa: lib/ai-analyst-server.ts, tests/ai-brains.test.ts · sin índice visible en el código
@@ -927,4 +935,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

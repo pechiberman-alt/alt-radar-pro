@@ -12,6 +12,8 @@
  */
 import { explicadoDe } from "./agentes-explicado.ts";
 import { leerClavePapel } from "./agentes-papel.ts";
+import { leerClaveServidor } from "./agentes-servidor.ts";
+import { forAi } from "./ai-numbers.ts";
 import { compararConsenso, type Comparacion, type ResultadoConsenso } from "./consenso.ts";
 import { ESTRATEGIAS } from "./estrategias.ts";
 import { contar, estadistica, MUESTRA_MINIMA, type Estadistica, type OperacionLeida } from "./registro.ts";
@@ -71,25 +73,31 @@ export type Oficina = {
 /** De qué agente es una entrada; null si la clave no tiene una forma conocida. */
 export function agenteDeClave(clave: string): string | null {
   if (clave.startsWith("st:")) return ID_ST;
+  if (clave.startsWith("sv:")) return leerClaveServidor(clave)?.estrategia ?? null;
   return leerClavePapel(clave)?.estrategia ?? null;
 }
 
 const leida = (f: FilaOficina): OperacionLeida => (f.desenlace === "ABIERTA" ? { r: null, abierta: true } : { r: f.r, abierta: false });
 
 /** Los agentes que tienen escritorio: todos los del estudio salvo el control al azar, más el agente ST con filtro de régimen. */
-export function plantel(): { id: string; agente: string; mira: string }[] {
+export function plantel(conSt = true): { id: string; agente: string; mira: string }[] {
   const delEstudio = ESTRATEGIAS.filter((e) => e.id !== "AZAR").map((e) => ({ id: e.id as string, agente: e.agente, mira: explicadoDe(e.id)?.mira ?? e.nombre }));
+  if (!conSt) return delEstudio;
   return [...delEstudio, { id: ID_ST, agente: "Agente Supertrend + régimen de BTC", mira: "La tendencia del Supertrend en varias temporalidades, con volumen, y solo si BTC acompaña." }];
 }
 
-export function armarOficina(filas: FilaOficina[] | null, ahora: number): Oficina {
+/**
+ * `plan`: CUENTA son tus agentes del navegador (con el agente ST); SERVIDOR, los que corren 24/7 en el Worker con velas de
+ * Kraken (el agente ST no corre ahí: necesita las velas de BTC de Binance para su filtro).
+ */
+export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "CUENTA" | "SERVIDOR" = "CUENTA"): Oficina {
   const por = new Map<string, FilaOficina[]>();
   for (const f of filas ?? []) {
     const id = agenteDeClave(f.clave);
     if (id) por.set(id, [...(por.get(id) ?? []), f]);
   }
   const desde = ahora - SEMANA_MS;
-  const escritorios: Escritorio[] = plantel().map((p) => {
+  const escritorios: Escritorio[] = plantel(plan === "CUENTA").map((p) => {
     const suyas = por.get(p.id) ?? [];
     const semana = suyas.filter((f) => f.desenlace !== "ABIERTA" && typeof f.cerrada === "number" && f.cerrada >= desde && f.cerrada <= ahora);
     return {
@@ -193,4 +201,77 @@ export function propuestas(o: Oficina): Propuesta[] {
 /** Cómo se nombra el mejor de la semana sin mentir: si todos perdieron, es el que menos perdió. */
 export function tituloSemana(e: Escritorio): string {
   return e.semana.neto > 0 ? "Mejor neto" : e.semana.neto === 0 ? "Nadie ganó; empató" : "Nadie ganó esta semana; el que menos perdió";
+}
+
+// ── Para hablar con la oficina desde JARVIS y Telegram: lo mismo que muestra la pantalla, compacto y con los números en formato argentino ──
+
+/** Lo que recibe la IA: escritorios con actividad, la charla, lo que aprenden y las propuestas. Los números ya formateados (forAi). */
+export function oficinaParaIa(o: Oficina, plan: "CUENTA" | "SERVIDOR") {
+  const activos = o.escritorios.filter((e) => e.total.cerradas > 0 || e.abiertas.length > 0);
+  return forAi({
+    plan: plan === "SERVIDOR" ? "servidor 24/7, velas de Kraken, papel" : "tu cuenta, en el navegador, papel",
+    sinDatos: o.sinDatos,
+    agentesSinActividad: o.escritorios.length - activos.length,
+    escritorios: activos.slice(0, 20).map((e) => ({
+      agente: e.agente,
+      cerradas: e.total.cerradas,
+      netoR: Math.round(e.total.neto * 100) / 100,
+      rPorOperacion: e.total.expectancia === null ? null : Math.round(e.total.expectancia * 1000) / 1000,
+      muestra: e.total.muestra === "MINIMA" ? "muestra mínima (menos de 15)" : e.total.muestra === "SIN DATOS" ? "sin cierres" : "razonable",
+      abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`),
+    })),
+    charla: charla(o).slice(0, 12).map((f) => `${f.nombre}: ${f.texto}`),
+    aprendizaje: o.aprendizaje.texto,
+    propuestas: propuestas(o).map((p) => `${corto(p.agente)}: ${p.texto}`),
+    regla: "Cada agente decide solo con su regla fija. Nada se cambia ni se pausa sin que la persona lo apruebe. Es papel, no asesoramiento financiero.",
+  });
+}
+
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const sinAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/** /oficina en Telegram: en directo, la reunión de la semana, lo que aprenden y las propuestas. */
+export function textoOficinaTelegram(o: Oficina, estado: { error: string | null }[] = []): string {
+  if (o.sinDatos) return "🏢 No pude leer la oficina ahora: sin datos (no es cero). Probá en un rato.";
+  const fallas = estado.filter((e) => e.error).length;
+  const directo = o.escritorios.flatMap((e) => e.abiertas.map((a) => `• ${esc(corto(e.agente))} · ${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`));
+  const mejor = o.reunion[0];
+  const partes = [
+    "🏢 <b>Oficina del fondo · servidor 24/7</b>\n<i>Velas de Kraken, papel. Cada agente con su regla fija.</i>",
+    directo.length ? `<b>En directo</b>\n${directo.slice(0, 10).join("\n")}${directo.length > 10 ? `\n… y ${directo.length - 10} más` : ""}` : "<b>En directo</b>\nSin posiciones abiertas.",
+    mejor
+      ? `<b>Reunión de la semana</b>\n${tituloSemana(mejor)}: ${esc(corto(mejor.agente))}, ${r2(mejor.semana.neto)} con ${mejor.semana.cerradas} ${mejor.semana.cerradas === 1 ? "cierre" : "cierres"}${mejor.semana.muestra === "MINIMA" ? " (muestra mínima)" : ""}.`
+      : "<b>Reunión de la semana</b>\nNadie cerró en 7 días.",
+    `<b>Lo que aprenden</b>\n${esc(o.aprendizaje.texto)}`,
+  ];
+  const props = propuestas(o);
+  partes.push(props.length ? `<b>Propuestas para vos</b>\n${props.map((p) => `• ${esc(corto(p.agente))}: ${esc(p.texto)}`).join("\n")}` : "<b>Propuestas</b>\nNingún agente llegó a 15 cierres: seguir midiendo.");
+  if (fallas) partes.push(`<i>En la última vuelta, ${fallas} ${fallas === 1 ? "moneda no respondió" : "monedas no respondieron"} en Kraken.</i>`);
+  partes.push("Hablá con uno: /agente nombre (ej. /agente amd). <i>No es asesoramiento financiero.</i>");
+  return partes.join("\n\n");
+}
+
+/** Busca un agente por una parte de su nombre, sin importar acentos ni mayúsculas. */
+export function buscarAgente(o: Oficina, nombre: string): Escritorio | null {
+  const q = sinAcento(nombre.trim());
+  if (!q) return null;
+  return o.escritorios.find((e) => sinAcento(corto(e.agente)) === q) ?? o.escritorios.find((e) => sinAcento(e.agente).includes(q) || sinAcento(e.id).includes(q)) ?? null;
+}
+
+/** /agente nombre en Telegram: su ficha y lo que dice, con su muestra. */
+export function textoAgenteTelegram(o: Oficina, nombre: string): string {
+  const e = buscarAgente(o, nombre);
+  if (!e) return `No encontré ese agente. Están: ${o.escritorios.map((x) => esc(corto(x.agente))).join(", ")}.`;
+  const t = e.total;
+  const dice = charla(o).filter((f) => f.quien === e.id).map((f) => `«${esc(f.texto)}»`);
+  return [
+    `🧑‍💼 <b>${esc(e.agente)}</b> · ${MESAS.find((m) => m.id === e.mesa)?.nombre ?? ""}`,
+    esc(e.mira),
+    t.cerradas
+      ? `Cerradas: ${t.cerradas} · acierto ${t.winRate === null ? "—" : `${Math.round(t.winRate * 100)} %`}${t.muestra === "MINIMA" ? " (muestra mínima)" : ""} · ${r2(t.expectancia ?? 0)} por operación · neto ${r2(t.neto)}`
+      : "Todavía sin cierres.",
+    e.abiertas.length ? `Abiertas: ${e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}` : "Sin posiciones abiertas.",
+    ...dice,
+    "<i>Papel, servidor 24/7, velas de Kraken. No es asesoramiento financiero.</i>",
+  ].join("\n");
 }

@@ -8,6 +8,8 @@ import { archiveCoreLiquidity } from "../lib/liquidity-archive";
 import { runCoreTick } from "../lib/jarvis-core-db";
 import { probeFreeBrain } from "../lib/ai-probe";
 import { runMindHour } from "../lib/jarvis-mind-db";
+import { runAgentesServidor } from "../lib/agentes-servidor-run";
+import { CRON_SERVIDOR } from "../lib/agentes-servidor";
 import type { AiLike } from "../lib/ai-brains";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
@@ -152,6 +154,14 @@ const worker = {
           .catch((error) => {
             console.error("[ALT_RADAR_TELEGRAM_SCHEDULED]", error);
           }),
+      );
+    }
+    // Los agentes de papel 24/7 (lib/agentes-servidor.ts): una moneda por corrida, en su propio cron para no compartir CPU.
+    if (controller.cron === CRON_SERVIDOR) {
+      ctx.waitUntil(
+        runAgentesServidor(env.DB, controller.scheduledTime).catch((error) => {
+          console.error("[ALT_RADAR_AGENTES_SERVIDOR]", error);
+        }),
       );
     }
     // Scalping automation: switched off with the confluence engine (see above).
