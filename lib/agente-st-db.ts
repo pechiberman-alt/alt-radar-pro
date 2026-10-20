@@ -127,6 +127,17 @@ export async function resultadosSt(db: D1Database, userId: number, limite: numbe
   ).results;
 }
 
+/** Lo que lee la oficina del fondo (lib/oficina.ts): las últimas entradas de todos los agentes de papel, por índice y con tope. */
+export async function filasOficina(db: D1Database, userId: number, limite: number) {
+  await ensureAgenteSt(db);
+  return (
+    await db
+      .prepare("SELECT clave, symbol, lado, r, desenlace, cerrada, detectada FROM agente_st_senales WHERE user_id = ?1 ORDER BY detectada DESC LIMIT ?2")
+      .bind(userId, limite)
+      .all<{ clave: string; symbol: string; lado: string; r: number | null; desenlace: string; cerrada: number | null; detectada: number }>()
+  ).results;
+}
+
 export type RecienteSt = FilaSt & {
   foto: string;
   sl_at: number | null;

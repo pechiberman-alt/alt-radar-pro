@@ -7,6 +7,7 @@
  * Cada señal se calcula con velas cerradas hasta la vela `i` inclusive; la entrada es la apertura de la vela
  * siguiente y el recorrido usa solo velas posteriores. Una operación por vez por moneda y estrategia.
  */
+import { senalesAmd } from "./amd-ifvg.ts";
 import { escaleraHacia, escaleraValida, recorrer, type Escalera, type Lado } from "./escalera.ts";
 
 /** La escalera con TP1 y TP2 propios (ya llevados a la entrada real); null si no queda ordenada. */
@@ -19,7 +20,7 @@ import type { SwingCandle } from "./swing-entries.ts";
 import { CONFIGURACION_AGENTE_FIB, senalesFib } from "./fibonacci-niveles.ts";
 import { CONFIGURACION_BASE_SMC, DISPARO_DEL_AGENTE, senalesSmc, type FiltroSmc } from "./smc-liquidez.ts";
 
-export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "FIB_NIVELES" | "AZAR";
+export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "FIB_NIVELES" | "AMD_IFVG" | "AZAR";
 
 /** Lo que una estrategia propone en la vela i: lado, stop y objetivo final (TP3). Sin señal, null. */
 export type Senal = { lado: Lado; stop: number; objetivo: number; /** Objetivos propios de la estrategia; sin ellos, TP1 y TP2 van a un tercio y dos tercios del camino al TP3. */ tp1?: number; tp2?: number };
@@ -487,6 +488,13 @@ const conRR = (lado: Lado, entrada: number, stop: number, rr: number): Senal => 
 /** Las señales del agente de liquidez, calculadas una vez por serie (son de toda la serie, pero cada una usa solo velas hasta su vela). */
 const SENALES_SMC = new WeakMap<SwingCandle[], Map<FiltroSmc, (i: number) => Senal | null>>();
 const SENALES_FIB = new WeakMap<SwingCandle[], (i: number) => Senal | null>();
+const SENALES_AMD = new WeakMap<SwingCandle[], (i: number) => Senal | null>();
+/** Las señales del agente AMD + IFVG, una vez por serie (cada una usa solo velas hasta la suya). */
+function senalAmd(v: SwingCandle[], ind: Indicadores, i: number): Senal | null {
+  let f = SENALES_AMD.get(v);
+  if (!f) SENALES_AMD.set(v, (f = senalesAmd(v, ind.atr14)));
+  return f(i);
+}
 function senalFib(v: SwingCandle[], ind: Indicadores, i: number): Senal | null {
   let f = SENALES_FIB.get(v);
   if (!f) SENALES_FIB.set(v, (f = senalesFib(v, ind.atr14, CONFIGURACION_AGENTE_FIB)));
@@ -727,6 +735,13 @@ export const ESTRATEGIAS: Estrategia[] = [
     nombre: "Retroceso de Fibonacci 0,618–0,786 con extensiones 1 / 1,272 / 1,618 y un nivel clave en la zona",
     regla: "Toma la última pierna de impulso (pivotes de 5 velas, al menos 2 ATR) y espera el retroceso al bolsillo dorado (0,618 a 0,786). Entra en la primera vela que lo toca y cierra a favor, sin cerrar más allá de la zona, solo si el máximo o el mínimo del día o de la semana anteriores cae dentro de la zona (a 0,25 ATR o menos). Stop a 0,25 ATR del origen de la pierna. Objetivos en la escalera de Fibonacci: TP1 en la extensión 1 (volver al extremo del impulso), TP2 en 1,272 y TP3 en 1,618. Una señal por pierna. Configuración fijada de antemano.",
     senal: (v, ind, i) => senalFib(v, ind, i),
+  },
+  {
+    id: "AMD_IFVG",
+    agente: "Agente AMD + IFVG",
+    nombre: "Acumulación, manipulación y distribución, con entrada en el IFVG de la última pata",
+    regla: "Busca un rango de acumulación (las 20 velas anteriores, de 4 ATR de alto o menos) que una vela barre por un solo lado (manipulación). Dentro de las 12 velas siguientes espera el IFVG de la última pata: un hueco de valor justo en contra, formado desde 5 velas antes de la barrida, que una vela cierra por el otro lado, con el cierre de vuelta adentro del rango. Entra en esa vela. Stop a 0,5 ATR del extremo de la manipulación. Objetivo 2 R. Es fractal: la misma regla en cualquier temporalidad. Configuración fijada de antemano.",
+    senal: (v, ind, i) => senalAmd(v, ind, i),
   },
   {
     id: "AZAR",

@@ -1,5 +1,5 @@
 /**
- * Cuentas de fondeo (prop firms) para XAUUSDT y NASDAQ, con prioridad, y el «Agente Fondeo»: un agente SIN estrategia propia
+ * Cuentas de fondeo (prop firms) para XAUUSDT, XAGUSDT (plata) y NASDAQ, con prioridad, y el «Agente Fondeo»: un agente SIN estrategia propia
  * que se conecta a los demás (la mesa de JARVIS TRADING y los agentes del laboratorio le pasan sus propuestas) y las pasa por la
  * compuerta de las reglas de la cuenta de fondeo: pérdida diaria, pérdida total y objetivo. Si una propuesta rompería un límite
  * (o se queda sin margen), la ajusta a la baja o la frena y dice por qué. No inventa señales, no mide aciertos y no manda órdenes.
@@ -8,7 +8,7 @@
  */
 
 export type InstrumentoFondeo = {
-  clave: "XAU" | "NASDAQ";
+  clave: "XAU" | "XAG" | "NASDAQ";
   nombre: string;
   /** Símbolo del perpetuo en Binance; null mientras no esté confirmado (no se adivina). */
   symbol: string | null;
@@ -35,7 +35,8 @@ export const SIMBOLOS_AXI = Object.freeze({
 
 export const INSTRUMENTOS_FONDEO: readonly InstrumentoFondeo[] = Object.freeze([
   { clave: "XAU", nombre: "Oro", symbol: "XAUUSDT", prioridad: 1 },
-  { clave: "NASDAQ", nombre: "NASDAQ", symbol: NASDAQ_SIMBOLO, prioridad: 2 },
+  { clave: "XAG", nombre: "Plata", symbol: "XAGUSDT", prioridad: 2 },
+  { clave: "NASDAQ", nombre: "NASDAQ", symbol: NASDAQ_SIMBOLO, prioridad: 3 },
 ]);
 
 export const simbolosFondeo = (): string[] => INSTRUMENTOS_FONDEO.flatMap((i) => (i.symbol ? [i.symbol] : []));

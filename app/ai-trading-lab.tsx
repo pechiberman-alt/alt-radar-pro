@@ -20,6 +20,7 @@ import { lecturaTramo, veredictoNovato } from "../lib/lectura-novato.ts";
 import { MONEDAS_PRACTICA } from "../lib/practica-gatillo.ts";
 import AprenderLab from "./aprender-lab";
 import LabPiso from "./lab-piso";
+import LabOficina from "./lab-oficina";
 
 /**
  * AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES. Junta en un panel para el celular el estado real del motor de la
@@ -27,11 +28,12 @@ import LabPiso from "./lab-piso";
  * Solo simulación: no hay ningún camino a una orden real. Sin dato de avance, el avance es indeterminado.
  */
 
-type Pestana = "aprender" | "centro" | "agentes" | "practica" | "backtest" | "riesgo" | "jarvis" | "actividad";
+type Pestana = "aprender" | "centro" | "oficina" | "agentes" | "practica" | "backtest" | "riesgo" | "jarvis" | "actividad";
 const PESTANAS: [Pestana, string][] = [
   ["aprender", "APRENDER"],
   ["practica", "PRÁCTICA"],
   ["centro", "CENTRO"],
+  ["oficina", "OFICINA"],
   ["agentes", "AGENTES"],
   ["backtest", "BACKTEST"],
   ["riesgo", "PAPEL Y RIESGO"],
@@ -254,6 +256,12 @@ export default function AiTradingLab() {
             <li className={f.vivo?.registro?.fuentes.some((x) => x.ambito === "CUENTA" && x.disponible) ? "ok" : "mal"}>Tu cuenta: {f.vivo?.registro?.fuentes.some((x) => x.ambito === "CUENTA" && x.disponible) ? "con sesión" : "sin sesión (papel en este equipo)"}</li>
             <li className="ok">Ejecución real: bloqueada en este laboratorio</li>
           </ul>
+        </div>
+      )}
+
+      {pestana === "oficina" && (
+        <div className="lab-cuerpo">
+          <LabOficina />
         </div>
       )}
 

@@ -132,3 +132,12 @@ test("los símbolos de Axi quedan anotados aparte de los de Binance: son mercado
   assert.equal(NASDAQ_SIMBOLO, null);
   assert.notEqual(SIMBOLOS_AXI.XAU, "XAUUSDT");
 });
+
+test("la plata (XAGUSDT) es instrumento de fondeo detrás del oro y corre en papel con su propio plan, sin estudio previo", async () => {
+  const { planDe, sinEstudioPrevio, SIMBOLOS_PAPEL, PLAN_FONDEO } = await import("../lib/agentes-papel.ts");
+  assert.equal(prioridadFondeo("XAGUSDT"), 2);
+  assert.ok(prioridadFondeo("XAUUSDT") < prioridadFondeo("XAGUSDT"));
+  assert.ok(SIMBOLOS_PAPEL.includes("XAGUSDT"));
+  assert.equal(planDe("XAGUSDT"), PLAN_FONDEO);
+  assert.equal(sinEstudioPrevio("XAGUSDT"), true);
+});

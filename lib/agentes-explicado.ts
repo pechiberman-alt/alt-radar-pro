@@ -85,6 +85,10 @@ export const EXPLICADO: Record<string, Explicado> = {
     mira: "Ese barrido, pero exigiendo además varias confirmaciones de tendencia y de volumen.",
     idea: "Pedir todo junto deja muchas menos entradas, con la idea de que sean mejores.",
   },
+  AMD_IFVG: {
+    mira: "Un precio quieto en un rango, un tirón falso que barre un lado, y la vuelta que deja un hueco cerrado al revés.",
+    idea: "El tirón falso junta las órdenes de los apurados; cuando el precio vuelve adentro del rango, suele ir para el otro lado.",
+  },
   FIB_NIVELES: {
     mira: "Cuánto retrocedió el precio de su último tramo, en proporciones fijas, cerca de los máximos o mínimos del día o la semana.",
     idea: "Hay proporciones de retroceso que mucha gente mira, y los niveles del día concentran órdenes.",
