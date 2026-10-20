@@ -182,7 +182,11 @@ export default function LabOficina() {
   const { puestos, filas, bloques } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
   const frases = charla(oficina);
   const propias = propuestas(oficina);
-  const hablan = frases.filter((f) => f.quien !== "JARVIS");
+  // Lo que se oye en la oficina: lo que dice cada uno y lo que se dicen entre ellos.
+  const hablan: Frase[] = [
+    ...frases.filter((f) => f.quien !== "JARVIS"),
+    ...oficina.conversaciones.flatMap((d) => d.lineas.map((l) => ({ quien: l.quien, nombre: l.nombre, texto: l.texto, tipo: "acuerdo" as const }))),
+  ];
   const actual: Frase | null = hablan.length ? hablan[turno % hablan.length] : null;
   const elegidoE = oficina.escritorios.find((e) => e.id === elegido) ?? null;
   const enDirecto = oficina.escritorios.flatMap((e) => e.abiertas.map((a) => ({ e, a }))).sort((x, y) => y.a.detectada - x.a.detectada);
@@ -251,7 +255,7 @@ export default function LabOficina() {
                   <span className="of-tapa" />
                   <span className="of-frente" />
                   <span className="of-lado" />
-                  <span className="of-monitor">{e.abiertas.length ? e.abiertas.length : ""}</span>
+                  <span className={`of-monitor${e.total.muestra === "MINIMA" ? " of-monitor-poca" : ""}`} title="Acierto">{e.total.winRate === null ? "—" : `${Math.round(e.total.winRate * 100)}%`}</span>
                 </span>
                 <span className="of-parado">
                   <Persona tonoCamisa={tono(e)} />
@@ -295,6 +299,7 @@ export default function LabOficina() {
               <dt>Acierto</dt>
               <dd>
                 {pct(elegidoE.total.winRate)}
+                {elegidoE.total.intervalo && <small> ({pct(elegidoE.total.intervalo.low)} a {pct(elegidoE.total.intervalo.high)})</small>}
                 {elegidoE.total.muestra === "MINIMA" && <small> muestra mínima</small>}
               </dd>
             </div>
@@ -306,6 +311,16 @@ export default function LabOficina() {
             <p>Abiertas: {elegidoE.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}</p>
           )}
           {frases.filter((f) => f.quien === elegidoE.id).map((f) => <p key={f.texto} className="of-dice">«{f.texto}»</p>)}
+          <h5 className="of-ficha-sub">Cómo se ve</h5>
+          <p className="of-dice">«{elegidoE.conciencia}»</p>
+          <h5 className="of-ficha-sub">Lo que aprendió</h5>
+          <ul className="of-lecciones">
+            {elegidoE.lecciones.map((l) => (
+              <li key={l.tema}>
+                {l.texto} <span className={l.firme ? "of-firme" : "of-floja"}>{l.firme ? "firme" : "todavía no firme"}</span>
+              </li>
+            ))}
+          </ul>
           <div className="of-conversa" aria-live="polite">
             {(chat[elegidoE.id] ?? []).map((l, k) => (
               <p key={k} className={`of-msg of-msg-${l.de}`}>
@@ -327,6 +342,51 @@ export default function LabOficina() {
           </form>
           <small>Papel, velas de 4 h{plan === "SERVIDOR" ? " de Kraken" : ""}. No es asesoramiento financiero.</small>
         </article>
+      )}
+
+      <div className="of-tabla-caja">
+        <h4>Acierto de cada uno</h4>
+        <p className="of-tenue">Ordenado por el piso del intervalo del 90 %: premia la muestra, no la suerte. Con menos de 15 cierres, muestra mínima.</p>
+        {oficina.ranking.length ? (
+          <table className="of-tabla">
+            <thead>
+              <tr><th>Agente</th><th>Cierres</th><th>Acierto (IC 90 %)</th><th>PF</th><th>Por op.</th></tr>
+            </thead>
+            <tbody>
+              {oficina.ranking.map((e) => (
+                <tr key={e.id} className={e.total.muestra === "MINIMA" ? "of-fila-poca" : ""} onClick={() => setElegido(e.id)}>
+                  <td>{nombreCorto(e.agente)}</td>
+                  <td>{e.total.cerradas}</td>
+                  <td>
+                    {pct(e.total.winRate)}
+                    {e.total.intervalo ? ` (${pct(e.total.intervalo.low)}–${pct(e.total.intervalo.high)})` : ""}
+                  </td>
+                  <td>{n2(e.total.profitFactor)}</td>
+                  <td>{r2(e.total.expectancia)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="of-tenue">Nadie cerró todavía: el acierto aparece con el primer cierre.</p>
+        )}
+        <p className="of-tenue">{oficina.escritorios.length - oficina.ranking.length} agentes todavía sin cierres.</p>
+      </div>
+
+      {oficina.conversaciones.length > 0 && (
+        <div className="of-tabla-caja">
+          <h4>Conversaciones entre ellos</h4>
+          {oficina.conversaciones.map((d) => (
+            <div key={d.tema + d.lineas[0].texto} className="of-dialogo">
+              <b className="of-dialogo-tema">{d.tema}</b>
+              {d.lineas.map((l, k) => (
+                <p key={k} className={`of-msg ${k % 2 ? "of-msg-vos" : "of-msg-agente"}`}>
+                  <b>{l.nombre}:</b> {l.texto}
+                </p>
+              ))}
+            </div>
+          ))}
+        </div>
       )}
 
       <div className="of-listas">
@@ -379,7 +439,7 @@ export default function LabOficina() {
         <div>
           <h4>Lo que aprenden entre ellos</h4>
           <p>{oficina.aprendizaje.texto}</p>
-          <p className="of-tenue">Cada agente decide solo, con su regla. Solo queda anotado con quién coincidió, para ver si coincidir ayuda.</p>
+          <p className="of-tenue">Cada agente decide solo, con su regla. Aprenden todo el tiempo: sus lecciones se recalculan con cada cierre. Lo que no hacen es cambiarse la regla solos; eso lo aprobás vos.</p>
         </div>
       </div>
     </section>
