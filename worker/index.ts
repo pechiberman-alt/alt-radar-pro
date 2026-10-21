@@ -18,6 +18,7 @@ import { puertaDe, respuestaPuerta } from "../lib/suscripcion-db";
 import type { AiLike } from "../lib/ai-brains";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
+import { probarMercadoAr, tocaPruebaAr } from "../lib/mercado-ar-fuente";
 
 /**
  * Free sources publish dominance only as a current value. Recording it on a
@@ -163,6 +164,14 @@ const worker = {
           console.error("[ALT_RADAR_STRUCTURE_SCHEDULED]", error);
         }),
       );
+      // Diagnóstico horario del mercado argentino (Yahoo Finance): una vez por hora, en los primeros 15 minutos.
+      if (tocaPruebaAr(controller.scheduledTime)) {
+        ctx.waitUntil(
+          probarMercadoAr(env.DB, controller.scheduledTime).catch((error) => {
+            console.error("[ALT_RADAR_MERCADO_AR]", error);
+          }),
+        );
+      }
       // El aprendizaje diario de la oficina (lib/aprendizaje-diario.ts): una vez por día, a las 00:15 de Argentina. Sin IA.
       if (esHoraDelDiario(controller.scheduledTime)) {
         ctx.waitUntil(

@@ -59,6 +59,7 @@ dac8ac9522e3	103	app/api/liquidity-history/route.ts
 24fcf3c46bae	30	app/api/mapa/agentes/route.ts
 a9e76218b723	216	app/api/market-structure/route.ts
 3356888e120f	49	app/api/market/derivatives/route.ts
+ac40a7c6c2e8	41	app/api/mercado-ar/route.ts
 037cfd21c11f	27	app/api/oficina/route.ts
 bb0ab7329c8b	117	app/api/orderbook/route.ts
 f1bfc7d45533	89	app/api/performance/route.ts
@@ -156,6 +157,8 @@ d6e1ca037a9c	393	app/mapa-agentes.tsx
 db0be99a3f89	499	app/market-brain.tsx
 89b25149b415	141	app/market-structure-panel.tsx
 244b15230fb0	48	app/market-structure.css
+08b1336d6220	298	app/mercado-ar-desk.module.css
+5207ee365d66	186	app/mercado-ar-desk.tsx
 4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
 3da71069ee49	75	app/open-heatmap.css
@@ -173,7 +176,7 @@ ece7ccbad21e	206	app/puerta-pro.css
 9f9d72a3dd57	87	app/pump-radar.css
 74db3d1c5d80	350	app/pump-radar.tsx
 f58412c957a0	53	app/pwa-register.tsx
-bd9bb3a2b2b8	1373	app/radar-app.tsx
+79351a80b727	1379	app/radar-app.tsx
 72da20719972	274	app/responsive-fixes.css
 119930fcab22	76	app/risk-desk.css
 57216ff5dacb	344	app/risk-desk.tsx
@@ -199,12 +202,12 @@ fbfd8084693b	38	app/trade-journal-desk.css
 d1d42e77268a	43	app/unlock-desk.css
 75b335780f73	170	app/unlock-desk.tsx
 7d79d9a14c6a	343	app/workspace.css
-0fbec7802058	357	app/workspace.tsx
+bd6422c65a0d	358	app/workspace.tsx
 330c84e55f99	43	app/zones-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d4a923a876cb	360	docs/araña/objetivos.md
+a4ffeec19316	376	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -387,6 +390,8 @@ dad5e13476dd	150	lib/mapa-agentes.ts
 c5ba3f905dda	317	lib/market-fetch.ts
 92529383cd86	434	lib/market-providers.ts
 dca52626b743	252	lib/market-structure.ts
+ce75623846e9	103	lib/mercado-ar-fuente.ts
+7c03d66313bc	259	lib/mercado-ar.ts
 dd7f989876a5	57	lib/mesa-medicion.ts
 8de6a64346cf	57	lib/mesa-sombra-auditoria.ts
 9c00475bf5c6	164	lib/mesa-sombra-db.ts
@@ -629,6 +634,7 @@ c90b4a2a66b4	70	tests/live-market.test.ts
 9ba8d41b41a9	95	tests/mapa-contexto.test.ts
 e46e93dda3df	226	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
+31d1d7a40de0	277	tests/mercado-ar.test.ts
 4fec70e5eb48	37	tests/mesa-medicion.test.ts
 ea96d2b2093d	44	tests/mesa-sombra-auditoria.test.ts
 21cf8ab702fe	99	tests/mesa-sombra-db.test.ts
@@ -696,5 +702,5 @@ dafba0404d8e	92	tests/volume-spike.test.ts
 21b30109f4c3	79	tests/xau-alerts.test.ts
 b41bd6678407	33	tsconfig.json
 037c2ff06898	75	vite.config.ts
-cc373359d28a	202	worker/index.ts
+1532859f656f	211	worker/index.ts
 a49c24aef5a7	37	wrangler.production.jsonc
