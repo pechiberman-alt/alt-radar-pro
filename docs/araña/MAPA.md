@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 715 · objetivos: 21 · sin objetivo: 0
-- Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 61 · hosts: 63
-- Código de navegador: 74 archivos con "use client" que alcanzan 238 · problemas: 0
-- Lib sin prueba directa: 29 de 236
+- Archivos: 720 · objetivos: 21 · sin objetivo: 0
+- Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 62 · hosts: 63
+- Código de navegador: 75 archivos con "use client" que alcanzan 241 · problemas: 0
+- Lib sin prueba directa: 29 de 238
 
 ## Objetivos
 
@@ -525,23 +525,28 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 - `tests/universos.test.ts` — Pruebas de los universos de monedas (lib/universos.ts): que no se diga que un universo se puede medir cuando no hay velas descargadas, que las monedas con datos sean exactamente la
 
-### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (16)
+### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (21)
 Texto: acciones del panel líder y CEDEARs con ruedas diarias de Yahoo Finance (con demora), dentro del panel MERCADO AR y del MAPA (el buscador del mapa encuentra papeles de BYMA y muestra su vista). Las MENTES (Buffett, Graham, Lynch, crecimiento al estilo Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes del laboratorio leen cada papel y todo el panel. Balances de SEC EDGAR para los CEDEARs de empresas de EE. UU.
 Pendiente: Señales AR en el registro unificado (resolverlas con ruedas diarias en el servidor). · Balances de empresas argentinas si aparece una fuente gratis en datos. · Agentes moviéndose en la oficina cuando coinciden o discrepan; lecturas de agentes en el mapa de footprint cripto.
 - `app/api/mercado-ar/fundamentales/route.ts` — Balances anuales de la empresa de afuera de un CEDEAR, de SEC EDGAR, para las mentes de valor (Buffett, Graham, Lynch, crecimiento).
+- `app/api/mercado-ar/lote/route.ts` — Varias series de MERCADO AR en un solo pedido (hasta 12), en formato compacto (lib/mercado-ar-lote.ts): el panel entero llega en unos pocos pedidos en lugar de cien.
 - `app/api/mercado-ar/route.ts` — Velas diarias de una acción argentina o un CEDEAR (y de su acción de afuera), de Yahoo Finance, para el panel MERCADO AR.
 - `app/mercado-ar-desk.tsx` — MERCADO AR: acciones del panel líder de BYMA y CEDEARs, con ruedas diarias (Yahoo Finance, con demora).
 - `app/mercado-ar-vistas.tsx` — Las vistas de MERCADO AR que comparten el panel y el MAPA: el gráfico diario de un papel (velas, medias, soportes y resistencias, perfil de volumen aproximado, RSI y MACD), las MEN
 - `app/mercado-ar.css` — MERCADO AR: panel, escáner de agentes y mentes, y la vista de un papel en el MAPA.
+- `app/sala-mentes.tsx` — La sala de las MENTES (lib/mentes-inversoras.ts): los nueve agentes inspirados en Buffett, Graham, Lynch, Musk, Tudor Jones, Darvas, O'Neil, Templeton y Dalio en sus escritorios.
 - `lib/fundamentales-sec.ts` — Los balances de las empresas de afuera que hay detrás de los CEDEARs, de SEC EDGAR (XBRL, gratis y oficial): ingresos, ganancia neta, BPA diluido, patrimonio, pasivo y activo/pasiv
 - `lib/mentes-inversoras.ts` — Las MENTES: agentes que leen un papel con las reglas públicas de inversores famosos (Buffett, Graham, Lynch, la prédica de crecimiento de Musk, Paul Tudor Jones, Darvas, O'Neil, Te
 - `lib/mercado-ar-agentes.ts` — Los agentes del AI TRADING LAB (lib/estrategias.ts) leyendo acciones y CEDEARs de BYMA con ruedas diarias: cada uno con su estrategia fija, medido con la escalera de la app (SL, TP
 - `lib/mercado-ar-cliente.ts` — El lado del navegador de MERCADO AR: baja las series (/api/mercado-ar) y los balances (/api/mercado-ar/fundamentales), las guarda en memoria mientras la pestaña está abierta y arma
 - `lib/mercado-ar-fuente.ts` — Baja las velas diarias del mercado argentino (lib/mercado-ar.ts) desde Yahoo Finance, en el Worker: el navegador no puede (Yahoo no manda permisos CORS).
+- `lib/mercado-ar-lote.ts` — El formato compacto con el que viajan las series de MERCADO AR en lote (/api/mercado-ar/lote): cada rueda como [hora, apertura, máximo, mínimo, cierre, volumen], con los precios a
 - `lib/mercado-ar-mapa.ts` — El mapa de un papel de BYMA (acción o CEDEAR): lo que se puede dibujar honestamente con ruedas diarias.
+- `lib/mercado-ar-ranking.ts` — Las listas que arma MERCADO AR con todo el panel leído: las mejores compras según Fibonacci (precio dentro de la zona 0,618–0,786 o cerca, con su plan y lo que pasó antes en ese pa
 - `lib/mercado-ar-tecnico.ts` — El análisis técnico de un papel de BYMA con ruedas diarias, con los mismos motores del mapa cripto: zona de compra de Fibonacci (retroceso 0,618–0,786 de la última pierna alcista,
 - `lib/mercado-ar.ts` — El mercado argentino en la terminal: acciones del panel líder de BYMA y CEDEARs, con velas DIARIAS de Yahoo Finance (BYMA llega con demora; Yahoo dice cuántos minutos en `exchangeD
 - `tests/mentes-ar.test.ts` — Pruebas de las MENTES (lib/mentes-inversoras.ts), los balances de SEC (lib/fundamentales-sec.ts), los agentes sobre ruedas de BYMA (lib/mercado-ar-agentes.ts) y el mapa de un papel
+- `tests/mercado-ar-ranking.test.ts` — Pruebas de las listas de MERCADO AR (lib/mercado-ar-ranking.ts: mejores compras Fibonacci, señales con mentes y el guion de la reunión) y del formato compacto de los lotes (lib/mer
 - `tests/mercado-ar-tecnico.test.ts` — Pruebas del análisis técnico de un papel de BYMA (lib/mercado-ar-tecnico.ts): la zona de compra de Fibonacci, su historial (aguantó, falló, abierta), las semanas armadas con ruedas
 - `tests/mercado-ar.test.ts` — Mercado argentino: parse Yahoo, diagnósticos, lecturas diarias.
 
@@ -936,6 +941,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/market/derivatives` [GET] — app/api/market/derivatives/route.ts · datos-mercado
 - `/api/mercado-ar` [GET] — app/api/mercado-ar/route.ts · mercado-ar
 - `/api/mercado-ar/fundamentales` [GET] — app/api/mercado-ar/fundamentales/route.ts · mercado-ar
+- `/api/mercado-ar/lote` [GET] — app/api/mercado-ar/lote/route.ts · mercado-ar
 - `/api/oficina` [GET] — app/api/oficina/route.ts · laboratorio
 - `/api/orderbook` [GET] — app/api/orderbook/route.ts · datos-mercado
 - `/api/performance` [GET] — app/api/performance/route.ts · riesgo-diario
@@ -1025,7 +1031,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/cobros-admin.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-axi-diario.tsx, app/lab-fondeo.tsx, app/lab-oficina.tsx, app/lab-piso.tsx, app/lab-universos.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/mapa-agentes.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mercado-ar-desk.tsx, app/mercado-ar-vistas.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/puerta-pro.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/cobros-admin.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-axi-diario.tsx, app/lab-fondeo.tsx, app/lab-oficina.tsx, app/lab-piso.tsx, app/lab-universos.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/mapa-agentes.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mercado-ar-desk.tsx, app/mercado-ar-vistas.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/puerta-pro.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/sala-mentes.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa

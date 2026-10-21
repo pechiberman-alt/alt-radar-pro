@@ -240,6 +240,39 @@ export function TecnicoPanel({ analisis }: { analisis: AnalisisAr }) {
   );
 }
 
+// ── Ficha del papel ──
+
+function Ficha({ velas }: { velas: SwingCandle[] }) {
+  const v = (n: number) => (velas.length > n ? (velas.at(-1)!.close / velas[velas.length - 1 - n].close - 1) * 100 : null);
+  const anio = velas.slice(-252);
+  const lo = Math.min(...anio.map((c) => c.low));
+  const hi = Math.max(...anio.map((c) => c.high));
+  const cierre = velas.at(-1)!.close;
+  const pos = hi > lo ? ((cierre - lo) / (hi - lo)) * 100 : 50;
+  const celdas: [string, number | null][] = [["1 SEMANA", v(5)], ["1 MES", v(21)], ["3 MESES", v(63)], ["6 MESES", v(126)], ["1 AÑO", v(250)], ["DESDE EL MÁXIMO", (cierre / hi - 1) * 100]];
+  return (
+    <>
+      <div className="ar-ficha">
+        {celdas.map(([t, x]) => (
+          <div key={t}>
+            <span>{t}</span>
+            <b className={x === null ? "ar-mute" : x >= 0 ? "ar-up" : "ar-down"}>{fmtPct(x, 1)}</b>
+          </div>
+        ))}
+      </div>
+      <div>
+        <div className="ar-head ar-mute" style={{ fontSize: 10 }}>
+          <span>Mín. {anio.length >= 250 ? "52 sem." : `${anio.length} ruedas`} {fmt(lo)}</span>
+          <span>Máx. {fmt(hi)}</span>
+        </div>
+        <div className="ar-rango" role="img" aria-label={`El cierre está al ${Math.round(pos)} % del rango`}>
+          <i style={{ left: `calc(${pos}% - 1px)` }} />
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Mentes ──
 
 export function MentesPanel({ mentes, consenso }: { mentes: LecturaMente[]; consenso: Consenso }) {
@@ -247,6 +280,14 @@ export function MentesPanel({ mentes, consenso }: { mentes: LecturaMente[]; cons
   return (
     <div className="ar-box">
       <h3>MENTES · {consenso.aFavor} a favor · {consenso.enContra} en contra · {consenso.neutral} neutrales · {consenso.sinDatos} sin datos</h3>
+      <div className="ar-avatares">
+        {mentes.map((m) => (
+          <button key={m.id} className={`ar-avatar ${CLASE_POSTURA[m.postura]}`} onClick={() => setAbierta(abierta === m.id ? null : m.id)} title={`${m.mente}: ${m.postura}`}>
+            <i>{m.mente.split(" ").filter((w) => /^[A-ZÁÉÍÓÚ]/.test(w)).slice(0, 2).map((w) => w[0]).join("")}</i>
+            {m.mente.split(" (")[0].split(" ").at(-1)}
+          </button>
+        ))}
+      </div>
       {mentes.map((m) => (
         <div className="ar-mente" key={m.id}>
           <div>
@@ -376,6 +417,7 @@ export function MapaAr({ papel, onSalir }: { papel: PapelAr; onSalir: () => void
               {s?.serie?.meta.demoraMin ? ` · demora declarada ${s.serie.meta.demoraMin} min` : ""}
               {ultima ? ` · última rueda cerrada ${fecha(ultima.openTime)}` : ""}. La rueda de hoy, si está abierta, no entra en ninguna cuenta.
             </p>
+            {velas.length > 21 && <Ficha velas={velas} />}
           </div>
           {velas.length > 1 && (
             <>
