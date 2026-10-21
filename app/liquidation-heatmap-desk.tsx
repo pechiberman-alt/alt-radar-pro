@@ -32,6 +32,7 @@ import {
   stackTally,
   type Trade,
 } from "@/lib/footprint";
+import { mismoMercado } from "@/lib/contexto-comun";
 import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSource } from "@/lib/level-engine";
@@ -482,6 +483,9 @@ export default function LiquidationHeatmapDesk() {
   const tradesRef = useRef<Map<number, Trade>>(new Map());
   const tradesDirty = useRef(false);
   const [trades, setTrades] = useState<Trade[]>([]);
+  /** Which source answered the map's candles (loadRows): the footprint is futures trades, so it only goes on futures candles. */
+  const [velasDe, setVelasDe] = useState<string | null>(null);
+  const footprintMismoMercado = mismoMercado(velasDe, "FUTURES");
   /** Minimum bubble size in dollars; null = automatic (top 0,5% of what is on screen). */
   const [bubbleMin, setBubbleMin] = useState<number | null>(null);
   const [cross, setCross] = useState<{ i: number; y: number } | null>(null);
@@ -829,8 +833,10 @@ export default function LiquidationHeatmapDesk() {
       try {
         const interval = timeframe;
         const config = timeframeConfig(timeframe);
-        const rows = await loadRows(symbol, interval, config.lookback, controller.signal);
+        const venue: { venue?: string } = {};
+        const rows = await loadRows(symbol, interval, config.lookback, controller.signal, venue);
         if (!alive) return;
+        setVelasDe(venue.venue ?? null);
         if (!rows) {
           fail("MAPA NO DISPONIBLE");
           return;
@@ -1314,7 +1320,8 @@ export default function LiquidationHeatmapDesk() {
   }, [patternSeries]);
 
   const footprints = useMemo(() => {
-    if (!footprintMode || !layout || !trades.length) return null;
+    // Futures trades over spot candles would mix two markets: no footprint then (the hint below says why).
+    if (!footprintMode || !layout || !trades.length || !footprintMismoMercado) return null;
     let first = Infinity;
     for (const t of trades) if (t.time < first) first = t.time;
     const size = bucketSize(layout.candles.map((c) => c.high - c.low));
@@ -1322,7 +1329,7 @@ export default function LiquidationHeatmapDesk() {
     let maxCell = 0;
     for (const fp of map.values()) for (const c of fp.cells.values()) maxCell = Math.max(maxCell, c.buy + c.sell);
     return { map, maxCell };
-  }, [footprintMode, layout, trades, timeframe]);
+  }, [footprintMode, layout, trades, timeframe, footprintMismoMercado]);
 
   // Liquidity sweeps on 5-candle pivots: about 13 per 300 candles on random
   // data, with a 50–51% "worked" rate there — the baseline shown in the panel.
@@ -3677,7 +3684,9 @@ export default function LiquidationHeatmapDesk() {
                 ? "FOOTPRINT (celdas por precio): necesita cada operación y solo existe en 1M, 3M, 5M y 15M. En este marco te queda el veredicto de arriba, que sí cubre todo el historial."
                 : !trades.length
                   ? "FOOTPRINT: cargando operaciones…"
-                  : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
+                  : !footprintMismoMercado
+                    ? `FOOTPRINT apagado: las operaciones son de Binance Futures y las velas de este mapa vinieron de ${velasDe ?? "una fuente que no dice su mercado"}. Spot y Futures no se mezclan.`
+                    : `FOOTPRINT con ${trades.length.toLocaleString("es-AR")} operaciones reales. Solo las velas cubiertas por esas operaciones tienen footprint (las parciales se ven atenuadas). Acercá con + a ~20 velas para leer los números venta×compra.`}
             </p>
           )}
 

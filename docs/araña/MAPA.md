@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 694 · objetivos: 19 · sin objetivo: 0
+- Archivos: 699 · objetivos: 20 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 59 · hosts: 60
-- Código de navegador: 72 archivos con "use client" que alcanzan 226 · problemas: 0
-- Lib sin prueba directa: 28 de 227
+- Código de navegador: 72 archivos con "use client" que alcanzan 227 · problemas: 0
+- Lib sin prueba directa: 28 de 228
 
 ## Objetivos
 
@@ -525,7 +525,13 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 - `tests/universos.test.ts` — Pruebas de los universos de monedas (lib/universos.ts): que no se diga que un universo se puede medir cuando no hay velas descargadas, que las monedas con datos sean exactamente la
 
-### calidad — Pruebas (135)
+### terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato (2)
+Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
+Pendiente: Fase C: que la mesa de JARVIS, la araña y los agentes lean el contexto común y se abstengan con su motivo; footprint, CVD por operación y libro dentro del contexto. · Unificar las dos implementaciones de footprint (unidades y desequilibrio). · Registro auditable de cada decisión de JARVIS con el id del contexto; motor de day trading; riesgo agregado por correlación; deslizamiento con el libro. · Fase F: rediseño visual, celular primero.
+- `docs/terminal-unificada.md` — ALT RADAR PRO — plataforma unificada: auditoría y primer incremento
+- `lib/contexto-comun.ts` — El contexto común de la terminal (docs/terminal-unificada.md, fase B): la forma en que un dato llega a cualquier agente, con su fuente, su mercado (Spot o Futures), la hora del dat
+
+### calidad — Pruebas (138)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agente-metales.test.ts` — Pruebas del Agente Metales (METALES_D55 en lib/estrategias.ts): solo opera oro y plata (en papel y en el estudio), solo compra, dispara cuando el cierre supera el máximo de las 55
@@ -549,6 +555,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/bot-journal.test.ts` — pruebas: a closed trade becomes a row carrying everything the report needs; an open one d, the key includes the account start: the same trade id after a reset is a differe, merge keeps one row per key — the first source wins — sorted by close time (+1)
 - `tests/breaker-blocks.test.ts` — pruebas: an order block that never breaks produces no breaker block and no stat, a break with no retest is an active, unproven breaker block, a break that gets retested and holds counts as held, and stays active (+1)
 - `tests/chart-patterns.test.ts` — pruebas: a pole and a tight pause form a bull flag, forming until it breaks, a close above the flag confirms it, one below fails it, the mirror image is a bear flag (+1)
+- `tests/contexto-comun.test.ts` — Pruebas del contexto común (lib/contexto-comun.ts): cada dato con su estado de calidad (ausente, viejo, insuficiente o incoherente, nunca cero), Spot y Futures sin mezclarse, velas
 - `tests/cost-basis.test.ts` — pruebas: a single buy sets the average cost to its own price, two buys at different prices give the size-weighted average, a sell removes units at the current average and leaves the average unchanged (+1)
 - `tests/dca-tracker.test.ts` — pruebas: average cost is total invested over total units, not a plain price average, P&L is null until a current price is supplied — not zero, with a current price, P&L compares current value to what was actually invested (+1)
 - `tests/decoupling.test.ts` — pruebas: a coin up 3% in 4 hours on volume while BTC and ETH sit flat rises on its own, when BTC itself is up, rising with it is not rising alone, beta comes from the hours before the window: a high-beta coin (+1)
@@ -560,6 +567,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/fair-value-gaps.test.ts` — pruebas: a bullish gap is found between the first and third candle, the mirror case produces a bearish gap, overlapping candles leave no gap at all (+1)
 - `tests/fib-backtest.test.ts` — pruebas: finds no legs on a flat series, LONG: a clean pullback into 0.618 that continues to the extreme is a TARGET win, LONG: a pullback that breaks the leg origin before reclaiming it is a STOP loss (+1)
 - `tests/fib-zone.test.ts` — pruebas: levels come from the shared FIB_LEVELS, not a private copy, a pullback inside the band is reported as in-zone, a shallow pullback is reported as not there yet (+1)
+- `tests/footprint-area-valor.test.ts` — Pruebas del footprint verificado (lib/footprint.ts y lib/order-flow.ts) con datos conocidos: el área de valor es la banda CONTIGUA alrededor del POC (método CBOT, 70 %), el POC no
 - `tests/footprint-signals.test.ts` — A cell where buy dominates enough to read as a COMPRA imbalance against the level below it, or the mirror for VENTA — built directly, not reverse-engineered from raw trades, so eac
 - `tests/footprint-sweeps.test.ts` — pruebas: candle delta splits volume by aggressor from the taker-buy field, CVD accumulates and carries across gaps, bucket size is round and gives about ten rows (+1)
 - `tests/footprint-verdict.test.ts` — pruebas: fewer than 3 candles with taker data → no verdict, rather than one built on noth, candles without taker data or without volume are ignored, not counted as balance, aggressive buyers winning is reported as such, with the share and the delta (+1)
@@ -641,6 +649,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/signal-confluence.test.ts` — pruebas: a long aims at the zone above and is invalidated at the one below, a short mirrors it, the map (+1)
 - `tests/signal-plan-db.test.ts` — pruebas: the plan columns are added once, only the missing ones, and never to a table tha, a plan is written next to its signal and the evaluator settles it from the candl, an open signal keeps its partial hits and is re-read next time; an unchanged one (+1)
 - `tests/signal-plan.test.ts` — pruebas: ATR: the average true range of the last 14 candles, or nothing without enough, LONG plan: stop beyond the swing, kept between 1 and 2.5 ATR, targets at 1, 2 an, SHORT plan mirrors it (+1)
+- `tests/sin-ordenes-reales.test.ts` — La terminal no envía órdenes reales: ningún archivo de la app, del Worker ni de lib/ llama a un endpoint o método que cree, cambie o cancele una orden en un exchange o broker.
 - `tests/speech-text.test.ts` — pruebas: numbers in Spanish words, with apocope and the 100/1000 forms, decimal comma, thousands dot and short decimals as said aloud, JARVIS text becomes speakable words: %, +R, US$, tickers, trading English, emoji (+1)
 - `tests/spot-strategy.test.ts` — pruebas: all conditions present reads as present, never as a buy order, without a location condition it cannot be, the entry ladder puts the largest tranche at the lowest level (+1)
 - `tests/structure-archive.test.ts` — pruebas: series change is the difference in percentage points, a falling series reports a negative change, gaps in the series are skipped, not treated as zero (+1)

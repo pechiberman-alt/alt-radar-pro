@@ -324,6 +324,20 @@ Reglas:
 - Auditoría de sobreajuste (lib/sobreajuste.ts): el estudio informa PSR y DSR por fila (contando las variantes de la tabla y las declaradas, incluidas las de fuera de la tabla, redondeadas para arriba) y Reality Check / SPA sobre el resultado diario de todas. Una VENTAJA con DSR declarado menor a 95 % o desconocido se muestra como CANDIDATA. Probar una variante nueva sobre los mismos datos suma uno al contador de ensayos.
 - Preregistro del flujo (lib/preregistro-flujo.ts): los cuatro filtros de volumen taker, funding y open interest se fijaron el 14/10/2026 antes de ver esos datos y no se ajustan; un dato faltante no aprueba ni rechaza. Los datos de Binance Vision (CC BY-NC-SA 4.0) son para investigación personal: no se commitean, no se redistribuyen y no alimentan señales para terceros.
 
+## terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato
+Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
+Archivos: lib/contexto-comun.ts, docs/terminal-unificada.md
+Reglas:
+- Un dato que falta es DATA UNAVAILABLE, uno viejo STALE DATA y uno con muestra corta o incoherente INSUFFICIENT DATA, siempre con el motivo. Nunca cero ni un valor supuesto.
+- Spot y Futures no se mezclan: si las fuentes no declaran el mismo mercado, el contexto queda sin mercado y lo avisa. El footprint de operaciones de futuros solo se dibuja sobre velas de futuros.
+- El footprint sale solo de operaciones ejecutadas con lado agresor; una vela con huecos en los ids de aggTrade es parcial. El área de valor es la banda contigua alrededor del POC (método CBOT, 70 %), igual en el mapa y en el bookmap.
+- Nada de esta rama va a main ni a producción sin revisión de la persona. Ningún camino envía órdenes reales (tests/sin-ordenes-reales.test.ts).
+Pendiente:
+- Fase C: que la mesa de JARVIS, la araña y los agentes lean el contexto común y se abstengan con su motivo; footprint, CVD por operación y libro dentro del contexto.
+- Unificar las dos implementaciones de footprint (unidades y desequilibrio).
+- Registro auditable de cada decisión de JARVIS con el id del contexto; motor de day trading; riesgo agregado por correlación; deslizamiento con el libro.
+- Fase F: rediseño visual, celular primero.
+
 ## calidad — Pruebas
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 Archivos: tests/**

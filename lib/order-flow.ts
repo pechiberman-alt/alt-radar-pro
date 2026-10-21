@@ -3,6 +3,7 @@
  * exercised without mounting a WebSocket-driven canvas. Everything here is a
  * function of the executions handed to it.
  */
+import { valueArea } from "./footprint.ts";
 
 export type OrderFlowTrade = {
   price: number;
@@ -90,19 +91,17 @@ export function footprintRows(
     .sort((left, right) => Math.abs(left.price - mid) - Math.abs(right.price - mid))
     .slice(0, FOOTPRINT_TARGET_ROWS);
 
-  // Value area: the levels that together hold 70% of the traded volume, walking
-  // outward from the point of control.
-  const byVolume = [...nearest].sort(
-    (left, right) => right.buy + right.sell - (left.buy + left.sell),
+  // Value area: the contiguous band around the point of control holding 70% of
+  // the volume of EVERY traded level, not only of the rows shown — the same
+  // method the map's footprint uses (valueArea in lib/footprint.ts).
+  const area = valueArea(
+    [...rows.entries()].map(([price, value]) => ({ price, volume: value.buy + value.sell })),
+    step,
   );
-  const totalVolume = byVolume.reduce((sum, row) => sum + row.buy + row.sell, 0);
-  const valueAreaPrices = new Set<number>();
-  let accumulated = 0;
-  for (const row of byVolume) {
-    if (totalVolume > 0 && accumulated >= totalVolume * 0.7) break;
-    valueAreaPrices.add(row.price);
-    accumulated += row.buy + row.sell;
-  }
+  const inArea = (price: number) =>
+    area !== null &&
+    Math.round(price / step) >= Math.round(area.val / step) &&
+    Math.round(price / step) <= Math.round(area.vah / step);
 
   return nearest
     .map((row) => {
@@ -118,7 +117,7 @@ export function footprintRows(
             : row.buy > row.sell
               ? ("buy" as const)
               : ("sell" as const),
-        inValueArea: valueAreaPrices.has(row.price),
+        inValueArea: inArea(row.price),
       };
     })
     .sort((left, right) => right.price - left.price);

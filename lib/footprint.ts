@@ -22,9 +22,79 @@ export type Footprint = {
   buy: number;
   sell: number;
   poc: number | null;
-  /** True when trades were seen from the candle's open onward. */
+  /** Value area low and high, as level prices (the same keys as `cells`), from `valueArea`. Absent where not computed. */
+  val?: number | null;
+  vah?: number | null;
+  /**
+   * Trades missing from the candle, found by the gaps in Binance's aggregate-trade ids, which are consecutive per
+   * symbol. 0 = no id is missing between the trades seen; null = the ids can't be checked (missing or not integers).
+   * Absent where not computed.
+   */
+  gaps?: number | null;
+  /** True when trades were seen from the candle's open onward and no aggregate-trade id is missing. */
   complete: boolean;
 };
+
+/** Share of the volume the value area holds. */
+export const VALUE_AREA_FRACTION = 0.7;
+
+export type ValueArea = { poc: number; val: number; vah: number; total: number; inside: number };
+
+/**
+ * Point of control and value area of a set of price levels (volume in any unit: base, quote, contracts).
+ *
+ * POC: the level with the most volume. On a tie, the one nearest the middle of the traded range, then the lower one,
+ * so the result never depends on the order the trades arrived in.
+ *
+ * Value area: the CONTIGUOUS band around the POC that holds `fraction` of the volume (70% by default), built the way
+ * Market Profile and volume-profile tools build it (the CBOT method): from the POC, compare the next two levels above
+ * with the next two below (a level with no trades counts as zero), add the pair with more volume (on a tie, both) and
+ * repeat until the band holds the fraction. It can overshoot slightly, because levels are added two at a time.
+ * `val` and `vah` are level prices, like `poc`, not band edges. Null when there is no volume.
+ */
+export function valueArea(levels: { price: number; volume: number }[], step: number, fraction = VALUE_AREA_FRACTION): ValueArea | null {
+  if (!(step > 0) || !(fraction > 0)) return null;
+  const vol = new Map<number, number>();
+  for (const l of levels) {
+    if (!Number.isFinite(l.price) || !(l.volume > 0)) continue;
+    const i = Math.round(l.price / step);
+    vol.set(i, (vol.get(i) ?? 0) + l.volume);
+  }
+  if (!vol.size) return null;
+  let lowI = Infinity;
+  let highI = -Infinity;
+  let total = 0;
+  for (const [i, v] of vol) {
+    lowI = Math.min(lowI, i);
+    highI = Math.max(highI, i);
+    total += v;
+  }
+  const mid = (lowI + highI) / 2;
+  let poc = lowI;
+  for (const [i, v] of vol) {
+    const best = vol.get(poc) ?? 0;
+    const nearer = Math.abs(i - mid) < Math.abs(poc - mid) || (Math.abs(i - mid) === Math.abs(poc - mid) && i < poc);
+    if (v > best || (v === best && nearer)) poc = i;
+  }
+  const at = (i: number) => (i >= lowI && i <= highI ? (vol.get(i) ?? 0) : 0);
+  const target = total * Math.min(1, fraction);
+  let lo = poc;
+  let hi = poc;
+  let inside = at(poc);
+  while (inside < target && (lo > lowI || hi < highI)) {
+    const up = hi < highI ? at(hi + 1) + at(hi + 2) : -1;
+    const down = lo > lowI ? at(lo - 1) + at(lo - 2) : -1;
+    if (up >= down) {
+      hi = Math.min(hi + 2, highI);
+      inside += up;
+    }
+    if (down >= up) {
+      lo = Math.max(lo - 2, lowI);
+      inside += down;
+    }
+  }
+  return { poc: poc * step, val: lo * step, vah: hi * step, total, inside };
+}
 
 export function candleDelta(volume: number, takerBuy: number | undefined) {
   if (takerBuy === undefined || !Number.isFinite(takerBuy)) return null;
@@ -58,7 +128,11 @@ const bucketOf = (price: number, size: number) => Math.floor(price / size + 1e-9
 
 /**
  * Groups trades into the candles they belong to. `firstTradeTime` is the
- * earliest trade seen: a candle opening before it is partial.
+ * earliest trade seen: a candle opening before it is partial. So is a candle
+ * with a gap in the aggregate-trade ids (a dropped socket, a missing REST
+ * page): the trades it shows are real, but not all of them. A gap between two
+ * candles marks both, because the missing trades could belong to either. The
+ * same trade id counted twice (a REST page and the live stream) counts once.
  */
 export function buildFootprints(
   trades: Trade[],
@@ -70,13 +144,29 @@ export function buildFootprints(
   const out = new Map<number, Footprint>();
   if (!trades.length || !candleTimes.length) return out;
   const earliest = candleTimes[0];
+  const seen = new Set<number>();
+  const ids = new Map<number, { min: number; max: number; count: number; checkable: boolean }>();
   for (const t of trades) {
     if (t.time < earliest) continue;
+    const checkable = Number.isInteger(t.id) && t.id > 0;
+    if (checkable) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+    }
     const open = Math.floor((t.time - earliest) / frameMs) * frameMs + earliest;
     let fp = out.get(open);
     if (!fp) {
-      fp = { time: open, bucket: size, cells: new Map(), buy: 0, sell: 0, poc: null, complete: open >= firstTradeTime };
+      fp = { time: open, bucket: size, cells: new Map(), buy: 0, sell: 0, poc: null, val: null, vah: null, gaps: null, complete: false };
       out.set(open, fp);
+      ids.set(open, { min: Infinity, max: -Infinity, count: 0, checkable: true });
+    }
+    const r = ids.get(open)!;
+    if (checkable) {
+      r.min = Math.min(r.min, t.id);
+      r.max = Math.max(r.max, t.id);
+      r.count += 1;
+    } else {
+      r.checkable = false;
     }
     const key = bucketOf(t.price, size);
     const cell = fp.cells.get(key) ?? { buy: 0, sell: 0 };
@@ -90,14 +180,30 @@ export function buildFootprints(
     }
     fp.cells.set(key, cell);
   }
-  for (const fp of out.values()) {
-    let best = -1;
-    for (const [price, c] of fp.cells) {
-      if (c.buy + c.sell > best) {
-        best = c.buy + c.sell;
-        fp.poc = price;
-      }
+  const ordered = [...out.values()].sort((a, b) => a.time - b.time);
+  const gaps = new Map<number, number | null>();
+  for (const fp of ordered) {
+    const r = ids.get(fp.time)!;
+    gaps.set(fp.time, r.checkable && r.count > 0 ? r.max - r.min + 1 - r.count : null);
+  }
+  for (let k = 1; k < ordered.length; k += 1) {
+    const a = ids.get(ordered[k - 1].time)!;
+    const b = ids.get(ordered[k].time)!;
+    if (!a.checkable || !b.checkable) continue;
+    const between = b.min - a.max - 1;
+    for (const time of [ordered[k - 1].time, ordered[k].time]) {
+      const g = gaps.get(time);
+      // Ids running backwards across candles can't be checked; missing ones count against both candles.
+      if (g !== null && g !== undefined) gaps.set(time, between < 0 ? null : g + between);
     }
+  }
+  for (const fp of ordered) {
+    const area = valueArea([...fp.cells].map(([price, c]) => ({ price, volume: c.buy + c.sell })), fp.bucket);
+    fp.poc = area?.poc ?? null;
+    fp.val = area?.val ?? null;
+    fp.vah = area?.vah ?? null;
+    fp.gaps = gaps.get(fp.time) ?? null;
+    fp.complete = fp.time >= firstTradeTime && fp.gaps === 0;
   }
   return out;
 }
