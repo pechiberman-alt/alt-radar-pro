@@ -159,7 +159,7 @@ db0be99a3f89	499	app/market-brain.tsx
 4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
 3da71069ee49	75	app/open-heatmap.css
-4471a9abbf33	12	app/page.tsx
+b4cd4d7dbbc6	25	app/page.tsx
 f87f234d88cd	47	app/portfolio-risk.css
 0bfe99958b31	314	app/portfolio-risk.tsx
 855a62f29ac1	249	app/practica-gatillo.tsx
@@ -468,6 +468,7 @@ cd048d1dc164	111	lib/upstream-cache.ts
 89327ac52fc9	8	next.config.ts
 d0a9b2e42716	53	package.json
 8f8be689e9af	8	postcss.config.mjs
+220b8c8ea6cb	2	public/2ef6b9791a8f7e4abb3d34f228548ac2.txt
 676ebcb8018c	0	public/anuncio/altradar-anuncio.mp4
 21e553bba8a0	0	public/anuncio/portada.jpg
 af87e3de1f7b	0	public/anuncio/subtitulos.vtt

@@ -4,7 +4,7 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 693 · objetivos: 19 · sin objetivo: 0
+- Archivos: 694 · objetivos: 19 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 59 · hosts: 60
 - Código de navegador: 72 archivos con "use client" que alcanzan 226 · problemas: 0
 - Lib sin prueba directa: 28 de 227
@@ -663,7 +663,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/workspace-sections.test.ts` — Every <Collapsible id="x" ...
 - `tests/xau-alerts.test.ts` — pruebas: gold and silver by any common name, and real coins untouched, the metals live on the futures API; everything else on spot, gold prices keep their cents and both writing habits work (+1)
 
-### app-movil — Interfaz, PWA y celular primero (101)
+### app-movil — Interfaz, PWA y celular primero (102)
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
 - `app/account-panel.css`
 - `app/account-panel.tsx` — exporta: AccountPanel, AuthForms, default
@@ -751,6 +751,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/zones-desk.tsx` — exporta: ZonesDesk, default
 - `lib/account-events.ts` — Small browser events so any panel can open the account drawer, and every panel learns when someone signs in or out without reloading the page.
 - `lib/visible-interval.ts` — setInterval that only runs while the tab is visible.
+- `public/2ef6b9791a8f7e4abb3d34f228548ac2.txt`
 - `public/anuncio/altradar-anuncio.mp4`
 - `public/anuncio/portada.jpg`
 - `public/anuncio/subtitulos.vtt`
@@ -928,7 +929,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 ## Hosts externos
 
 - `alt-radar-cache.internal` — lib/shared-cache.ts
-- `alt-radar-pro.pechiberman.workers.dev` — app/anuncio/page.tsx, app/api/etf-flows/route.ts, app/layout.tsx
+- `alt-radar-pro.pechiberman.workers.dev` — app/anuncio/page.tsx, app/api/etf-flows/route.ts, app/layout.tsx, app/page.tsx
 - `alt-radar-voice.internal` — lib/jarvis-voice-server.ts
 - `api-gcp.binance.com` — app/api/tickers/route.ts, lib/automation.ts, lib/klines-server.ts, lib/telegram-ai-server.ts
 - `api.alternative.me` — app/api/sentiment/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-ai-server.ts, lib/telegram-dispatch.ts
