@@ -571,7 +571,7 @@ function Presentacion({ cobro, onEntrar }: { cobro: Cobro; onEntrar: () => void 
         </div>
         <blockquote>
           <p>
-            Medimos la mesa de flujo en cuatro años de velas de diez monedas, con costos: sin ventaja en 1 h y 15 min, sin conclusión en 4 h.
+            Medimos la mesa de flujo con velas de diez monedas desde 2020, con costos: sin ventaja en 1 h y 15 min, sin conclusión en 4 h.
             Lo publicamos igual, y los agentes se siguen midiendo hacia adelante.
           </p>
           <cite>Así trabajamos todo lo demás.</cite>
