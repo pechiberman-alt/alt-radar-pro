@@ -49,7 +49,8 @@ function ubicar(escritorios: Escritorio[]): { puestos: Puesto[]; filas: number; 
     const filas = Math.ceil(suyos.length / POR_FILA);
     bloques.push({ mesa: m.id, y, filas });
     suyos.forEach((e, k) => puestos.push({ e, x: 1 + (k % POR_FILA) * 1.5, y: y + Math.floor(k / POR_FILA) * 1.6 }));
-    y += filas * 1.6 + 1.1;
+    // El pasillo deja lugar al globo con el nombre de la primera fila, para que no tape el cartel de la mesa de atrás.
+    y += filas * 1.6 + 1.8;
   }
   return { puestos, filas: y + 3, bloques };
 }
@@ -205,6 +206,7 @@ export default function LabOficina() {
         }),
       });
       if (r.status === 401) return local("iniciá sesión para la IA");
+      if (r.status === 429) return local("se terminó la IA gratis de hoy");
       const d = (await r.json().catch(() => ({}))) as { text?: string; label?: string };
       if (!r.ok || !d.text) return local("la IA no respondió");
       anotar({ de: "agente", texto: d.text, cerebro: d.label });
@@ -220,7 +222,8 @@ export default function LabOficina() {
     id: e.id,
     nombre: e.agente,
     instruccion: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo.`,
-    local: frases.filter((f) => f.quien === e.id).map((f) => f.texto),
+    // Sin IA contesta con lo que ya dice; si todavía no dijo nada, con cómo se ve (siempre tiene algo honesto para contar).
+    local: ((propias) => (propias.length ? propias : [e.conciencia]))(frases.filter((f) => f.quien === e.id).map((f) => f.texto)),
     datos: forAi({
       nombre: e.agente,
       regla: ESTRATEGIAS.find((x) => x.id === e.id)?.regla ?? e.mira,

@@ -138,7 +138,7 @@ b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
 2989dc5ae236	168	app/lab-oficina.css
-39697d13ad27	590	app/lab-oficina.tsx
+c03610d46364	593	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -196,9 +196,9 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d84453a72d34	320	docs/araña/objetivos.md
+f83368263a17	320	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
-c06f06eff751	43	docs/busqueda-amd.md
+5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
 fc6042bacccc	116	docs/busqueda-fibonacci.md
 25e7d2744ee2	187	docs/busqueda-linea.md
@@ -232,7 +232,7 @@ e0459b113cf2	42	eslint.config.mjs
 54958781f9f3	166	lib/agente-st-db.ts
 22efb8b3e5db	192	lib/agente-st-run.ts
 f997c496526e	156	lib/agente-st.ts
-94a0f30f9a2b	111	lib/agentes-explicado.ts
+f7443622018d	111	lib/agentes-explicado.ts
 ead38fee7389	160	lib/agentes-mente.ts
 09276133fe53	188	lib/agentes-papel.ts
 b53ef68c2a35	104	lib/agentes-servidor-db.ts
@@ -246,7 +246,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 054288014395	51	lib/ai-probe.ts
 509da5ba4297	47	lib/alert-bus.ts
 dbd75245f8b8	366	lib/alerts.ts
-3cea7aee65d0	116	lib/amd-ifvg.ts
+58037aaa761b	203	lib/amd-ifvg.ts
 db6ae19f1b13	157	lib/app-settings.ts
 4998b2cb2829	188	lib/aprender.ts
 8bc8d3dc5620	41	lib/arana-ultimo-db.ts
@@ -282,7 +282,7 @@ c77d39563bd6	219	lib/decoupling.ts
 2cc0a1363253	119	lib/diario-db.ts
 b907998f0b9a	200	lib/econ-calendar.ts
 a2c5aeea0e4f	115	lib/escalera.ts
-432c90258877	929	lib/estrategias.ts
+46e42d9dee62	929	lib/estrategias.ts
 f5d17a2b3a5b	2311	lib/estudio-estrategias-datos.ts
 ca8f3802c4a6	21	lib/estudio-resumen.ts
 a3a2b47ba078	160	lib/etf-flows-multi.ts
@@ -455,7 +455,7 @@ d13ecf4702a3	63	scripts/claude-hooks.mjs
 b36fd1c34b30	183	scripts/herramientas.mjs
 4347662f5847	175	scripts/ia-editor.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
-e5ff7be3ef14	137	scripts/investigacion/amd-estudio.ts
+c5f9020cfd4a	176	scripts/investigacion/amd-estudio.ts
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
 bc4d23a74d94	123	scripts/investigacion/axi-estudio.ts
 c88ad361f676	292	scripts/investigacion/breaker-busqueda.ts
@@ -488,7 +488,7 @@ bc528d50d94b	74	tests/ai-analyst.test.ts
 57f3eea79cb8	38	tests/ai-numbers.test.ts
 eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
-1fc53db1796f	87	tests/amd-ifvg.test.ts
+9896df93f3a4	136	tests/amd-ifvg.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
 1dd438218685	96	tests/app-settings.test.ts
 c5f7f005ea47	56	tests/aprender.test.ts
