@@ -22,6 +22,7 @@ import { MONEDAS_SERVIDOR, PLAN_SERVIDOR } from "../lib/agentes-servidor.ts";
 import { openInMap } from "../lib/account-events.ts";
 import { lecturaMapa, lecturaParaIa, lecturasMapa, onLecturaMapa, type LecturaMapa } from "../lib/mapa-memoria.ts";
 import MiniArana from "./lab-mini-arana";
+import SalaMentes from "./sala-mentes";
 
 type Plan = "SERVIDOR" | "CUENTA";
 type EstadoMoneda = { symbol: string; at: number; venue: string | null; registradas: number; avanzadas: number; error: string | null };
@@ -1103,6 +1104,11 @@ export default function LabOficina() {
           <p>{oficina.aprendizaje.texto}</p>
           <p className="of-tenue">Cada agente decide solo, con su regla. Aprenden todo el tiempo: sus lecciones se recalculan con cada cierre. Lo que no hacen es cambiarse la regla solos; eso lo aprobás vos.</p>
         </div>
+      </div>
+      {/* Las mentes (Buffett, Musk y los demás) trabajan en su propia sala: leen acciones y CEDEARs de BYMA. */}
+      <div className="of-sala-mentes">
+        <h3 className="lab-sub">La sala de las mentes</h3>
+        <SalaMentes />
       </div>
     </section>
   );

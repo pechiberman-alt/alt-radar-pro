@@ -1,13 +1,16 @@
 /**
  * El lado del navegador de MERCADO AR: baja las series (/api/mercado-ar) y los balances (/api/mercado-ar/fundamentales),
  * las guarda en memoria mientras la pestaña está abierta y arma la entrada de las mentes y de los agentes para un papel o
- * para todo el panel. Lo usan el panel MERCADO AR y el MAPA, así leen lo mismo. De a 3 pedidos por vez (los balances, de a
- * uno: SEC limita). Nada de esto se guarda en el navegador ni pide historial en intervalos.
+ * para todo el panel. Lo usan el panel MERCADO AR, el MAPA y la sala de las mentes, así leen lo mismo. Las series viajan en
+ * lotes de 12 (/api/mercado-ar/lote, formato compacto), de a 3 lotes por vez; los balances, de a una empresa (SEC limita).
+ * Nada de esto se guarda en el navegador ni pide historial en intervalos.
  */
 import { INDICE_EEUU, INDICE_MERVAL, PAPELES_AR, estadoSerie, type EstadoSerie, type PapelAr, type SerieAr } from "./mercado-ar.ts";
 import { consenso, leerMentes, percentiles, rendimiento, sma, volatilidadAnual, type Consenso, type LecturaMente } from "./mentes-inversoras.ts";
 import { estudiarPapel, type AgenteEnPapel } from "./mercado-ar-agentes.ts";
 import { EMPRESAS_SEC, SIN_BALANCE, type Fundamentales } from "./fundamentales-sec.ts";
+import { expandir, MAX_LOTE, type ItemLote } from "./mercado-ar-lote.ts";
+import { zonaFib, type ZonaFibAr } from "./mercado-ar-tecnico.ts";
 
 export type SerieCargada = { serie: SerieAr | null; fuente: string | null; edadSeg: number; error: string | null; estado: EstadoSerie };
 export type FundCargado = { fund: Fundamentales | null; viejo: boolean; error: string | null };
@@ -30,6 +33,41 @@ export function cargarSerie(yahoo: string): Promise<SerieCargada> {
   })();
   series.set(yahoo, p);
   return p;
+}
+
+const sinConexion = (e: unknown): SerieCargada => ({ serie: null, fuente: null, edadSeg: 0, error: e instanceof Error ? e.message : "sin conexión", estado: { estado: "DATA_UNAVAILABLE", motivo: "sin conexión" } });
+
+/**
+ * Varias series en un pedido. Las que ya están (o se están bajando) no se vuelven a pedir. Si el lote falla, cada una se
+ * reintenta sola.
+ */
+export function cargarLote(simbolos: string[]): Promise<SerieCargada[]> {
+  const faltan = [...new Set(simbolos)].filter((s) => !series.has(s));
+  for (let k = 0; k < faltan.length; k += MAX_LOTE) {
+    const parte = faltan.slice(k, k + MAX_LOTE);
+    const lote = fetch(`/api/mercado-ar/lote?simbolos=${parte.map(encodeURIComponent).join(",")}`, { cache: "no-store" }).then(async (r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return ((await r.json()) as { series: Record<string, ItemLote> }).series;
+    });
+    for (const s of parte) {
+      series.set(
+        s,
+        lote.then(
+          (todas) => {
+            const it = todas[s];
+            if (!it) return sinConexion(new Error("el lote no la trajo"));
+            const serie = expandir(it.serie);
+            return { serie, fuente: it.fuente, edadSeg: it.edadSeg, error: it.error, estado: estadoSerie(serie, Date.now()) };
+          },
+          () => {
+            series.delete(s);
+            return cargarSerie(s);
+          },
+        ),
+      );
+    }
+  }
+  return Promise.all(simbolos.map((s) => series.get(s) ?? cargarSerie(s)));
 }
 
 let colaFund: Promise<unknown> = Promise.resolve();
@@ -96,6 +134,9 @@ export type LecturaPapel = {
   mentes: LecturaMente[];
   consenso: Consenso;
   agentes: AgenteEnPapel[];
+  /** La zona de compra de Fibonacci de la serie que se opera (en pesos). */
+  fib: ZonaFibAr | null;
+  fibMotivo: string | null;
 };
 
 /** Todo lo de un papel: su serie, la de afuera si es CEDEAR, los balances, las mentes y los agentes. */
@@ -124,22 +165,49 @@ export async function leerPapel(papel: PapelAr, u?: Universo): Promise<LecturaPa
     mercadoNombre: papel.tipo === "ACCION" ? "el Merval" : "el S&P 500 (SPY)",
     volMediana: uni.volMediana[papel.tipo],
   });
-  return { papel, serie, subyacente, fund, mentes, consenso: consenso(mentes), agentes: estudiarPapel(papel.ticker, velasDe(serie)) };
+  const z = zonaFib(velasDe(serie));
+  return { papel, serie, subyacente, fund, mentes, consenso: consenso(mentes), agentes: estudiarPapel(papel.ticker, velasDe(serie)), fib: z.fib, fibMotivo: z.motivo };
 }
 
-/** Baja todo el panel (o una parte) de a 3, avisando el avance. Las cuentas se hacen después, con el universo completo. */
+/** Baja todo el panel (o una parte) en lotes, de a 3 lotes por vez, avisando el avance. */
 export async function cargarPanel(papeles: PapelAr[], alAvanzar?: (hechos: number, total: number) => void): Promise<void> {
-  const pendientes = papeles.flatMap((p) => (p.subyacente ? [p.yahoo, p.subyacente] : [p.yahoo]));
-  pendientes.push(INDICE_MERVAL, INDICE_EEUU);
+  const todos = [...papeles.flatMap((p) => (p.subyacente ? [p.yahoo, p.subyacente] : [p.yahoo])), INDICE_MERVAL, INDICE_EEUU];
+  const lotes: string[][] = [];
+  for (let k = 0; k < todos.length; k += MAX_LOTE) lotes.push(todos.slice(k, k + MAX_LOTE));
   let hechos = 0;
   let k = 0;
   const trabajar = async () => {
-    while (k < pendientes.length) {
-      const s = pendientes[k++];
-      await cargarSerie(s);
-      hechos += 1;
-      alAvanzar?.(hechos, pendientes.length);
+    while (k < lotes.length) {
+      const l = lotes[k++];
+      await cargarLote(l);
+      hechos += l.length;
+      alAvanzar?.(hechos, todos.length);
     }
   };
   await Promise.all([trabajar(), trabajar(), trabajar()]);
+}
+
+let panel: Promise<LecturaPapel[]> | null = null;
+
+/**
+ * Todo el panel leído por las mentes y los agentes, una vez por pestaña abierta (lo comparten el escáner y la sala de las
+ * mentes). `nuevo` lo vuelve a leer.
+ */
+export function panelCompleto(alAvanzar?: (texto: string, hechos: number, total: number) => void, nuevo = false): Promise<LecturaPapel[]> {
+  if (panel && !nuevo) return panel;
+  panel = (async () => {
+    await cargarPanel(PAPELES_AR, (h, t) => alAvanzar?.("Bajando ruedas", h, t));
+    const u = await universoCargado();
+    const out: LecturaPapel[] = [];
+    for (const [k, p] of PAPELES_AR.entries()) {
+      alAvanzar?.(`Mentes y agentes leyendo ${p.ticker}${p.tipo === "CEDEAR" ? " (y sus balances)" : ""}`, k, PAPELES_AR.length);
+      out.push(await leerPapel(p, u));
+      await new Promise((r) => setTimeout(r, 0)); // que la pantalla respire entre papel y papel
+    }
+    return out;
+  })();
+  panel.catch(() => {
+    panel = null;
+  });
+  return panel;
 }

@@ -45,3 +45,66 @@
 .liq-ar-hits button{border:1px solid #2c493b;background:#0c2d20;color:var(--green);font:10px var(--font-mono);padding:6px 8px;border-radius:4px;cursor:pointer}
 @media(min-width:900px){.ar-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 button.ar-agente{background:none;border:0;border-top:1px solid #17201c;color:inherit;text-align:left;cursor:pointer;width:100%}
+/* Panel: tarjetas de papeles, resumen de índices y mejores compras. */
+.ar-indices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ar-indice{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:linear-gradient(145deg,#0f1814,#0a0e0c);display:grid;gap:2px}
+.ar-indice span{font:9px var(--font-mono);letter-spacing:1.2px;color:var(--muted)}
+.ar-indice b{font:18px var(--font-mono)}
+.ar-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.ar-card{border:1px solid var(--line);border-radius:8px;padding:10px;background:linear-gradient(160deg,#0f1814,#090d0b);text-align:left;color:var(--text);cursor:pointer;display:grid;gap:4px;font:11px var(--font-mono);transition:border-color .2s,transform .2s}
+.ar-card:hover{border-color:#39634f;transform:translateY(-1px)}
+.ar-card-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.ar-card-top b{font-size:14px;color:var(--text)}
+.ar-card small{color:var(--muted);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ar-card .ar-precio{font-size:16px}
+.ar-spark{width:100%;height:30px;display:block}
+.ar-buscar{width:100%;border:1px solid var(--line);background:#0b110e;color:var(--text);font:12px var(--font-mono);padding:10px 12px;border-radius:6px}
+.ar-fib-card{border:1px solid #2c493b;border-radius:8px;padding:12px;background:linear-gradient(150deg,#0c2018,#0a0f0c);display:grid;gap:6px;text-align:left;color:var(--text);cursor:pointer;font:11px var(--font-mono)}
+.ar-fib-card .ar-card-top b{font-size:16px}
+.ar-rango{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,#ff596455,#f4b84a55,#39f29a55)}
+.ar-rango i{position:absolute;top:-3px;width:3px;height:12px;background:var(--text);border-radius:2px}
+.ar-ficha{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.ar-ficha div{border:1px solid var(--line);border-radius:6px;padding:8px;background:#0b110e;font:11px var(--font-mono)}
+.ar-ficha span{display:block;color:var(--muted);font-size:9px;letter-spacing:1px}
+.ar-avatares{display:flex;flex-wrap:wrap;gap:6px}
+.ar-avatar{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:16px;padding:3px 8px 3px 3px;font:10px var(--font-mono);background:#0b110e;color:var(--text);cursor:pointer}
+.ar-avatar i{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;font-style:normal;font-size:8px;font-weight:700;background:#1d2c25}
+.ar-avatar.ok i{background:#0c3d27;color:var(--green);box-shadow:0 0 0 1px var(--green2)}
+.ar-avatar.mal i{background:#3a1418;color:var(--red);box-shadow:0 0 0 1px #8a3a42}
+.ar-avatar.alerta i{background:#3a2c10;color:var(--amber);box-shadow:0 0 0 1px #7b5f29}
+/* La sala de las mentes. */
+.sm-sala{position:relative;width:100%;aspect-ratio:1/1;max-height:560px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:radial-gradient(circle at 50% 48%,#15241d 0,#0b130f 55%,#070b09 100%)}
+@media(min-width:700px){.sm-sala{aspect-ratio:16/10}}
+.sm-sala:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff06 1px,transparent 1px),linear-gradient(90deg,#ffffff06 1px,transparent 1px);background-size:28px 28px}
+.sm-mesa{position:absolute;left:50%;top:48%;width:30%;height:34%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,#1b3a2d,#0f2119);border:1px solid #2c493b;box-shadow:0 0 30px #39f29a22 inset;display:grid;place-content:center;text-align:center;font:12px var(--font-mono)}
+.sm-mesa b{font-size:18px;color:var(--green)}
+.sm-mesa small{color:var(--muted)}
+.sm-en-reunion .sm-mesa{box-shadow:0 0 40px #39f29a55 inset,0 0 24px #39f29a33}
+.sm-escritorio{position:absolute;width:13%;height:7%;transform:translate(-50%,-10%);border-radius:5px;background:linear-gradient(#1a2621,#111a16);border:1px solid #24342d}
+.sm-mente{position:absolute;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:2px;border:0;background:none;cursor:pointer;color:var(--text);transition:left 1.4s cubic-bezier(.4,0,.2,1),top 1.4s cubic-bezier(.4,0,.2,1);z-index:2}
+.sm-quieta .sm-mente{transition:none}
+.sm-avatar{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;font:700 11px var(--font-mono);background:#1d2c25;border:2px solid #3a4a43;box-shadow:0 4px 10px #0008}
+.sm-nombre{font:9px var(--font-mono);color:#b7c2bc;white-space:nowrap;background:#070b09cc;padding:1px 4px;border-radius:3px}
+.sm-favor .sm-avatar{border-color:var(--green);color:var(--green);background:#0c3d27}
+.sm-contra .sm-avatar{border-color:var(--red);color:var(--red);background:#3a1418}
+.sm-neutral .sm-avatar{border-color:var(--amber);color:var(--amber);background:#3a2c10}
+.sm-info .sm-avatar{border-color:var(--cyan);color:var(--cyan)}
+.sm-elegida .sm-avatar{outline:2px solid var(--text);outline-offset:2px}
+.sm-habla .sm-avatar{animation:sm-pulso 1.2s ease-in-out infinite}
+.sm-quieta .sm-habla .sm-avatar{animation:none}
+@keyframes sm-pulso{50%{box-shadow:0 0 0 6px #39f29a33}}
+.sm-globo{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);width:max-content;max-width:190px;background:#e7eee9;color:#06100b;font:10px/1.35 var(--font-sans,Arial),sans-serif;padding:6px 8px;border-radius:8px;box-shadow:0 6px 16px #000a;z-index:5;text-align:left}
+.sm-globo:after{content:"";position:absolute;top:100%;left:50%;margin-left:-5px;border:5px solid transparent;border-top-color:#e7eee9}
+.sm-globo-jarvis{bottom:auto;top:8px;max-width:80%}
+.sm-globo-jarvis:after{display:none}
+.sm-turno{background:#0c2d20;border-radius:4px;padding:2px 4px}
+.sm-favor{color:var(--green)}.sm-contra{color:var(--red)}.sm-neutral{color:var(--amber)}.sm-info{color:var(--cyan)}.sm-sin{color:var(--muted)}
+.sm-tema{display:grid;gap:3px}
+.sm-tema select{background:#0b110e;color:var(--text);border:1px solid var(--line);border-radius:5px;padding:7px;font:11px var(--font-mono)}
+.sm-msg{margin:0;padding:6px 8px;border-radius:6px;font-size:11px;background:#111a16}
+.sm-msg-vos{background:#0c2d20;justify-self:end}
+.sm-preguntar{display:flex;gap:6px}
+.sm-preguntar input{flex:1;min-width:0;background:#0b110e;color:var(--text);border:1px solid var(--line);border-radius:5px;padding:8px;font:11px var(--font-mono)}
+.sm-conversa{display:grid;gap:5px;max-height:260px;overflow:auto}
+.of-sala-mentes{margin-top:18px;display:grid;gap:8px}
+.sm-globo-abajo{bottom:auto;top:calc(100% + 4px)}.sm-globo-abajo:after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:#e7eee9}

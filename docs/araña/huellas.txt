@@ -60,6 +60,7 @@ dac8ac9522e3	103	app/api/liquidity-history/route.ts
 a9e76218b723	216	app/api/market-structure/route.ts
 3356888e120f	49	app/api/market/derivatives/route.ts
 a7f8ef491113	23	app/api/mercado-ar/fundamentales/route.ts
+7387b111870c	35	app/api/mercado-ar/lote/route.ts
 ac40a7c6c2e8	41	app/api/mercado-ar/route.ts
 037cfd21c11f	27	app/api/oficina/route.ts
 bb0ab7329c8b	117	app/api/orderbook/route.ts
@@ -145,7 +146,7 @@ b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
 fdac540c69d5	243	app/lab-oficina.css
-5cf6a445ff38	1110	app/lab-oficina.tsx
+ef470658cdf3	1116	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -158,9 +159,9 @@ d6e1ca037a9c	393	app/mapa-agentes.tsx
 db0be99a3f89	499	app/market-brain.tsx
 89b25149b415	141	app/market-structure-panel.tsx
 244b15230fb0	48	app/market-structure.css
-c6bfdf99d2ca	247	app/mercado-ar-desk.tsx
-e08f360935d1	406	app/mercado-ar-vistas.tsx
-88eead3e31d3	48	app/mercado-ar.css
+6598a486ff67	349	app/mercado-ar-desk.tsx
+d1450c8e74dc	448	app/mercado-ar-vistas.tsx
+efbf0a2bc40c	111	app/mercado-ar.css
 4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
 3da71069ee49	75	app/open-heatmap.css
@@ -184,6 +185,7 @@ f58412c957a0	53	app/pwa-register.tsx
 57216ff5dacb	344	app/risk-desk.tsx
 712a705a7619	25	app/robot-signals-desk.css
 bb570d5787dc	402	app/robot-signals-desk.tsx
+2a5f5b2bd3af	269	app/sala-mentes.tsx
 1db656ad7025	174	app/scalping-desk.css
 d180ba5315c4	324	app/scalping-desk.tsx
 12f05e090902	80	app/secure-brain.css
@@ -209,7 +211,7 @@ bd6422c65a0d	358	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-88efc2c94af9	383	docs/araña/objetivos.md
+d3de7da08d02	385	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -395,9 +397,11 @@ c5ba3f905dda	317	lib/market-fetch.ts
 dca52626b743	252	lib/market-structure.ts
 52366d3220c1	354	lib/mentes-inversoras.ts
 10b738288f9a	99	lib/mercado-ar-agentes.ts
-99f1fbbd5129	146	lib/mercado-ar-cliente.ts
+3f6ce36db908	214	lib/mercado-ar-cliente.ts
 ce75623846e9	103	lib/mercado-ar-fuente.ts
+3b3668054ce0	33	lib/mercado-ar-lote.ts
 5be54e85d73d	89	lib/mercado-ar-mapa.ts
+d65060e8502e	97	lib/mercado-ar-ranking.ts
 8663f4178a63	201	lib/mercado-ar-tecnico.ts
 5055ab17957f	277	lib/mercado-ar.ts
 dd7f989876a5	57	lib/mesa-medicion.ts
@@ -643,6 +647,7 @@ c90b4a2a66b4	70	tests/live-market.test.ts
 e46e93dda3df	226	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
 f48827a4672a	227	tests/mentes-ar.test.ts
+600bb362ca80	105	tests/mercado-ar-ranking.test.ts
 5dbee8601d14	101	tests/mercado-ar-tecnico.test.ts
 d435514e5aa5	277	tests/mercado-ar.test.ts
 4fec70e5eb48	37	tests/mesa-medicion.test.ts
