@@ -12,7 +12,10 @@ import { coreSnapshot } from "@/lib/jarvis-core-db";
 import { learnSpeech } from "@/lib/jarvis-learn";
 import { sharedJson } from "@/lib/shared-cache";
 import { textoAgenteTelegram, textoOficinaTelegram } from "@/lib/oficina";
-import { oficinaServidor } from "@/lib/oficina-db";
+import { lecturaServidor, oficinaServidor } from "@/lib/oficina-db";
+import { armarDiario, diaAnterior, diaAr, textoDiarioTelegram, type Diario } from "@/lib/aprendizaje-diario";
+import { diariosServidor } from "@/lib/aprendizaje-diario-db";
+import { PLAN_SERVIDOR } from "@/lib/agentes-servidor";
 import type { TgVoice } from "@/lib/telegram-voice";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +29,7 @@ const HELP =
   "/aprendizaje — qué aprendió JARVIS estudiando el mercado\n" +
   "/oficina — los agentes 24/7: qué tienen abierto, la reunión de la semana y lo que aprenden\n" +
   "/agente amd — hablar con un agente: su ficha y lo que dice\n" +
+  "/diario — el aprendizaje diario de los agentes: el día y lo que dice el registro según el mapa\n" +
   "/alerta BTC 90000 — te aviso cuando llegue a ese precio · /alertas · /borrar N\n" +
   "/nuevo — empezar una conversación nueva\n" +
   "/stop — dejar de recibir alertas\n\n" +
@@ -172,6 +176,15 @@ export async function POST(request: NextRequest) {
   } else if (cmd === "oficina" || cmd === "agente") {
     const { oficina, estado } = await oficinaServidor(env.DB);
     await sendMessage(token, chat, cmd === "oficina" || !arg ? textoOficinaTelegram(oficina, estado) : textoAgenteTelegram(oficina, arg));
+  } else if (cmd === "diario") {
+    // El último diario guardado (se arma cada noche); si todavía no hay, el de ayer armado con la lectura de la oficina.
+    const guardados = await diariosServidor(env.DB).catch(() => []);
+    let diario: Diario | null = guardados[0] ?? null;
+    if (!diario) {
+      const lectura = await lecturaServidor(env.DB).catch(() => null);
+      diario = lectura ? armarDiario(lectura.filas, diaAnterior(diaAr(Date.now())), PLAN_SERVIDOR) : null;
+    }
+    await sendMessage(token, chat, textoDiarioTelegram(diario));
   } else if (cmd === "resultados") {
     const stats = await getPlanStatsCached(env.DB, Date.now()).catch(() => []);
     await sendMessage(token, chat, resultsMessage(stats, STATS_DAYS));

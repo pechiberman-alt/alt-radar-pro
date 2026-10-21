@@ -16,6 +16,21 @@ type Entry<T> = {
 };
 
 const store = new Map<string, Entry<unknown>>();
+/**
+ * Tope de claves: las claves llevan parámetros del pedido (par, intervalo, lista de pares), así que sin tope cualquiera podía
+ * llenar la memoria del Worker pidiendo combinaciones distintas. Pasado el tope se van las más viejas (el Map guarda el orden).
+ */
+export const MAX_ENTRADAS = 600;
+function guardar(key: string, entry: Entry<unknown>) {
+  store.delete(key);
+  store.set(key, entry);
+  if (store.size <= MAX_ENTRADAS) return;
+  let sobran = store.size - MAX_ENTRADAS + 100;
+  for (const k of store.keys()) {
+    if (sobran-- <= 0) break;
+    if (k !== key && !store.get(k)?.pending) store.delete(k);
+  }
+}
 
 export type CacheState = "HIT" | "MISS" | "STALE" | "COALESCED";
 
@@ -52,18 +67,18 @@ export async function cached<T>(
   }
 
   const pending = loader().catch(() => null);
-  store.set(key, { ...(existing ?? { value: null as T, at: 0 }), pending });
+  guardar(key, { ...(existing ?? { value: null as T, at: 0 }), pending });
 
   const value = await pending;
 
   if (value !== null && value !== undefined) {
-    store.set(key, { value, at: Date.now() });
+    guardar(key, { value, at: Date.now() });
     return { value, state: "MISS", ageMs: 0 };
   }
 
   // Loader failed. Serve the previous reading while it is still worth showing.
   if (existing && now - existing.at < staleMs) {
-    store.set(key, { value: existing.value, at: existing.at });
+    guardar(key, { value: existing.value, at: existing.at });
     return { value: existing.value, state: "STALE", ageMs: now - existing.at };
   }
 
@@ -85,7 +100,7 @@ export function offerCached<T>(key: string, value: T, freshMs: number): boolean 
   if (value === null || value === undefined) return false;
   const existing = store.get(key);
   if (existing && Date.now() - existing.at < freshMs) return false;
-  store.set(key, { value, at: Date.now() });
+  guardar(key, { value, at: Date.now() });
   return true;
 }
 

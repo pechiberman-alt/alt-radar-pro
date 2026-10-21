@@ -21,6 +21,8 @@ export async function ensureAgentesServidor(db: D1Database) {
     ),
     db.prepare("CREATE INDEX IF NOT EXISTS agentes_servidor_abiertas ON agentes_servidor (symbol, desenlace)"),
     db.prepare("CREATE INDEX IF NOT EXISTS agentes_servidor_reciente ON agentes_servidor (detectada)"),
+    // Para el mapa: las posiciones de un par en los últimos días (lib/mapa-agentes-db.ts).
+    db.prepare("CREATE INDEX IF NOT EXISTS agentes_servidor_par ON agentes_servidor (symbol, detectada)"),
     db.prepare(
       `CREATE TABLE IF NOT EXISTS agentes_servidor_estado (
         symbol TEXT PRIMARY KEY, at INTEGER NOT NULL, venue TEXT, registradas INTEGER NOT NULL, avanzadas INTEGER NOT NULL, error TEXT)`,
@@ -40,7 +42,7 @@ export async function registrarServidor(db: D1Database, entradas: EntradaServido
           `INSERT OR IGNORE INTO agentes_servidor (clave, estrategia, symbol, lado, vela, detectada, entrada, sl, tp1, tp2, tp3, venue, foto, plan)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`,
         )
-        .bind(e.clave, e.estrategia, e.symbol, e.lado, e.vela, e.detectada, e.entrada, e.stop, e.tp1, e.tp2, e.tp3, e.venue, JSON.stringify(e.consenso), PLAN_SERVIDOR),
+        .bind(e.clave, e.estrategia, e.symbol, e.lado, e.vela, e.detectada, e.entrada, e.stop, e.tp1, e.tp2, e.tp3, e.venue, JSON.stringify({ ...e.consenso, ...(e.mapa ? { mapa: e.mapa } : {}) }), PLAN_SERVIDOR),
     ),
   );
   return res.reduce((n, r) => n + (r.meta.changes ?? 0), 0);

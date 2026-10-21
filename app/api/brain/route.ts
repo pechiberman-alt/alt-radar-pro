@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { coincide, corroborado, TOLERANCIA_CIERRE, velasDeReferencia } from "@/lib/corroborar";
 import {
   BRAIN_TIMEFRAMES,
   TIMEFRAME_MINUTES,
@@ -246,11 +247,20 @@ function outcomeCandle(candles: Candle[], targetMs: number, nowMs: number) {
   ) ?? null;
 }
 
+/**
+ * Quién puede escribir en la memoria del cerebro. SERVIDOR: velas que bajó el Worker. CORROBORADA: velas del navegador cuyo
+ * último cierre coincide con Kraken o Coinbase; ahí cada resultado también se corrobora vela por vela antes de contarlo. NO: las
+ * velas del navegador no se pudieron corroborar, así que se responde pero no se guarda nada (nadie puede ensuciar la
+ * calibración que ven todos mandando velas inventadas).
+ */
+type Escritura = "SERVIDOR" | "CORROBORADA" | "NO";
+
 async function evaluateDueObservations(
   db: D1Database,
   symbol: string,
   candleSets: Record<BrainTimeframe, Candle[]>,
   now: Date,
+  escritura: Escritura = "SERVIDOR",
 ) {
   const due = await db.prepare(
     `SELECT id, timeframe, direction, entry_price, target_at
@@ -267,10 +277,22 @@ async function evaluateDueObservations(
     directionalReturn: number;
     success: boolean;
   }[] = [];
+  // Con velas del navegador, el cierre de cada resultado tiene que coincidir con el de la misma vela en Kraken o Coinbase.
+  const referencias = new Map<string, Map<number, number> | null>();
+  if (escritura === "CORROBORADA") {
+    for (const tf of new Set(due.results.map((r) => r.timeframe))) {
+      const velas = await velasDeReferencia(symbol, tf, 300).catch(() => null);
+      referencias.set(tf, velas ? new Map(velas.map((v) => [v.openTime, v.close])) : null);
+    }
+  }
   const updates = due.results.flatMap((row) => {
     const candles = candleSets[row.timeframe] ?? [];
     const candle = outcomeCandle(candles, Date.parse(row.target_at), now.getTime());
     if (!candle || !row.entry_price) return [];
+    if (escritura === "CORROBORADA") {
+      const ref = referencias.get(row.timeframe)?.get(candle.openTime);
+      if (ref === undefined || !coincide(candle.close, ref, TOLERANCIA_CIERRE)) return [];
+    }
     const rawReturn = ((candle.close / row.entry_price) - 1) * 100;
     const directionalReturn = row.direction === "BULLISH" ? rawReturn : -rawReturn;
     audits.push({
@@ -401,6 +423,7 @@ async function learn(
   candleSets: Record<BrainTimeframe, Candle[]>,
   derivatives: DerivativesSnapshot,
   now: Date,
+  escritura: Escritura = "SERVIDOR",
 ): Promise<{
   learning: BrainLearning;
   confidence: number;
@@ -424,10 +447,10 @@ async function learn(
   try {
     await ensureBrainSchema(env.DB);
     await registerBrainManifest(env.DB, now.toISOString());
-    await evaluateDueObservations(env.DB, symbol, candleSets, now);
+    if (escritura !== "NO") await evaluateDueObservations(env.DB, symbol, candleSets, now, escritura);
     const stats = await loadCalibration(env.DB, timeframe);
     const confidence = calibratedConfidence(rawConfidence, stats);
-    if (analysis) {
+    if (analysis && escritura !== "NO") {
       await rememberObservation(
         env.DB,
         symbol,
@@ -551,6 +574,13 @@ export async function POST(request: Request) {
     if (derivatives.available) sources.add(derivatives.source);
     const consensusBase = buildConsensus(analyses, derivatives);
     const selected = analyses[input.timeframe];
+    // Velas del navegador: solo se guarda algo si su último cierre coincide con Kraken o Coinbase (lib/corroborar.ts).
+    const ultimoCierre = candleSets[input.timeframe].at(-1)?.close ?? null;
+    const escritura: Escritura = !hasBrowserSnapshot
+      ? "SERVIDOR"
+      : ultimoCierre !== null && (await corroborado(input.symbol, ultimoCierre).catch(() => null)) === true
+        ? "CORROBORADA"
+        : "NO";
     const learned = await learn(
       input.symbol,
       input.timeframe,
@@ -559,6 +589,7 @@ export async function POST(request: Request) {
       candleSets,
       derivatives,
       now,
+      escritura,
     );
     const referencePrice = derivatives.markPrice ?? selected?.price ?? 0;
     const warnings = [

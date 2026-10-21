@@ -2,6 +2,7 @@ import { ensureSignalPlanColumns, getPlanStatsCached } from "@/lib/signal-plan-d
 import { env } from "cloudflare:workers";
 import { ensureSignalSchema, syncOpenSignals } from "@/lib/automation";
 import { dropShared, sharedJson } from "@/lib/shared-cache";
+import { cached } from "@/lib/upstream-cache";
 import type {
   LedgerPayload,
   LedgerStats,
@@ -244,8 +245,17 @@ export async function POST(request: Request) {
     // The confluence engine no longer opens signals (3/10/2026): whatever a
     // caller asks, this only re-grades the open ones.
     void syncOnly;
-    const automation = await syncOpenSignals(env.DB);
-    await Promise.all([dropShared("ledger"), dropShared("performance")]);
+    // Cualquiera puede llamar acá sin sesión: como mucho una corrida por minuto (las demás reciben la misma), para que nadie
+    // pueda gastar las lecturas de D1 ni la CPU del Worker llamando en bucle.
+    const db = env.DB;
+    const corrida = await cached("signals:sync", 60_000, () =>
+      syncOpenSignals(db).catch((error) => {
+        console.error("[ALT_RADAR_AUTOMATION]", error);
+        return null;
+      }),
+    );
+    const automation = corrida.value;
+    if (corrida.state === "MISS") await Promise.all([dropShared("ledger"), dropShared("performance")]);
     const ledger = await sharedJson("ledger", 300, readLedger);
     return Response.json({ ...ledger, run: automation });
   } catch (error) {

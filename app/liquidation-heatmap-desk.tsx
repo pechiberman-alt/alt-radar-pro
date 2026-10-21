@@ -49,7 +49,12 @@ import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
 import { analyzeTrend, latestBreak, lineAt } from "@/lib/trendlines";
 import { findSweeps, sweepStats } from "@/lib/liquidity-sweeps";
 import { findFlags, readWyckoff, type FlagPattern, type WyckoffReading } from "@/lib/chart-patterns";
-import { findReversalZones, type LevelAtom, type ReversalZone } from "@/lib/reversal-zones";
+import { findReversalZones, type ReversalZone } from "@/lib/reversal-zones";
+import { atomosMapa } from "@/lib/mapa-atomos";
+import { agruparMotivos } from "@/lib/reversal-zones";
+import { guardarLecturaMapa } from "@/lib/mapa-memoria";
+import type { MapaVivo } from "@/lib/mapa-agentes";
+import { CapaAgentes, PanelAgentes, useAgentesDelPar } from "./mapa-agentes";
 import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
 import { buildScenarios, type ScenarioBoard } from "@/lib/scenario-analysis";
 import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
@@ -86,7 +91,7 @@ type DisplayCandle = {
   /** Aggressive buying (Binance kline field 9); the rest of volume is selling. */
   takerBuy?: number;
 };
-type LayerKey = "sr" | "liqvol" | "idm" | "robot" | "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp";
+type LayerKey = "sr" | "liqvol" | "idm" | "robot" | "calor" | "reversion" | "patrones" | "tendencia" | "liquidez" | "ob" | "breaker" | "fvg" | "fib" | "volumen" | "reales" | "rsi" | "macd" | "footprint" | "burbujas" | "tomas" | "scalp" | "agentes";
 /** Footprint needs individual trades: legible and fetchable only on short frames. */
 const FOOTPRINT_FRAMES = new Set(["1m", "3m", "5m", "15m"]);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -105,7 +110,7 @@ const LV_HORIZON = 24;
  * Everything else is one click away, and leaving the mode restores the layers
  * that were on before.
  */
-const SIMPLE_ON = new Set(["sr", "liqvol", "calor", "tendencia", "volumen", "reversion"]);
+const SIMPLE_ON = new Set(["sr", "liqvol", "calor", "tendencia", "volumen", "reversion", "agentes"]);
 /**
  * Fewer layers on by default. Order blocks, gaps and Fibonacci are the noisiest
  * and their levels already feed the reversal zones, so a reader who never
@@ -135,6 +140,8 @@ const DEFAULT_LAYERS: Record<LayerKey, boolean> = {
   tomas: true,
   scalp: true,
   reales: true,
+  // Los agentes de la oficina en este par (app/mapa-agentes.tsx).
+  agentes: true,
 };
 const simpleLayers = (): Record<LayerKey, boolean> =>
   Object.fromEntries(Object.keys(DEFAULT_LAYERS).map((k) => [k, SIMPLE_ON.has(k)])) as Record<LayerKey, boolean>;
@@ -146,6 +153,7 @@ const LAYER_LABELS: [LayerKey, string][] = [
   ["calor", "CALOR"],
   // The key stays "reversion" so saved layer choices keep working.
   ["reversion", "COMPRA / VENTA"],
+  ["agentes", "AGENTES"],
   ["patrones", "PATRONES"],
   ["tendencia", "TENDENCIA"],
   ["liquidez", "LIQUIDEZ"],
@@ -1555,41 +1563,67 @@ export default function LiquidationHeatmapDesk() {
     return { ...picked, index, frameMs, first, largest };
   }, [footprintMode, layers.burbujas, layout, trades, timeframe, bubbleMin]);
 
+  // Los mismos motivos que la foto del mapa de cada entrada de los agentes (lib/mapa-atomos.ts).
+  const mapAtoms = useMemo(
+    () =>
+      layout
+        ? atomosMapa({
+            pools,
+            imanes: [layout.heatmap.topZoneAbove, layout.heatmap.topZoneBelow],
+            orderBlocks,
+            breakers: breakerBlocks,
+            gaps,
+            fib: fibZone,
+            wyckoff,
+            niveles: levels,
+          })
+        : [],
+    [layout, pools, orderBlocks, breakerBlocks, gaps, fibZone, wyckoff, levels],
+  );
   const reversalZones = useMemo<ReversalZone[]>(() => {
     if (!layout || livePrice === null) return [];
-    const p = livePrice;
-    const atoms: LevelAtom[] = [];
-    const around = (price: number, pct: number) => ({ low: price * (1 - pct), high: price * (1 + pct) });
-    for (const pool of pools) {
-      if (pool.taken) continue;
-      atoms.push({ kind: "liquidez", weight: pool.frames.length > 1 ? 1.5 : 1, ...around(pool.price, 0.0005) });
-    }
-    for (const zone of [layout.heatmap.topZoneAbove, layout.heatmap.topZoneBelow]) {
-      if (zone) atoms.push({ kind: "imán de liquidaciones", weight: 1.5, ...around(zone.price, 0.002) });
-    }
-    for (const block of orderBlocks) atoms.push({ kind: "order block", weight: 1, low: block.low, high: block.high });
-    // Same weight as IFVG: both are evidence of an OBSERVED failure — price
-    // actually closed through and the level flipped — not just an unfilled
-    // level, which is why both rank above their un-broken counterpart.
-    for (const block of breakerBlocks) atoms.push({ kind: "breaker block", weight: 1.25, low: block.low, high: block.high });
-    for (const gap of gaps) atoms.push({ kind: gap.kind, weight: gap.kind === "IFVG" ? 1.25 : 1, low: gap.low, high: gap.high });
-    if (fibZone) for (const l of fibZone.levels) atoms.push({ kind: "Fibonacci", weight: 1, ...around(l.price, 0.001) });
-    if (wyckoff) {
-      atoms.push({ kind: "borde de rango Wyckoff", weight: 1.25, ...around(wyckoff.support, 0.0015) });
-      atoms.push({ kind: "borde de rango Wyckoff", weight: 1.25, ...around(wyckoff.resistance, 0.0015) });
-      for (const e of wyckoff.events) {
-        if (e.type === "SPRING" || e.type === "UPTHRUST") {
-          atoms.push({ kind: e.type === "SPRING" ? "spring" : "upthrust", weight: 1.5, ...around(e.price, 0.0015) });
-        }
-      }
-    }
-    // Key levels (structure, day and week references, volume profile, round numbers) count once per level, as one kind:
-    // their liquidity sources are already in as pools and magnets, so they are left out here to not count twice.
-    for (const l of levels) {
-      if (l.sources.some((x) => x.kind !== "IMÁN" && !x.kind.startsWith("POOL"))) atoms.push({ kind: "nivel clave", weight: 1, low: l.low, high: l.high });
-    }
-    return findReversalZones(p, atoms, { fillSides: true }).filter((z) => z.high >= layout.lo && z.low <= layout.hi);
-  }, [layout, livePrice, pools, orderBlocks, breakerBlocks, gaps, fibZone, wyckoff, levels]);
+    return findReversalZones(livePrice, mapAtoms, { fillSides: true }).filter((z) => z.high >= layout.lo && z.low <= layout.hi);
+  }, [layout, livePrice, mapAtoms]);
+  // Lo que el mapa de ahora sabe, para leer las posiciones de los agentes con las mismas reglas que su foto al entrar.
+  const mapaVivo = useMemo<MapaVivo | null>(() => {
+    if (!layout || livePrice === null || !swingView.length) return null;
+    const atr = atrOf(swingView);
+    if (!(atr > 0)) return null;
+    return {
+      atr,
+      zonas: agruparMotivos(livePrice, mapAtoms).filter((z) => z.kinds.length >= 2),
+      liquidez: pools.filter((p) => !p.taken).map((p) => ({ precio: p.price, lado: p.side === "COMPRA" ? ("ALTOS" as const) : ("BAJOS" as const) })),
+      imanArriba: layout.heatmap.topZoneAbove?.price ?? null,
+      imanAbajo: layout.heatmap.topZoneBelow?.price ?? null,
+    };
+  }, [layout, livePrice, swingView, mapAtoms, pools]);
+  // La oficina (los agentes y JARVIS) habla con el mapa a la vista: se guarda lo leído, como mucho una vez por minuto o
+  // cuando cambian las zonas (lib/mapa-memoria.ts).
+  const ultimaLectura = useRef<{ clave: string; at: number }>({ clave: "", at: 0 });
+  useEffect(() => {
+    if (!data || livePrice === null || data.heatmap.symbol !== symbol) return;
+    const compra = reversalZones.filter((z) => z.side === "SOPORTE").map((z) => ({ low: z.low, high: z.high, stars: z.stars, kinds: z.kinds }));
+    const venta = reversalZones.filter((z) => z.side === "RESISTENCIA").map((z) => ({ low: z.low, high: z.high, stars: z.stars, kinds: z.kinds }));
+    const clave = `${symbol}|${timeframe}|${[...compra, ...venta].map((z) => `${z.low.toPrecision(6)}-${z.stars}`).join(",")}`;
+    const ahora = Date.now();
+    if (clave === ultimaLectura.current.clave && ahora - ultimaLectura.current.at < 60_000) return;
+    ultimaLectura.current = { clave, at: ahora };
+    guardarLecturaMapa({
+      symbol,
+      timeframe,
+      at: ahora,
+      precio: livePrice,
+      compra,
+      venta,
+      imanArriba: data.heatmap.topZoneAbove?.price ?? null,
+      imanAbajo: data.heatmap.topZoneBelow?.price ?? null,
+      sesgo: data.heatmap.bias ?? null,
+    });
+  }, [data, livePrice, reversalZones, symbol, timeframe]);
+  const agentesPar = useAgentesDelPar(symbol, layers.agentes);
+  const [agenteElegido, setAgenteElegido] = useState<string | null>(null);
+  // Si la elegida ya no está (cambió el par o cerró), no hay elegida: se deriva, no se borra en un efecto.
+  const elegidaAgente = agentesPar.abiertas.some((p) => p.clave === agenteElegido) ? agenteElegido : null;
 
   const labelSlots = useMemo(() => {
     if (!layout) return { pool: new Set<string>(), ob: new Set<number>(), breaker: new Set<number>(), gap: new Set<number>(), rev: new Set<number>(), revBelow: new Set<number>(), fib: [] as { y: number; text: string }[], wy: false, flag: new Set<string>() };
@@ -2001,6 +2035,11 @@ export default function LiquidationHeatmapDesk() {
               <span className={reversalZones.length ? "rev" : "none"}>
                 ZONAS · {reversalZones.filter((z) => z.side === "SOPORTE").length} de compra · {reversalZones.filter((z) => z.side === "RESISTENCIA").length} de venta
               </span>
+              {layers.agentes && (
+                <span className={agentesPar.abiertas.length ? "ag" : "none"}>
+                  AGENTES · {agentesPar.cargando ? "leyendo…" : agentesPar.error ? "sin datos" : agentesPar.abiertas.length ? `${agentesPar.abiertas.filter((p) => p.lado === "LONG").length} ▲ · ${agentesPar.abiertas.filter((p) => p.lado === "SHORT").length} ▼` : "sin posiciones"}
+                </span>
+              )}
             </div>
           )}
 
@@ -3048,6 +3087,22 @@ export default function LiquidationHeatmapDesk() {
                 });
               })()}
 
+              {/* Los agentes de la oficina en este par: un marcador por posición en su entrada y, para la elegida, sus
+                  niveles de punta a punta (app/mapa-agentes.tsx). Encima de todo, para que se puedan tocar. */}
+              {layers.agentes && (
+                <CapaAgentes
+                  abiertas={agentesPar.abiertas}
+                  elegida={elegidaAgente}
+                  onElegir={setAgenteElegido}
+                  y={layout.y}
+                  x0={MARGIN.left}
+                  ancho={layout.candleAreaW}
+                  arriba={MARGIN.top}
+                  abajo={MARGIN.top + layout.plotH}
+                  fmt={priceLabel}
+                />
+              )}
+
               </g>
 
               {/* Volume strip. Bars scale to the largest candle in view; the
@@ -3480,6 +3535,18 @@ export default function LiquidationHeatmapDesk() {
               carry volume and a hit rate cannot share vertical space with
               another one — on the chart they stacked into an unreadable pile
               that also hid the candles. In a list each line has its own row. */}
+          {layers.agentes && layout && (
+            <PanelAgentes
+              symbol={symbol}
+              datos={agentesPar}
+              precio={livePrice}
+              mapa={mapaVivo}
+              elegida={elegidaAgente}
+              onElegir={setAgenteElegido}
+              fmt={priceLabel}
+            />
+          )}
+
           {(reversalZones.length > 0 || flags.length > 0 || wyckoff) && (
             <div className="liq-patterns">
               <h4>ZONAS DE COMPRA Y DE VENTA, Y PATRONES</h4>

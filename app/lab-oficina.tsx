@@ -11,14 +11,20 @@ import { useEffect, useMemo, useState } from "react";
 import { forAi } from "../lib/ai-numbers.ts";
 import { ESTRATEGIAS } from "../lib/estrategias.ts";
 import { armarOficina, charla, MESAS, nombreActivo, oficinaParaIa, propuestas, tituloSemana, usdTxt, type Escritorio, type FilaOficina, type Frase, type MesaId, type Oficina } from "../lib/oficina.ts";
+import { diaAr, diarioParaIa, leerDiario, resumenDia, ultimosDiarios, type Diario } from "../lib/aprendizaje-diario.ts";
+import { PLAN_SERVIDOR } from "../lib/agentes-servidor.ts";
+import { openInMap } from "../lib/account-events.ts";
+import { lecturaMapa, lecturaParaIa, lecturasMapa, onLecturaMapa, type LecturaMapa } from "../lib/mapa-memoria.ts";
 import MiniArana from "./lab-mini-arana";
 
 type Plan = "SERVIDOR" | "CUENTA";
 type EstadoMoneda = { symbol: string; at: number; venue: string | null; registradas: number; avanzadas: number; error: string | null };
-type Respuesta = { servidor: { filas: FilaOficina[]; estado: EstadoMoneda[] } | null; cuenta: FilaOficina[] | null; sesion: boolean };
+type Respuesta = { servidor: { filas: FilaOficina[]; estado: EstadoMoneda[] } | null; cuenta: FilaOficina[] | null; sesion: boolean; diarios?: unknown[] };
 type Linea = { de: "vos" | "agente"; texto: string; cerebro?: string };
 
 const POR_FILA = 4;
+/** El largo de piso (en unidades) que entra entero en la escena; más largo, se achica. */
+const ESCENA_FILAS = 21.5;
 const CAMBIO_FRASE_MS = 4500;
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)} %`);
 const r2 = (v: number | null) => {
@@ -37,6 +43,20 @@ const pantalla = (e: Escritorio) => {
 };
 
 type Puesto = { e: Escritorio; x: number; y: number };
+
+const precioCorto = (v: number) => v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : v >= 1 ? 2 : 5 });
+/** La pantalla del mapa en la pared: lo último que leyó el mapa de liquidaciones en este navegador. */
+function lineasMapa(l: LecturaMapa | null): string[] {
+  if (!l) return [];
+  const zona = (z: { low: number; high: number; stars: number }) => `${precioCorto(z.low)}–${precioCorto(z.high)} ${"★".repeat(z.stars)}`;
+  return [
+    `${nombreActivo(l.symbol)} ${l.timeframe} · ${precioCorto(l.precio)}`,
+    ...l.venta.slice(0, 2).map((z) => `Venta ${zona(z)}`),
+    ...l.compra.slice(0, 2).map((z) => `Compra ${zona(z)}`),
+    ...(l.sesgo ? [l.sesgo.toLowerCase()] : []),
+  ];
+}
+const fechaDia = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
 
 /** Ubica los escritorios: cada mesa en su bloque de filas, con un pasillo entre mesas. La sala de reuniones va al fondo. */
 function ubicar(escritorios: Escritorio[]): { puestos: Puesto[]; filas: number; bloques: { mesa: MesaId; y: number; filas: number }[] } {
@@ -147,6 +167,19 @@ export default function LabOficina() {
   const [chat, setChat] = useState<Record<string, Linea[]>>({});
   const [pregunta, setPregunta] = useState("");
   const [pensando, setPensando] = useState(false);
+  const [diaElegido, setDiaElegido] = useState<string | null>(null);
+  const [lecturas, setLecturas] = useState<LecturaMapa[]>([]);
+
+  // Lo que leyó el mapa de liquidaciones en este navegador: la pantalla de la pared y lo que ven los agentes al hablar.
+  useEffect(() => {
+    const leer = () => setLecturas(lecturasMapa());
+    const id = window.setTimeout(leer, 0);
+    const corta = onLecturaMapa(leer);
+    return () => {
+      window.clearTimeout(id);
+      corta();
+    };
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -173,6 +206,17 @@ export default function LabOficina() {
     () => armarOficina(plan === "SERVIDOR" ? (datos?.servidor?.filas ?? null) : (datos?.cuenta ?? null), ahora, plan),
     [datos, plan, ahora],
   );
+  // El diario de aprendizaje del plan que se ve: el guardado del servidor (lee más registro) y, para los días que falten y
+  // para hoy, el armado acá con las mismas filas (lib/aprendizaje-diario.ts). El de tu cuenta se arma siempre acá.
+  const diarios: Diario[] = useMemo(() => {
+    if (!ahora) return [];
+    const hoy = diaAr(ahora);
+    const filasPlan = plan === "SERVIDOR" ? (datos?.servidor?.filas ?? null) : (datos?.cuenta ?? null);
+    const guardados = plan === "SERVIDOR" ? (datos?.diarios ?? []).map(leerDiario).filter((d): d is Diario => d !== null) : [];
+    if (!filasPlan) return guardados;
+    return ultimosDiarios(filasPlan, hoy, plan === "SERVIDOR" ? PLAN_SERVIDOR : "TU_CUENTA").map((d) => (d.dia !== hoy ? (guardados.find((g) => g.dia === d.dia) ?? d) : d));
+  }, [datos, plan, ahora]);
+  const diaSel = diarios.find((d) => d.dia === diaElegido) ?? diarios.find((d) => d.delDia.cierres > 0) ?? diarios[0] ?? null;
   const fallas = (datos?.servidor?.estado ?? []).filter((e) => e.error);
   const ultimaVuelta = Math.max(0, ...(datos?.servidor?.estado ?? []).map((e) => e.at));
 
@@ -221,7 +265,7 @@ export default function LabOficina() {
   const personaAgente = (e: Escritorio) => ({
     id: e.id,
     nombre: e.agente,
-    instruccion: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo.`,
+    instruccion: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo. «mapa» es lo que leyó el mapa de liquidaciones en este navegador para los pares donde tenés posición (zonas de compra y de venta, imanes): usalo si te preguntan por el mapa; si no está, decí que abran el mapa en ese par.`,
     // Sin IA contesta con lo que ya dice; si todavía no dijo nada, con cómo se ve (siempre tiene algo honesto para contar).
     local: ((propias) => (propias.length ? propias : [e.conciencia]))(frases.filter((f) => f.quien === e.id).map((f) => f.texto)),
     datos: forAi({
@@ -237,14 +281,16 @@ export default function LabOficina() {
       abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`),
       comoSeVe: e.conciencia,
       lecciones: e.lecciones.map((l) => l.texto),
+      mapa: [...new Set(e.abiertas.map((a) => a.symbol))].map((sym) => lecturaMapa(sym)).filter((l): l is LecturaMapa => l !== null).map(lecturaParaIa),
+      diarioDeLaOficina: diarioParaIa(diaSel),
     }),
   });
   const personaJarvis = () => ({
     id: "JARVIS",
     nombre: "JARVIS",
-    instruccion: "Sos JARVIS y coordinás la oficina del fondo: ves a todos los agentes, el fondo simulado y lo que aprenden.",
-    local: [oficina.aprendizaje.texto, `El fondo simulado va ${usdTxt(oficina.fondo.netoUsd, true)} con ${oficina.fondo.cierres} cierres.`],
-    datos: oficinaParaIa(oficina, plan),
+    instruccion: "Sos JARVIS y coordinás la oficina del fondo: ves a todos los agentes, el fondo simulado, lo que aprenden cada día (diario) y lo que leyó el mapa de liquidaciones (mapa).",
+    local: [oficina.aprendizaje.texto, `El fondo simulado va ${usdTxt(oficina.fondo.netoUsd, true)} con ${oficina.fondo.cierres} cierres.`, ...(diaSel ? [`Diario del ${fechaDia(diaSel.dia)}: ${resumenDia(diaSel)}`] : [])],
+    datos: { oficina: oficinaParaIa(oficina, plan), diario: diarioParaIa(diaSel), mapa: lecturas.slice(0, 3).map(lecturaParaIa) } as unknown,
   });
 
   /** El chat de la ficha que esté abierta. */
@@ -301,7 +347,7 @@ export default function LabOficina() {
         </div>
         <p className="of-tenue">
           {plan === "SERVIDOR"
-            ? `Corren solos en el servidor, con la app cerrada, sobre velas de 4 h de Kraken (otra serie que Binance: su medición arrancó de cero). Oro y plata no están acá: solo los da Binance.${ultimaVuelta ? ` Última vuelta: ${new Date(ultimaVuelta).toLocaleString("es-AR")}.` : " Todavía no corrió ninguna vuelta."}${fallas.length ? ` ${fallas.length} ${fallas.length === 1 ? "moneda no respondió" : "monedas no respondieron"}: ${fallas.map((f) => f.symbol.replace(/USDT$/, "")).join(", ")}.` : ""}`
+            ? `Corren solos en el servidor, con la app cerrada, sobre velas de 4 h de Kraken (otra serie que Binance: su medición arrancó de cero). El oro corre como PAXG; la plata no está acá (solo la da Binance).${ultimaVuelta ? ` Última vuelta: ${new Date(ultimaVuelta).toLocaleString("es-AR")}.` : " Todavía no corrió ninguna vuelta."}${fallas.length ? ` ${fallas.length} ${fallas.length === 1 ? "moneda no respondió" : "monedas no respondieron"}: ${fallas.map((f) => f.symbol.replace(/USDT$/, "")).join(", ")}.` : ""}`
             : "Tus agentes del navegador: corren con la app abierta, sobre velas de Binance, con oro y plata."}
         </p>
         <div className="of-fondo">
@@ -327,13 +373,14 @@ export default function LabOficina() {
         {oficina.incompleta && <p className="of-tenue">Se leyeron las últimas 1.000 entradas: lo más viejo no entra.</p>}
       </header>
 
-      <div className="of-escena" style={{ ["--giro" as string]: `${giro}deg`, ["--filas" as string]: filas }}>
+      {/* Con más mesas el piso es más largo: se achica para que la sala de reuniones (y JARVIS) siga entrando en la escena. */}
+      <div className="of-escena" style={{ ["--giro" as string]: `${giro}deg`, ["--filas" as string]: filas, ["--esc" as string]: Math.min(1, ESCENA_FILAS / filas) }}>
         <div className="of-piso">
           <span className="of-luz" style={{ ["--y" as string]: 3 }} aria-hidden="true" />
           <span className="of-luz" style={{ ["--y" as string]: filas - 5 }} aria-hidden="true" />
           <div className="of-pared of-pared-fondo">
             <Pizarra titulo="EN DIRECTO" filas={lineasDirecto} vacio="Sin posiciones abiertas" />
-            <span className="of-ventana" aria-hidden="true" />
+            <Pizarra titulo="MAPA DE LIQUIDACIONES" filas={lineasMapa(lecturas[0] ?? null)} vacio="Abrí el mapa: lo que lea aparece acá" />
             <Pizarra titulo="REUNIÓN DE LA SEMANA" filas={lineasReunion} vacio="Nadie cerró en 7 días" />
             <Arana activa={elegido === "ARANA"} elegir={() => setElegido(elegido === "ARANA" ? null : "ARANA")} falla={plan === "SERVIDOR" && fallas.length > 0} />
           </div>
@@ -421,7 +468,14 @@ export default function LabOficina() {
           </dl>
           <Curva puntos={elegidoE.capital.curva} etiqueta={`Capital simulado de ${elegidoE.agente}`} />
           {elegidoE.abiertas.length > 0 && (
-            <p>Abiertas: {elegidoE.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}</p>
+            <div className="of-abiertas">
+              <span>Abiertas</span>
+              {elegidoE.abiertas.map((a) => (
+                <button key={`${a.symbol}-${a.detectada}`} type="button" className={a.lado === "LONG" ? "of-sube" : "of-baja"} onClick={() => openInMap(a.symbol, "4h")} title="Ver la posición y sus niveles en el mapa de liquidaciones">
+                  {nombreActivo(a.symbol)} {a.lado === "LONG" ? "▲" : "▼"} · VER EN EL MAPA
+                </button>
+              ))}
+            </div>
           )}
           {frases.filter((f) => f.quien === elegidoE.id).map((f) => <p key={f.texto} className="of-dice">«{f.texto}»</p>)}
           <h5 className="of-ficha-sub">Cómo se ve</h5>
@@ -518,6 +572,63 @@ export default function LabOficina() {
         <p className="of-tenue">{oficina.escritorios.length - oficina.ranking.length} agentes todavía sin cierres.</p>
       </div>
 
+      <div className="of-tabla-caja of-diario">
+        <h4>Diario de aprendizaje</h4>
+        <p className="of-tenue">
+          Cada día (de Argentina) los agentes cuentan qué cerraron y qué dice todo su registro según el mapa de liquidaciones al entrar:
+          con o sin zona detrás del stop, con el camino libre o con una zona en el medio, con el stop lejos o junto a liquidez sin barrer.
+          Firme recién con 15 cierres de cada lado. Aprender es medir: ninguna regla cambia sola.
+        </p>
+        {diarios.length ? (
+          <>
+            <div className="of-dias" role="tablist" aria-label="Día del diario">
+              {diarios.map((d) => (
+                <button key={d.dia} type="button" role="tab" aria-selected={diaSel?.dia === d.dia} onClick={() => setDiaElegido(d.dia)}>
+                  <span>{fechaDia(d.dia)}</span>
+                  <b className={d.delDia.netoR > 0 ? "of-sube" : d.delDia.netoR < 0 ? "of-baja" : ""}>{d.delDia.cierres ? r2(d.delDia.netoR) : "—"}</b>
+                  <small>{d.delDia.cierres} {d.delDia.cierres === 1 ? "cierre" : "cierres"}</small>
+                </button>
+              ))}
+            </div>
+            {diaSel && (
+              <>
+                <p>
+                  <b>{fechaDia(diaSel.dia)}:</b> {resumenDia(diaSel)}
+                </p>
+                <div className="of-tabla-scroll">
+                  <table className="of-tabla of-comparar">
+                    <thead>
+                      <tr><th>Lo que mira</th><th>Sí</th><th>No</th><th>Estado</th></tr>
+                    </thead>
+                    <tbody>
+                      {diaSel.comparaciones.map((c) => (
+                        <tr key={c.tema}>
+                          <td>{c.si.etiqueta}</td>
+                          <td>{pct(c.si.est.winRate)} · {r2(c.si.est.expectancia)} <small>n={c.si.est.cerradas}</small></td>
+                          <td>{pct(c.no.est.winRate)} · {r2(c.no.est.expectancia)} <small>n={c.no.est.cerradas}</small></td>
+                          <td className={c.firme ? "of-firme-txt" : "of-tenue"}>{c.firme ? (c.separados ? "firme · se separan" : "firme · todavía se pisan") : "todavía no firme"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {diaSel.novedades.length > 0 && (
+                  <ul className="of-lecciones">
+                    {diaSel.novedades.map((n) => <li key={n}>{n}</li>)}
+                  </ul>
+                )}
+                <p className="of-tenue">
+                  {diaSel.conFoto} de {diaSel.total.cerradas} cierres tienen foto del mapa (las entradas anteriores al 21/10/2026 no la tienen). Comparar no es
+                  probar una causa. No es asesoramiento financiero.
+                </p>
+              </>
+            )}
+          </>
+        ) : (
+          <p className="of-tenue">{estado === "cargando" ? "Leyendo el diario…" : "Sin datos para armar el diario (no es cero)."}</p>
+        )}
+      </div>
+
       {oficina.conversaciones.length > 0 && (
         <div className="of-tabla-caja">
           <h4>Conversaciones entre ellos</h4>
@@ -576,7 +687,16 @@ export default function LabOficina() {
         <div>
           <h4>En directo</h4>
           {enDirecto.length ? (
-            <ul>{enDirecto.slice(0, 12).map(({ e, a }) => <li key={`${e.id}-${a.symbol}-${a.detectada}`}>{nombreCorto(e.agente)} · {nombreActivo(a.symbol)} {a.lado === "LONG" ? "▲ largo" : "▼ corto"}</li>)}</ul>
+            <ul>
+              {enDirecto.slice(0, 12).map(({ e, a }) => (
+                <li key={`${e.id}-${a.symbol}-${a.detectada}`}>
+                  {nombreCorto(e.agente)} · {nombreActivo(a.symbol)} {a.lado === "LONG" ? "▲ largo" : "▼ corto"}{" "}
+                  <button type="button" className="of-link" onClick={() => openInMap(a.symbol, "4h")}>
+                    ver en el mapa
+                  </button>
+                </li>
+              ))}
+            </ul>
           ) : (
             <p className="of-tenue">Sin posiciones abiertas.</p>
           )}

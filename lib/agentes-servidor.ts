@@ -12,6 +12,7 @@
 import { consensoDe, fotoConsenso } from "./consenso.ts";
 import { recorrer, type Lado, type Recorrido } from "./escalera.ts";
 import { COMISION_AGENTES_PCT, HORIZONTE_AGENTES, leerSenalesPapel, MARCO_AGENTES_MS, MONEDAS_AGENTES } from "./agentes-papel.ts";
+import type { FotoMapa } from "./mapa-contexto.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
 export const PLAN_SERVIDOR = "PLAN_SERVIDOR_1";
@@ -57,6 +58,8 @@ export type EntradaServidor = {
   tp3: number;
   venue: string;
   consenso: { acuerdo: number; contra: number; con: string[] };
+  /** La foto del mapa al entrar (lib/mapa-contexto.ts), con las mismas velas de Kraken. */
+  mapa: FotoMapa | null;
 };
 
 /**
@@ -80,6 +83,7 @@ export function entradasServidor(symbol: string, velas: SwingCandle[], ahora: nu
     tp3: p.escalera.tp3,
     venue,
     consenso: fotoConsenso(acuerdos.get(`${p.estrategia}|${symbol}|${p.vela}`) ?? { acuerdo: 0, contra: 0, con: [] }),
+    mapa: p.foto,
   }));
 }
 

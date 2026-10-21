@@ -143,3 +143,18 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at TEXT NOT NULL
 );
 `;
+
+/**
+ * Solo servicios de notificaciones de los navegadores: el servidor le escribe a esta dirección, así que no puede ser una
+ * cualquiera (nadie tiene que poder hacer que el Worker le pegue a un sitio elegido por otro). Y con tope de largo.
+ */
+const SERVICIOS_PUSH = [/^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^[a-z0-9-]+\.push\.apple\.com$/, /^web\.push\.apple\.com$/, /^[a-z0-9.-]+\.notify\.windows\.com$/];
+export function endpointPushValido(endpoint: string): boolean {
+  if (endpoint.length > 1000) return false;
+  try {
+    const u = new URL(endpoint);
+    return u.protocol === "https:" && !u.port && SERVICIOS_PUSH.some((re) => re.test(u.hostname));
+  } catch {
+    return false;
+  }
+}

@@ -12,6 +12,7 @@ import { respuestaLab } from "../lib/lab-jarvis.ts";
 import { operacionDePapel, TOPES, type LimitesRiesgo } from "../lib/lab-riesgo.ts";
 import { fijarBacktest, fijarError, fijarEvaluacion, fotoLab, guardarLimites, LAB_EVENT, registrarActividad } from "../lib/lab-run.ts";
 import { lineaFuente } from "../lib/registro.ts";
+import { onLabTab } from "../lib/account-events.ts";
 import LabAxiDiario from "./lab-axi-diario";
 import LabFondeo from "./lab-fondeo";
 import LabUniversos from "./lab-universos";
@@ -188,6 +189,15 @@ export default function AiTradingLab() {
   const [pregunta, setPregunta] = useState<string | null>(null);
   const [borrador, setBorrador] = useState<LimitesRiesgo | null>(null);
   const corriendo = useRef<AbortController | null>(null);
+  // Otro panel (el mapa de liquidaciones) puede pedir una pestaña: la oficina, por ejemplo.
+  useEffect(
+    () =>
+      onLabTab((tab) => {
+        const p = PESTANAS.find(([id]) => id === tab);
+        if (p) setPestana(p[0]);
+      }),
+    [],
+  );
 
   if (!f) return <section className="panel lab lab-cargando">ARMANDO EL LABORATORIO…</section>;
   const c = centroDe(f);

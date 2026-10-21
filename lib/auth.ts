@@ -93,6 +93,27 @@ export async function verifyPassword(password: string, hash: string, salt: strin
   return timingSafeEqual(computed, hash);
 }
 
+const SAL_FALSA = new Uint8Array(16).fill(7);
+/**
+ * El mismo trabajo que verificar una contraseña, para un email que no existe: así la respuesta tarda lo mismo y no deja
+ * adivinar qué emails tienen cuenta midiendo el tiempo. Siempre da false.
+ */
+export async function fakeVerify(password: string) {
+  await pbkdf2(password, SAL_FALSA);
+  return false;
+}
+
+/**
+ * Lo que se guarda de una sesión es el hash de su token, no el token: quien lea la base no puede usar las sesiones. Las
+ * sesiones viejas (guardadas en claro) siguen andando y se pasan a hash la primera vez que se usan.
+ */
+export async function hashToken(token: string): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return `h:${[...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+/** Un token de sesión tiene esta forma (32 bytes en hexa); cualquier otra cosa ni se busca. */
+export const tokenValido = (token: string) => /^[0-9a-f]{64}$/.test(token);
+
 export function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -107,29 +128,34 @@ export async function createSession(db: D1Database, userId: number) {
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
   await db
     .prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?1, ?2, ?3)")
-    .bind(token, userId, expiresAt)
+    .bind(await hashToken(token), userId, expiresAt)
     .run();
   return { token, expiresAt };
 }
 
 export async function destroySession(db: D1Database, token: string) {
-  await db.prepare("DELETE FROM sessions WHERE token = ?1").bind(token).run();
+  await db.prepare("DELETE FROM sessions WHERE token IN (?1, ?2)").bind(await hashToken(token), token).run();
 }
 
 export async function getSessionUser(db: D1Database, token: string) {
+  if (!tokenValido(token)) return null;
+  const hashed = await hashToken(token);
   const row = await db
     .prepare(
-      `SELECT users.id AS id, users.email AS email, sessions.expires_at AS expiresAt
+      `SELECT users.id AS id, users.email AS email, sessions.expires_at AS expiresAt, sessions.token AS stored
        FROM sessions JOIN users ON users.id = sessions.user_id
-       WHERE sessions.token = ?1`,
+       WHERE sessions.token IN (?1, ?2)
+       LIMIT 1`,
     )
-    .bind(token)
-    .first<{ id: number; email: string; expiresAt: string }>();
+    .bind(hashed, token)
+    .first<{ id: number; email: string; expiresAt: string; stored: string }>();
   if (!row) return null;
   if (new Date(row.expiresAt).getTime() < Date.now()) {
     await destroySession(db, token);
     return null;
   }
+  // Una sesión vieja guardada en claro: se pasa a hash ahora.
+  if (row.stored === token) await db.prepare("UPDATE sessions SET token = ?1 WHERE token = ?2").bind(hashed, token).run();
   return { id: row.id, email: row.email };
 }
 

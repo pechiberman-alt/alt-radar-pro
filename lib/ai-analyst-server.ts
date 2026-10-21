@@ -9,21 +9,36 @@ import { AI_DAILY_LIMIT, AI_MAX_OUTPUT, AI_MODEL, extractText, quotaState, type 
 const USAGE_SCHEMA =
   "CREATE TABLE IF NOT EXISTS ai_usage (user_id INTEGER NOT NULL, day TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY (user_id, day))";
 
+/**
+ * Tope de respuestas de Claude por día entre TODOS los usuarios (se paga por respuesta). Con la registración abierta, el tope
+ * por persona solo no alcanza: alguien podía crear muchas cuentas y gastar 25 por cada una. Se cuenta en la fila user_id = 0.
+ * Pasado el tope, la cascada sigue con los cerebros gratis.
+ */
+export const CLAUDE_GLOBAL_DAILY = 150;
+const GLOBAL_ID = 0;
+
 export async function quotaFor(db: D1Database, userId: number) {
   await db.prepare(USAGE_SCHEMA).run();
   const day = new Date().toISOString().slice(0, 10);
-  const used = (await db.prepare("SELECT count FROM ai_usage WHERE user_id = ?1 AND day = ?2").bind(userId, day).first<{ count: number }>())?.count ?? 0;
-  return { ...quotaState(used), day, limit: AI_DAILY_LIMIT };
+  const rows = (
+    await db.prepare("SELECT user_id, count FROM ai_usage WHERE day = ?2 AND user_id IN (?1, ?3) LIMIT 2").bind(userId, day, GLOBAL_ID).all<{ user_id: number; count: number }>()
+  ).results;
+  const used = rows.find((r) => r.user_id === userId)?.count ?? 0;
+  const global = rows.find((r) => r.user_id === GLOBAL_ID)?.count ?? 0;
+  const own = quotaState(used);
+  const globalOk = global < CLAUDE_GLOBAL_DAILY;
+  return { allowed: own.allowed && globalOk, remaining: globalOk ? own.remaining : 0, day, limit: AI_DAILY_LIMIT };
 }
 
 export async function consumeQuota(db: D1Database, userId: number, day: string) {
-  await db
-    .prepare(
-      `INSERT INTO ai_usage (user_id, day, count) VALUES (?1, ?2, 1)
-       ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1`,
-    )
-    .bind(userId, day)
-    .run();
+  const sumar = (id: number) =>
+    db
+      .prepare(
+        `INSERT INTO ai_usage (user_id, day, count) VALUES (?1, ?2, 1)
+         ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1`,
+      )
+      .bind(id, day);
+  await db.batch([sumar(userId), sumar(GLOBAL_ID)]);
 }
 
 /** Consecutive same-role turns are merged: the API requires alternation. */

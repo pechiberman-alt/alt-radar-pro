@@ -25,6 +25,8 @@ export async function ensureAgenteSt(db: D1Database) {
         PRIMARY KEY (user_id, clave))`,
     ),
     db.prepare("CREATE INDEX IF NOT EXISTS agente_st_senales_reciente ON agente_st_senales (user_id, detectada)"),
+    // Para el mapa: tus posiciones de un par en los últimos días (lib/mapa-agentes-db.ts).
+    db.prepare("CREATE INDEX IF NOT EXISTS agente_st_senales_par ON agente_st_senales (user_id, symbol, detectada)"),
   ]);
   listo.add(db);
 }
@@ -57,7 +59,7 @@ export async function registrarSenalPapel(db: D1Database, userId: number, s: Sen
       `INSERT OR IGNORE INTO agente_st_senales (user_id, clave, symbol, lado, marco, vela, detectada, entrada, sl, tp1, tp2, tp3, foto, plan)
        VALUES (?1, ?2, ?3, ?4, '4h', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
     )
-    .bind(userId, s.clave, s.symbol, s.lado, s.vela, s.detectada, s.entrada, s.stop, s.tp1, s.tp2, s.tp3, JSON.stringify(s.consenso ?? {}), planDe(s.symbol))
+    .bind(userId, s.clave, s.symbol, s.lado, s.vela, s.detectada, s.entrada, s.stop, s.tp1, s.tp2, s.tp3, JSON.stringify({ ...(s.consenso ?? {}), ...(s.mapa ? { mapa: s.mapa } : {}) }), planDe(s.symbol))
     .run();
   return res.meta.changes === 1;
 }

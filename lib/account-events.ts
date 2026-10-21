@@ -82,3 +82,20 @@ export function onMapSymbol(cb: (symbol: string, timeframe: string | null) => vo
   window.addEventListener(MAP_SYMBOL, handler);
   return () => window.removeEventListener(MAP_SYMBOL, handler);
 }
+
+const LAB_TAB = "alt-radar:lab-tab";
+
+/** Opens the AI TRADING LAB on one of its tabs (the office, for example) and scrolls to it. */
+export function openLabTab(tab: string) {
+  window.dispatchEvent(new CustomEvent(LAB_TAB, { detail: { tab } }));
+  showSection("lab");
+}
+
+export function onLabTab(cb: (tab: string) => void) {
+  const handler = (e: Event) => {
+    const tab = (e as CustomEvent).detail?.tab;
+    if (typeof tab === "string" && /^[a-z]{3,20}$/.test(tab)) cb(tab);
+  };
+  window.addEventListener(LAB_TAB, handler);
+  return () => window.removeEventListener(LAB_TAB, handler);
+}

@@ -176,7 +176,7 @@ export function selectForUser(
   return { send: eligible.slice(0, cap), rest, suppressed: rest.length };
 }
 
-export type BotCommand = { cmd: "start" | "stop" | "estado" | "nuevo" | "ayuda" | "texto" | "resultados" | "alerta" | "alertas" | "borrar" | "jarvis" | "aprendizaje" | "oficina" | "agente"; arg: string };
+export type BotCommand = { cmd: "start" | "stop" | "estado" | "nuevo" | "ayuda" | "texto" | "resultados" | "alerta" | "alertas" | "borrar" | "jarvis" | "aprendizaje" | "oficina" | "agente" | "diario"; arg: string };
 
 export function parseCommand(text: string | undefined): BotCommand {
   const raw = (text ?? "").trim();
@@ -197,6 +197,7 @@ export function parseCommand(text: string | undefined): BotCommand {
   if (name === "aprendizaje" || name === "aprendi" || name === "lecciones") return { cmd: "aprendizaje", arg };
   if (name === "oficina" || name === "fondo" || name === "agentes") return { cmd: "oficina", arg };
   if (name === "agente") return { cmd: "agente", arg };
+  if (name === "diario" || name === "bitacora") return { cmd: "diario", arg };
   return { cmd: "ayuda", arg };
 }
 

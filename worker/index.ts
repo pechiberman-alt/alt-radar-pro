@@ -10,6 +10,8 @@ import { probeFreeBrain } from "../lib/ai-probe";
 import { runMindHour } from "../lib/jarvis-mind-db";
 import { runAgentesServidor } from "../lib/agentes-servidor-run";
 import { CRON_SERVIDOR } from "../lib/agentes-servidor";
+import { esHoraDelDiario, runAprendizajeDiario } from "../lib/aprendizaje-diario-db";
+import { conSeguridad } from "../lib/seguridad-cabeceras";
 import type { AiLike } from "../lib/ai-brains";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
@@ -77,8 +79,7 @@ interface ExecutionContext {
 // dangerouslyAllowSVG: true in next.config.js and uncomment below:
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
-const worker = {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+async function responder(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/_vinext/image") {
@@ -93,6 +94,11 @@ const worker = {
     }
 
     return handler.fetch(request, env, ctx);
+}
+
+const worker = {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return conSeguridad(await responder(request, env, ctx));
   },
 
   async scheduled(
@@ -141,6 +147,14 @@ const worker = {
           console.error("[ALT_RADAR_STRUCTURE_SCHEDULED]", error);
         }),
       );
+      // El aprendizaje diario de la oficina (lib/aprendizaje-diario.ts): una vez por día, a las 00:15 de Argentina. Sin IA.
+      if (esHoraDelDiario(controller.scheduledTime)) {
+        ctx.waitUntil(
+          runAprendizajeDiario(env.DB, controller.scheduledTime).catch((error) => {
+            console.error("[ALT_RADAR_APRENDIZAJE_DIARIO]", error);
+          }),
+        );
+      }
     }
     if (controller.cron === "*/5 * * * *") {
       // Token from a Cloudflare secret or, if absent, the one saved in the app.

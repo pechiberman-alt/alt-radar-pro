@@ -99,6 +99,8 @@ export async function escanearAgenteSt(ahora = Date.now()): Promise<number> {
               stop: p.stop,
               objetivo: p.objetivo,
               consenso: fotoConsenso(acuerdos.get(`${p.estrategia}|${symbol}|${p.vela}`) ?? { acuerdo: 0, contra: 0, con: [] }),
+              // La foto del mapa al entrar (lib/mapa-contexto.ts): el servidor la revisa y la guarda junto al consenso.
+              ...(p.foto ? { mapa: p.foto } : {}),
             },
           }),
         });

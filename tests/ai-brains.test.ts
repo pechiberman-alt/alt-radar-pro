@@ -165,3 +165,16 @@ test("deploy check: the free brain is asked once per build, a failure is retried
   assert.equal(calls, 3);
   resetProbe();
 });
+
+test("Claude tiene un tope diario entre todos: pasado el tope, contesta el cerebro gratis aunque a la persona le queden", { skip: !sqlite }, async () => {
+  const { CLAUDE_GLOBAL_DAILY } = await import("../lib/ai-analyst-server.ts");
+  const db = makeDb();
+  const now = Date.now();
+  const a = await answerWithBrains(db, 11, { claude: "sk-ant", groq: null }, freeAi(), "S", Q, now, claudeOk);
+  assert.equal(a.ok && a.brain, "claude");
+  const global = await db.prepare("SELECT count FROM ai_usage WHERE user_id = 0").first<{ count: number }>();
+  assert.equal(global?.count, 1, "cada respuesta de Claude suma también al total del día");
+  await db.prepare("UPDATE ai_usage SET count = ?1 WHERE user_id = 0").bind(CLAUDE_GLOBAL_DAILY).run();
+  const b = await answerWithBrains(db, 12, { claude: "sk-ant", groq: null }, freeAi(), "S", Q, now, claudeOk);
+  assert.deepEqual(b.ok && [b.brain, b.claudeLeft], ["cloudflare", 0]);
+});
