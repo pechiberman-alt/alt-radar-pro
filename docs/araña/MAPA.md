@@ -4,7 +4,7 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 692 · objetivos: 19 · sin objetivo: 0
+- Archivos: 693 · objetivos: 19 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 59 · hosts: 60
 - Código de navegador: 72 archivos con "use client" que alcanzan 226 · problemas: 0
 - Lib sin prueba directa: 28 de 227
@@ -663,7 +663,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/workspace-sections.test.ts` — Every <Collapsible id="x" ...
 - `tests/xau-alerts.test.ts` — pruebas: gold and silver by any common name, and real coins untouched, the metals live on the futures API; everything else on spot, gold prices keep their cents and both writing habits work (+1)
 
-### app-movil — Interfaz, PWA y celular primero (100)
+### app-movil — Interfaz, PWA y celular primero (101)
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
 - `app/account-panel.css`
 - `app/account-panel.tsx` — exporta: AccountPanel, AuthForms, default
@@ -757,6 +757,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `public/favicon.svg`
 - `public/file.svg`
 - `public/globe.svg`
+- `public/googledf489adb531a8301.html`
 - `public/icon-192.png`
 - `public/icon-512.png`
 - `public/manifest.webmanifest`
