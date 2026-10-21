@@ -82,17 +82,23 @@ export async function encryptSecret(plain: string, db: D1Database, env: { ENCRYP
 }
 
 export async function decryptSecret(encrypted: string, db: D1Database, env: { ENCRYPTION_KEY?: string }) {
+  return (await decryptSecretConEstado(encrypted, db, env)).plain;
+}
+
+/**
+ * Como decryptSecret, y además dice si se abrió con la clave vieja (la local, de antes de poner ENCRYPTION_KEY): así quien lee
+ * puede volver a cifrarlo con la fuerte. Agregar la clave fuerte no obliga a nadie a volver a vincular su cuenta.
+ */
+export async function decryptSecretConEstado(encrypted: string, db: D1Database, env: { ENCRYPTION_KEY?: string }): Promise<{ plain: string; conClaveVieja: boolean }> {
   const combined = fromBase64(encrypted);
   const iv = combined.slice(0, 12);
   const data = combined.slice(12);
   const abrir = async (key: CryptoKey) => new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, data as BufferSource));
   try {
-    return await abrir(await getEncryptionKey(db, env));
+    return { plain: await abrir(await getEncryptionKey(db, env)), conClaveVieja: false };
   } catch (error) {
-    // Lo guardado antes de poner ENCRYPTION_KEY quedó cifrado con la clave local: se sigue pudiendo leer, así que agregar la
-    // clave fuerte no obliga a nadie a volver a vincular su cuenta (la próxima vinculación ya se cifra con la fuerte).
     if (!env.ENCRYPTION_KEY) throw error;
-    return abrir(await importAesKey(await resolveEncryptionKey(db, {})));
+    return { plain: await abrir(await importAesKey(await resolveEncryptionKey(db, {}))), conClaveVieja: true };
   }
 }
 

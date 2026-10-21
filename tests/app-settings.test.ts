@@ -93,3 +93,18 @@ test("two independent stores never share a local key", async () => {
   const b = await resolveEncryptionKey(fakeD1(), {});
   assert.notEqual(a, b);
 });
+
+test("con ENCRYPTION_KEY, un secreto guardado con la clave local se sigue leyendo y se vuelve a cifrar con la fuerte", async () => {
+  const { getSecret, setSecret } = await import("../lib/app-settings.ts");
+  const db = fakeD1();
+  await setSecret(db, {}, "arkham_api_key", "clave-arkham-123");
+  const viejo = await db.prepare("SELECT value FROM app_settings WHERE key = ?1").bind("secret:arkham_api_key").first<{ value: string }>();
+  assert.equal(unpackSecret(viejo!.value)?.k, "local");
+  const fuerte = randomKeyBase64();
+  const leido = await getSecret(db, { ENCRYPTION_KEY: fuerte }, "arkham_api_key");
+  assert.equal(leido.value, "clave-arkham-123");
+  const nuevo = await db.prepare("SELECT value FROM app_settings WHERE key = ?1").bind("secret:arkham_api_key").first<{ value: string }>();
+  const packed = unpackSecret(nuevo!.value);
+  assert.equal(packed?.k, "env", "quedó cifrado con la clave fuerte");
+  assert.equal(await open(packed!.c, fuerte), "clave-arkham-123");
+});

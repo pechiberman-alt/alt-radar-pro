@@ -12,6 +12,7 @@ import { runAgentesServidor } from "../lib/agentes-servidor-run";
 import { CRON_SERVIDOR } from "../lib/agentes-servidor";
 import { esHoraDelDiario, runAprendizajeDiario } from "../lib/aprendizaje-diario-db";
 import { conSeguridad } from "../lib/seguridad-cabeceras";
+import { contarPedido, respuestaLimite } from "../lib/limite-pedidos";
 import type { AiLike } from "../lib/ai-brains";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
@@ -98,6 +99,9 @@ async function responder(request: Request, env: Env, ctx: ExecutionContext): Pro
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Primer freno contra quien llama a la API en bucle desde una IP (lib/limite-pedidos.ts).
+    const espera = contarPedido(request.headers.get("cf-connecting-ip"), new URL(request.url).pathname);
+    if (espera !== null) return conSeguridad(respuestaLimite(espera));
     return conSeguridad(await responder(request, env, ctx));
   },
 

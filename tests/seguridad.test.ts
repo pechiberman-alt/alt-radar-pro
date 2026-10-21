@@ -98,3 +98,23 @@ test("la caché del Worker tiene tope: pasado el tope se van las claves más vie
   assert.equal(offerCached("primera", 3, 60_000), true, "la más vieja ya no está");
   clearUpstreamCache();
 });
+
+test("límite de pedidos por IP: la API se frena pasado el tope, el webhook de Telegram nunca, y sin IP no se limita", async () => {
+  const { contarPedido, limiteDe, MAX_PEDIDOS_API, MAX_PEDIDOS_AUTH, olvidarPedidos, respuestaLimite, VENTANA_PEDIDOS_MS } = await import("../lib/limite-pedidos.ts");
+  olvidarPedidos();
+  const t = 5_000_000;
+  for (let k = 0; k < MAX_PEDIDOS_API; k += 1) assert.equal(contarPedido("1.2.3.4", "/api/tickers", t), null);
+  const espera = contarPedido("1.2.3.4", "/api/tickers", t + 1000);
+  assert.equal(espera, 59, "pasado el tope, cuánto falta para que se libere");
+  assert.equal(contarPedido("5.6.7.8", "/api/tickers", t + 1000), null, "otra IP no se ve afectada");
+  assert.equal(contarPedido("1.2.3.4", "/api/tickers", t + VENTANA_PEDIDOS_MS), null, "en la ventana siguiente vuelve a pasar");
+  for (let k = 0; k < MAX_PEDIDOS_AUTH; k += 1) assert.equal(contarPedido("9.9.9.9", "/api/auth/login", t), null);
+  assert.ok(contarPedido("9.9.9.9", "/api/auth/login", t) !== null, "entrar tiene un tope mucho más bajo");
+  for (let k = 0; k < MAX_PEDIDOS_API + 50; k += 1) assert.equal(contarPedido("1.1.1.1", "/api/telegram/webhook", t), null);
+  assert.equal(contarPedido(null, "/api/tickers", t), null);
+  assert.equal(limiteDe("/"), null, "las páginas no se limitan");
+  const r = respuestaLimite(30);
+  assert.equal(r.status, 429);
+  assert.equal(r.headers.get("Retry-After"), "30");
+  olvidarPedidos();
+});

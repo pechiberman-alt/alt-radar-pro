@@ -33,16 +33,19 @@ las dependencias y el historial de git. Lo que se pudo arreglar en el código se
 | Llenar la memoria del Worker con claves distintas | La caché del Worker tiene tope (600 claves; se van las más viejas). |
 | Que el servidor le escriba a una dirección cualquiera (notificaciones) | Solo servicios de notificaciones de los navegadores, por HTTPS y con tope de largo. |
 | Meter la app en un marco de otro sitio (clickjacking) y otros | Cabeceras en todas las respuestas: `X-Frame-Options`, `frame-ancestors 'self'`, `nosniff`, `Referrer-Policy`, HSTS y `Permissions-Policy` (sin cámara, ubicación ni pagos; micrófono solo la propia página). `lib/seguridad-cabeceras.ts` |
+| Llamar a la API en bucle desde una IP | Límite en el propio Worker: 300 pedidos por minuto por IP a `/api/` y 20 para entrar o crear cuenta (429 con cuánto esperar). El webhook de Telegram no se limita. `lib/limite-pedidos.ts` |
 | Activar la clave de cifrado fuerte rompía las claves de Binance ya guardadas | Ahora se pueden leer con la clave anterior: se puede activar `ENCRYPTION_KEY` sin que nadie tenga que volver a vincular. |
 
 ## Pendiente (lo hace la persona, en Cloudflare)
 
 1. **Rotar los tokens que quedaron a la vista** y borrar el token «Altradar 2» (ya estaba anotado en `docs/araña/objetivos.md`).
-2. **Clave de cifrado fuerte**: hoy los secretos se cifran con una clave guardada en la misma base. Con
-   `npx wrangler secret put ENCRYPTION_KEY` (32 bytes en base64, por ejemplo `openssl rand -base64 32`) quedan cifrados con una
-   clave que no está en la base.
-3. **Una regla de límite de pedidos** en Cloudflare (Seguridad → WAF → Rate limiting; el plan gratis trae una): por ejemplo, 100
-   pedidos cada 10 segundos por IP en `/api/`. Frena el abuso antes de que llegue al Worker.
+2. **Clave de cifrado fuerte**: hoy los secretos se cifran con una clave guardada en la misma base. En la app, CONFIGURACIÓN →
+   «GENERAR UNA CLAVE DE CIFRADO FUERTE» la arma en tu navegador (no viaja a ningún lado) y dice dónde pegarla en Cloudflare
+   (Workers y Pages → alt-radar-pro → Variables y secretos → Secreto `ENCRYPTION_KEY`). Lo ya guardado se vuelve a cifrar con la
+   clave fuerte solo, la primera vez que se lee (secretos del administrador y claves de Binance).
+3. **Si pasás a un dominio propio**: ahí sí existe la regla de límite de pedidos del WAF de Cloudflare (Seguridad → WAF → Rate
+   limiting; el plan gratis trae una), que frena el abuso antes de llegar al Worker. En `*.workers.dev` no existe: por eso el
+   límite va en el Worker (arriba).
 4. **Herramientas de desarrollo**: `npm audit` marca 30 avisos en paquetes que solo se usan para compilar y probar (wrangler,
    miniflare, ws), no en lo que corre en internet. Se actualizan cuando el plugin de Cloudflare para Vite lo permita.
 

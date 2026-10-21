@@ -207,7 +207,7 @@ Reglas:
 
 ## seguridad — Sesiones, secretos y claves
 Texto: quién entra, cómo se guardan los secretos y qué nunca sale del servidor.
-Archivos: lib/auth*.ts, lib/secret*.ts, app/api/auth/**, app/api/admin/**, app/sign-in*.tsx, lib/corroborar.ts, lib/aporte-velas.ts, lib/seguridad-cabeceras.ts, tests/seguridad.test.ts, docs/seguridad.md
+Archivos: lib/auth*.ts, lib/secret*.ts, app/api/auth/**, app/api/admin/**, app/sign-in*.tsx, lib/corroborar.ts, lib/aporte-velas.ts, lib/seguridad-cabeceras.ts, lib/limite-pedidos.ts, tests/seguridad.test.ts, docs/seguridad.md
 Reglas:
 - Nunca commitear claves, tokens ni contraseñas. Nunca loguear credenciales.
 - Las claves de IA y de exchanges se leen con getSecret y nunca llegan al navegador.
@@ -217,10 +217,11 @@ Reglas:
 - Una ruta sin sesión que lee D1 va con caché compartida (sharedJson) y parámetros acotados; una que escribe, con corroboración o con una corrida por minuto como mucho.
 - Claude (se paga) tiene tope diario entre todos los usuarios (CLAUDE_GLOBAL_DAILY), además del de cada uno.
 - Todas las respuestas llevan las cabeceras de lib/seguridad-cabeceras.ts (no se puede meter la app en un marco de otro sitio).
+- Límite de pedidos por IP en el Worker (lib/limite-pedidos.ts: 300 por minuto a /api/, 20 para entrar o crear cuenta; el webhook de Telegram no). En *.workers.dev no hay WAF: el límite va en el código.
 - Revisión completa y pendientes: docs/seguridad.md.
 Pendiente:
 - Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que quedaron a la vista en el chat.
-- Poner ENCRYPTION_KEY como secreto del Worker (ya no rompe las claves de Binance guardadas) y una regla de límite de pedidos en el WAF para /api/.
+- Poner ENCRYPTION_KEY como secreto del Worker (ya no rompe las claves de Binance guardadas). Con dominio propio, sumar la regla de límite de pedidos del WAF.
 
 ## araña — La araña del proyecto y las instrucciones para trabajar en él
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.

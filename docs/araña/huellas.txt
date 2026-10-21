@@ -31,7 +31,7 @@ e6ca04d22a7f	73	app/api/auth/login/route.ts
 88f003febfca	73	app/api/axi/diario/route.ts
 36a25f71018a	63	app/api/backtest/fibonacci/route.ts
 aaacdc67b091	39	app/api/binance/client-log/route.ts
-c6c1c3bff4b9	44	app/api/binance/credentials/route.ts
+29ebeafc544c	53	app/api/binance/credentials/route.ts
 3af85369b605	53	app/api/binance/futures-log/route.ts
 3e5c83f68e7e	80	app/api/binance/link/route.ts
 f33342b56fd7	55	app/api/bot/journal/route.ts
@@ -178,8 +178,8 @@ d180ba5315c4	324	app/scalping-desk.tsx
 12f05e090902	80	app/secure-brain.css
 61aeec6728ee	43	app/sentiment-desk.css
 17158023a26f	214	app/sentiment-desk.tsx
-2f608ab498fd	21	app/settings-desk.css
-6a9f3e13c84c	223	app/settings-desk.tsx
+2ba7c37dbc1a	26	app/settings-desk.css
+7c61f07848da	264	app/settings-desk.tsx
 9acc1747570b	19	app/sign-in-prompt.tsx
 94eb31e12b92	41	app/signal-ledger.css
 2053366a2a2f	624	app/signal-ledger.tsx
@@ -198,7 +198,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-40b3278b0ee4	330	docs/araña/objetivos.md
+943b1283124c	331	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -212,7 +212,7 @@ e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
 ec29d0ad6d0c	166	docs/mesa-reglas-v2.md
-27fb3add815d	59	docs/seguridad.md
+46ef38933aff	62	docs/seguridad.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -251,7 +251,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 dbd75245f8b8	366	lib/alerts.ts
 58037aaa761b	203	lib/amd-ifvg.ts
 6bfed10a9b83	44	lib/aporte-velas.ts
-db6ae19f1b13	157	lib/app-settings.ts
+a860f44cf759	162	lib/app-settings.ts
 4998b2cb2829	188	lib/aprender.ts
 5b106de4c580	72	lib/aprendizaje-diario-db.ts
 59ef6540706f	208	lib/aprendizaje-diario.ts
@@ -269,7 +269,7 @@ ab1defe0d619	284	lib/arana-vivo.ts
 8a2f00fbc9e2	89	lib/axi-db.ts
 8394f6ccf025	219	lib/axi-diario.ts
 8aead8c82ec0	156	lib/big-trades.ts
-774fc9c2bcf1	321	lib/binance-account.ts
+2a06368c2c89	327	lib/binance-account.ts
 88d7204af739	426	lib/binance-client-signed.ts
 7a3337dae7d8	49	lib/binance-debug-log.ts
 dbb61e696813	67	lib/binance-futures.ts
@@ -353,6 +353,7 @@ fe550a7f3308	117	lib/lab-jarvis.ts
 eda55eca2fdc	298	lib/lab.ts
 59c01b7901bf	127	lib/lectura-novato.ts
 99fb494d0e6a	267	lib/level-engine.ts
+0622ef509c48	64	lib/limite-pedidos.ts
 4dbec818cfe9	179	lib/linea-busqueda.ts
 f30387232851	191	lib/liq-vol-signals.ts
 1321af2613b0	198	lib/liquidation-columns.ts
@@ -504,7 +505,7 @@ eb69cb3c629a	53	tests/alert-bus.test.ts
 23ae380f097f	194	tests/alerts.test.ts
 9896df93f3a4	136	tests/amd-ifvg.test.ts
 9cc84562a84c	206	tests/api-routes.test.ts
-1dd438218685	96	tests/app-settings.test.ts
+bfa206d67ce0	111	tests/app-settings.test.ts
 c5f7f005ea47	56	tests/aprender.test.ts
 7367d625cbbb	98	tests/aprendizaje-diario.test.ts
 e8ec72c5deb7	89	tests/arana-ultimo.test.ts
@@ -518,7 +519,7 @@ dff2674006ae	17	tests/auth-pbkdf2.test.ts
 9c839531c0ad	83	tests/axi-db.test.ts
 c3efb04fe8a8	138	tests/axi-diario.test.ts
 c9269f098959	107	tests/big-trades.test.ts
-d3752b5c0eee	221	tests/binance-account.test.ts
+faef30687ecd	233	tests/binance-account.test.ts
 7196a528f9c5	261	tests/binance-client-signed.test.ts
 0c1c8e289261	77	tests/binance-debug-log.test.ts
 c230ab327c5d	127	tests/binance-import.test.ts
@@ -631,7 +632,7 @@ be9108096ae0	127	tests/robot-ledger.test.ts
 86312ffaffac	67	tests/robot-signals.test.ts
 cb2709dad5d1	228	tests/scalp-signals.test.ts
 de58453ca449	139	tests/scenario-analysis.test.ts
-22818b33acd5	101	tests/seguridad.test.ts
+2c5f84e74521	121	tests/seguridad.test.ts
 297d3e2bfa7c	17	tests/shared-cache.test.ts
 0acb179e0c9c	133	tests/signal-confluence.test.ts
 b49ac1298da8	141	tests/signal-plan-db.test.ts
@@ -663,5 +664,5 @@ dafba0404d8e	92	tests/volume-spike.test.ts
 21b30109f4c3	79	tests/xau-alerts.test.ts
 b41bd6678407	33	tsconfig.json
 037c2ff06898	75	vite.config.ts
-11c0f302572b	186	worker/index.ts
+c36bbfad8408	190	worker/index.ts
 a49c24aef5a7	37	wrangler.production.jsonc

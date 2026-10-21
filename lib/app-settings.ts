@@ -110,6 +110,11 @@ export async function getSecret(db: D1Database, env: SettingsEnv, name: SecretNa
     try {
       const key = packed.k === "env" ? env.ENCRYPTION_KEY : await localKey(db);
       if (key) value = await open(packed.c, key);
+      // Guardado con la clave local y ya hay ENCRYPTION_KEY: se vuelve a cifrar con la fuerte (migra solo, la primera vez
+      // que se lee). Si falla la escritura, se sigue leyendo igual.
+      if (value !== null && packed.k === "local" && env.ENCRYPTION_KEY) {
+        await write(db, `secret:${name}`, packSecret({ k: "env", c: await seal(value, env.ENCRYPTION_KEY) })).catch(() => undefined);
+      }
     } catch {
       value = null;
     }
