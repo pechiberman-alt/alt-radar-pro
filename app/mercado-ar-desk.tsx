@@ -15,7 +15,7 @@ import { medirUniverso, ESTUDIO_AR, EXCLUIDOS_AR } from "@/lib/mercado-ar-agente
 import { mejoresComprasFib, senalesConMentes, CERCA_ZONA, type PapelLeido } from "@/lib/mercado-ar-ranking";
 import { MUESTRA_ESTUDIO } from "@/lib/estrategias";
 import { AVISO_MENTES } from "@/lib/mentes-inversoras";
-import { openArEnMapa } from "@/lib/account-events";
+import { onMercadoAr, openArEnMapa, openTutorial } from "@/lib/account-events";
 import type { SwingCandle } from "@/lib/swing-entries";
 import { fmt, fmtPct } from "./mercado-ar-vistas";
 import SalaMentes from "./sala-mentes";
@@ -306,6 +306,14 @@ function Escaner({ lecturas, correr, avance }: { lecturas: LecturaPapel[]; corre
 export default function MercadoArDesk() {
   const [pestania, setPestania] = useState<Pestania>("ACCIONES");
   const { lecturas, avance, correr } = usePanel();
+  // El tutorial (y cualquier otra parte) puede pedir una pestaña.
+  useEffect(
+    () =>
+      onMercadoAr((p) => {
+        if (["ACCIONES", "CEDEARS", "FIBONACCI", "ESCANER", "SALA"].includes(p)) setPestania(p as Pestania);
+      }),
+    [],
+  );
   const pestanias: { id: Pestania; texto: string }[] = [
     { id: "ACCIONES", texto: `ACCIONES (${ACCIONES_AR.length})` },
     { id: "CEDEARS", texto: `CEDEARS (${CEDEARS.length})` },
@@ -320,6 +328,7 @@ export default function MercadoArDesk() {
       <p className="ar-flag">
         <b>RUEDAS DIARIAS CON DEMORA</b> · Yahoo Finance (BYMA). Sin footprint ni liquidaciones: BYMA no publica cada operación con su lado agresor ni el apalancamiento de las posiciones. No es asesoramiento financiero.
       </p>
+      <button className="ar-chip-btn ar-ayuda" onClick={openTutorial}>¿CÓMO SE USA? · TUTORIAL</button>
       <div className="ar-tabs" role="tablist">
         {pestanias.map((p) => (
           <button key={p.id} role="tab" aria-selected={pestania === p.id} className={pestania === p.id ? "on" : ""} onClick={() => setPestania(p.id)}>

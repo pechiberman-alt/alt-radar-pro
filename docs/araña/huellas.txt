@@ -160,9 +160,9 @@ d6e1ca037a9c	393	app/mapa-agentes.tsx
 db0be99a3f89	499	app/market-brain.tsx
 89b25149b415	141	app/market-structure-panel.tsx
 244b15230fb0	48	app/market-structure.css
-6598a486ff67	349	app/mercado-ar-desk.tsx
+0f764caf6293	358	app/mercado-ar-desk.tsx
 4ba98720cfe2	322	app/mercado-ar-vistas.tsx
-6079fe3cd1d1	118	app/mercado-ar.css
+8abab890ea7f	137	app/mercado-ar.css
 4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
 3da71069ee49	75	app/open-heatmap.css
@@ -180,7 +180,7 @@ ece7ccbad21e	206	app/puerta-pro.css
 9f9d72a3dd57	87	app/pump-radar.css
 74db3d1c5d80	350	app/pump-radar.tsx
 f58412c957a0	53	app/pwa-register.tsx
-79351a80b727	1379	app/radar-app.tsx
+bd46935a341e	1381	app/radar-app.tsx
 72da20719972	274	app/responsive-fixes.css
 119930fcab22	76	app/risk-desk.css
 57216ff5dacb	344	app/risk-desk.tsx
@@ -204,15 +204,16 @@ d92243b48c4e	226	app/swing-desk.tsx
 bf2d0803539f	168	app/telegram-card.tsx
 fbfd8084693b	38	app/trade-journal-desk.css
 932eb45f1ee4	256	app/trade-journal-desk.tsx
+7707333468b6	92	app/tutorial.tsx
 d1d42e77268a	43	app/unlock-desk.css
 75b335780f73	170	app/unlock-desk.tsx
 7d79d9a14c6a	343	app/workspace.css
-bd6422c65a0d	358	app/workspace.tsx
+c32c087d3f1a	360	app/workspace.tsx
 330c84e55f99	43	app/zones-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-96b782b2980d	386	docs/araña/objetivos.md
+8e62c61cda34	387	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -246,7 +247,7 @@ a8b2d84ca1b7	846	drizzle/meta/0005_snapshot.json
 e0459b113cf2	42	eslint.config.mjs
 79967ad93a9f	59	examples/d1/app/api/notes/route.ts
 766d1eb792e8	10	examples/d1/db/schema.ts
-e812e922f594	119	lib/account-events.ts
+54aaca56f0e6	148	lib/account-events.ts
 6b197acd00d5	559	lib/account-journal.ts
 fc2a3822598c	168	lib/agente-st-db.ts
 039b5a0103b5	196	lib/agente-st-run.ts
@@ -479,6 +480,7 @@ d0434e2eafe5	81	lib/trade-bubbles.ts
 759b1ffa8280	142	lib/trade-journal.ts
 3ae6c5a6865e	265	lib/trading-profiles.ts
 09d30197f4dc	283	lib/trendlines.ts
+d6f393f1c8a3	156	lib/tutorial.ts
 763fbbce015d	105	lib/universos.ts
 cd048d1dc164	111	lib/upstream-cache.ts
 93845159d10c	27	lib/visible-interval.ts
@@ -710,6 +712,7 @@ be4820285ec6	54	tests/timeframes.test.ts
 7abc9c547923	67	tests/trade-bubbles.test.ts
 1780efc99a76	93	tests/trade-journal.test.ts
 7c6e53012303	190	tests/trendlines.test.ts
+0761581817da	35	tests/tutorial.test.ts
 f0ea4f541999	85	tests/universos.test.ts
 2919de6f3d64	157	tests/upstream-cache.test.ts
 dafba0404d8e	92	tests/volume-spike.test.ts

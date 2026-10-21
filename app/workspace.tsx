@@ -1,5 +1,5 @@
 "use client";
-import { onShowSection, openAccount, showSection } from "@/lib/account-events";
+import { onShowSection, openAccount, openTutorial, showSection } from "@/lib/account-events";
 import { BUILD_ID } from "@/lib/build-info";
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
@@ -97,7 +97,7 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
  * They live under AVANZADO, one tap away, and opening any of them from
  * elsewhere in the app turns AVANZADO on by itself.
  */
-export const ESSENTIAL_IDS = new Set(["resumen", "jarvis-trading", "inteligencia", "liquidaciones", "rompe", "desacople", "alertas", "diario", "configuracion"]);
+export const ESSENTIAL_IDS = new Set(["resumen", "jarvis-trading", "inteligencia", "liquidaciones", "mercado-ar", "rompe", "desacople", "alertas", "diario", "configuracion"]);
 const ADVANCED_KEY = "alt-radar-pro:workspace:advanced:v1";
 const ADVANCED_EVENT = "alt-radar:advanced";
 
@@ -282,6 +282,7 @@ export function WorkspaceBar({
         <button onClick={() => setAll(true)}>TODO</button>
         <button onClick={() => setAll(false)}>NADA</button>
         <button onClick={reset}>PREDET.</button>
+        <button className="ws-tutorial" onClick={openTutorial}>TUTORIAL</button>
         <button className={advanced ? "ws-advanced on" : "ws-advanced"} onClick={() => setAdvanced(!advanced)} aria-pressed={advanced}>
           {advanced ? "SOLO LO ESENCIAL" : `AVANZADO · ${extra} HERRAMIENTAS MÁS`}
         </button>
@@ -344,6 +345,7 @@ export function WelcomeHint() {
           <li>Arriesgá como máximo <b>1% por operación</b>, siempre con stop. Calculalo en DIARIO → CALCULADORA.</li>
         </ol>
         <span>
+          <button className="ws-welcome-cta" onClick={openTutorial}>VER EL TUTORIAL</button>
           <button className="ws-welcome-cta" onClick={() => showSection("liquidaciones")}>ABRIR EL MAPA</button>
           <button className="ws-welcome-cta" onClick={() => openAccount("register")}>CREAR CUENTA GRATIS</button>
         </span>

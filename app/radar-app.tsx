@@ -50,6 +50,7 @@ import SpotDesk from "./spot-desk";
 import SentimentDesk from "./sentiment-desk";
 import AranaDesk from "./arana-desk";
 import MercadoArDesk from "./mercado-ar-desk";
+import Tutorial from "./tutorial";
 import AiTradingLab from "./ai-trading-lab";
 import SettingsDesk from "./settings-desk";
 import SwingDesk from "./swing-desk";
@@ -959,6 +960,7 @@ export default function RadarApp() {
 
       <div className="shell">
         <WelcomeHint />
+        <Tutorial />
 
         <WorkspaceBar
           open={workspace.open}
