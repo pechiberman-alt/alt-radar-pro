@@ -41,7 +41,7 @@ const SEPARACION = 0.8;
 const COLOR_MESA: Record<MesaId, string> = { TENDENCIA: "59,130,246", REVERSION: "168,85,247", ESTRUCTURA: "34,211,238", FLUJO: "52,211,153", METALES: "242,184,75" };
 const ZOOM_MAX = 4;
 /** Desde este zoom se ven las etiquetas con el nombre y los números de cada agente. */
-const ZOOM_CERCA = 1.6;
+const ZOOM_CERCA = 2.2;
 const CAMBIO_FRASE_MS = 4500;
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)} %`);
 const r2 = (v: number | null) => {
@@ -69,9 +69,11 @@ type Pod = { mesa: MesaId; x: number; y: number; ancho: number; alto: number };
 
 /** Lo que muestran los dos monitores: el acierto y el PF en papel; sin cierres, los de su historial (H); sin nada, una raya. */
 function monitores(e: Escritorio): { tipo: "papel" | "hist" | "nada"; acierto: string; pf: string } {
-  if (e.total.cerradas > 0) return { tipo: "papel", acierto: e.total.winRate === null ? "—" : `${Math.round(e.total.winRate * 100)}%`, pf: n2(e.total.profitFactor) };
+  // Con menos de 15 operaciones el número lleva un asterisco: muestra mínima.
+  const poca = (n: number) => (n < 15 ? "*" : "");
+  if (e.total.cerradas > 0) return { tipo: "papel", acierto: e.total.winRate === null ? "—" : `${Math.round(e.total.winRate * 100)}%${poca(e.total.cerradas)}`, pf: n2(e.total.profitFactor) };
   const h = e.historial;
-  if (h && h.operaciones > 0) return { tipo: "hist", acierto: h.winRate === null ? "—" : `${Math.round(h.winRate * 100)}%`, pf: n2(h.profitFactor) };
+  if (h && h.operaciones > 0) return { tipo: "hist", acierto: h.winRate === null ? "—" : `${Math.round(h.winRate * 100)}%${poca(h.operaciones)}`, pf: n2(h.profitFactor) };
   return { tipo: "nada", acierto: "—", pf: "—" };
 }
 /** Una estadística del registro en una línea: acierto, PF, R por operación y muestra; sin cierres, lo dice. */
@@ -761,7 +763,7 @@ export default function LabOficina() {
       </div>
       <p className="of-tenue of-pista">
         Acercate con + o pellizcando (en la compu, Ctrl + rueda o doble clic en el piso) y arrastrá para recorrer. En los monitores: acierto y
-        profit factor en papel; con H, los de su historial en 4 h mientras no cierre nada.
+        profit factor en papel; con H, los de su historial en 4 h mientras no cierre nada; con *, menos de 15 operaciones (muestra mínima).
       </p>
 
       {elegidoE && (

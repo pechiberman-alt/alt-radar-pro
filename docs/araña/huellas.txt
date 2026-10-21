@@ -141,8 +141,8 @@ a0bec1d6e010	165	app/lab-agente-st.tsx
 b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
-f91a770d007e	242	app/lab-oficina.css
-116e2c267040	1108	app/lab-oficina.tsx
+fdac540c69d5	243	app/lab-oficina.css
+5cf6a445ff38	1110	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -168,7 +168,7 @@ f87f234d88cd	47	app/portfolio-risk.css
 2937f70ab7ef	38	app/pressure-desk.css
 f6c0da2d5db5	170	app/pressure-desk.tsx
 ece7ccbad21e	206	app/puerta-pro.css
-90f0f1ea1565	642	app/puerta-pro.tsx
+b8484b88b976	642	app/puerta-pro.tsx
 9f9d72a3dd57	87	app/pump-radar.css
 74db3d1c5d80	350	app/pump-radar.tsx
 f58412c957a0	53	app/pwa-register.tsx
