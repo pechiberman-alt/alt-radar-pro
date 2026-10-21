@@ -376,8 +376,9 @@ Reglas:
 
 ## app-movil — Interfaz, PWA y celular primero
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
-Archivos: app/*.tsx, app/*.css, app/*.ts, public/**, lib/account-events*.ts, lib/visible-interval*.ts
+Archivos: app/*.tsx, app/*.css, app/*.ts, public/**, lib/account-events*.ts, lib/visible-interval*.ts, lib/tutorial.ts
 Reglas:
+- Tutorial de toda la plataforma (lib/tutorial.ts, app/tutorial.tsx): por capítulos, cada paso con un botón que lleva a esa sección (tests/tutorial.test.ts chequea que existan). Se abre solo la primera vez y con ?tutorial=1 (el QR impreso); después, con TUTORIAL en la barra de paneles. Si se agrega o renombra una sección, revisar sus pasos.
 - Celular > tablet > escritorio. Nada sale de la pantalla ni hay scroll horizontal; margen lateral de 16 px.
 - Todo texto visible va en español rioplatense (vos, «comprá», decimales con coma).
 - Las reglas de React: el setState de un efecto va después del primer await.

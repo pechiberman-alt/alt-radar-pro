@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 721 · objetivos: 21 · sin objetivo: 0
+- Archivos: 724 · objetivos: 21 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 62 · hosts: 63
-- Código de navegador: 76 archivos con "use client" que alcanzan 242 · problemas: 0
-- Lib sin prueba directa: 29 de 238
+- Código de navegador: 77 archivos con "use client" que alcanzan 244 · problemas: 0
+- Lib sin prueba directa: 29 de 239
 
 ## Objetivos
 
@@ -557,7 +557,7 @@ Pendiente: Fase C: que la mesa de JARVIS, la araña y los agentes lean el contex
 - `docs/terminal-unificada.md` — ALT RADAR PRO — plataforma unificada: auditoría y primer incremento
 - `lib/contexto-comun.ts` — El contexto común de la terminal (docs/terminal-unificada.md, fase B): la forma en que un dato llega a cualquier agente, con su fuente, su mercado (Spot o Futures), la hora del dat
 
-### calidad — Pruebas (138)
+### calidad — Pruebas (139)
 Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su prueba.
 - `tests/account-journal.test.ts` — pruebas: a long: entry, exit, size, result and fees, Binance, a short mirrors a long (+1)
 - `tests/agente-metales.test.ts` — Pruebas del Agente Metales (METALES_D55 en lib/estrategias.ts): solo opera oro y plata (en papel y en el estudio), solo compra, dispara cuando el cierre supera el máximo de las 55
@@ -692,13 +692,14 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/trade-bubbles.test.ts` — pruebas: automatic: the top 0,5% of on-screen orders, sides from the aggressor, biggest d, only orders inside the visible window count, for the threshold too, a fixed minimum replaces the automatic one (+1)
 - `tests/trade-journal.test.ts` — pruebas: a long profits when price rises, sized by the recorded USD amount, a short profits when price falls — the sign is flipped, not the math, an open trade has no P&L yet — not zero, genuinely unknown (+1)
 - `tests/trendlines.test.ts` — pruebas: pivots: the first of equal highs counts, edges are never pivots, a resistance line through three swing highs, and the close that breaks it, before the break the same line is standing, and nothing is reported broken (+1)
+- `tests/tutorial.test.ts` — Pruebas del tutorial de la plataforma (lib/tutorial.ts): cada paso lleva a una sección que existe, cada capítulo tiene pasos, y se abre solo la primera vez o con ?tutorial=1 (el QR
 - `tests/upstream-cache.test.ts` — pruebas: first read loads, second is served from cache, concurrent readers coalesce into one upstream call, an expired entry is refreshed (+1)
 - `tests/volume-spike.test.ts` — pruebas: 3.5× the average of the previous 20 is a spike; just under 3× is not; exactly 3×, only the 20 candles before the last count: an older spike doesn, not enough history, no baseline, or unusable numbers: nothing is reported (+1)
 - `tests/web-push.test.ts` — pruebas: the VAPID token is addressed to the push service, not to us, a different endpoint host produces a different audience, the token expires within the window push services accept (+1)
 - `tests/workspace-sections.test.ts` — Every <Collapsible id="x" ...
 - `tests/xau-alerts.test.ts` — pruebas: gold and silver by any common name, and real coins untouched, the metals live on the futures API; everything else on spot, gold prices keep their cents and both writing habits work (+1)
 
-### app-movil — Interfaz, PWA y celular primero (102)
+### app-movil — Interfaz, PWA y celular primero (104)
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
 - `app/account-panel.css`
 - `app/account-panel.tsx` — exporta: AccountPanel, AuthForms, default
@@ -778,6 +779,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/swing-desk.css`
 - `app/swing-desk.tsx` — exporta: SwingDesk, default
 - `app/trade-journal-desk.css`
+- `app/tutorial.tsx` — El tutorial de toda la plataforma (lib/tutorial.ts): una tarjeta al pie de la pantalla, que no tapa la app, con el capítulo, el paso, un botón que lleva a esa parte y anterior/sigu
 - `app/unlock-desk.css`
 - `app/unlock-desk.tsx` — exporta: UnlockDesk, default
 - `app/workspace.css` — Workspace chrome: the bar that indexes every panel and the collapsible wrapper each section sits in.
@@ -785,6 +787,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/zones-desk.css`
 - `app/zones-desk.tsx` — exporta: ZonesDesk, default
 - `lib/account-events.ts` — Small browser events so any panel can open the account drawer, and every panel learns when someone signs in or out without reloading the page.
+- `lib/tutorial.ts` — El tutorial paso a paso de toda la plataforma, por capítulos: empezá acá (RESUMEN, JARVIS, señales), el MAPA y sus niveles, señales y entradas, acciones y CEDEARs (Fibonacci, mente
 - `lib/visible-interval.ts` — setInterval that only runs while the tab is visible.
 - `public/2ef6b9791a8f7e4abb3d34f228548ac2.txt`
 - `public/anuncio/altradar-anuncio.mp4`
@@ -1032,7 +1035,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/cobros-admin.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/grafico-ar-tv.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-axi-diario.tsx, app/lab-fondeo.tsx, app/lab-oficina.tsx, app/lab-piso.tsx, app/lab-universos.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/mapa-agentes.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mercado-ar-desk.tsx, app/mercado-ar-vistas.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/puerta-pro.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/sala-mentes.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/cobros-admin.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/grafico-ar-tv.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-axi-diario.tsx, app/lab-fondeo.tsx, app/lab-oficina.tsx, app/lab-piso.tsx, app/lab-universos.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/mapa-agentes.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mercado-ar-desk.tsx, app/mercado-ar-vistas.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/puerta-pro.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/sala-mentes.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/tutorial.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa

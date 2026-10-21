@@ -100,6 +100,35 @@ export function onArEnMapa(cb: (ticker: string) => void) {
   return () => window.removeEventListener(MAPA_AR, handler);
 }
 
+const PESTANA_AR = "alt-radar:pestana-ar";
+
+/** Abre MERCADO AR en una de sus pestañas (ACCIONES, CEDEARS, FIBONACCI, ESCANER, SALA) y lo lleva a pantalla. */
+export function openMercadoAr(pestana: string) {
+  window.dispatchEvent(new CustomEvent(PESTANA_AR, { detail: { pestana } }));
+  showSection("mercado-ar");
+}
+
+export function onMercadoAr(cb: (pestana: string) => void) {
+  const handler = (e: Event) => {
+    const p = (e as CustomEvent).detail?.pestana;
+    if (typeof p === "string") cb(p);
+  };
+  window.addEventListener(PESTANA_AR, handler);
+  return () => window.removeEventListener(PESTANA_AR, handler);
+}
+
+const TUTORIAL = "alt-radar:tutorial";
+
+/** Abre el tutorial paso a paso desde cualquier parte de la app. */
+export function openTutorial() {
+  window.dispatchEvent(new CustomEvent(TUTORIAL));
+}
+
+export function onTutorial(cb: () => void) {
+  window.addEventListener(TUTORIAL, cb);
+  return () => window.removeEventListener(TUTORIAL, cb);
+}
+
 const LAB_TAB = "alt-radar:lab-tab";
 
 /** Opens the AI TRADING LAB on one of its tabs (the office, for example) and scrolls to it. */

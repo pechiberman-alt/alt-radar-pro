@@ -115,3 +115,22 @@ button.ar-agente{background:none;border:0;border-top:1px solid #17201c;color:inh
 .ar-tv-leyenda{display:flex;flex-wrap:wrap;gap:4px 10px;font:11px var(--font-mono);color:#9fb0c8}
 .ar-tv-leyenda b{color:var(--text)}
 .ar-tv-capas button{font-size:9px;padding:6px 8px}
+/* El tutorial: tarjeta al pie, sin tapar la app. */
+.tut{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(520px,calc(100vw - 20px));z-index:80;background:linear-gradient(160deg,#10231b,#0a110e);border:1px solid var(--green2);border-radius:14px;padding:14px 16px;display:grid;gap:8px;box-shadow:0 18px 40px #000c,0 0 0 1px #39f29a22;color:var(--text)}
+.tut b{font-size:16px}
+.tut p{margin:0;color:#c9d4ce;font-size:13px;line-height:1.45}
+.tut small{color:var(--muted);font:9px var(--font-mono)}
+.tut-puntos{display:flex;gap:4px}
+.tut-puntos i{flex:1;height:3px;border-radius:2px;background:#22332b}
+.tut-puntos i.hecho{background:var(--green2)}
+.tut-puntos i.on{background:var(--green)}
+.tut-ir{justify-self:start;border:1px solid var(--green2);background:#0c2d20;color:var(--green);font:11px var(--font-mono);letter-spacing:1px;padding:9px 12px;border-radius:6px;cursor:pointer}
+.tut-nav{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tut-nav button{border:1px solid var(--line);background:#0b110e;color:var(--muted);font:10px var(--font-mono);letter-spacing:1px;padding:8px 10px;border-radius:6px;cursor:pointer}
+.tut-nav span{display:flex;gap:6px}
+.tut-nav .tut-sig{border-color:var(--green);background:var(--green);color:#041008;font-weight:700}
+.ar-ayuda{justify-self:start}
+.ws-tutorial{color:var(--green)!important;border-color:var(--green2)!important}
+.tut-cap{font:9px var(--font-mono);letter-spacing:1.5px;color:var(--green2)}
+.tut-indice{display:flex;flex-wrap:wrap;gap:5px}
+.tut-indice button{border:1px solid #2c493b;background:#0b110e;color:#c9d4ce;font:9px var(--font-mono);letter-spacing:.8px;padding:6px 8px;border-radius:14px;cursor:pointer}
