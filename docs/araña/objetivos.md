@@ -68,6 +68,12 @@ capital: exposicion, exposure, equity
 exposicion: exposure, capital
 cinta: tape
 registro: record, ledger
+acciones: mercado-ar, byma, cedear, cedears, merval, bolsa
+cedear: mercado-ar, cedears, byma
+bolsa: mercado-ar, byma, acciones
+mentes: mentes-inversoras, buffett, graham, lynch, musk, inversores
+buffett: mentes-inversoras, mentes, valor, fundamentales
+balances: fundamentales-sec, fundamentales, sec, edgar
 
 ## jarvis — JARVIS, la IA propia del software
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
@@ -324,21 +330,21 @@ Reglas:
 - Auditoría de sobreajuste (lib/sobreajuste.ts): el estudio informa PSR y DSR por fila (contando las variantes de la tabla y las declaradas, incluidas las de fuera de la tabla, redondeadas para arriba) y Reality Check / SPA sobre el resultado diario de todas. Una VENTAJA con DSR declarado menor a 95 % o desconocido se muestra como CANDIDATA. Probar una variante nueva sobre los mismos datos suma uno al contador de ensayos.
 - Preregistro del flujo (lib/preregistro-flujo.ts): los cuatro filtros de volumen taker, funding y open interest se fijaron el 14/10/2026 antes de ver esos datos y no se ajustan; un dato faltante no aprueba ni rechaza. Los datos de Binance Vision (CC BY-NC-SA 4.0) son para investigación personal: no se commitean, no se redistribuyen y no alimentan señales para terceros.
 
-## mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA
-Texto: panel del mercado argentino (acciones del panel líder + CEDEARs) con velas diarias de Yahoo Finance (rezagado: BYMA publica con demora). Lectura diaria: EMA, tendencia, RSI, ATR, distancia a máximos y mínimos de 52 semanas, volumen relativo. Sin footprint (BYMA no publica operaciones gratis). Diagnóstico horario: la fuente responde cada hora, al principio del cron de 15 minutos, guardado en ajustes.
-Archivos: lib/mercado-ar.ts, lib/mercado-ar-fuente.ts, app/mercado-ar-desk.tsx, app/mercado-ar-desk.module.css, app/api/mercado-ar/route.ts, tests/mercado-ar.test.ts
+## mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes
+Texto: acciones del panel líder y CEDEARs con ruedas diarias de Yahoo Finance (con demora), dentro del panel MERCADO AR y del MAPA (el buscador del mapa encuentra papeles de BYMA y muestra su vista). Las MENTES (Buffett, Graham, Lynch, crecimiento al estilo Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes del laboratorio leen cada papel y todo el panel. Balances de SEC EDGAR para los CEDEARs de empresas de EE. UU.
+Archivos: lib/mercado-ar*.ts, lib/mentes-inversoras.ts, lib/fundamentales-sec.ts, app/mercado-ar*.tsx, app/mercado-ar.css, app/api/mercado-ar/**, tests/mercado-ar.test.ts, tests/mentes-ar.test.ts
 Reglas:
-- Lista fija de papeles (23 acciones + 25 CEDEARs): si el símbolo no está, error 400. Nunca un proxy abierto.
-- De cada CEDEAR se leen dos series: el CEDEAR en pesos (BYMA) y la acción de afuera en dólares (sin CCL).
-- Datos públicos de mercado: sin puerta PRO.
-- Lectura diaria: medias, RSI, ATR, distancias con el vocabulario del contexto común (lib/contexto-comun.ts); faltantes si insuficientes ruedas.
-- Yahoo sigue dos hosts (por si uno falla) e intenta desde el Worker (no cubre CORS el navegador). Demora: BYMA + Yahoo delay. Máximo de edad antes de STALE_DATA: MAX_DIAS_SIN_RUEDA + 1.
-- El diagnóstico corre en paralelo con los otros crons (*/15); su estado (la fuente respondió, qué símbolo, cuántas ruedas, error si hay) se guarda en `ajuste:mercado_ar_estado` (lista de las últimas 12 pruebas).
-- Todo texto visible en español rioplatense; sin asesoramiento financiero.
+- Lista fija de papeles (23 acciones + 25 CEDEARs, más el Merval y SPY como índices): un símbolo fuera de la lista es error 400. Nunca un proxy abierto.
+- Sin footprint ni mapa de liquidaciones para BYMA: no se publica el lado agresor de cada operación ni el apalancamiento de las posiciones. Se dice en pantalla (TEXTO_SIN_FOOTPRINT, TEXTO_SIN_LIQUIDACIONES); nunca se dibuja uno aproximado. El perfil de volumen es aproximado por rueda y lo dice.
+- Mentes (lib/mentes-inversoras.ts): cada una es una lista fija de criterios con umbral, inspirada en lo que ese inversor publicó; ninguno participa ni avala (AVISO_MENTES). Sin balances, las de valor dicen SIN DATOS. Musk no publicó un método de inversión: su lente es la de crecimiento y se dice. El consenso cuenta mentes, no es una probabilidad. Las técnicas de un CEDEAR leen la acción de afuera en dólares; las de una acción, la serie en pesos (y lo dicen).
+- Balances (lib/fundamentales-sec.ts): solo 10-K anuales de SEC EDGAR, CIK fijo controlado contra el nombre de la empresa, de a un pedido por vez (SEC limita a 10 por segundo), guardados 7 días en una fila de app_settings por empresa. ETF, Alibaba (yuanes) y Vista (NIIF) quedan sin balances con el motivo. Berkshire: el BPA es de la clase A y no se compara. Acciones argentinas: sin fuente gratis de balances en datos. El User-Agent lleva el contacto del ajuste `sec_contacto` si está cargado.
+- Agentes (lib/mercado-ar-agentes.ts): las estrategias del laboratorio que tienen sentido con ruedas diarias y sin volumen agresor, solo compras (en BYMA el corto no está al alcance del inversor común), horizonte de 20 ruedas, comisión supuesta 0,6 % por lado, el azar de control. La señal de la última rueda va con SL, TP1, TP2 y TP3 y no cuenta como resultado. Es un backtest histórico, no el registro unificado, y se dice.
+- Diagnóstico horario de Yahoo en el cron de 15 minutos (`ajuste:mercado_ar_estado`, las últimas 12 pruebas).
+- Todo texto visible en español rioplatense; no es asesoramiento financiero.
 Pendiente:
-- Value agent (Buffett/Graham) con fundamentals de CEDEARs; papel en AR diarios.
-- Agentes moviéndose en la oficina cuando coinciden o discrepan; aprendizaje visible.
-- Lecturas en el mapa de footprint (cripto).
+- Señales AR en el registro unificado (resolverlas con ruedas diarias en el servidor).
+- Balances de empresas argentinas si aparece una fuente gratis en datos.
+- Agentes moviéndose en la oficina cuando coinciden o discrepan; lecturas de agentes en el mapa de footprint cripto.
 
 ## terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato
 Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.

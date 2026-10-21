@@ -87,8 +87,26 @@ export const CEDEARS: PapelAr[] = [
 
 export const PAPELES_AR: PapelAr[] = [...ACCIONES_AR, ...CEDEARS];
 
+/** Índices de referencia para la mente de O'Neil («M»: el mercado a favor): el Merval para acciones, el S&P 500 para CEDEARs. */
+export const INDICE_MERVAL = "^MERV";
+export const INDICE_EEUU = "SPY";
+
 /** Los únicos símbolos que la ruta del Worker acepta pedir: no es un proxy abierto. */
-export const SIMBOLOS_PERMITIDOS: ReadonlySet<string> = new Set(PAPELES_AR.flatMap((p) => (p.subyacente ? [p.yahoo, p.subyacente] : [p.yahoo])));
+export const SIMBOLOS_PERMITIDOS: ReadonlySet<string> = new Set([INDICE_MERVAL, INDICE_EEUU, ...PAPELES_AR.flatMap((p) => (p.subyacente ? [p.yahoo, p.subyacente] : [p.yahoo]))]);
+
+/** El papel de un ticker de BYMA escrito como sea («ggal», «GGAL.BA», «byma»); null si no está en la lista. */
+export function papelPorTicker(texto: string): PapelAr | null {
+  const t = texto.trim().toUpperCase().replace(/\.BA$/, "");
+  return PAPELES_AR.find((p) => p.ticker === t) ?? null;
+}
+
+/** Los papeles cuyo ticker o nombre contiene lo buscado (para el buscador del mapa). */
+export function buscarPapeles(texto: string, maximo = 12): PapelAr[] {
+  const q = texto.trim().toUpperCase();
+  if (q.length < 2) return [];
+  const sinTildes = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  return PAPELES_AR.filter((p) => p.ticker.includes(q) || sinTildes(p.nombre).includes(sinTildes(q))).slice(0, maximo);
+}
 
 export const TEXTO_SIN_FOOTPRINT =
   "FOOTPRINT NO DISPONIBLE: BYMA no publica gratis cada operación con su lado agresor; con velas diarias solo hay precio y volumen.";

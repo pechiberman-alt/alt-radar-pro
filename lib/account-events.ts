@@ -83,6 +83,23 @@ export function onMapSymbol(cb: (symbol: string, timeframe: string | null) => vo
   return () => window.removeEventListener(MAP_SYMBOL, handler);
 }
 
+const MAPA_AR = "alt-radar:mapa-ar";
+
+/** Abre una acción o un CEDEAR de BYMA en el MAPA (su vista con mentes y agentes) y lo lleva a pantalla. */
+export function openArEnMapa(ticker: string) {
+  window.dispatchEvent(new CustomEvent(MAPA_AR, { detail: { ticker } }));
+  showSection("liquidaciones");
+}
+
+export function onArEnMapa(cb: (ticker: string) => void) {
+  const handler = (e: Event) => {
+    const t = (e as CustomEvent).detail?.ticker;
+    if (typeof t === "string" && /^[A-Z0-9]{1,8}$/.test(t)) cb(t);
+  };
+  window.addEventListener(MAPA_AR, handler);
+  return () => window.removeEventListener(MAPA_AR, handler);
+}
+
 const LAB_TAB = "alt-radar:lab-tab";
 
 /** Opens the AI TRADING LAB on one of its tabs (the office, for example) and scrolls to it. */

@@ -33,6 +33,8 @@ import {
   type Trade,
 } from "@/lib/footprint";
 import { mismoMercado } from "@/lib/contexto-comun";
+import { buscarPapeles, papelPorTicker, type PapelAr } from "@/lib/mercado-ar";
+import { MapaAr } from "./mercado-ar-vistas";
 import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSource } from "@/lib/level-engine";
@@ -44,7 +46,7 @@ import { mmEvents, runMm, studyMm, studyMmPooled, type MmTrade } from "@/lib/mm-
 import { eligible } from "@/lib/decoupling";
 import { MM_WIDE_KEY, MM_WIDE_TTL, type WideSummary, type WideVariant } from "@/lib/robot-signals";
 import type { LvStats } from "@/lib/liq-vol-signals";
-import { onMapSymbol } from "@/lib/account-events";
+import { onArEnMapa, onMapSymbol } from "@/lib/account-events";
 import { findLvSignals, flushSeries, lvStats, resolveLv, type LvTrade } from "@/lib/liq-vol-signals";
 import { bubbleRadius, dollarsShort, pickBubbles } from "@/lib/trade-bubbles";
 import { analyzeTrend, latestBreak, lineAt } from "@/lib/trendlines";
@@ -364,6 +366,8 @@ export default function LiquidationHeatmapDesk() {
   });
   const [symbols, setSymbols] = useState<string[]>(FALLBACK_SYMBOLS);
   const [symbolQuery, setSymbolQuery] = useState("");
+  // Una acción o un CEDEAR de BYMA elegido en el buscador: el mapa muestra su vista (MapaAr) en lugar del mapa cripto.
+  const [papelAr, setPapelAr] = useState<PapelAr | null>(null);
   const [htfPools, setHtfPools] = useState<{ timeframe: string; pools: LiquidityPool[] }[]>([]);
   /** The same larger-frame candles, kept for the level engine. */
   const [htfCandles, setHtfCandles] = useState<{ timeframe: string; candles: SwingCandle[] }[]>([]);
@@ -679,6 +683,7 @@ export default function LiquidationHeatmapDesk() {
   // and reset the refresh counter so that load is allowed to report errors.
   const selectSymbol = (next: string) => {
     setSymbolQuery("");
+    setPapelAr(null);
     // The coin already on screen: nothing to reload (blanking it would stick).
     if (next === symbol) return;
     setLoading(true);
@@ -699,6 +704,7 @@ export default function LiquidationHeatmapDesk() {
     () =>
       onMapSymbol((next, tf) => {
         const wantTf = tf && TIMEFRAME_ORDER.includes(tf) ? tf : shownRef.current.timeframe;
+        setPapelAr(null);
         if (next === shownRef.current.symbol && wantTf === shownRef.current.timeframe) return;
         if (wantTf !== shownRef.current.timeframe) setTimeframe(wantTf);
         setSymbolQuery("");
@@ -708,6 +714,15 @@ export default function LiquidationHeatmapDesk() {
         setRefreshKey(0);
         setVisibleCandles(70);
         setSymbol(next);
+      }),
+    [],
+  );
+  // MERCADO AR (y su escáner) pueden pedir que el mapa muestre un papel de BYMA.
+  useEffect(
+    () =>
+      onArEnMapa((ticker) => {
+        const p = papelPorTicker(ticker);
+        if (p) setPapelAr(p);
       }),
     [],
   );
@@ -1804,9 +1819,25 @@ export default function LiquidationHeatmapDesk() {
           className="liq-search"
           value={symbolQuery}
           onChange={(e) => setSymbolQuery(e.target.value)}
-          placeholder={`Buscar entre ${symbols.length} pares…`}
-          aria-label="Buscar par"
+          placeholder={`Buscar entre ${symbols.length} pares, acciones y CEDEARs…`}
+          aria-label="Buscar par, acción o CEDEAR"
         />
+        {symbolQuery.trim().length >= 2 && buscarPapeles(symbolQuery).length > 0 && (
+          <div className="liq-ar-hits" aria-label="Acciones y CEDEARs de BYMA">
+            {buscarPapeles(symbolQuery).map((p) => (
+              <button
+                key={p.ticker}
+                onClick={() => {
+                  setSymbolQuery("");
+                  setPapelAr(p);
+                }}
+                title={p.nombre}
+              >
+                {p.ticker} · {p.tipo === "CEDEAR" ? "CEDEAR" : "ACCIÓN AR"}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="liq-symbols">
           {(symbolQuery.trim()
             ? symbols.filter((s) => s.includes(symbolQuery.trim().toUpperCase())).slice(0, 40)
@@ -1822,7 +1853,7 @@ export default function LiquidationHeatmapDesk() {
             </button>
           ))}
         </div>
-        <div className="liq-timeframes">
+        {!papelAr && <div className="liq-timeframes">
           {FRAME_OPTIONS.map((tf) => (
             <button
               key={tf.id}
@@ -1832,9 +1863,11 @@ export default function LiquidationHeatmapDesk() {
               {tf.label}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
+      {papelAr && <MapaAr key={papelAr.ticker} papel={papelAr} onSalir={() => setPapelAr(null)} />}
+      {!papelAr && <>
       {loading && <p className="liq-loading">CONSTRUYENDO EL MAPA…</p>}
       {error && !loading && (
         <div className="liq-empty">
@@ -4339,6 +4372,7 @@ export default function LiquidationHeatmapDesk() {
           </details>
         </>
       )}
+      </>}
     </section>
   );
 }

@@ -1,185 +1,246 @@
 "use client";
 
 /**
- * MERCADO AR: panel del mercado argentino (acciones + CEDEARs) de BYMA,
- * con velas diarias de Yahoo Finance (demora: BYMA publica rezagado).
- * Lectura diaria: medias, RSI, ATR, distancia a máximos y mínimos,
- * volumen relativo. Sin footprint (BYMA no publica operaciones gratis).
- * Sin asesoramiento financiero.
+ * MERCADO AR: acciones del panel líder de BYMA y CEDEARs, con ruedas diarias (Yahoo Finance, con demora). Tres pestañas:
+ * las listas de acciones y de CEDEARs (tocar un papel lo abre en el MAPA con su gráfico, sus mentes y sus agentes) y el
+ * ESCÁNER, donde las MENTES (Buffett, Graham, Lynch, Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes
+ * del laboratorio leen todos los papeles: ranking, señales de compra de la última rueda con su plan, y cada agente medido
+ * en todo el panel contra el azar. Sin footprint ni liquidaciones (BYMA no los publica). No es asesoramiento financiero.
  */
+import { useEffect, useState } from "react";
+import { ACCIONES_AR, CEDEARS, PAPELES_AR, type PapelAr } from "@/lib/mercado-ar";
+import { cargarPanel, cargarSerie, leerPapel, universoCargado, type LecturaPapel, type SerieCargada } from "@/lib/mercado-ar-cliente";
+import { medirUniverso, ESTUDIO_AR, EXCLUIDOS_AR } from "@/lib/mercado-ar-agentes";
+import { MUESTRA_ESTUDIO } from "@/lib/estrategias";
+import { AVISO_MENTES } from "@/lib/mentes-inversoras";
+import { openArEnMapa } from "@/lib/account-events";
+import { fmt, fmtPct } from "./mercado-ar-vistas";
 
-import { useState, useEffect } from "react";
-import { ACCIONES_AR, CEDEARS, TEXTO_SIN_FOOTPRINT, type PapelAr, type SerieAr } from "@/lib/mercado-ar";
-import { lecturaDiaria, estadoSerie } from "@/lib/mercado-ar";
-import styles from "./mercado-ar-desk.module.css";
+type Pestania = "ACCIONES" | "CEDEARS" | "ESCANER";
 
-type ResultadoAr = { serie: SerieAr | null; fuente: string | null; edadSeg: number; error: string | null };
-
-// Mini SVG line chart: closes con EMA 50 y 200
-function MiniChart({ velas, ema50, ema200 }: { velas: SerieAr["velas"]; ema50: number | null; ema200: number | null }) {
-  if (!velas.length) return null;
-  const width = 200,
-    height = 60;
-  const cierre = velas.map((v) => v.close);
-  const min = Math.min(...cierre, ema50 ?? Infinity, ema200 ?? Infinity);
-  const max = Math.max(...cierre, ema50 ?? -Infinity, ema200 ?? -Infinity);
-  const range = max - min || 1;
-
-  const points = cierre.map((c, i) => ({ x: (i / (cierre.length - 1)) * width, y: height - ((c - min) / range) * height }));
-  const pathClose = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-
-  return (
-    <svg width={width} height={height} className={styles.miniChart}>
-      <path d={pathClose} fill="none" stroke="currentColor" strokeWidth="1.5" />
-      {ema50 !== null && <line x1="0" y1={height - ((ema50 - min) / range) * height} x2={width} y2={height - ((ema50 - min) / range) * height} stroke="rgba(255,165,0,0.5)" strokeWidth="1" strokeDasharray="2,2" />}
-      {ema200 !== null && <line x1="0" y1={height - ((ema200 - min) / range) * height} x2={width} y2={height - ((ema200 - min) / range) * height} stroke="rgba(100,100,255,0.5)" strokeWidth="1" strokeDasharray="2,2" />}
-    </svg>
-  );
-}
-
-function PaperRow({ paper, onSelect }: { paper: PapelAr; onSelect: (p: PapelAr) => void }) {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<ResultadoAr | null>(null);
-
+function Lista({ papeles }: { papeles: PapelAr[] }) {
+  const [series, setSeries] = useState<Record<string, SerieCargada>>({});
   useEffect(() => {
-    const fetch_ = async () => {
-      try {
-        const r = await fetch(`/api/mercado-ar?simbolo=${encodeURIComponent(paper.yahoo)}`);
-        const j = (await r.json()) as ResultadoAr;
-        setData(j);
-      } catch {
-        setData({ serie: null, fuente: null, edadSeg: 0, error: "no se pudo leer" });
-      } finally {
-        setLoading(false);
+    let vivo = true;
+    void (async () => {
+      for (const p of papeles) {
+        const s = await cargarSerie(p.yahoo);
+        if (!vivo) return;
+        setSeries((x) => ({ ...x, [p.ticker]: s }));
       }
+    })();
+    return () => {
+      vivo = false;
     };
-    fetch_();
-  }, [paper.yahoo]);
-
-  const cierre = data?.serie?.velas.at(-1)?.close;
-  const cambio = data?.serie?.velas.length ? ((data.serie.velas.at(-1)!.close - data.serie.velas.at(-2)!.close) / data.serie.velas.at(-2)!.close) * 100 : null;
-
+  }, [papeles]);
   return (
-    <button className={styles.row} onClick={() => onSelect(paper)} title={paper.nombre}>
-      <div className={styles.ticker}>{paper.ticker}</div>
-      <div className={styles.precio}>{cierre?.toFixed(2) || "—"}</div>
-      <div className={styles.cambio} data-positivo={cambio && cambio > 0}>{cambio?.toFixed(2) || "—"}%</div>
-      <div className={styles.edad}>{data?.edadSeg ? Math.floor(data.edadSeg / 60) + "m" : "—"}</div>
-      {loading && <div className={styles.spinner} />}
-      {data?.error && <div className={styles.error} title={data.error}>⚠</div>}
-    </button>
+    <div className="ar-list">
+      {papeles.map((p) => {
+        const s = series[p.ticker];
+        const v = s?.serie?.velas ?? [];
+        const u = v.at(-1);
+        const a = v.at(-2);
+        const cambio = u && a ? (u.close / a.close - 1) * 100 : null;
+        return (
+          <button key={p.ticker} className="ar-row" onClick={() => openArEnMapa(p.ticker)} title={`${p.nombre}: abrir en el MAPA`}>
+            <b>{p.ticker}</b>
+            <small>{p.nombre}</small>
+            <span>{s ? fmt(u?.close ?? null) : "…"}</span>
+            <span className={cambio === null ? "ar-mute" : cambio >= 0 ? "ar-up" : "ar-down"}>
+              {s && !s.serie ? <span className="ar-chip mal">SIN DATOS</span> : s && s.estado.estado !== "OK" ? <span className="ar-chip alerta">{s.estado.estado}</span> : fmtPct(cambio, 2)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
-function DetailPanel({ paper, data, close }: { paper: PapelAr | null; data: ResultadoAr | null; close: () => void }) {
-  const [ahora] = useState(() => Date.now());
+function Escaner() {
+  const [avance, setAvance] = useState<{ texto: string; hechos: number; total: number } | null>(null);
+  const [lecturas, setLecturas] = useState<LecturaPapel[] | null>(null);
 
-  if (!paper || !data?.serie) return null;
+  const correr = async () => {
+    setAvance({ texto: "Bajando ruedas", hechos: 0, total: 1 });
+    await cargarPanel(PAPELES_AR, (hechos, total) => setAvance({ texto: "Bajando ruedas", hechos, total }));
+    const u = await universoCargado();
+    const out: LecturaPapel[] = [];
+    for (const [k, p] of PAPELES_AR.entries()) {
+      setAvance({ texto: `Mentes y agentes leyendo ${p.ticker}${p.tipo === "CEDEAR" ? " (y sus balances)" : ""}`, hechos: k, total: PAPELES_AR.length });
+      out.push(await leerPapel(p, u));
+      await new Promise((r) => setTimeout(r, 0)); // que la pantalla respire entre papel y papel
+    }
+    setLecturas(out);
+    setAvance(null);
+  };
 
-  const lectura = data.serie.velas.length ? lecturaDiaria(data.serie.velas) : null;
-  const { estado, motivo } = estadoSerie(data.serie, ahora);
+  if (!lecturas) {
+    return (
+      <div className="ar-box">
+        <h3>ESCÁNER · {PAPELES_AR.length} PAPELES</h3>
+        <p>
+          Las mentes y los agentes leen todas las acciones y los CEDEARs: ranking por mentes a favor, señales de compra de la última rueda con
+          SL, TP1, TP2 y TP3, y cada agente medido en todo el panel contra el agente de azar. La primera vez tarda (los balances de SEC se bajan de a
+          una empresa); después queda guardado.
+        </p>
+        {avance ? (
+          <>
+            <p>
+              {avance.texto}… {avance.hechos}/{avance.total}
+            </p>
+            <div className="ar-progress">
+              <i style={{ width: `${(avance.hechos / Math.max(1, avance.total)) * 100}%` }} />
+            </div>
+          </>
+        ) : (
+          <button className="ar-chip-btn on" onClick={() => void correr()}>
+            LEER TODO EL PANEL
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const ranking = [...lecturas].sort((a, b) => b.consenso.aFavor - b.consenso.enContra - (a.consenso.aFavor - a.consenso.enContra) || b.consenso.aFavor - a.consenso.aFavor);
+  const senales = lecturas.flatMap((l) => l.agentes.filter((a) => a.senalHoy).map((a) => ({ l, a })));
+  const universo = medirUniverso(lecturas.map((l) => l.agentes)).sort((a, b) => (b.medicion.expectancia ?? -9) - (a.medicion.expectancia ?? -9));
+  const sinDatos = lecturas.filter((l) => !l.serie.serie);
 
   return (
-    <div className={styles.detail}>
-      <button className={styles.closeBtn} onClick={close}>✕</button>
-      <div className={styles.detailHead}>
-        <div>
-          <div className={styles.detailTicker}>{paper.ticker}</div>
-          <div className={styles.detailNombre}>{paper.nombre}</div>
-          {paper.subyacente && <div className={styles.subyacente}> subyacente: {paper.subyacente}</div>}
-        </div>
-        <div className={styles.meta}>
-          <div>
-            <strong>Cierre:</strong> {data.serie.meta.precio?.toFixed(2) || "—"} {data.serie.meta.moneda || "—"}
-          </div>
-          <div>
-            <strong>Demora:</strong> {data.serie.meta.demoraMin ? `${data.serie.meta.demoraMin} min` : "—"}
-          </div>
-          <div>
-            <strong>Estado:</strong> <span className={styles[`estado-${estado}`]}>{estado}</span>
-            {motivo && <div className={styles.motivo}>{motivo}</div>}
-          </div>
-        </div>
+    <div className="ar-wrap" style={{ padding: 0 }}>
+      <div className="ar-head">
+        <span className="ar-mute">
+          {lecturas.length - sinDatos.length} papeles con datos{sinDatos.length ? ` · sin datos: ${sinDatos.map((l) => l.papel.ticker).join(", ")}` : ""}
+        </span>
+        <button className="ar-chip-btn" onClick={() => void correr()} disabled={avance !== null}>
+          {avance ? `${avance.hechos}/${avance.total}…` : "VOLVER A LEER"}
+        </button>
       </div>
 
-      {lectura && (
-        <div className={styles.lectura}>
-          <div className={styles.titulo2}>Lectura Diaria</div>
-          <div className={styles.grid}>
-            <div><strong>Ruedas:</strong> {lectura.ruedas}</div>
-            <div><strong>Var 1d:</strong> {lectura.var1?.toFixed(2) || "—"}%</div>
-            <div><strong>Var 5d:</strong> {lectura.var5?.toFixed(2) || "—"}%</div>
-            <div><strong>Var 20d:</strong> {lectura.var20?.toFixed(2) || "—"}%</div>
-            <div><strong>EMA 50:</strong> {lectura.ema50?.toFixed(2) || "—"}</div>
-            <div><strong>EMA 200:</strong> {lectura.ema200?.toFixed(2) || "—"}</div>
-            <div><strong>Tendencia:</strong> {lectura.tendencia || "—"}</div>
-            <div><strong>RSI 14:</strong> {lectura.rsi14?.toFixed(1) || "—"}</div>
-            <div><strong>ATR %:</strong> {lectura.atrPct?.toFixed(2) || "—"}</div>
-            <div><strong>Desde máx (1y):</strong> {lectura.desdeMaximo?.toFixed(2) || "—"}%</div>
-            <div><strong>Desde mín (1y):</strong> {lectura.desdeMinimo?.toFixed(2) || "—"}%</div>
-            <div><strong>Vol relativo:</strong> {lectura.volumenRelativo?.toFixed(2) || "—"}x</div>
-          </div>
-          {lectura.faltantes.length > 0 && (
-            <div className={styles.faltantes}>
-              Datos incompletos: {lectura.faltantes.join("; ")}
-            </div>
-          )}
-          <div className={styles.chart}>
-            <MiniChart velas={data.serie.velas} ema50={lectura.ema50} ema200={lectura.ema200} />
-          </div>
+      <div className="ar-box">
+        <h3>RANKING DE LAS MENTES</h3>
+        <div className="ar-scroll">
+          <table className="ar-table">
+            <thead>
+              <tr>
+                <th>PAPEL</th>
+                <th>CIERRE</th>
+                <th>A FAVOR</th>
+                <th>EN CONTRA</th>
+                <th>SIN DATOS</th>
+                <th>SEÑALES HOY</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranking.map((l) => {
+                const v = l.serie.serie?.velas ?? [];
+                return (
+                  <tr key={l.papel.ticker} onClick={() => openArEnMapa(l.papel.ticker)} style={{ cursor: "pointer" }}>
+                    <td>
+                      <b>{l.papel.ticker}</b> <span className="ar-mute">{l.papel.tipo === "CEDEAR" ? "CEDEAR" : "ACCIÓN"}</span>
+                    </td>
+                    <td>{fmt(v.at(-1)?.close ?? null)}</td>
+                    <td className="ar-up">
+                      {l.consenso.aFavor} de {l.consenso.opinan}
+                      {l.consenso.aFavor ? ` · ${l.mentes.filter((m) => m.postura === "A FAVOR").map((m) => m.mente.split(" ")[1] ?? m.mente).join(", ")}` : ""}
+                    </td>
+                    <td className="ar-down">{l.consenso.enContra}</td>
+                    <td className="ar-mute">{l.consenso.sinDatos}</td>
+                    <td>{l.agentes.filter((a) => a.senalHoy).length || "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
+        <p className="ar-mute">Cuenta mentes, no es una probabilidad. Tocá un papel para verlo en el MAPA con cada criterio. {AVISO_MENTES}</p>
+      </div>
 
-      <div className={styles.disclaimer}>⚠️ Esto no es asesoramiento financiero. Los datos de BYMA llegan con demora ({data.serie.meta.demoraMin}+ min); {TEXTO_SIN_FOOTPRINT}</div>
-      <div className={styles.fuente}>Fuente: {data.fuente} (edad: {Math.floor(data.edadSeg / 60)} min)</div>
+      <div className="ar-box">
+        <h3>SEÑALES DE COMPRA EN LA ÚLTIMA RUEDA · {senales.length}</h3>
+        {senales.length === 0 && <p>Ningún agente disparó en la última rueda cerrada.</p>}
+        {senales.map(({ l, a }) => (
+          <button className="ar-agente" key={`${l.papel.ticker}-${a.id}`} onClick={() => openArEnMapa(l.papel.ticker)}>
+            <b>
+              {l.papel.ticker} · {a.agente}
+            </b>
+            <div className="ar-plan">
+              ref. {fmt(a.senalHoy!.referencia)} · SL {fmt(a.senalHoy!.escalera.stop)} · TP1 {fmt(a.senalHoy!.escalera.tp1)} · TP2 {fmt(a.senalHoy!.escalera.tp2)} · TP3 {fmt(a.senalHoy!.escalera.tp3)} · R:R {fmt(a.senalHoy!.rr, 1)}
+            </div>
+          </button>
+        ))}
+        <p className="ar-mute">Entrada en la apertura de la rueda siguiente. Mirá cómo le fue a cada agente abajo antes de darle peso. No es asesoramiento financiero.</p>
+      </div>
+
+      <div className="ar-box">
+        <h3>LOS AGENTES EN TODO EL PANEL (BACKTEST)</h3>
+        <div className="ar-scroll">
+          <table className="ar-table">
+            <thead>
+              <tr>
+                <th>AGENTE</th>
+                <th>OP.</th>
+                <th>ACIERTO</th>
+                <th>PF</th>
+                <th>EXPECTANCIA (90 %)</th>
+                <th>VEREDICTO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {universo.map((x) => {
+                const m = x.medicion;
+                return (
+                  <tr key={x.id}>
+                    <td>
+                      <b>{x.agente}</b>
+                    </td>
+                    <td>{m.operaciones}</td>
+                    <td>{m.winRate === null ? "—" : fmtPct(m.winRate * 100, 0)}</td>
+                    <td>{m.profitFactor === null ? "—" : fmt(m.profitFactor)}</td>
+                    <td>
+                      {m.expectancia === null ? "—" : `${fmt(m.expectancia, 2)} R`}
+                      {m.expectanciaIc ? <span className="ar-mute"> [{fmt(m.expectanciaIc.low, 2)}; {fmt(m.expectanciaIc.high, 2)}]</span> : null}
+                    </td>
+                    <td className={x.veredicto === "VENTAJA" ? "ar-up" : x.veredicto === "SIN VENTAJA" ? "ar-down" : "ar-mute"}>{x.id === "AZAR" ? "CONTROL" : x.veredicto}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="ar-mute">
+          Todas las operaciones de cada agente en todos los papeles, solo compras, horizonte {ESTUDIO_AR.horizonte} ruedas, comisión supuesta {fmt(ESTUDIO_AR.feePct, 1)} % por lado. VENTAJA pide al menos{" "}
+          {MUESTRA_ESTUDIO} operaciones, el intervalo de la expectancia entero sobre cero y ganarle al azar; con menos, SIN CONCLUSIÓN. Es un estudio sobre el pasado, no el registro unificado: no garantiza nada. {EXCLUIDOS_AR}
+        </p>
+      </div>
     </div>
   );
 }
 
 export default function MercadoArDesk() {
-  const [tab, setTab] = useState<"acciones" | "cedears">("acciones");
-  const [selected, setSelected] = useState<PapelAr | null>(null);
-  const [selectedData, setSelectedData] = useState<ResultadoAr | null>(null);
-
-  const papeles = tab === "acciones" ? ACCIONES_AR : CEDEARS;
-
-  useEffect(() => {
-    if (!selected) return;
-    const fetch_ = async () => {
-      try {
-        const r = await fetch(`/api/mercado-ar?simbolo=${encodeURIComponent(selected.yahoo)}`);
-        setSelectedData((await r.json()) as ResultadoAr);
-      } catch {
-        setSelectedData({ serie: null, fuente: null, edadSeg: 0, error: "error" });
-      }
-    };
-    fetch_();
-  }, [selected]);
-
+  const [pestania, setPestania] = useState<Pestania>("ACCIONES");
   return (
-    <div className={styles.container}>
-      <div className={styles.tabs}>
-        <button className={tab === "acciones" ? styles.active : ""} onClick={() => { setTab("acciones"); setSelected(null); }}>
+    <div className="ar-wrap">
+      <p className="ar-flag">
+        <b>RUEDAS DIARIAS CON DEMORA</b> · Yahoo Finance (BYMA). Sin footprint ni liquidaciones: BYMA no publica cada operación con su lado agresor ni el apalancamiento de las posiciones. No es asesoramiento financiero.
+      </p>
+      <div className="ar-tabs">
+        <button className={pestania === "ACCIONES" ? "on" : ""} onClick={() => setPestania("ACCIONES")}>
           ACCIONES ({ACCIONES_AR.length})
         </button>
-        <button className={tab === "cedears" ? styles.active : ""} onClick={() => { setTab("cedears"); setSelected(null); }}>
+        <button className={pestania === "CEDEARS" ? "on" : ""} onClick={() => setPestania("CEDEARS")}>
           CEDEARS ({CEDEARS.length})
         </button>
+        <button className={pestania === "ESCANER" ? "on" : ""} onClick={() => setPestania("ESCANER")}>
+          MENTES Y AGENTES
+        </button>
       </div>
-
-      <div className={styles.lista}>
-        <div className={styles.header}>
-          <div className={styles.ticker}>Ticker</div>
-          <div className={styles.precio}>Precio</div>
-          <div className={styles.cambio}>Cambio</div>
-          <div className={styles.edad}>Edad</div>
-        </div>
-        {papeles.map((p) => (
-          <PaperRow key={p.yahoo} paper={p} onSelect={setSelected} />
-        ))}
+      {pestania === "ACCIONES" && <Lista papeles={ACCIONES_AR} />}
+      {pestania === "CEDEARS" && <Lista papeles={CEDEARS} />}
+      {/* El escáner queda montado: cambiar de pestaña no borra lo que ya leyó. */}
+      <div hidden={pestania !== "ESCANER"}>
+        <Escaner />
       </div>
-
-      <DetailPanel paper={selected} data={selectedData} close={() => { setSelected(null); setSelectedData(null); }} />
     </div>
   );
 }
