@@ -59,3 +59,63 @@ export function haceVelas(disparo: DisparoFlujo, cerradas: SwingCandle[]): strin
   const k = cerradas.length - 1 - cerradas.findIndex((c) => c.openTime === disparo.openTime);
   return k <= 0 ? "en la última vela cerrada" : `hace ${k} ${k === 1 ? "vela" : "velas"}`;
 }
+
+// ── La foto del flujo al entrar (PLAN_CONFLUENCIA_1, lib/confluencia.ts) ──
+
+/** Cuántas velas cerradas mira la foto del flujo: la de la señal y las dos anteriores. */
+export const VELAS_FOTO_FLUJO = 3;
+
+/** Lo que leía la mesa de flujo al entrar: lecturas a favor y en contra del lado de la entrada, y si había volumen agresor. */
+export type FotoFlujo = { v: 1; aFavor: string[]; enContra: string[]; conDelta: boolean };
+
+const CODIGOS_FLUJO = new Set(LECTORES_FLUJO.map((l) => l.codigo));
+
+/**
+ * La foto del flujo de una entrada, con la lectura de las últimas VELAS_FOTO_FLUJO velas cerradas (hasta la de la señal, así que
+ * no mira el futuro). `propia` es el código del agente si es de la mesa de flujo: su propia regla no cuenta como confirmación.
+ */
+export function fotoFlujo(lectura: LecturaFlujo, lado: "LONG" | "SHORT", propia: string | null = null): FotoFlujo {
+  const unicos = (xs: string[]) => [...new Set(xs)].sort();
+  return {
+    v: 1,
+    aFavor: unicos(lectura.disparos.filter((d) => d.lado === lado && d.codigo !== propia).map((d) => d.codigo)),
+    enContra: unicos(lectura.disparos.filter((d) => d.lado !== lado).map((d) => d.codigo)),
+    conDelta: !lectura.sinDelta,
+  };
+}
+
+/** El código de la mesa de flujo de un agente, o null si el agente no es de la mesa de flujo. */
+export const codigoFlujoDe = (id: string): string | null => LECTORES_FLUJO.find((l) => l.id === id)?.codigo ?? null;
+
+/** Lo que manda el navegador, revisado: solo códigos de la mesa de flujo. Si no tiene esta forma exacta, null (sin foto). */
+export function validarFotoFlujo(raw: unknown): FotoFlujo | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const lista = (x: unknown) => (Array.isArray(x) && x.length <= LECTORES_FLUJO.length && x.every((c) => typeof c === "string" && CODIGOS_FLUJO.has(c)) ? [...new Set(x as string[])].sort() : null);
+  const aFavor = lista(o.aFavor);
+  const enContra = lista(o.enContra);
+  if (o.v !== 1 || !aFavor || !enContra || typeof o.conDelta !== "boolean") return null;
+  return { v: 1, aFavor, enContra, conDelta: o.conDelta };
+}
+
+/** La foto del flujo guardada en el JSON de la entrada (junto al consenso y al mapa); null si no tiene o está mal. */
+export function fotoFlujoDeJson(foto: string | null | undefined): FotoFlujo | null {
+  if (!foto) return null;
+  try {
+    return validarFotoFlujo((JSON.parse(foto) as { flujo?: unknown }).flujo);
+  } catch {
+    return null;
+  }
+}
+
+const NOMBRE_CODIGO = new Map(LECTORES_FLUJO.map((l) => [l.codigo, l.corto.toLowerCase()] as const));
+/** La foto del flujo en palabras, para mostrarla. */
+export function textosFlujo(f: FotoFlujo): { tono: "bien" | "mal" | "neutro"; texto: string }[] {
+  const nombres = (cs: string[]) => cs.map((c) => NOMBRE_CODIGO.get(c) ?? c).join(", ");
+  const out: { tono: "bien" | "mal" | "neutro"; texto: string }[] = [];
+  if (f.aFavor.length) out.push({ tono: "bien", texto: `flujo a favor: ${nombres(f.aFavor)}` });
+  if (f.enContra.length) out.push({ tono: "mal", texto: `flujo en contra: ${nombres(f.enContra)}` });
+  if (!f.aFavor.length && !f.enContra.length) out.push({ tono: "neutro", texto: "flujo sin lectura en esas velas" });
+  if (!f.conDelta) out.push({ tono: "neutro", texto: "sin volumen agresor (delta desconocido)" });
+  return out;
+}

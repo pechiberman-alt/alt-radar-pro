@@ -12,6 +12,7 @@
 import { acuerdoDe, leccionesDe, resumenGrupo } from "./agentes-mente.ts";
 import { forAi } from "./ai-numbers.ts";
 import { fotoDeJson, type FotoMapa } from "./mapa-contexto.ts";
+import { veredictoDeFoto } from "./confluencia.ts";
 import { agenteDeClave, nombreActivo, plantel, type FilaOficina } from "./oficina.ts";
 import { contar, estadistica, MUESTRA_MINIMA, type Estadistica } from "./registro.ts";
 
@@ -21,7 +22,7 @@ export const DESFASE_AR_MS = -3 * 3_600_000;
 export const DIA_MS = 86_400_000;
 export const DIAS_DIARIO = 7;
 
-export type TemaDiario = "DETRAS" | "DELANTE" | "LIQUIDEZ" | "CONSENSO";
+export type TemaDiario = "DETRAS" | "DELANTE" | "LIQUIDEZ" | "VEREDICTO" | "CONSENSO";
 export type Grupo = { etiqueta: string; est: Estadistica };
 export type Comparacion = { tema: TemaDiario; si: Grupo; no: Grupo; firme: boolean; separados: boolean; texto: string };
 export type Movida = { agente: string; symbol: string; r: number };
@@ -55,6 +56,16 @@ const TEMAS: { tema: TemaDiario; si: string; no: string; de: (f: FilaOficina, fo
   { tema: "DETRAS", si: "Con una zona de confluencia detrás del stop", no: "sin zona detrás", de: (_f, m) => (m ? m.detras > 0 : null) },
   { tema: "DELANTE", si: "Con una zona en el camino al objetivo", no: "con el camino libre", de: (_f, m) => (m ? m.delante !== null : null) },
   { tema: "LIQUIDEZ", si: "Con el stop junto a liquidez sin barrer", no: "con el stop lejos de la liquidez", de: (_f, m) => (m ? m.liquidezStop : null) },
+  {
+    // La operativa con el mapa (lib/confluencia.ts): las entradas que el mapa o el flujo tenían en contra contra el resto.
+    tema: "VEREDICTO",
+    si: "Con el mapa o el flujo en contra al entrar",
+    no: "sin nada en contra (las que toma la versión con el mapa)",
+    de: (f) => {
+      const v = veredictoDeFoto(f.foto);
+      return v === null ? null : v === "EN_CONTRA";
+    },
+  },
   {
     tema: "CONSENSO",
     si: "Entrando acompañado por otro agente",

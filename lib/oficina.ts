@@ -17,6 +17,8 @@ import { forAi } from "./ai-numbers.ts";
 import { acuerdoDe, concienciaDe, conversaciones, leccionesDe, type Dialogo, type Leccion } from "./agentes-mente.ts";
 import { compararConsenso, type Comparacion, type ResultadoConsenso } from "./consenso.ts";
 import { ESTRATEGIAS } from "./estrategias.ts";
+import { entraConMapa, veredictoDeFoto, type Veredicto } from "./confluencia.ts";
+import { historialDe, textoHistorial, type Historial } from "./oficina-historial.ts";
 import { CAPITAL_INICIAL_USD, contar, estadistica, MUESTRA_MINIMA, RIESGO_POR_OPERACION_PCT, simularCapital, type Capital, type Estadistica, type OperacionLeida } from "./registro.ts";
 
 /** Entradas que se leen por visita: por índice y con tope (plan gratuito de D1). Si se llega al tope, se dice. */
@@ -50,7 +52,8 @@ const MESA_DE: Record<string, MesaId> = {
 /** La mesa de un agente; uno nuevo sin mesa asignada va a estructura hasta que se le asigne (no se pierde). */
 export const mesaDe = (id: string): MesaId => MESA_DE[id] ?? "ESTRUCTURA";
 
-export type Abierta = { symbol: string; lado: string; detectada: number };
+/** Una posición abierta, con el veredicto del mapa y el flujo al entrar (null si entró sin las dos fotos). */
+export type Abierta = { symbol: string; lado: string; detectada: number; veredicto?: Veredicto | null };
 
 export type Escritorio = {
   id: string;
@@ -68,6 +71,14 @@ export type Escritorio = {
   conciencia: string;
   /** PnL simulado: USD 1.000 y 1 % de riesgo fijo por operación (el mismo supuesto del registro). No es dinero real. */
   capital: Capital;
+  /** La versión «con el mapa» (lib/confluencia.ts): sus cierres con veredicto que no estaba en contra. */
+  conMapa: Estadistica;
+  /** Los cierres que el mapa o el flujo tenían en contra: los que la versión con el mapa no habría tomado. */
+  frenadas: Estadistica;
+  /** Cuántas de sus entradas (abiertas o cerradas) tienen veredicto: las anteriores a la foto del flujo no lo tienen. */
+  conVeredicto: number;
+  /** Su regla en 4 h en el tramo de evaluación de su estudio (el pasado, con costos); null si no tiene. */
+  historial: Historial | null;
 };
 
 /** El fondo simulado: la suma de los agentes, cada uno con su capital de papel. */
@@ -136,12 +147,18 @@ export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "
     const total = estadistica(conteo);
     const cierresSuyos = suyas.flatMap((f) => (f.desenlace !== "ABIERTA" && typeof f.r === "number" && Number.isFinite(f.r) && typeof f.cerrada === "number" ? [{ r: f.r, cerradaA: f.cerrada, abiertaA: f.detectada }] : []));
     const lecciones = leccionesDe(suyas);
+    const veredictos = new Map(suyas.map((f) => [f, veredictoDeFoto(f.foto)] as const));
+    const cerradasV = suyas.filter((f) => f.desenlace !== "ABIERTA" && veredictos.get(f) !== null);
     return {
       ...p,
+      conMapa: estadistica(contar(cerradasV.filter((f) => entraConMapa(veredictos.get(f) ?? null)).map(leida))),
+      frenadas: estadistica(contar(cerradasV.filter((f) => veredictos.get(f) === "EN_CONTRA").map(leida))),
+      conVeredicto: suyas.filter((f) => veredictos.get(f) !== null).length,
+      historial: historialDe(p.id),
       mesa: mesaDe(p.id),
       total,
       semana: estadistica(contar(semana.map(leida))),
-      abiertas: suyas.filter((f) => f.desenlace === "ABIERTA").map((f) => ({ symbol: f.symbol, lado: f.lado, detectada: f.detectada })),
+      abiertas: suyas.filter((f) => f.desenlace === "ABIERTA").map((f) => ({ symbol: f.symbol, lado: f.lado, detectada: f.detectada, veredicto: veredictos.get(f) ?? null })),
       lecciones,
       conciencia: concienciaDe(p.agente, mesaDe(p.id), total, lecciones),
       capital: simularCapital(conteo, cierresSuyos, suyas.length ? Math.min(...suyas.map((f) => f.detectada)) : null),
@@ -183,16 +200,20 @@ export type Frase = { quien: string; nombre: string; texto: string; tipo: "posic
 /** Lo que dicen en la oficina. Cada frase sale de un dato; ninguna inventa números ni opiniones. */
 export function charla(o: Oficina): Frase[] {
   const out: Frase[] = [];
-  const porActivo = new Map<string, { e: Escritorio; lado: string }[]>();
+  const porActivo = new Map<string, { e: Escritorio; lado: string; v: Veredicto | null }[]>();
   for (const e of o.escritorios)
-    for (const a of e.abiertas) porActivo.set(a.symbol, [...(porActivo.get(a.symbol) ?? []), { e, lado: a.lado }]);
+    for (const a of e.abiertas) porActivo.set(a.symbol, [...(porActivo.get(a.symbol) ?? []), { e, lado: a.lado, v: a.veredicto ?? null }]);
   for (const [symbol, quienes] of porActivo) {
     const activo = nombreActivo(symbol);
     for (const l of ["LONG", "SHORT"]) {
       const mismos = [...new Map(quienes.filter((q) => q.lado === l).map((q) => [q.e.id, q.e])).values()];
       if (mismos.length >= 2)
         out.push({ quien: mismos[0].id, nombre: corto(mismos[0].agente), tipo: "acuerdo", texto: `Coincido con ${mismos.slice(1, 3).map((x) => corto(x.agente)).join(" y ")}${mismos.length > 3 ? ` y ${mismos.length - 3} más` : ""}: ${activo} ${lado(l)}.` });
-      else if (mismos.length === 1) out.push({ quien: mismos[0].id, nombre: corto(mismos[0].agente), tipo: "posicion", texto: `Tengo ${activo} ${lado(l)} abierto.` });
+      else if (mismos.length === 1) {
+        const v = quienes.find((q) => q.e.id === mismos[0].id && q.lado === l)?.v ?? null;
+        const conMapa = v === "A_FAVOR" ? ", con el mapa y el flujo a favor" : v === "EN_CONTRA" ? ": el mapa o el flujo estaban en contra, con el mapa no entraba" : v === "NEUTRA" ? ", con el mapa neutro" : "";
+        out.push({ quien: mismos[0].id, nombre: corto(mismos[0].agente), tipo: "posicion", texto: `Tengo ${activo} ${lado(l)} abierto${conMapa}.` });
+      }
     }
     const largos = quienes.filter((q) => q.lado === "LONG");
     const cortos = quienes.filter((q) => q.lado === "SHORT");
@@ -259,7 +280,12 @@ export function oficinaParaIa(o: Oficina, plan: "CUENTA" | "SERVIDOR") {
       abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`),
       lecciones: e.lecciones.map((l) => `${l.texto}${l.firme ? " (firme)" : ""}`),
       comoSeVe: e.conciencia,
+      profitFactor: e.total.profitFactor === null ? null : Math.round(e.total.profitFactor * 100) / 100,
+      conElMapa: { cerradas: e.conMapa.cerradas, aciertoPct: e.conMapa.winRate === null ? null : Math.round(e.conMapa.winRate * 1000) / 10, profitFactor: e.conMapa.profitFactor === null ? null : Math.round(e.conMapa.profitFactor * 100) / 100, rPorOperacion: e.conMapa.expectancia === null ? null : Math.round(e.conMapa.expectancia * 1000) / 1000 },
+      frenadasPorElMapa: { cerradas: e.frenadas.cerradas, rPorOperacion: e.frenadas.expectancia === null ? null : Math.round(e.frenadas.expectancia * 1000) / 1000 },
+      historial4h: textoHistorial(e.historial),
     })),
+    operativaConElMapa: "Cada agente se mide dos veces: con su regla sola y con el mapa (no entra si el mapa de liquidaciones o el flujo de órdenes estaban en contra al entrar). Las dos sobre las mismas entradas; la comparación vale recién con 15 cierres de cada lado.",
     conversaciones: o.conversaciones.map((d) => `${d.tema}: ${d.lineas.map((l) => `${l.nombre}: ${l.texto}`).join(" / ")}`),
     charla: charla(o).slice(0, 12).map((f) => `${f.nombre}: ${f.texto}`),
     aprendizaje: o.aprendizaje.texto,
@@ -317,6 +343,10 @@ export function textoAgenteTelegram(o: Oficina, nombre: string): string {
       ? `Cerradas: ${t.cerradas} · acierto ${t.winRate === null ? "—" : `${Math.round(t.winRate * 100)} %`}${t.muestra === "MINIMA" ? " (muestra mínima)" : ""} · ${r2(t.expectancia ?? 0)} por operación · neto ${r2(t.neto)}`
       : "Todavía sin cierres.",
     `PnL simulado: ${usdTxt(e.capital.netoUsd, true)} (${usdTxt(e.capital.inicialUsd)} → ${usdTxt(e.capital.actualUsd)})`,
+    e.conMapa.cerradas || e.frenadas.cerradas
+      ? `Con el mapa: ${e.conMapa.cerradas} cierres · acierto ${e.conMapa.winRate === null ? "—" : `${Math.round(e.conMapa.winRate * 100)} %`} · PF ${e.conMapa.profitFactor === null ? "—" : e.conMapa.profitFactor.toFixed(2).replace(".", ",")}. Frenadas por el mapa: ${e.frenadas.cerradas}.`
+      : "Con el mapa: todavía sin cierres con las dos fotos.",
+    `Historial 4 h: ${esc(textoHistorial(e.historial))}`,
     e.abiertas.length ? `Abiertas: ${e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`).join(" · ")}` : "Sin posiciones abiertas.",
     ...dice,
     `<b>Cómo se ve</b>\n${esc(e.conciencia)}`,

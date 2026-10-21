@@ -7,11 +7,12 @@
  * cierres se dice «muestra mínima» y ninguna lección se da por firme. Pura: sin red ni base.
  */
 import { contar, estadistica, MUESTRA_MINIMA, type Estadistica, type OperacionLeida } from "./registro.ts";
+import { entraConMapa, veredictoDeFoto } from "./confluencia.ts";
 
 /** Lo mínimo de una entrada que necesita la mente (es compatible con FilaOficina). */
 export type FilaAgente = { symbol: string; lado: string; r: number | null; desenlace: string; cerrada: number | null; foto?: string | null };
 
-export type Leccion = { tema: "LADO" | "ACTIVO" | "COMPANIA" | "RACHA" | "MUESTRA"; texto: string; n: number; firme: boolean };
+export type Leccion = { tema: "LADO" | "ACTIVO" | "COMPANIA" | "MAPA" | "RACHA" | "MUESTRA"; texto: string; n: number; firme: boolean };
 
 /** Con cuántos coincidió una entrada, leído de su foto de consenso; null si la foto no lo trae (no se supone cero). */
 export function acuerdoDe(foto: string | null | undefined): number | null {
@@ -60,6 +61,14 @@ export function leccionesDe(filas: FilaAgente[]): Leccion[] {
   if (acomp.length && solas.length) {
     const firme = acomp.length >= MUESTRA_MINIMA && solas.length >= MUESTRA_MINIMA;
     out.push({ tema: "COMPANIA", n: acomp.length + solas.length, firme, texto: `Cuando coincido con otros agentes: ${resumenGrupo(est(acomp))}. Cuando entro solo: ${resumenGrupo(est(solas))}.` });
+  }
+  // Con el mapa (lib/confluencia.ts): lo que la versión con el mapa habría tomado contra lo que el mapa o el flujo tenían en contra.
+  const conV = cs.map((f) => ({ f, v: veredictoDeFoto(f.foto) })).filter((x) => x.v !== null);
+  const tomadas = conV.filter((x) => entraConMapa(x.v)).map((x) => x.f);
+  const frenadas = conV.filter((x) => x.v === "EN_CONTRA").map((x) => x.f);
+  if (tomadas.length && frenadas.length) {
+    const firme = tomadas.length >= MUESTRA_MINIMA && frenadas.length >= MUESTRA_MINIMA;
+    out.push({ tema: "MAPA", n: tomadas.length + frenadas.length, firme, texto: `Con el mapa y el flujo sin nada en contra: ${resumenGrupo(est(tomadas))}. Con algo en contra (con el mapa no las tomaba): ${resumenGrupo(est(frenadas))}.` });
   }
   if (cs.length >= 2 * 10) {
     const ultimas = est(cs.slice(-10));

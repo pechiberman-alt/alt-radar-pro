@@ -59,7 +59,7 @@ export async function registrarSenalPapel(db: D1Database, userId: number, s: Sen
       `INSERT OR IGNORE INTO agente_st_senales (user_id, clave, symbol, lado, marco, vela, detectada, entrada, sl, tp1, tp2, tp3, foto, plan)
        VALUES (?1, ?2, ?3, ?4, '4h', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
     )
-    .bind(userId, s.clave, s.symbol, s.lado, s.vela, s.detectada, s.entrada, s.stop, s.tp1, s.tp2, s.tp3, JSON.stringify({ ...(s.consenso ?? {}), ...(s.mapa ? { mapa: s.mapa } : {}) }), planDe(s.symbol))
+    .bind(userId, s.clave, s.symbol, s.lado, s.vela, s.detectada, s.entrada, s.stop, s.tp1, s.tp2, s.tp3, JSON.stringify({ ...(s.consenso ?? {}), ...(s.mapa ? { mapa: s.mapa } : {}), ...(s.flujo ? { flujo: s.flujo } : {}) }), planDe(s.symbol))
     .run();
   return res.meta.changes === 1;
 }
