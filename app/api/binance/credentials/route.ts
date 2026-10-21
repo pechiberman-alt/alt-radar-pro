@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { ensureAuthSchema, getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
-import { decryptSecret } from "@/lib/binance-account";
+import { decryptSecretConEstado, encryptSecret } from "@/lib/binance-account";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +32,17 @@ export async function GET(request: Request) {
       .first<{ api_key_encrypted: string; api_secret_encrypted: string }>();
     if (!stored) return Response.json({ error: "NO HAY CUENTA DE BINANCE VINCULADA" }, { status: 404 });
 
-    const apiKey = await decryptSecret(stored.api_key_encrypted, env.DB, env);
-    const apiSecret = await decryptSecret(stored.api_secret_encrypted, env.DB, env);
+    const key = await decryptSecretConEstado(stored.api_key_encrypted, env.DB, env);
+    const secret = await decryptSecretConEstado(stored.api_secret_encrypted, env.DB, env);
+    const apiKey = key.plain;
+    const apiSecret = secret.plain;
+    // Cifradas con la clave vieja y ya hay ENCRYPTION_KEY: se vuelven a cifrar con la fuerte (una sola vez).
+    if (key.conClaveVieja || secret.conClaveVieja) {
+      await env.DB.prepare("UPDATE binance_credentials SET api_key_encrypted = ?1, api_secret_encrypted = ?2 WHERE user_id = ?3")
+        .bind(await encryptSecret(apiKey, env.DB, env), await encryptSecret(apiSecret, env.DB, env), user.id)
+        .run()
+        .catch(() => undefined);
+    }
 
     return Response.json({ apiKey, apiSecret }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

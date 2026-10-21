@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 666 · objetivos: 18 · sin objetivo: 0
+- Archivos: 667 · objetivos: 18 · sin objetivo: 0
 - Tablas D1: 54 · secretos: 5 · variables de entorno: 25 · rutas /api: 57 · hosts: 60
 - Código de navegador: 70 archivos con "use client" que alcanzan 219 · problemas: 0
-- Lib sin prueba directa: 29 de 219
+- Lib sin prueba directa: 29 de 220
 
 ## Objetivos
 
@@ -341,9 +341,9 @@ Texto: cómo llega el código a producción, cómo corre en el Worker y la confi
 - `worker/index.ts` — Cloudflare Worker entry point for the vinext-starter template.
 - `wrangler.production.jsonc`
 
-### seguridad — Sesiones, secretos y claves (14)
+### seguridad — Sesiones, secretos y claves (15)
 Texto: quién entra, cómo se guardan los secretos y qué nunca sale del servidor.
-Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que quedaron a la vista en el chat. · Poner ENCRYPTION_KEY como secreto del Worker (ya no rompe las claves de Binance guardadas) y una regla de límite de pedidos en el WAF para /api/.
+Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que quedaron a la vista en el chat. · Poner ENCRYPTION_KEY como secreto del Worker (ya no rompe las claves de Binance guardadas). Con dominio propio, sumar la regla de límite de pedidos del WAF.
 - `app/api/admin/settings/route.ts` — exporta: dynamic, GET, POST, PUT, DELETE
 - `app/api/auth/login/route.ts` — exporta: dynamic, POST
 - `app/api/auth/logout/route.ts` — exporta: dynamic, POST
@@ -355,6 +355,7 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/auth-limites.ts` — Límites de intentos para entrar y para crear cuentas: sin esto, cualquiera podía probar contraseñas sin parar contra un email o crear cuentas en masa.
 - `lib/auth.ts` — Per-client authentication: email + password, isolated by user_id.
 - `lib/corroborar.ts` — Corroborar lo que manda un navegador antes de guardarlo o mostrárselo a otros: el precio se compara con una fuente que el Worker sí alcanza por su cuenta (Kraken o Coinbase, en dól
+- `lib/limite-pedidos.ts` — Límite de pedidos por IP a la API, en el propio Worker.
 - `lib/secret-box.ts` — AES-GCM with a base64 32-byte key: iv (12 bytes) + ciphertext, base64.
 - `lib/seguridad-cabeceras.ts` — Cabeceras de seguridad en todas las respuestas: nadie puede meter la app en un marco de otro sitio (clickjacking), el navegador no adivina tipos de archivo, no se filtra la direcci
 - `tests/seguridad.test.ts` — Pruebas de la revisión de seguridad: series de velas que manda un navegador (forma, coherencia, horario), corroboración de precios, límites de intentos de login, tokens de sesión g

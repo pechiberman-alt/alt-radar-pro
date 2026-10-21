@@ -18,3 +18,8 @@
 .set-caveat{margin-top:12px;padding:10px 12px;background:#0a0f0c;border:1px solid var(--line);border-radius:4px;font:9px var(--font-mono);line-height:1.7;color:var(--muted)}
 .set-caveat b{color:#b9c5be}
 .set-note{margin:8px 0 0;font:10px var(--font-mono);color:var(--amber)}
+/* Generar la clave de cifrado fuerte (solo en el navegador). */
+.set-clave{margin-top:12px;display:grid;gap:8px}
+.set-codigo{display:block;padding:10px 12px;border:1px dashed #2c6048;border-radius:4px;background:#07110d;font:11px var(--font-mono);color:var(--green);word-break:break-all;user-select:all}
+.set-copiar{justify-self:start;padding:6px 12px;border:1px solid #2c6048;border-radius:4px;background:#0c1c15;color:var(--green);font:10px var(--font-mono);letter-spacing:1px;cursor:pointer}
+.set-pasos{margin:0;padding-left:18px;font:10px/1.7 var(--font-mono);color:#b9c5be}

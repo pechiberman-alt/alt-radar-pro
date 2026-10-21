@@ -17,6 +17,14 @@ type Status = {
   encryption: "fuerte" | "local";
 };
 
+/** Una clave de cifrado de 32 bytes en base64, hecha en este navegador con su generador seguro. No viaja a ningún lado. */
+function generarClave(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
 const sourceLabel = (s: Status["telegram"]) =>
   !s.configured ? "SIN CONFIGURAR" : s.source === "cloudflare" ? "ACTIVO · CLOUDFLARE" : "ACTIVO · GUARDADO EN LA APP";
 
@@ -37,6 +45,8 @@ export default function SettingsDesk() {
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
+  const [claveNueva, setClaveNueva] = useState<string | null>(null);
+  const [copiada, setCopiada] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -214,6 +224,37 @@ export default function SettingsDesk() {
               " Con cifrado local, alguien con acceso completo a la base de datos podría recuperarlos; para cifrado fuerte cargá ENCRYPTION_KEY en Cloudflare."}{" "}
             Si un secreto también está cargado en Cloudflare, ese tiene prioridad.
           </p>
+
+          {status.encryption === "local" && (
+            <div className="set-clave">
+              <button type="button" className="set-save" onClick={() => { setClaveNueva(generarClave()); setCopiada(false); }}>
+                {claveNueva ? "GENERAR OTRA CLAVE" : "GENERAR UNA CLAVE DE CIFRADO FUERTE"}
+              </button>
+              {claveNueva && (
+                <>
+                  <code className="set-codigo">{claveNueva}</code>
+                  <button
+                    type="button"
+                    className="set-copiar"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(claveNueva).then(() => setCopiada(true)).catch(() => setCopiada(false));
+                    }}
+                  >
+                    {copiada ? "COPIADA" : "COPIAR"}
+                  </button>
+                  <ol className="set-pasos">
+                    <li>En Cloudflare: Workers y Pages → alt-radar-pro → Configuración → Variables y secretos.</li>
+                    <li>Agregar → tipo «Secreto» → nombre <b>ENCRYPTION_KEY</b> → pegá la clave → Implementar.</li>
+                    <li>Volvé acá: tiene que decir «Cifrado actual: fuerte». Lo guardado se vuelve a cifrar solo la primera vez que se lee.</li>
+                  </ol>
+                  <p className="set-caveat">
+                    La clave se hizo en este navegador y no se mandó a ningún lado. Guardala en un lugar seguro (si se pierde, hay que volver
+                    a cargar los secretos y a vincular Binance) y no la pegues en chats. Al cerrar esta pantalla desaparece.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
       {note && <p className="set-note">{note}</p>}

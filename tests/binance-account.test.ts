@@ -218,3 +218,15 @@ test("validateApiRestrictions rejects withdrawals enabled", () => {
     /solo lectura/,
   );
 });
+
+test("con ENCRYPTION_KEY nueva, una credencial cifrada con la clave local se abre y avisa que hay que volver a cifrarla", async () => {
+  const { decryptSecretConEstado } = await import("../lib/binance-account.ts");
+  const { randomKeyBase64 } = await import("../lib/app-settings.ts");
+  const db = fakeD1();
+  const vieja = await encryptSecret("api-key-xyz", db, {});
+  const env = { ENCRYPTION_KEY: randomKeyBase64() };
+  assert.deepEqual(await decryptSecretConEstado(vieja, db, env), { plain: "api-key-xyz", conClaveVieja: true });
+  const nueva = await encryptSecret("api-key-xyz", db, env);
+  assert.deepEqual(await decryptSecretConEstado(nueva, db, env), { plain: "api-key-xyz", conClaveVieja: false });
+  assert.equal(await decryptSecret(vieja, db, env), "api-key-xyz");
+});
