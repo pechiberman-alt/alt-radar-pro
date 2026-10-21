@@ -49,6 +49,7 @@ import PortfolioRisk from "./portfolio-risk";
 import SpotDesk from "./spot-desk";
 import SentimentDesk from "./sentiment-desk";
 import AranaDesk from "./arana-desk";
+import MercadoArDesk from "./mercado-ar-desk";
 import AiTradingLab from "./ai-trading-lab";
 import SettingsDesk from "./settings-desk";
 import SwingDesk from "./swing-desk";
@@ -104,6 +105,7 @@ const NAV_ITEMS = [
   { label: "LA ARAÑA", mobile: "ARAÑA", icon: "✺", id: "arana" },
   { label: "AI TRADING LAB", mobile: "LAB", icon: "⌬", id: "lab" },
   { label: "ESTRATEGIA SPOT", mobile: "SPOT", icon: "◎", id: "spot" },
+  { label: "MERCADO AR", mobile: "AR", icon: "🇦🇷", id: "mercado-ar" },
   { label: "INSTITUCIONAL", mobile: "FONDOS", icon: "▤", id: "institucional" },
   { label: "RESERVAS", mobile: "CUSTODIA", icon: "⇅", id: "reservas" },
   { label: "SWING", mobile: "SWING", icon: "◤", id: "swing" },
@@ -1109,6 +1111,10 @@ export default function RadarApp() {
 
         <Collapsible id="spot" label="ESTRATEGIA SPOT" open={workspace.open["spot"]} onToggle={workspace.toggle}>
           <SpotDesk />
+        </Collapsible>
+
+        <Collapsible id="mercado-ar" label="MERCADO AR" open={workspace.open["mercado-ar"]} onToggle={workspace.toggle}>
+          <MercadoArDesk />
         </Collapsible>
 
         <Collapsible id="registro" label="REGISTRO" open={workspace.open["registro"]} onToggle={workspace.toggle}>

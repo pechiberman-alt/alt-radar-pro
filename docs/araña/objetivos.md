@@ -324,6 +324,22 @@ Reglas:
 - Auditoría de sobreajuste (lib/sobreajuste.ts): el estudio informa PSR y DSR por fila (contando las variantes de la tabla y las declaradas, incluidas las de fuera de la tabla, redondeadas para arriba) y Reality Check / SPA sobre el resultado diario de todas. Una VENTAJA con DSR declarado menor a 95 % o desconocido se muestra como CANDIDATA. Probar una variante nueva sobre los mismos datos suma uno al contador de ensayos.
 - Preregistro del flujo (lib/preregistro-flujo.ts): los cuatro filtros de volumen taker, funding y open interest se fijaron el 14/10/2026 antes de ver esos datos y no se ajustan; un dato faltante no aprueba ni rechaza. Los datos de Binance Vision (CC BY-NC-SA 4.0) son para investigación personal: no se commitean, no se redistribuyen y no alimentan señales para terceros.
 
+## mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA
+Texto: panel del mercado argentino (acciones del panel líder + CEDEARs) con velas diarias de Yahoo Finance (rezagado: BYMA publica con demora). Lectura diaria: EMA, tendencia, RSI, ATR, distancia a máximos y mínimos de 52 semanas, volumen relativo. Sin footprint (BYMA no publica operaciones gratis). Diagnóstico horario: la fuente responde cada hora, al principio del cron de 15 minutos, guardado en ajustes.
+Archivos: lib/mercado-ar.ts, lib/mercado-ar-fuente.ts, app/mercado-ar-desk.tsx, app/mercado-ar-desk.module.css, app/api/mercado-ar/route.ts, tests/mercado-ar.test.ts
+Reglas:
+- Lista fija de papeles (23 acciones + 25 CEDEARs): si el símbolo no está, error 400. Nunca un proxy abierto.
+- De cada CEDEAR se leen dos series: el CEDEAR en pesos (BYMA) y la acción de afuera en dólares (sin CCL).
+- Datos públicos de mercado: sin puerta PRO.
+- Lectura diaria: medias, RSI, ATR, distancias con el vocabulario del contexto común (lib/contexto-comun.ts); faltantes si insuficientes ruedas.
+- Yahoo sigue dos hosts (por si uno falla) e intenta desde el Worker (no cubre CORS el navegador). Demora: BYMA + Yahoo delay. Máximo de edad antes de STALE_DATA: MAX_DIAS_SIN_RUEDA + 1.
+- El diagnóstico corre en paralelo con los otros crons (*/15); su estado (la fuente respondió, qué símbolo, cuántas ruedas, error si hay) se guarda en `ajuste:mercado_ar_estado` (lista de las últimas 12 pruebas).
+- Todo texto visible en español rioplatense; sin asesoramiento financiero.
+Pendiente:
+- Value agent (Buffett/Graham) con fundamentals de CEDEARs; papel en AR diarios.
+- Agentes moviéndose en la oficina cuando coinciden o discrepan; aprendizaje visible.
+- Lecturas en el mapa de footprint (cripto).
+
 ## terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato
 Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
 Archivos: lib/contexto-comun.ts, docs/terminal-unificada.md
