@@ -4,7 +4,7 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 686 · objetivos: 19 · sin objetivo: 0
+- Archivos: 692 · objetivos: 19 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 59 · hosts: 60
 - Código de navegador: 72 archivos con "use client" que alcanzan 226 · problemas: 0
 - Lib sin prueba directa: 28 de 227
@@ -362,9 +362,10 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/seguridad-cabeceras.ts` — Cabeceras de seguridad en todas las respuestas: nadie puede meter la app en un marco de otro sitio (clickjacking), el navegador no adivina tipos de archivo, no se filtra la direcci
 - `tests/seguridad.test.ts` — Pruebas de la revisión de seguridad: series de velas que manda un navegador (forma, coherencia, horario), corroboración de precios, límites de intentos de login, tokens de sesión g
 
-### cobro-pro — La terminal PRO: prueba de 7 días, pago por alias y activación manual (8)
+### cobro-pro — La terminal PRO: prueba de 7 días, pago por alias y activación manual (9)
 Texto: quién usa la terminal, cómo se paga y cómo se activa; la presentación para visitantes y el muro de pago.
 Pendiente: Cargar el precio en CONFIGURACIÓN → COBROS.
+- `app/anuncio/page.tsx` — La página pública del anuncio de ALT RADAR PRO: el video con voz, qué muestra y el camino para probar la terminal 7 días.
 - `app/api/suscripcion/route.ts` — exporta: dynamic, GET, POST
 - `app/cobros-admin.tsx` — Los cobros de la terminal, solo para el administrador (dentro de CONFIGURACIÓN): el alias, el precio y los días; los avisos de pago para aprobar o rechazar a mano, mirando el compr
 - `app/puerta-pro.css` — La puerta PRO (app/puerta-pro.tsx): la presentación para visitantes, el muro de pago y el aviso de días dentro de la terminal.
@@ -662,7 +663,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 - `tests/workspace-sections.test.ts` — Every <Collapsible id="x" ...
 - `tests/xau-alerts.test.ts` — pruebas: gold and silver by any common name, and real coins untouched, the metals live on the futures API; everything else on spot, gold prices keep their cents and both writing habits work (+1)
 
-### app-movil — Interfaz, PWA y celular primero (95)
+### app-movil — Interfaz, PWA y celular primero (100)
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
 - `app/account-panel.css`
 - `app/account-panel.tsx` — exporta: AccountPanel, AuthForms, default
@@ -750,6 +751,9 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/zones-desk.tsx` — exporta: ZonesDesk, default
 - `lib/account-events.ts` — Small browser events so any panel can open the account drawer, and every panel learns when someone signs in or out without reloading the page.
 - `lib/visible-interval.ts` — setInterval that only runs while the tab is visible.
+- `public/anuncio/altradar-anuncio.mp4`
+- `public/anuncio/portada.jpg`
+- `public/anuncio/subtitulos.vtt`
 - `public/favicon.svg`
 - `public/file.svg`
 - `public/globe.svg`
@@ -757,6 +761,8 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `public/icon-512.png`
 - `public/manifest.webmanifest`
 - `public/og.png`
+- `public/robots.txt`
+- `public/sitemap.xml`
 - `public/sw.js`
 - `public/window.svg`
 
@@ -921,7 +927,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 ## Hosts externos
 
 - `alt-radar-cache.internal` — lib/shared-cache.ts
-- `alt-radar-pro.pechiberman.workers.dev` — app/api/etf-flows/route.ts, app/layout.tsx
+- `alt-radar-pro.pechiberman.workers.dev` — app/anuncio/page.tsx, app/api/etf-flows/route.ts, app/layout.tsx
 - `alt-radar-voice.internal` — lib/jarvis-voice-server.ts
 - `api-gcp.binance.com` — app/api/tickers/route.ts, lib/automation.ts, lib/klines-server.ts, lib/telegram-ai-server.ts
 - `api.alternative.me` — app/api/sentiment/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-ai-server.ts, lib/telegram-dispatch.ts

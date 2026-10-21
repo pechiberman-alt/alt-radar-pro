@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://alt-radar-pro.pechiberman.workers.dev/sitemap.xml
