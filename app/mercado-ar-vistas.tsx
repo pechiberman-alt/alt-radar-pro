@@ -6,13 +6,15 @@
  * laboratorio (lib/mercado-ar-agentes.ts), y MapaAr, la vista completa de un papel que el MAPA muestra en lugar del mapa de
  * liquidaciones (que para acciones no existe y se dice). Todo con ruedas cerradas; no es asesoramiento financiero.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { PAPELES_AR, TEXTO_SIN_FOOTPRINT, type PapelAr } from "@/lib/mercado-ar";
 import { AVISO_MENTES, type Consenso, type LecturaMente } from "@/lib/mentes-inversoras";
 import { EXCLUIDOS_AR, ESTUDIO_AR, type AgenteEnPapel } from "@/lib/mercado-ar-agentes";
 import { medir } from "@/lib/estrategias";
 import { MUESTRA_MINIMA } from "@/lib/registro";
-import { nivelesAr, perfilAprox, TEXTO_SIN_LIQUIDACIONES } from "@/lib/mercado-ar-mapa";
+import { perfilAprox, TEXTO_SIN_LIQUIDACIONES } from "@/lib/mercado-ar-mapa";
+import { analisisAr, ZONA_COMPRA, type AnalisisAr } from "@/lib/mercado-ar-tecnico";
+import { lineAt } from "@/lib/trendlines";
 import { ema, macd, rsi } from "@/lib/oscillators";
 import { cargarPanel, leerPapel, type LecturaPapel } from "@/lib/mercado-ar-cliente";
 import type { SwingCandle } from "@/lib/swing-entries";
@@ -20,13 +22,15 @@ import type { SwingCandle } from "@/lib/swing-entries";
 export const fmt = (x: number | null | undefined, d = 2) =>
   x === null || x === undefined || !Number.isFinite(x) ? "—" : x.toLocaleString("es-AR", { maximumFractionDigits: Math.abs(x) >= 1000 ? Math.min(d, 1) : d, minimumFractionDigits: 0 });
 export const fmtPct = (x: number | null | undefined, d = 1) => (x === null || x === undefined || !Number.isFinite(x) ? "—" : `${x > 0 ? "+" : ""}${x.toLocaleString("es-AR", { maximumFractionDigits: d })} %`);
-const fecha = (t: number) => new Date(t).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+const fecha = (t: number) => new Date(t).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+const estrellas = (n: number) => "★".repeat(n);
 
 const CLASE_POSTURA: Record<string, string> = { "A FAVOR": "ok", "EN CONTRA": "mal", NEUTRAL: "alerta", "SIN DATOS": "", INFORMA: "" };
 
 // ── Gráfico ──
 
-export function GraficoAr({ velas, cantidad }: { velas: SwingCandle[]; cantidad: number }) {
+export function GraficoAr({ velas, cantidad, analisis }: { velas: SwingCandle[]; cantidad: number; analisis: AnalisisAr }) {
+  const clip = `ar-precio-${useId().replace(/:/g, "")}`;
   const g = useMemo(() => {
     if (velas.length < 2) return null;
     const cierres = velas.map((c) => c.close);
@@ -36,13 +40,14 @@ export function GraficoAr({ velas, cantidad }: { velas: SwingCandle[]; cantidad:
     const md = macd(cierres);
     const desde = Math.max(0, velas.length - cantidad);
     const v = velas.slice(desde);
-    const niv = nivelesAr(velas);
+    const niv = analisis.niveles;
+    const fib = analisis.fib;
     const perfil = perfilAprox(v);
     const W = 360;
     const ejeX = 50;
     const anchoV = (W - ejeX) / v.length;
     const H = 200;
-    const precios = [...v.flatMap((c) => [c.high, c.low]), ...niv.soportes.map((n) => n.precio), ...niv.resistencias.map((n) => n.precio)];
+    const precios = [...niv.map((n) => n.price), ...(fib ? [fib.zona.bajo, fib.zona.alto] : [])];
     const lo = Math.min(...v.map((c) => c.low));
     const hi = Math.max(...v.map((c) => c.high));
     const loV = Math.min(lo, ...precios.filter((p) => p >= lo - (hi - lo) * 0.25));
@@ -59,8 +64,8 @@ export function GraficoAr({ velas, cantidad }: { velas: SwingCandle[]; cantidad:
     const maxPerfil = Math.max(...perfil.franjas.map((f) => f.volumen), 1);
     const hist = md.hist.slice(desde);
     const maxHist = Math.max(...hist.map((h) => Math.abs(h ?? 0)), 1e-9);
-    return { v, x, y, anchoV, W, H, ejeX, linea, e50, m200, r: r.slice(desde), md, hist, maxHist, desde, niv, perfil, maxVol, maxPerfil, loV, hiV };
-  }, [velas, cantidad]);
+    return { v, x, y, anchoV, W, H, ejeX, linea, e50, m200, r: r.slice(desde), md, hist, maxHist, desde, niv, fib, perfil, maxVol, maxPerfil, loV, hiV };
+  }, [velas, cantidad, analisis]);
   if (!g) return <p className="ar-mute">Sin ruedas para dibujar.</p>;
   const { v, x, y, anchoV, W, H, ejeX } = g;
   const VOL = H + 4;
@@ -81,11 +86,29 @@ export function GraficoAr({ velas, cantidad }: { velas: SwingCandle[]; cantidad:
           <text x={W - ejeX + 3} y={y(p) + 3} fill="#718078" fontSize="8" fontFamily="monospace">{fmt(p)}</text>
         </g>
       ))}
-      {[...g.niv.resistencias, ...g.niv.soportes].map((n, k) => (
+      {g.fib && (
+        <g>
+          <rect x={Math.max(0, x(velas.findIndex((c) => c.openTime === g.fib!.desde) - g.desde))} width={W - ejeX - Math.max(0, x(velas.findIndex((c) => c.openTime === g.fib!.desde) - g.desde))} y={y(g.fib.zona.alto)} height={Math.max(1, y(g.fib.zona.bajo) - y(g.fib.zona.alto))} fill="#39f29a1f" stroke="#39f29a66" strokeWidth="0.6" />
+          <text x={W - ejeX - 2} y={y(g.fib.zona.alto) + 8} fill="#39f29a" fontSize="7.5" fontFamily="monospace" textAnchor="end">ZONA DE COMPRA FIB {String(ZONA_COMPRA[0]).replace(".", ",")}–{String(ZONA_COMPRA[1]).replace(".", ",")}</text>
+          {[...g.fib.niveles, ...g.fib.extensiones].map((n) => (
+            <g key={`f${n.r}`}>
+              <line x1={0} x2={W - ejeX} y1={y(n.precio)} y2={y(n.precio)} stroke="#a78bfa" strokeWidth="0.5" strokeDasharray="1 2" />
+              <text x={W - ejeX - 2} y={y(n.precio) - 1.5} fill="#a78bfa" fontSize="6.5" fontFamily="monospace" textAnchor="end">{String(n.r).replace(".", ",")}</text>
+            </g>
+          ))}
+        </g>
+      )}
+      {analisis.fvg.map((f, k) => {
+        const i = f.index - g.desde;
+        if (i < 0) return null;
+        return <rect key={`g${k}`} x={x(i)} width={W - ejeX - x(i)} y={y(f.high)} height={Math.max(0.8, y(f.low) - y(f.high))} fill={f.side === "ALCISTA" ? "#55d6be14" : "#ff596414"} />;
+      })}
+      {g.niv.map((n, k) => (
         <g key={`n${k}`}>
-          <line x1={0} x2={W - ejeX} y1={y(n.precio)} y2={y(n.precio)} stroke={n.tipo === "RESISTENCIA" ? "#ff5964" : "#39f29a"} strokeDasharray="4 3" strokeWidth="0.8" />
-          <text x={2} y={y(n.precio) - 2} fill={n.tipo === "RESISTENCIA" ? "#ff5964" : "#39f29a"} fontSize="7.5" fontFamily="monospace">
-            {n.tipo === "RESISTENCIA" ? "R" : "S"} {fmt(n.precio)} ×{n.toques}
+          {/* Dos etiquetas casi en el mismo precio se pisan: la de menos estrellas no lleva texto. */}
+          <line x1={0} x2={W - ejeX} y1={y(n.price)} y2={y(n.price)} stroke={n.kind === "RESISTENCIA" ? "#ff5964" : "#39f29a"} strokeDasharray="4 3" strokeWidth={0.5 + n.stars * 0.25} />
+          <text x={2} y={y(n.price) - 2} fill={n.kind === "RESISTENCIA" ? "#ff5964" : "#39f29a"} fontSize="7.5" fontFamily="monospace" visibility={g.niv.some((o) => o !== n && Math.abs(y(o.price) - y(n.price)) < 9 && (o.stars > n.stars || (o.stars === n.stars && o.price > n.price))) ? "hidden" : "visible"}>
+            {n.kind === "RESISTENCIA" ? "R" : "S"} {fmt(n.price)} {estrellas(n.stars)} {n.sources.slice(0, 2).map((f) => f.kind).join(" + ")}
           </text>
         </g>
       ))}
@@ -101,10 +124,22 @@ export function GraficoAr({ velas, cantidad }: { velas: SwingCandle[]; cantidad:
           </g>
         );
       })}
-      <polyline points={g.linea(g.e50)} fill="none" stroke="#55d6be" strokeWidth="1" />
-      <polyline points={g.linea(g.m200)} fill="none" stroke="#f4b84a" strokeWidth="1.1" />
-      <text x={2} y={10} fill="#55d6be" fontSize="8" fontFamily="monospace">EMA 50</text>
-      <text x={40} y={10} fill="#f4b84a" fontSize="8" fontFamily="monospace">MEDIA 200</text>
+      <defs>
+        <clipPath id={clip}>
+          <rect x={0} y={0} width={W - ejeX} height={H} />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        <polyline points={g.linea(g.e50)} fill="none" stroke="#55d6be" strokeWidth="1" />
+        <polyline points={g.linea(g.m200)} fill="none" stroke="#f4b84a" strokeWidth="1.1" />
+        {analisis.lineas.map((l, k) => {
+          const a = Math.max(l.a, g.desde);
+          const b = velas.length - 1;
+          return <line key={`l${k}`} x1={x(a - g.desde)} x2={x(b - g.desde)} y1={y(lineAt(l, a))} y2={y(lineAt(l, b))} stroke={l.side === "RESISTENCIA" ? "#ff8a8a" : "#7cf0bd"} strokeWidth="0.9" />;
+        })}
+      </g>
+      <text x={2} y={H - 2} fill="#55d6be" fontSize="8" fontFamily="monospace">EMA 50</text>
+      <text x={40} y={H - 2} fill="#f4b84a" fontSize="8" fontFamily="monospace">MEDIA 200</text>
       <text x={2} y={VOL + 8} fill="#718078" fontSize="7.5" fontFamily="monospace">VOLUMEN</text>
       <line x1={0} x2={W - ejeX} y1={yRsi(70)} y2={yRsi(70)} stroke="#673238" strokeDasharray="2 2" />
       <line x1={0} x2={W - ejeX} y1={yRsi(30)} y2={yRsi(30)} stroke="#2c493b" strokeDasharray="2 2" />
@@ -114,6 +149,94 @@ export function GraficoAr({ velas, cantidad }: { velas: SwingCandle[]; cantidad:
       <text x={2} y={MACD + 8} fill="#718078" fontSize="7.5" fontFamily="monospace">MACD 12·26·9</text>
       <text x={2} y={total - 2} fill="#4f5e56" fontSize="7" fontFamily="monospace">{fecha(v[0].openTime)} → {fecha(v.at(-1)!.openTime)} · perfil de volumen aproximado (por rueda)</text>
     </svg>
+  );
+}
+
+// ── Análisis técnico ──
+
+const tasa = (a: number, n: number) => (n ? `${fmt((a / n) * 100, 0)} %` : "—");
+
+export function TecnicoPanel({ analisis }: { analisis: AnalisisAr }) {
+  const { fib, estructura, ruptura, banderas, wyckoff, preRuptura, divergencias, fvg, niveles } = analisis;
+  const chips: { texto: string; clase: string }[] = [];
+  chips.push({ texto: `ESTRUCTURA · ${estructura.tendencia}${estructura.tendencia !== "SIN DATOS" ? ` · ${estructura.detalle}` : ""}`, clase: estructura.tendencia === "ALCISTA" ? "ok" : estructura.tendencia === "BAJISTA" ? "mal" : "alerta" });
+  if (ruptura) chips.push({ texto: `RUPTURA ${ruptura.direction} (línea) · ${ruptura.confirmed ? "confirmada" : "sin confirmar"} · ${ruptura.outcome.toLowerCase()}${ruptura.volumeMultiple ? ` · ${fmt(ruptura.volumeMultiple, 1)}× vol` : ""}`, clase: ruptura.direction === "ALCISTA" ? "ok" : "mal" });
+  for (const b of banderas) chips.push({ texto: `${b.kind} · ${b.status} · objetivo ${fmt(b.target)}`, clase: b.kind === "BULL FLAG" ? "ok" : "mal" });
+  if (wyckoff) chips.push({ texto: `WYCKOFF · ${wyckoff.kind} posible · ${wyckoff.phase}`, clase: "alerta" });
+  if (preRuptura && preRuptura.state !== "QUIETO") chips.push({ texto: `${preRuptura.state} · ${preRuptura.score}/100 · ${preRuptura.side}${preRuptura.level ? ` · ${fmt(preRuptura.level)} (${preRuptura.touches} toques)` : ""}`, clase: preRuptura.side === "ALCISTA" ? "ok" : preRuptura.side === "BAJISTA" ? "mal" : "alerta" });
+  for (const d of divergencias) chips.push({ texto: `DIVERGENCIA ${d.kind} ${d.side} · RSI · hace ${d.age} ruedas`, clase: d.side === "ALCISTA" ? "ok" : "mal" });
+  if (fvg.length) chips.push({ texto: `FVG · ${fvg.filter((f) => f.side === "ALCISTA").length} de compra · ${fvg.filter((f) => f.side === "BAJISTA").length} de venta`, clase: "" });
+  const h = fib?.historial;
+  const resueltas = h ? h.aguantaron + h.fallaron : 0;
+  return (
+    <>
+      <div className="ar-box">
+        <h3>ZONA DE COMPRA FIBONACCI</h3>
+        {!fib && <p>{analisis.fibMotivo}</p>}
+        {fib && (
+          <>
+            <div className="ar-head">
+              <span>
+                Pierna alcista {fmt(fib.pierna.origen)} → {fmt(fib.pierna.extremo)} (terminó el {fecha(fib.desde)})
+              </span>
+              <span className={`ar-chip ${fib.estado === "EN LA ZONA" ? "ok" : fib.estado === "INVALIDADA" ? "mal" : "alerta"}`}>{fib.estado}</span>
+            </div>
+            <div className="ar-grid">
+              {fib.niveles.map((n) => (
+                <div key={n.r}>
+                  <span>RETROCESO {String(n.r).replace(".", ",")}</span>
+                  {fmt(n.precio)}
+                </div>
+              ))}
+              {fib.extensiones.map((n) => (
+                <div key={n.r}>
+                  <span>EXTENSIÓN {String(n.r).replace(".", ",")}</span>
+                  {fmt(n.precio)}
+                </div>
+              ))}
+            </div>
+            <div className="ar-plan">
+              ZONA {fmt(fib.zona.bajo)} – {fmt(fib.zona.alto)}
+              {fib.plan
+                ? ` · entrada ${fmt(fib.plan.entrada)} · SL ${fmt(fib.plan.stop)} · TP1 ${fmt(fib.plan.tp1)} · TP2 ${fmt(fib.plan.tp2)} · TP3 ${fmt(fib.plan.tp3)} · R:R ${fmt(fib.plan.rr, 1)}`
+                : " · sin plan: la pierna quedó invalidada (el precio perdió su origen)"}
+            </div>
+            <p>
+              En este papel el precio volvió a la zona {h!.probadas} {h!.probadas === 1 ? "vez" : "veces"}: aguantó (volvió al máximo antes de perder el origen) {h!.aguantaron}, falló {h!.fallaron}
+              {h!.abiertas ? `, ${h!.abiertas} sin resolver` : ""}. {resueltas ? `Aguantó ${tasa(h!.aguantaron, resueltas)} de ${resueltas}` : "Sin casos resueltos"}
+              {resueltas < 15 ? " · muestra mínima" : ""}. Si en una misma rueda pasan las dos cosas, cuenta como falla. No es una probabilidad.
+            </p>
+          </>
+        )}
+      </div>
+      <div className="ar-box">
+        <h3>ANÁLISIS TÉCNICO</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {chips.map((c) => (
+            <span key={c.texto} className={`ar-chip ${c.clase}`}>{c.texto}</span>
+          ))}
+        </div>
+        {niveles.length > 0 && (
+          <div className="ar-scroll">
+            <table className="ar-table">
+              <tbody>
+                {niveles.map((n) => (
+                  <tr key={`${n.kind}${n.price}`}>
+                    <td className={n.kind === "RESISTENCIA" ? "ar-down" : "ar-up"}>{n.kind === "RESISTENCIA" ? "R" : "S"} {fmt(n.price)}</td>
+                    <td>{estrellas(n.stars)}</td>
+                    <td className="ar-mute">{fmtPct(n.distancePct, 1)}</td>
+                    <td className="ar-mute">{n.sources.map((f) => f.label).join(" + ")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="ar-mute">
+          Niveles: estructura diaria y semanal, máximo y mínimo de ayer y de la semana pasada, POC y área de valor (aproximados por rueda), números redondos y Fibonacci; más estrellas = más motivos coinciden en ese precio. Banderas, Wyckoff y rupturas son lecturas mecánicas del gráfico: si funcionaron se sabe después. No es asesoramiento financiero.
+        </p>
+      </div>
+    </>
   );
 }
 
@@ -217,7 +340,8 @@ export function MapaAr({ papel, onSalir }: { papel: PapelAr; onSalir: () => void
   };
 
   const s = lectura?.serie;
-  const velas = s?.serie?.velas ?? [];
+  const velas = useMemo(() => s?.serie?.velas ?? [], [s]);
+  const analisis = useMemo(() => analisisAr(velas), [velas]);
   const ultima = velas.at(-1);
   const previa = velas.at(-2);
   const estado = s?.estado;
@@ -262,10 +386,11 @@ export function MapaAr({ papel, onSalir }: { papel: PapelAr; onSalir: () => void
                   </button>
                 ))}
               </div>
-              <GraficoAr velas={velas} cantidad={cantidad} />
+              <GraficoAr velas={velas} cantidad={cantidad} analisis={analisis} />
               <p className="ar-mute" style={{ fontSize: 10 }}>{TEXTO_SIN_FOOTPRINT}</p>
             </>
           )}
+          {velas.length > 1 && <TecnicoPanel analisis={analisis} />}
           <MentesPanel mentes={lectura.mentes} consenso={lectura.consenso} />
           {lectura.mentes.some((m) => m.criterios.some((c) => c.valor.startsWith("falta el"))) && (
             <button className="ar-chip-btn" onClick={() => void leerPanel()} disabled={panel !== null}>

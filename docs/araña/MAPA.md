@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 713 · objetivos: 21 · sin objetivo: 0
+- Archivos: 715 · objetivos: 21 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 61 · hosts: 63
-- Código de navegador: 74 archivos con "use client" que alcanzan 237 · problemas: 0
-- Lib sin prueba directa: 29 de 235
+- Código de navegador: 74 archivos con "use client" que alcanzan 238 · problemas: 0
+- Lib sin prueba directa: 29 de 236
 
 ## Objetivos
 
@@ -525,7 +525,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 - `tests/universos.test.ts` — Pruebas de los universos de monedas (lib/universos.ts): que no se diga que un universo se puede medir cuando no hay velas descargadas, que las monedas con datos sean exactamente la
 
-### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (14)
+### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (16)
 Texto: acciones del panel líder y CEDEARs con ruedas diarias de Yahoo Finance (con demora), dentro del panel MERCADO AR y del MAPA (el buscador del mapa encuentra papeles de BYMA y muestra su vista). Las MENTES (Buffett, Graham, Lynch, crecimiento al estilo Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes del laboratorio leen cada papel y todo el panel. Balances de SEC EDGAR para los CEDEARs de empresas de EE. UU.
 Pendiente: Señales AR en el registro unificado (resolverlas con ruedas diarias en el servidor). · Balances de empresas argentinas si aparece una fuente gratis en datos. · Agentes moviéndose en la oficina cuando coinciden o discrepan; lecturas de agentes en el mapa de footprint cripto.
 - `app/api/mercado-ar/fundamentales/route.ts` — Balances anuales de la empresa de afuera de un CEDEAR, de SEC EDGAR, para las mentes de valor (Buffett, Graham, Lynch, crecimiento).
@@ -539,8 +539,10 @@ Pendiente: Señales AR en el registro unificado (resolverlas con ruedas diarias 
 - `lib/mercado-ar-cliente.ts` — El lado del navegador de MERCADO AR: baja las series (/api/mercado-ar) y los balances (/api/mercado-ar/fundamentales), las guarda en memoria mientras la pestaña está abierta y arma
 - `lib/mercado-ar-fuente.ts` — Baja las velas diarias del mercado argentino (lib/mercado-ar.ts) desde Yahoo Finance, en el Worker: el navegador no puede (Yahoo no manda permisos CORS).
 - `lib/mercado-ar-mapa.ts` — El mapa de un papel de BYMA (acción o CEDEAR): lo que se puede dibujar honestamente con ruedas diarias.
+- `lib/mercado-ar-tecnico.ts` — El análisis técnico de un papel de BYMA con ruedas diarias, con los mismos motores del mapa cripto: zona de compra de Fibonacci (retroceso 0,618–0,786 de la última pierna alcista,
 - `lib/mercado-ar.ts` — El mercado argentino en la terminal: acciones del panel líder de BYMA y CEDEARs, con velas DIARIAS de Yahoo Finance (BYMA llega con demora; Yahoo dice cuántos minutos en `exchangeD
 - `tests/mentes-ar.test.ts` — Pruebas de las MENTES (lib/mentes-inversoras.ts), los balances de SEC (lib/fundamentales-sec.ts), los agentes sobre ruedas de BYMA (lib/mercado-ar-agentes.ts) y el mapa de un papel
+- `tests/mercado-ar-tecnico.test.ts` — Pruebas del análisis técnico de un papel de BYMA (lib/mercado-ar-tecnico.ts): la zona de compra de Fibonacci, su historial (aguantó, falló, abierta), las semanas armadas con ruedas
 - `tests/mercado-ar.test.ts` — Mercado argentino: parse Yahoo, diagnósticos, lecturas diarias.
 
 ### terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato (2)
