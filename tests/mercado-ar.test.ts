@@ -12,7 +12,7 @@ import {
   SIMBOLOS_PERMITIDOS,
   MAX_DIAS_SIN_RUEDA,
 } from "../lib/mercado-ar.ts";
-import { bajarSerieAr, probarMercadoAr, tocaPruebaAr, leerPruebas } from "../lib/mercado-ar-fuente.ts";
+import { bajarSerieAr, tocaPruebaAr, leerPruebas } from "../lib/mercado-ar-fuente.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
 
 // Yahoo chart fixture: ALUA (acción argentina)
@@ -212,7 +212,7 @@ test("bajarSerieAr: rechaza símbolos fuera de lista", async () => {
 
 test("bajarSerieAr: intenta ambos hosts si el primero falla", async () => {
   let intentos = 0;
-  const mockFetch = async (input: string | URL | Request) => {
+  const mockFetch = async () => {
     intentos++;
     if (intentos === 1) return new Response("", { status: 503 }); // primer host falla
     return new Response(JSON.stringify(YAHOO_CHART_FIXTURE)); // segundo host ok

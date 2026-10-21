@@ -1,6 +1,6 @@
 /**
  * El acceso PRO de la terminal: todo es PRO, con 7 días de prueba desde el primer uso (o desde que se crea la cuenta) y
- * después se paga por transferencia al alias (url.mp) y el administrador activa a mano al ver el pago. Acá van las reglas
+ * después se paga por transferencia al alias (url.fx) y el administrador activa a mano al ver el pago. Acá van las reglas
  * puras: el estado de cada persona, cuánto suma un pago aprobado, qué rutas de la API son PRO y cómo se valida lo que manda
  * la persona al avisar que pagó (nunca un comprobante con datos de su cuenta: el número de operación alcanza).
  * Desconocido no es cero: sin precio cargado, se dice que falta, no se inventa. Pura: sin red ni base.
@@ -9,7 +9,7 @@
 export const DIA_MS = 86_400_000;
 export const DIAS_PRUEBA = 7;
 export const DIAS_POR_PAGO = 30;
-export const ALIAS_PAGO = "url.mp";
+export const ALIAS_PAGO = "url.fx";
 /** Cuántos avisos de pago pendientes puede tener una persona a la vez. */
 export const MAX_PENDIENTES = 3;
 

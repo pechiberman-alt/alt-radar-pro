@@ -228,7 +228,7 @@ Texto: quién usa la terminal, cómo se paga y cómo se activa; la presentación
 Archivos: lib/suscripcion.ts, lib/suscripcion-db.ts, app/api/suscripcion/**, app/puerta-pro.tsx, app/puerta-pro.css, app/anuncio/page.tsx, app/cobros-admin.tsx, tests/suscripcion.test.ts, tests/suscripcion-db.test.ts
 Reglas:
 - Todo es PRO, con prueba desde el primer uso (7 días por defecto, configurable). El administrador entra siempre.
-- Se paga por transferencia al alias (url.mp) y el administrador aprueba a mano, después de ver el comprobante. Ningún camino activa PRO solo: no agregar cobros automáticos sin pedido explícito.
+- Se paga por transferencia al alias (url.fx) y el administrador aprueba a mano, después de ver el comprobante. Ningún camino activa PRO solo: no agregar cobros automáticos sin pedido explícito.
 - La puerta está en el servidor (worker/index.ts con rutaPro y puertaDe): una ruta nueva con la inteligencia de la terminal va en PREFIJOS_PRO. Entrar, pagar, la versión y los datos públicos de mercado quedan abiertos. Telegram: alertas y comandos PRO solo con acceso.
 - Al avisar un pago se pide solo el número de operación: nunca claves, datos de tarjeta ni capturas con datos del banco. Lo que escribe la persona llega escapado al administrador.
 - Sin precio cargado se dice «precio a confirmar»: no se inventa. Pagar el acceso no compra promesas de ganancia: no es asesoramiento financiero.

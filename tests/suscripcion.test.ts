@@ -71,7 +71,7 @@ test("aviso de pago: monto, número de operación y una nota limpia; lo demás s
 test("configuración de cobro: alias de 6 a 20, precio opcional, días con límites", () => {
   assert.deepEqual(validarConfigCobro({ alias: "URL.MP", precio: "15.000", moneda: "ars", dias: 30, diasPrueba: 7 }), { alias: "url.mp", precio: 15000, moneda: "ARS", dias: 30, diasPrueba: 7 });
   assert.deepEqual(validarConfigCobro({ ...CONFIG_COBRO_INICIAL }), CONFIG_COBRO_INICIAL);
-  assert.equal(CONFIG_COBRO_INICIAL.alias, "url.mp");
+  assert.equal(CONFIG_COBRO_INICIAL.alias, "url.fx");
   assert.equal(CONFIG_COBRO_INICIAL.precio, null, "sin precio cargado no se inventa uno");
   assert.match(String(validarConfigCobro({ ...CONFIG_COBRO_INICIAL, alias: "a b" })), /ALIAS/);
   assert.match(String(validarConfigCobro({ ...CONFIG_COBRO_INICIAL, precio: "gratis" })), /PRECIO/);
