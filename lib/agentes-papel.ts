@@ -17,6 +17,7 @@ import { escaleraHacia, type Escalera, type Lado } from "./escalera.ts";
 import { ESTRATEGIAS, indicadores, operaEn, type EstrategiaId } from "./estrategias.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 import { simbolosFondeo } from "./fondeo.ts";
+import { contextoDeVelas, fotoMapa, validarFotoMapa, type FotoMapa } from "./mapa-contexto.ts";
 
 export const PLAN_AGENTES = "PLAN_AGENTES_1";
 export const MARCO_AGENTES = "4h";
@@ -79,6 +80,8 @@ export type PlanPapel = {
   stop: number;
   objetivo: number;
   escalera: Escalera;
+  /** Cómo estaba el mapa al entrar (lib/mapa-contexto.ts): con las velas cerradas hasta la de la señal. */
+  foto: FotoMapa | null;
 };
 
 /**
@@ -113,8 +116,11 @@ export function leerSenalesPapel(symbol: string, velas: SwingCandle[], ahora: nu
     const objetivo = entrada + signo * rr * riesgo;
     const escalera = escaleraHacia(s.lado, entrada, stop, objetivo);
     if (!escalera) continue;
-    out.push({ estrategia: id, symbol, lado: s.lado, vela: senal.openTime, velaEntrada: entradaVela.openTime, entrada, stop, objetivo, escalera });
+    out.push({ estrategia: id, symbol, lado: s.lado, vela: senal.openTime, velaEntrada: entradaVela.openTime, entrada, stop, objetivo, escalera, foto: null });
   }
+  // La foto del mapa se arma una sola vez por moneda y solo si alguien entró (en la mayoría de las velas nadie entra).
+  const ctx = out.length ? contextoDeVelas(cerradas) : null;
+  if (ctx) for (const p of out) p.foto = fotoMapa(ctx, p.lado, p.entrada, p.stop, p.objetivo);
   return out;
 }
 
@@ -122,6 +128,8 @@ export type SenalPapel = {
   clave: string;
   /** Con quiénes coincidió en esa moneda y vela. No filtra nada: se guarda para estudiarlo después. */
   consenso?: { acuerdo: number; contra: number; con: string[] };
+  /** La foto del mapa al entrar; tampoco filtra nada. */
+  mapa?: FotoMapa;
   estrategia: string;
   symbol: string;
   lado: Lado;
@@ -183,5 +191,6 @@ export function validarSenalPapel(raw: unknown, ahora: number): SenalPapel | nul
         con: (Array.isArray(c.con) ? c.con : []).filter((x): x is string => typeof x === "string" && (AGENTES_PAPEL as string[]).includes(x)).slice(0, 8),
       }
     : undefined;
-  return { clave: clavePapel(estrategia, symbol, lado, vela), consenso, estrategia, symbol, lado, vela, detectada, entrada, stop, objetivo, tp1: e.tp1, tp2: e.tp2, tp3: e.tp3 };
+  const mapa = validarFotoMapa(o.mapa) ?? undefined;
+  return { clave: clavePapel(estrategia, symbol, lado, vela), consenso, mapa, estrategia, symbol, lado, vela, detectada, entrada, stop, objetivo, tp1: e.tp1, tp2: e.tp2, tp3: e.tp3 };
 }

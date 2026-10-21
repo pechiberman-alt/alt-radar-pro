@@ -1,8 +1,9 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
-import { PUSH_SCHEMA } from "@/lib/web-push";
+import { endpointPushValido, PUSH_SCHEMA } from "@/lib/web-push";
 
 export const dynamic = "force-dynamic";
+
 
 /**
  * Stores a browser's push subscription.
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   // A subscription missing any part cannot receive anything, so storing it
   // would only produce failed sends later.
-  if (!endpoint || !p256dh || !auth || !endpoint.startsWith("https://")) {
+  if (!endpoint || !p256dh || !auth || !endpointPushValido(endpoint) || p256dh.length > 200 || auth.length > 100) {
     return NextResponse.json({ error: "SUSCRIPCIÓN NO VÁLIDA" }, { status: 400 });
   }
 

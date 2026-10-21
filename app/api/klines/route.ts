@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cached, offerCached } from "@/lib/upstream-cache";
+import { revisarSerie } from "@/lib/aporte-velas";
+import { corroborado } from "@/lib/corroborar";
 
 /** How long a client-supplied series is treated as fresh enough to keep. */
 const CONTRIBUTION_TTL_MS = 45_000;
@@ -66,6 +68,15 @@ export async function POST(request: NextRequest) {
 
   if (!isKlineSeries(rows)) {
     return NextResponse.json({ error: "SERIE NO VÁLIDA" }, { status: 400 });
+  }
+  // Lo que se guarda acá lo ven otros visitantes: la serie tiene que ser coherente y su último cierre coincidir con Kraken o
+  // Coinbase (lib/corroborar.ts). Sin referencia (un par que no está afuera) se acepta solo si es coherente.
+  const revision = revisarSerie(rows, interval, Date.now());
+  if (!revision.ok) {
+    return NextResponse.json({ error: `SERIE NO VÁLIDA: ${revision.motivo}` }, { status: 400 });
+  }
+  if ((await corroborado(symbol, revision.ultimoCierre).catch(() => null)) === false) {
+    return NextResponse.json({ error: "SERIE NO CORROBORADA" }, { status: 409 });
   }
 
   const limit = rows.length;

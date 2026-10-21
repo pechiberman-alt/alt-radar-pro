@@ -56,7 +56,10 @@ function fromBase64(value: string) {
 }
 
 async function getEncryptionKey(db: D1Database, env: { ENCRYPTION_KEY?: string }) {
-  const keyB64 = await resolveEncryptionKey(db, env);
+  return importAesKey(await resolveEncryptionKey(db, env));
+}
+
+async function importAesKey(keyB64: string) {
   const keyBytes = fromBase64(keyB64);
   return crypto.subtle.importKey("raw", keyBytes as BufferSource, "AES-GCM", false, [
     "encrypt",
@@ -79,12 +82,18 @@ export async function encryptSecret(plain: string, db: D1Database, env: { ENCRYP
 }
 
 export async function decryptSecret(encrypted: string, db: D1Database, env: { ENCRYPTION_KEY?: string }) {
-  const key = await getEncryptionKey(db, env);
   const combined = fromBase64(encrypted);
   const iv = combined.slice(0, 12);
   const data = combined.slice(12);
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, data as BufferSource);
-  return new TextDecoder().decode(plain);
+  const abrir = async (key: CryptoKey) => new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, data as BufferSource));
+  try {
+    return await abrir(await getEncryptionKey(db, env));
+  } catch (error) {
+    // Lo guardado antes de poner ENCRYPTION_KEY quedó cifrado con la clave local: se sigue pudiendo leer, así que agregar la
+    // clave fuerte no obliga a nadie a volver a vincular su cuenta (la próxima vinculación ya se cifra con la fuerte).
+    if (!env.ENCRYPTION_KEY) throw error;
+    return abrir(await importAesKey(await resolveEncryptionKey(db, {})));
+  }
 }
 
 export async function hmacSha256Hex(message: string, secret: string) {

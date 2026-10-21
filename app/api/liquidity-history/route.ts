@@ -3,6 +3,8 @@ import {
   readLiquidityHistory,
   storeLiquiditySnapshot,
 } from "@/lib/liquidity-history";
+import { corroborado } from "@/lib/corroborar";
+import { sharedJson } from "@/lib/shared-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +12,11 @@ function marketFrom(url: string) {
   const search = new URL(url).searchParams;
   const symbol = (search.get("symbol") ?? "").toUpperCase().replaceAll("/", "");
   const venue = search.get("venue") === "futures" ? "futures" : "spot";
-  const hours = Number(search.get("hours") ?? 24);
+  const pedido = Number(search.get("hours") ?? 24);
   if (!/^[A-Z0-9]{2,24}USDT$/.test(symbol)) return null;
-  return { symbol, venue, hours: Number.isFinite(hours) ? hours : 24 } as const;
+  // Pocas ventanas posibles: cada pedido distinto sería otra lectura de hasta 1.440 filas.
+  const hours = [1, 4, 12, 24].find((h) => h >= (Number.isFinite(pedido) ? pedido : 24)) ?? 24;
+  return { symbol, venue, hours } as const;
 }
 
 export async function GET(request: Request) {
@@ -20,11 +24,10 @@ export async function GET(request: Request) {
     if (!env.DB) throw new Error("D1_UNAVAILABLE");
     const market = marketFrom(request.url);
     if (!market) return Response.json({ error: "MERCADO INVÁLIDO" }, { status: 400 });
-    const snapshots = await readLiquidityHistory(
-      env.DB,
-      market.symbol,
-      market.venue,
-      market.hours,
+    // La misma lectura para todos durante un minuto: sin esto, cada pedido leía hasta 1.440 filas de D1.
+    const db = env.DB;
+    const snapshots = await sharedJson(`liq-hist-v1:${market.symbol}:${market.venue}:${market.hours}`, 60, () =>
+      readLiquidityHistory(db, market.symbol, market.venue, market.hours),
     );
     const first = snapshots[0]?.capturedAt ?? null;
     const last = snapshots.at(-1)?.capturedAt ?? null;
@@ -70,6 +73,13 @@ export async function POST(request: Request) {
       bids?: unknown;
       asks?: unknown;
     };
+    // Lo que se guarda acá lo leen todos: el precio medio tiene que coincidir con Kraken o Coinbase (lib/corroborar.ts). Sin
+    // referencia no se guarda: así nadie puede llenar la base con pares inventados.
+    const mid = Number(input.mid);
+    const par = typeof input.symbol === "string" ? input.symbol.toUpperCase() : "";
+    if ((await corroborado(par, mid).catch(() => null)) !== true) {
+      return Response.json({ stored: false, reason: "NO CORROBORADO" }, { status: 200, headers: { "Cache-Control": "no-store" } });
+    }
     const result = await storeLiquiditySnapshot(env.DB, {
       symbol: typeof input.symbol === "string" ? input.symbol.toUpperCase() : "",
       venue: input.venue === "futures" ? "futures" : "spot",
