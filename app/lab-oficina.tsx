@@ -1,18 +1,19 @@
 "use client";
 
 /**
- * La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en tres mesas (tendencia, reversión y
- * estructura), con pizarras en la pared (posiciones abiertas y reunión de la semana) y una sala de reuniones. Los agentes
+ * La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en mesas (tendencia, reversión,
+ * estructura, flujo de órdenes y metales), con pizarras en la pared (posiciones abiertas y reunión de la semana) y una sala de reuniones. Los agentes
  * «hablan»: cada globo es una frase armada con un dato (lib/oficina.ts, charla), nunca inventada. Aprenden entre ellos por el
  * consenso, que informa y no filtra; las propuestas son para la persona. Los números salen del registro unificado por agente y
  * se leen una vez al abrir. La escena es CSS 3D; el movimiento es decorativo y se apaga con «reducir movimiento». Solo papel.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { forAi } from "../lib/ai-numbers.ts";
-import { ESTRATEGIAS } from "../lib/estrategias.ts";
+import { ESTRATEGIAS, operaEn } from "../lib/estrategias.ts";
+import { conocimientoDe, conocimientoParaIa, respuestaConcepto } from "../lib/agentes-conocimiento.ts";
 import { armarOficina, charla, MESAS, nombreActivo, oficinaParaIa, propuestas, tituloSemana, usdTxt, type Escritorio, type FilaOficina, type Frase, type MesaId, type Oficina } from "../lib/oficina.ts";
 import { diaAr, diarioParaIa, leerDiario, resumenDia, ultimosDiarios, type Diario } from "../lib/aprendizaje-diario.ts";
-import { PLAN_SERVIDOR } from "../lib/agentes-servidor.ts";
+import { MONEDAS_SERVIDOR, PLAN_SERVIDOR } from "../lib/agentes-servidor.ts";
 import { openInMap } from "../lib/account-events.ts";
 import { lecturaMapa, lecturaParaIa, lecturasMapa, onLecturaMapa, type LecturaMapa } from "../lib/mapa-memoria.ts";
 import MiniArana from "./lab-mini-arana";
@@ -35,6 +36,11 @@ const r2 = (v: number | null) => {
 const n2 = (v: number | null) => (v === null ? "—" : v.toFixed(2).replace(".", ","));
 const tono = (e: Escritorio) => (e.semana.cerradas === 0 ? "quieto" : e.semana.neto > 0 ? "gana" : e.semana.neto < 0 ? "pierde" : "quieto");
 const nombreCorto = (agente: string) => agente.replace(/^Agente\s+/, "");
+/** Los pares que mira un agente en el servidor 24/7 (los metales, solo el oro como PAXG). */
+const universoDe = (id: string) => {
+  const e = ESTRATEGIAS.find((x) => x.id === id);
+  return MONEDAS_SERVIDOR.filter((s) => (e ? operaEn(e, s) : s !== "PAXGUSDT"));
+};
 /** El monitor: verde si solo tiene largos, rojo si solo cortos, ámbar si tiene de los dos, apagado si nada. */
 const pantalla = (e: Escritorio) => {
   const l = e.abiertas.some((a) => a.lado === "LONG");
@@ -43,6 +49,44 @@ const pantalla = (e: Escritorio) => {
 };
 
 type Puesto = { e: Escritorio; x: number; y: number };
+
+/**
+ * Encuadra la escena: mide lo que tiene que verse entero (el piso, la pared con las pizarras, la sala de reuniones y JARVIS) y
+ * ajusta la escala (--fit) y la altura (--sube) del piso para que entre debajo del subtítulo, con margen. Dos vueltas, porque
+ * la perspectiva no es lineal. Sin transición mientras mide, para leer la posición final y no una intermedia.
+ */
+function encuadrarEscena(escena: HTMLElement) {
+  const piso = escena.querySelector<HTMLElement>(".of-piso");
+  if (!piso) return;
+  const transicion = piso.style.transition;
+  piso.style.transition = "none";
+  let fit = 1;
+  let sube = 0;
+  escena.style.setProperty("--fit", "1");
+  escena.style.setProperty("--sube", "0px");
+  for (let vuelta = 0; vuelta < 3; vuelta += 1) {
+    const s = escena.getBoundingClientRect();
+    const cajas = [...escena.querySelectorAll<HTMLElement>(".of-piso, .of-pared-fondo, .of-sala, .of-jarvis")].map((el) => el.getBoundingClientRect()).filter((c) => c.width > 0 && c.height > 0);
+    if (!cajas.length || !(s.height > 0)) break;
+    const sub = escena.querySelector<HTMLElement>(".of-subtitulo")?.getBoundingClientRect();
+    const arriba = (sub && sub.height > 0 ? sub.bottom : s.top) + 6;
+    const abajo = s.bottom - 8;
+    const top = Math.min(...cajas.map((c) => c.top));
+    const bottom = Math.max(...cajas.map((c) => c.bottom));
+    const left = Math.min(...cajas.map((c) => c.left));
+    const right = Math.max(...cajas.map((c) => c.right));
+    const k = Math.min((abajo - arriba) / Math.max(1, bottom - top), (s.width - 16) / Math.max(1, right - left));
+    fit = Math.max(0.3, Math.min(1.35, fit * (vuelta === 0 ? k : Math.min(1.08, Math.max(0.92, k)))));
+    escena.style.setProperty("--fit", fit.toFixed(4));
+    const t = escena.getBoundingClientRect();
+    const despues = [...escena.querySelectorAll<HTMLElement>(".of-piso, .of-pared-fondo, .of-sala, .of-jarvis")].map((el) => el.getBoundingClientRect()).filter((c) => c.width > 0 && c.height > 0);
+    const centro = (Math.min(...despues.map((c) => c.top)) + Math.max(...despues.map((c) => c.bottom))) / 2;
+    sube += (arriba + abajo) / 2 - centro + (t.top - s.top);
+    escena.style.setProperty("--sube", `${Math.round(sube)}px`);
+  }
+  void piso.offsetWidth;
+  piso.style.transition = transicion;
+}
 
 const precioCorto = (v: number) => v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : v >= 1 ? 2 : 5 });
 /** La pantalla del mapa en la pared: lo último que leyó el mapa de liquidaciones en este navegador. */
@@ -238,14 +282,19 @@ export default function LabOficina() {
     anotar({ de: "vos", texto });
     setPregunta("");
     setPensando(true);
-    const local = (por: string) => anotar({ de: "agente", texto: quien.local.length ? quien.local.join(" ") : "Todavía no tengo datos para contarte.", cerebro: `motor local (${por})` });
+    // Sin IA: si pregunta por un concepto, el conocimiento revisado; si no, lo que ya dice de sí mismo.
+    const concepto = respuestaConcepto(texto);
+    const local = (por: string) =>
+      anotar({ de: "agente", texto: concepto ?? (quien.local.length ? quien.local.join(" ") : "Todavía no tengo datos para contarte."), cerebro: `motor local (${por})` });
+    // Si nombra un par que el mapa leyó hace poco, esa lectura va con la pregunta.
+    const nombrados = lecturasMapa().filter((l) => new RegExp(`\\b${l.symbol.replace(/USDT$/, "")}\\b`, "i").test(texto) || (l.symbol === "PAXGUSDT" && /\boro\b/i.test(texto)));
     try {
       const r = await fetch("/api/analyst/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: `${quien.instruccion} Respondé en primera persona, corto y en español rioplatense, solo con los datos del resumen. Si un dato no está, decilo. No cambiás reglas, no das órdenes y no es asesoramiento financiero. Pregunta: ${texto}`,
-          snapshot: { asistente: quien.nombre, datos: quien.datos },
+          snapshot: { asistente: quien.nombre, datos: quien.datos, ...(nombrados.length ? { mapaDeLoQuePreguntas: nombrados.slice(0, 2).map(lecturaParaIa) } : {}) },
           history: (chat[quien.id] ?? []).slice(-6).map((l) => ({ role: l.de === "vos" ? "user" : "assistant", content: l.texto })),
         }),
       });
@@ -265,7 +314,7 @@ export default function LabOficina() {
   const personaAgente = (e: Escritorio) => ({
     id: e.id,
     nombre: e.agente,
-    instruccion: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo. «mapa» es lo que leyó el mapa de liquidaciones en este navegador para los pares donde tenés posición (zonas de compra y de venta, imanes): usalo si te preguntan por el mapa; si no está, decí que abran el mapa en ese par.`,
+    instruccion: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo. «mapa» es lo que leyó el mapa de liquidaciones en este navegador para los pares donde tenés posición (zonas de compra y de venta, imanes y lo que vio la mesa de flujo); «mapaDeLoQuePreguntas», el del par que nombra la pregunta. Usalos si te preguntan por un activo; si no están, decí que abran el mapa en ese par. «conocimiento» es la teoría profesional de lo que mirás: explicala con tus palabras y con su cuidado, sin prometer resultados.`,
     // Sin IA contesta con lo que ya dice; si todavía no dijo nada, con cómo se ve (siempre tiene algo honesto para contar).
     local: ((propias) => (propias.length ? propias : [e.conciencia]))(frases.filter((f) => f.quien === e.id).map((f) => f.texto)),
     datos: forAi({
@@ -282,6 +331,8 @@ export default function LabOficina() {
       comoSeVe: e.conciencia,
       lecciones: e.lecciones.map((l) => l.texto),
       mapa: [...new Set(e.abiertas.map((a) => a.symbol))].map((sym) => lecturaMapa(sym)).filter((l): l is LecturaMapa => l !== null).map(lecturaParaIa),
+      conocimiento: conocimientoParaIa(conocimientoDe(e.id, e.mesa)),
+      mapasLeidosEnEsteNavegador: lecturas.map((l) => nombreActivo(l.symbol)),
       diarioDeLaOficina: diarioParaIa(diaSel),
     }),
   });
@@ -319,6 +370,19 @@ export default function LabOficina() {
   );
 
   const { puestos, filas, bloques } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
+  // El encuadre se mide en la pantalla (la perspectiva y el giro cambian lo que ocupa el piso): al dibujar, al girar y al
+  // cambiar el tamaño. Escribe dos variables CSS en la escena; no hay estado de React que vuelva a dibujar.
+  const escenaRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const escena = escenaRef.current;
+    if (!escena) return;
+    const encuadrar = () => encuadrarEscena(escena);
+    encuadrar();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(encuadrar);
+    ro.observe(escena);
+    return () => ro.disconnect();
+  }, [filas, giro, estado]);
   const frases = charla(oficina);
   const propias = propuestas(oficina);
   // Lo que se oye en la oficina: lo que dice cada uno y lo que se dicen entre ellos.
@@ -373,8 +437,8 @@ export default function LabOficina() {
         {oficina.incompleta && <p className="of-tenue">Se leyeron las últimas 1.000 entradas: lo más viejo no entra.</p>}
       </header>
 
-      {/* Con más mesas el piso es más largo: se achica para que la sala de reuniones (y JARVIS) siga entrando en la escena. */}
-      <div className="of-escena" style={{ ["--giro" as string]: `${giro}deg`, ["--filas" as string]: filas, ["--esc" as string]: Math.min(1, ESCENA_FILAS / filas) }}>
+      {/* Con más mesas el piso es más largo: se encuadra (encuadrarEscena) para que la pared, la sala y JARVIS entren siempre. */}
+      <div ref={escenaRef} className="of-escena" style={{ ["--giro" as string]: `${giro}deg`, ["--filas" as string]: filas, ["--esc" as string]: Math.min(1, ESCENA_FILAS / filas) }}>
         <div className="of-piso">
           <span className="of-luz" style={{ ["--y" as string]: 3 }} aria-hidden="true" />
           <span className="of-luz" style={{ ["--y" as string]: filas - 5 }} aria-hidden="true" />
@@ -477,7 +541,28 @@ export default function LabOficina() {
               ))}
             </div>
           )}
+          <div className="of-mirar">
+            <span>Mirar en el mapa</span>
+            {universoDe(elegidoE.id).map((sym) => (
+              <button key={sym} type="button" onClick={() => openInMap(sym, "4h")} title={`Abrir ${nombreActivo(sym)} en el mapa de liquidaciones, con las posiciones de los agentes y la mesa de flujo`}>
+                {nombreActivo(sym)}
+                {lecturas.some((l) => l.symbol === sym) ? <i aria-label="leído hace poco"> ●</i> : null}
+              </button>
+            ))}
+          </div>
           {frases.filter((f) => f.quien === elegidoE.id).map((f) => <p key={f.texto} className="of-dice">«{f.texto}»</p>)}
+          <h5 className="of-ficha-sub">Lo que sabe (conocimiento profesional)</h5>
+          <div className="of-saber">
+            {conocimientoDe(elegidoE.id, elegidoE.mesa).map((k) => (
+              <details key={k.id}>
+                <summary>
+                  <b>{k.title}</b> {k.summary}
+                </summary>
+                <p>{k.detail}</p>
+                {k.caveat && <p className="of-cuidado">Cuidado: {k.caveat}</p>}
+              </details>
+            ))}
+          </div>
           <h5 className="of-ficha-sub">Cómo se ve</h5>
           <p className="of-dice">«{elegidoE.conciencia}»</p>
           <h5 className="of-ficha-sub">Lo que aprendió</h5>

@@ -7,6 +7,8 @@
 import { forAi } from "./ai-numbers.ts";
 
 export type ZonaLeida = { low: number; high: number; stars: number; kinds: string[] };
+/** Un disparo de la mesa de flujo en el gráfico (lib/flujo-lectura.ts): lectura, no operación. */
+export type FlujoLeido = { codigo: string; regla: string; lado: "LONG" | "SHORT"; hace: string; cierre: number };
 export type LecturaMapa = {
   symbol: string;
   timeframe: string;
@@ -17,6 +19,10 @@ export type LecturaMapa = {
   imanArriba: number | null;
   imanAbajo: number | null;
   sesgo: string | null;
+  /** Lo que vio la mesa de flujo en las velas cerradas del gráfico (los más nuevos primero); sin el dato, no está. */
+  flujo?: FlujoLeido[];
+  /** Si las velas no traían el volumen agresor: las reglas de delta no pudieron leer (no es cero). */
+  flujoSinDelta?: boolean;
 };
 
 export const VIDA_LECTURA_MS = 30 * 60_000;
@@ -85,5 +91,14 @@ export function lecturaParaIa(l: LecturaMapa): unknown {
     imanArriba: l.imanArriba,
     imanAbajo: l.imanAbajo,
     sesgo: l.sesgo,
+    ...(l.flujo
+      ? {
+          mesaDeFlujo: {
+            nota: "Lectura de las reglas de los agentes de flujo sobre las velas cerradas del gráfico, no una operación.",
+            disparos: l.flujo.map((f) => ({ regla: f.regla, lado: f.lado === "LONG" ? "compra" : "venta", cuando: f.hace, cierre: f.cierre })),
+            ...(l.flujoSinDelta ? { delta: "las velas no traen el volumen agresor: las reglas de delta no pudieron leer" } : {}),
+          },
+        }
+      : {}),
   });
 }

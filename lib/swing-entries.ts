@@ -15,6 +15,8 @@ export type SwingCandle = {
   close: number;
   volume: number;
   quoteVolume: number;
+  /** Volumen comprado por agresores (taker buy, campo 9 de la vela de Binance). Sin dato (Kraken, el estudio), no está. */
+  takerBuy?: number;
 };
 
 export type SwingPoint = { index: number; price: number; time: number };
@@ -56,6 +58,8 @@ export function parseSwingKlines(rows: unknown): SwingCandle[] {
       close: Number(row[4]),
       volume: Number(row[5]),
       quoteVolume: Number(row[7]),
+      // El volumen agresor comprador, para los agentes de flujo de órdenes (lib/flujo-agentes.ts). Sin dato, no se inventa.
+      ...(row.length >= 10 && Number.isFinite(Number(row[9])) ? { takerBuy: Number(row[9]) } : {}),
     }))
     .filter(
       (candle) =>

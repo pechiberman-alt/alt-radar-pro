@@ -64,7 +64,12 @@ export const DIAS_POSICIONES = 21;
 
 const NOMBRES = new Map(plantel(true).map((p) => [p.id, p.agente.replace(/^Agente\s+/, "")] as const));
 /** Un código corto para el marcador del gráfico: la primera parte del id del agente. */
-export const codigoAgente = (id: string) => (id === ID_ST ? "ST+" : id.split("_")[0].slice(0, 4));
+/** Códigos cortos que no se repiten entre agentes de la misma familia (el resto: la primera palabra del id, hasta 4 letras). */
+const CODIGOS: Record<string, string> = {
+  [ID_ST]: "ST+", ST_VWAP: "STVW", ST_PERFIL: "STPF", ST_VWAP_PERFIL: "STVP", ST_MTF: "STMT", ST_MTF_VOL: "STMV",
+  SNR_HTF: "SNRH", MACD_MTF_SNR: "MMS", SMC_TODO: "SMCT", METALES_D55: "D55", BARRIDA_VOL: "BARV", DELTA_DIV: "ΔDIV", DELTA_ABSORBIDO: "ΔABS",
+};
+export const codigoAgente = (id: string) => CODIGOS[id] ?? id.split("_")[0].slice(0, 4);
 const finito = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
 /** Una fila de la base como posición; null si la clave no es de un agente conocido o los precios no tienen forma de plan. */

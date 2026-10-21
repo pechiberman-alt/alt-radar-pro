@@ -225,6 +225,94 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
       "Un barrido también puede ser una parada de stops: se toma la liquidez y el precio vuelve. Por sí solo no confirma continuación.",
   },
   {
+    id: "agresor-pasivo",
+    title: "Agresor y pasivo (taker y maker)",
+    aliases: ["agresor", "agresiva", "agresivo", "pasivo", "pasiva", "taker", "maker", "orden a mercado", "orden limite"],
+    summary:
+      "El agresor cruza el spread con una orden a mercado; el pasivo espera en el libro con una orden límite. Cada operación tiene uno de cada lado.",
+    detail:
+      "El precio se mueve cuando los agresores de un lado consumen las órdenes pasivas del otro. Por eso el flujo se lee en pares: cuánto agredió cada lado y si el libro cedió o aguantó. Las órdenes grandes suelen entrar pasivas, para no mover el precio en su contra.",
+    caveat:
+      "Que haya más compra agresiva no garantiza suba: si del otro lado hay órdenes pasivas grandes, absorben esa compra y el precio no avanza.",
+  },
+  {
+    id: "delta-vela",
+    title: "Delta de vela",
+    aliases: ["delta", "delta de vela", "delta por vela", "volumen agresor", "taker buy"],
+    summary:
+      "Compra agresiva menos venta agresiva dentro de una vela. Binance lo da en cada vela (volumen comprador tomador).",
+    detail:
+      "Un delta muy positivo con la vela cerrando abajo es agresión compradora absorbida; un delta muy negativo con la vela cerrando arriba, venta absorbida. Sumado vela a vela da el CVD. La mesa de flujo de la oficina usa este dato en dos agentes (divergencia de delta y delta absorbido).",
+    caveat:
+      "Kraken, Coinbase y el historial de estudio no traen ese dato: sin él, el delta es desconocido, no cero. Por eso esos dos agentes no operan en el servidor y se miden solo hacia adelante.",
+  },
+  {
+    id: "divergencia-delta",
+    title: "Divergencia de delta",
+    aliases: ["divergencia de delta", "divergencia delta", "divergencia de cvd", "divergencia cvd", "delta divergence"],
+    summary:
+      "El precio hace un extremo nuevo pero el delta acumulado no lo acompaña: la agresión que empujaba se está agotando.",
+    detail:
+      "En un mínimo nuevo con el CVD más alto que en el mínimo anterior, los vendedores agresivos ya no empujan como antes. Se lee junto con la estructura: una divergencia contra un nivel fuerte o contra un imán de liquidez barrido pesa más que una en el medio del rango.",
+    caveat:
+      "Una divergencia puede durar varias velas antes de girar, o no girar nunca. Es una condición, no un gatillo: el agente la exige con un cierre a favor y un stop fijo.",
+  },
+  {
+    id: "esfuerzo-resultado",
+    title: "Esfuerzo contra resultado (Wyckoff)",
+    aliases: ["esfuerzo", "esfuerzo sin resultado", "esfuerzo resultado", "effort vs result", "esfuerzo y resultado"],
+    summary:
+      "El volumen es el esfuerzo y el recorrido del precio es el resultado. Mucho esfuerzo con poco resultado avisa que alguien frena el movimiento.",
+    detail:
+      "Después de un tramo fuerte, una vela con volumen muy alto y rango chico que cierra en contra muestra que el empuje ya no rinde: del otro lado hay órdenes que lo absorben. Es una de las leyes de Wyckoff y la regla del agente Esfuerzo sin resultado.",
+    caveat:
+      "En una noticia o una apertura de mercado el volumen sube sin que nadie esté absorbiendo. El contexto importa: el volumen alto solo no es la señal.",
+  },
+  {
+    id: "caza-stops",
+    title: "Caza de stops (barrida de liquidez)",
+    aliases: ["caza de stops", "stop hunt", "barrida de stops", "barrida de liquidez", "liquidez de stops", "barrida"],
+    summary:
+      "El precio pasa un mínimo o máximo obvio donde se juntan los stops, los ejecuta y vuelve adentro.",
+    detail:
+      "Los stops de los largos quedan debajo de los mínimos y los de los cortos encima de los máximos. Ejecutarlos da liquidez para llenar órdenes grandes del lado contrario. Si la vela que barre cierra de vuelta adentro y con volumen, el que barrió ya tomó lo que buscaba. En el mapa, esos extremos son los charcos de liquidez y los imanes.",
+    caveat:
+      "Si el precio barre y se queda afuera, no fue una caza: fue una ruptura. Por eso el agente exige el cierre adentro, y aun así puede fallar.",
+  },
+  {
+    id: "volumen-relativo",
+    title: "Volumen relativo",
+    aliases: ["volumen relativo", "rvol", "volumen alto", "volumen anormal"],
+    summary:
+      "El volumen de la vela dividido por el promedio de las anteriores: 2 significa el doble de lo normal para ese activo.",
+    detail:
+      "Compara cada activo consigo mismo, así que sirve igual en BTC que en una moneda chica. Los agentes de flujo lo usan como umbral fijo: 2 veces para absorción, 2,5 para esfuerzo sin resultado, 1,5 para la barrida y 1,8 para el delta absorbido.",
+    caveat:
+      "En horarios de poca actividad el promedio baja y cualquier vela normal parece de volumen alto.",
+  },
+  {
+    id: "mapa-liquidez",
+    title: "Mapa de liquidez y liquidaciones",
+    aliases: ["mapa de liquidez", "mapa de liquidaciones", "mapa de calor", "heatmap", "liquidity heatmap", "iman", "imanes"],
+    summary:
+      "Dónde se juntan las liquidaciones estimadas y las órdenes del libro: zonas a las que el precio suele ir a buscar liquidez.",
+    detail:
+      "Las bandas más intensas marcan más liquidación estimada a ese precio. Un imán es la zona más cargada cerca del precio. Las zonas de compra y de venta del mapa salen de varios motivos que coinciden (niveles, order blocks, huecos, charcos de liquidez) y llevan estrellas por cuántos coinciden. Los agentes guardan una foto del mapa al entrar y la comparan con el mapa de ahora.",
+    caveat:
+      "El mapa de liquidaciones es un modelo con apalancamiento supuesto, no las posiciones reales. Que el precio vaya a un imán es una tendencia, no una regla.",
+  },
+  {
+    id: "vwap",
+    title: "VWAP",
+    aliases: ["vwap", "precio promedio ponderado", "promedio ponderado por volumen"],
+    summary:
+      "El precio promedio ponderado por volumen desde un ancla (acá, el lunes 00:00 UTC): el precio justo de la semana para quien operó.",
+    detail:
+      "Por encima del VWAP, el promedio de los que compraron esta semana gana; por debajo, pierde. Muchos institucionales lo usan como referencia de ejecución, así que suele actuar de soporte o resistencia.",
+    caveat:
+      "Recién empezada la semana el VWAP tiene pocas velas y se mueve mucho: pesa menos.",
+  },
+  {
     id: "squeeze",
     title: "Squeeze (short y long)",
     aliases: ["squeeze", "short squeeze", "long squeeze", "apretada"],
