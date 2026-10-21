@@ -19,6 +19,7 @@ bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
 e23fd9d98482	81	app/alert-toasts.tsx
+83f910c3b025	67	app/anuncio/page.tsx
 4cbabfe21eeb	92	app/api/admin/cobros/route.ts
 19408d68277e	167	app/api/admin/settings/route.ts
 45b256c81a5a	49	app/api/alerts/latest/route.ts
@@ -168,7 +169,7 @@ f87f234d88cd	47	app/portfolio-risk.css
 2937f70ab7ef	38	app/pressure-desk.css
 f6c0da2d5db5	170	app/pressure-desk.tsx
 ece7ccbad21e	206	app/puerta-pro.css
-b8484b88b976	642	app/puerta-pro.tsx
+212ccc853c8e	643	app/puerta-pro.tsx
 9f9d72a3dd57	87	app/pump-radar.css
 74db3d1c5d80	350	app/pump-radar.tsx
 f58412c957a0	53	app/pwa-register.tsx
@@ -203,7 +204,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-74c9ea2a1d69	346	docs/araña/objetivos.md
+68dffa466481	346	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -467,6 +468,9 @@ cd048d1dc164	111	lib/upstream-cache.ts
 89327ac52fc9	8	next.config.ts
 d0a9b2e42716	53	package.json
 8f8be689e9af	8	postcss.config.mjs
+676ebcb8018c	0	public/anuncio/altradar-anuncio.mp4
+21e553bba8a0	0	public/anuncio/portada.jpg
+af87e3de1f7b	0	public/anuncio/subtitulos.vtt
 81e071a890a7	0	public/favicon.svg
 43e2751ad2c3	0	public/file.svg
 bc7491d499a6	0	public/globe.svg
@@ -474,6 +478,8 @@ bc7491d499a6	0	public/globe.svg
 73c710a4743a	0	public/icon-512.png
 537e4d0fb48f	0	public/manifest.webmanifest
 fdf534d15afa	0	public/og.png
+b848ad709c5a	6	public/robots.txt
+e20d87aa6c72	0	public/sitemap.xml
 9500061babf1	24	public/sw.js
 aaa393c36db1	0	public/window.svg
 28ad537c49c6	1624	scripts/arana-vista.html

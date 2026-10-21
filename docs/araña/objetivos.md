@@ -225,7 +225,7 @@ Pendiente:
 
 ## cobro-pro — La terminal PRO: prueba de 7 días, pago por alias y activación manual
 Texto: quién usa la terminal, cómo se paga y cómo se activa; la presentación para visitantes y el muro de pago.
-Archivos: lib/suscripcion.ts, lib/suscripcion-db.ts, app/api/suscripcion/**, app/puerta-pro.tsx, app/puerta-pro.css, app/cobros-admin.tsx, tests/suscripcion.test.ts, tests/suscripcion-db.test.ts
+Archivos: lib/suscripcion.ts, lib/suscripcion-db.ts, app/api/suscripcion/**, app/puerta-pro.tsx, app/puerta-pro.css, app/anuncio/page.tsx, app/cobros-admin.tsx, tests/suscripcion.test.ts, tests/suscripcion-db.test.ts
 Reglas:
 - Todo es PRO, con prueba desde el primer uso (7 días por defecto, configurable). El administrador entra siempre.
 - Se paga por transferencia al alias (url.mp) y el administrador aprueba a mano, después de ver el comprobante. Ningún camino activa PRO solo: no agregar cobros automáticos sin pedido explícito.

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  <url>
+    <loc>https://alt-radar-pro.pechiberman.workers.dev/</loc>
+    <lastmod>2026-10-21</lastmod>
+  </url>
+  <url>
+    <loc>https://alt-radar-pro.pechiberman.workers.dev/anuncio</loc>
+    <lastmod>2026-10-21</lastmod>
+    <video:video>
+      <video:thumbnail_loc>https://alt-radar-pro.pechiberman.workers.dev/anuncio/portada.jpg</video:thumbnail_loc>
+      <video:title>ALT RADAR PRO: mirá cuántas veces perdió cada agente</video:title>
+      <video:description>Mapa de liquidez, 27 agentes operando en papel y el acierto y el profit factor de cada uno, con su muestra. Probala 7 días gratis.</video:description>
+      <video:content_loc>https://alt-radar-pro.pechiberman.workers.dev/anuncio/altradar-anuncio.mp4</video:content_loc>
+      <video:duration>24</video:duration>
+      <video:publication_date>2026-10-21T08:00:00+00:00</video:publication_date>
+    </video:video>
+  </url>
+</urlset>

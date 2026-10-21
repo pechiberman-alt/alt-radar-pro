@@ -77,6 +77,7 @@ export default function PuertaPro({ children }: { children: ReactNode }) {
           ALT RADAR <b>PRO</b>
         </h1>
         <p>ABRIENDO LA TERMINAL…</p>
+        <p>Terminal de inteligencia de mercado cripto: altseason, order flow, mapa de liquidez y señales auditables, con su muestra. Probala 7 días gratis. No es asesoramiento financiero.</p>
       </div>
     );
   // Sin poder leer el acceso, la terminal abre igual: la puerta de verdad está en el servidor y no se pierde nada.
