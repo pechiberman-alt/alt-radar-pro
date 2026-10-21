@@ -1,22 +1,21 @@
 "use client";
 
 /**
- * Las vistas de MERCADO AR que comparten el panel y el MAPA: el gráfico diario de un papel (velas, medias, soportes y
- * resistencias, perfil de volumen aproximado, RSI y MACD), las MENTES (lib/mentes-inversoras.ts) y los agentes del
+ * Las vistas de MERCADO AR que comparten el panel y el MAPA: el gráfico diario de un papel (app/grafico-ar-tv.tsx, estilo
+ * terminal), el análisis técnico y la zona de compra de Fibonacci, las MENTES (lib/mentes-inversoras.ts) y los agentes del
  * laboratorio (lib/mercado-ar-agentes.ts), y MapaAr, la vista completa de un papel que el MAPA muestra en lugar del mapa de
  * liquidaciones (que para acciones no existe y se dice). Todo con ruedas cerradas; no es asesoramiento financiero.
  */
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PAPELES_AR, TEXTO_SIN_FOOTPRINT, type PapelAr } from "@/lib/mercado-ar";
 import { AVISO_MENTES, type Consenso, type LecturaMente } from "@/lib/mentes-inversoras";
 import { EXCLUIDOS_AR, ESTUDIO_AR, type AgenteEnPapel } from "@/lib/mercado-ar-agentes";
 import { medir } from "@/lib/estrategias";
 import { MUESTRA_MINIMA } from "@/lib/registro";
-import { perfilAprox, TEXTO_SIN_LIQUIDACIONES } from "@/lib/mercado-ar-mapa";
-import { analisisAr, ZONA_COMPRA, type AnalisisAr } from "@/lib/mercado-ar-tecnico";
-import { lineAt } from "@/lib/trendlines";
-import { ema, macd, rsi } from "@/lib/oscillators";
+import { TEXTO_SIN_LIQUIDACIONES } from "@/lib/mercado-ar-mapa";
+import { analisisAr, type AnalisisAr } from "@/lib/mercado-ar-tecnico";
 import { cargarPanel, leerPapel, type LecturaPapel } from "@/lib/mercado-ar-cliente";
+import GraficoTv from "./grafico-ar-tv";
 import type { SwingCandle } from "@/lib/swing-entries";
 
 export const fmt = (x: number | null | undefined, d = 2) =>
@@ -26,131 +25,6 @@ const fecha = (t: number) => new Date(t).toLocaleDateString("es-AR", { day: "2-d
 const estrellas = (n: number) => "★".repeat(n);
 
 const CLASE_POSTURA: Record<string, string> = { "A FAVOR": "ok", "EN CONTRA": "mal", NEUTRAL: "alerta", "SIN DATOS": "", INFORMA: "" };
-
-// ── Gráfico ──
-
-export function GraficoAr({ velas, cantidad, analisis }: { velas: SwingCandle[]; cantidad: number; analisis: AnalisisAr }) {
-  const clip = `ar-precio-${useId().replace(/:/g, "")}`;
-  const g = useMemo(() => {
-    if (velas.length < 2) return null;
-    const cierres = velas.map((c) => c.close);
-    const e50 = ema(cierres, 50);
-    const m200: (number | null)[] = cierres.map((_, k) => (k >= 199 ? cierres.slice(k - 199, k + 1).reduce((s, x) => s + x, 0) / 200 : null));
-    const r = rsi(cierres, 14);
-    const md = macd(cierres);
-    const desde = Math.max(0, velas.length - cantidad);
-    const v = velas.slice(desde);
-    const niv = analisis.niveles;
-    const fib = analisis.fib;
-    const perfil = perfilAprox(v);
-    const W = 360;
-    const ejeX = 50;
-    const anchoV = (W - ejeX) / v.length;
-    const H = 200;
-    const precios = [...niv.map((n) => n.price), ...(fib ? [fib.zona.bajo, fib.zona.alto] : [])];
-    const lo = Math.min(...v.map((c) => c.low));
-    const hi = Math.max(...v.map((c) => c.high));
-    const loV = Math.min(lo, ...precios.filter((p) => p >= lo - (hi - lo) * 0.25));
-    const hiV = Math.max(hi, ...precios.filter((p) => p <= hi + (hi - lo) * 0.25));
-    const y = (p: number) => 8 + (1 - (p - loV) / (hiV - loV || 1)) * (H - 16);
-    const x = (k: number) => k * anchoV + anchoV / 2;
-    const linea = (serie: (number | null)[]) =>
-      serie
-        .slice(desde)
-        .map((p, k) => (p === null ? null : `${x(k).toFixed(1)},${y(p).toFixed(1)}`))
-        .filter(Boolean)
-        .join(" ");
-    const maxVol = Math.max(...v.map((c) => c.volume), 1);
-    const maxPerfil = Math.max(...perfil.franjas.map((f) => f.volumen), 1);
-    const hist = md.hist.slice(desde);
-    const maxHist = Math.max(...hist.map((h) => Math.abs(h ?? 0)), 1e-9);
-    return { v, x, y, anchoV, W, H, ejeX, linea, e50, m200, r: r.slice(desde), md, hist, maxHist, desde, niv, fib, perfil, maxVol, maxPerfil, loV, hiV };
-  }, [velas, cantidad, analisis]);
-  if (!g) return <p className="ar-mute">Sin ruedas para dibujar.</p>;
-  const { v, x, y, anchoV, W, H, ejeX } = g;
-  const VOL = H + 4;
-  const RSI = VOL + 40;
-  const MACD = RSI + 50;
-  const total = MACD + 50;
-  const yRsi = (r: number) => RSI + 4 + (1 - r / 100) * 40;
-  const yMacd = (h: number) => MACD + 25 - (h / g.maxHist) * 20;
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => g.loV + (g.hiV - g.loV) * t);
-  return (
-    <svg className="ar-svg" viewBox={`0 0 ${W} ${total}`} role="img" aria-label="Gráfico diario del papel">
-      {g.perfil.franjas.map((f, k) => (
-        <rect key={`p${k}`} x={W - ejeX - (f.volumen / g.maxPerfil) * 60} y={y(f.hasta)} width={(f.volumen / g.maxPerfil) * 60} height={Math.max(1, y(f.desde) - y(f.hasta))} fill="#55d6be14" />
-      ))}
-      {ticks.map((p, k) => (
-        <g key={`t${k}`}>
-          <line x1={0} x2={W - ejeX} y1={y(p)} y2={y(p)} stroke="#17201c" />
-          <text x={W - ejeX + 3} y={y(p) + 3} fill="#718078" fontSize="8" fontFamily="monospace">{fmt(p)}</text>
-        </g>
-      ))}
-      {g.fib && (
-        <g>
-          <rect x={Math.max(0, x(velas.findIndex((c) => c.openTime === g.fib!.desde) - g.desde))} width={W - ejeX - Math.max(0, x(velas.findIndex((c) => c.openTime === g.fib!.desde) - g.desde))} y={y(g.fib.zona.alto)} height={Math.max(1, y(g.fib.zona.bajo) - y(g.fib.zona.alto))} fill="#39f29a1f" stroke="#39f29a66" strokeWidth="0.6" />
-          <text x={W - ejeX - 2} y={y(g.fib.zona.alto) + 8} fill="#39f29a" fontSize="7.5" fontFamily="monospace" textAnchor="end">ZONA DE COMPRA FIB {String(ZONA_COMPRA[0]).replace(".", ",")}–{String(ZONA_COMPRA[1]).replace(".", ",")}</text>
-          {[...g.fib.niveles, ...g.fib.extensiones].map((n) => (
-            <g key={`f${n.r}`}>
-              <line x1={0} x2={W - ejeX} y1={y(n.precio)} y2={y(n.precio)} stroke="#a78bfa" strokeWidth="0.5" strokeDasharray="1 2" />
-              <text x={W - ejeX - 2} y={y(n.precio) - 1.5} fill="#a78bfa" fontSize="6.5" fontFamily="monospace" textAnchor="end">{String(n.r).replace(".", ",")}</text>
-            </g>
-          ))}
-        </g>
-      )}
-      {analisis.fvg.map((f, k) => {
-        const i = f.index - g.desde;
-        if (i < 0) return null;
-        return <rect key={`g${k}`} x={x(i)} width={W - ejeX - x(i)} y={y(f.high)} height={Math.max(0.8, y(f.low) - y(f.high))} fill={f.side === "ALCISTA" ? "#55d6be14" : "#ff596414"} />;
-      })}
-      {g.niv.map((n, k) => (
-        <g key={`n${k}`}>
-          {/* Dos etiquetas casi en el mismo precio se pisan: la de menos estrellas no lleva texto. */}
-          <line x1={0} x2={W - ejeX} y1={y(n.price)} y2={y(n.price)} stroke={n.kind === "RESISTENCIA" ? "#ff5964" : "#39f29a"} strokeDasharray="4 3" strokeWidth={0.5 + n.stars * 0.25} />
-          <text x={2} y={y(n.price) - 2} fill={n.kind === "RESISTENCIA" ? "#ff5964" : "#39f29a"} fontSize="7.5" fontFamily="monospace" visibility={g.niv.some((o) => o !== n && Math.abs(y(o.price) - y(n.price)) < 9 && (o.stars > n.stars || (o.stars === n.stars && o.price > n.price))) ? "hidden" : "visible"}>
-            {n.kind === "RESISTENCIA" ? "R" : "S"} {fmt(n.price)} {estrellas(n.stars)} {n.sources.slice(0, 2).map((f) => f.kind).join(" + ")}
-          </text>
-        </g>
-      ))}
-      {g.perfil.poc !== null && <line x1={0} x2={W - ejeX} y1={y(g.perfil.poc)} y2={y(g.perfil.poc)} stroke="#f4b84a" strokeWidth="0.6" strokeDasharray="1 2" />}
-      {v.map((c, k) => {
-        const sube = c.close >= c.open;
-        const col = sube ? "#39f29a" : "#ff5964";
-        return (
-          <g key={c.openTime}>
-            <line x1={x(k)} x2={x(k)} y1={y(c.high)} y2={y(c.low)} stroke={col} strokeWidth="0.7" />
-            <rect x={x(k) - Math.max(0.6, anchoV * 0.35)} width={Math.max(1.2, anchoV * 0.7)} y={y(Math.max(c.open, c.close))} height={Math.max(0.8, Math.abs(y(c.open) - y(c.close)))} fill={col} />
-            <rect x={x(k) - Math.max(0.6, anchoV * 0.35)} width={Math.max(1.2, anchoV * 0.7)} y={VOL + 36 - (c.volume / g.maxVol) * 32} height={(c.volume / g.maxVol) * 32} fill={sube ? "#39f29a55" : "#ff596455"} />
-          </g>
-        );
-      })}
-      <defs>
-        <clipPath id={clip}>
-          <rect x={0} y={0} width={W - ejeX} height={H} />
-        </clipPath>
-      </defs>
-      <g clipPath={`url(#${clip})`}>
-        <polyline points={g.linea(g.e50)} fill="none" stroke="#55d6be" strokeWidth="1" />
-        <polyline points={g.linea(g.m200)} fill="none" stroke="#f4b84a" strokeWidth="1.1" />
-        {analisis.lineas.map((l, k) => {
-          const a = Math.max(l.a, g.desde);
-          const b = velas.length - 1;
-          return <line key={`l${k}`} x1={x(a - g.desde)} x2={x(b - g.desde)} y1={y(lineAt(l, a))} y2={y(lineAt(l, b))} stroke={l.side === "RESISTENCIA" ? "#ff8a8a" : "#7cf0bd"} strokeWidth="0.9" />;
-        })}
-      </g>
-      <text x={2} y={H - 2} fill="#55d6be" fontSize="8" fontFamily="monospace">EMA 50</text>
-      <text x={40} y={H - 2} fill="#f4b84a" fontSize="8" fontFamily="monospace">MEDIA 200</text>
-      <text x={2} y={VOL + 8} fill="#718078" fontSize="7.5" fontFamily="monospace">VOLUMEN</text>
-      <line x1={0} x2={W - ejeX} y1={yRsi(70)} y2={yRsi(70)} stroke="#673238" strokeDasharray="2 2" />
-      <line x1={0} x2={W - ejeX} y1={yRsi(30)} y2={yRsi(30)} stroke="#2c493b" strokeDasharray="2 2" />
-      <polyline points={g.r.map((r, k) => (r === null ? null : `${x(k).toFixed(1)},${yRsi(r).toFixed(1)}`)).filter(Boolean).join(" ")} fill="none" stroke="#a78bfa" strokeWidth="1" />
-      <text x={2} y={RSI + 8} fill="#718078" fontSize="7.5" fontFamily="monospace">RSI 14 · {fmt(g.r.at(-1) ?? null, 1)}</text>
-      {g.hist.map((h, k) => (h === null ? null : <rect key={`h${k}`} x={x(k) - anchoV * 0.35} width={Math.max(1, anchoV * 0.7)} y={Math.min(yMacd(h), MACD + 25)} height={Math.abs(yMacd(h) - (MACD + 25))} fill={h >= 0 ? "#39f29a88" : "#ff596488"} />))}
-      <text x={2} y={MACD + 8} fill="#718078" fontSize="7.5" fontFamily="monospace">MACD 12·26·9</text>
-      <text x={2} y={total - 2} fill="#4f5e56" fontSize="7" fontFamily="monospace">{fecha(v[0].openTime)} → {fecha(v.at(-1)!.openTime)} · perfil de volumen aproximado (por rueda)</text>
-    </svg>
-  );
-}
 
 // ── Análisis técnico ──
 
@@ -428,7 +302,7 @@ export function MapaAr({ papel, onSalir }: { papel: PapelAr; onSalir: () => void
                   </button>
                 ))}
               </div>
-              <GraficoAr velas={velas} cantidad={cantidad} analisis={analisis} />
+              <GraficoTv velas={velas} cantidad={cantidad} analisis={analisis} ticker={papel.ticker} />
               <p className="ar-mute" style={{ fontSize: 10 }}>{TEXTO_SIN_FOOTPRINT}</p>
             </>
           )}
