@@ -23,6 +23,10 @@ import { openInMap } from "../lib/account-events.ts";
 import { lecturaMapa, lecturaParaIa, lecturasMapa, onLecturaMapa, type LecturaMapa } from "../lib/mapa-memoria.ts";
 import MiniArana from "./lab-mini-arana";
 import SalaMentes from "./sala-mentes";
+import { panelCompleto, type LecturaPapel } from "../lib/mercado-ar-cliente.ts";
+import { guionReunion } from "../lib/mercado-ar-ranking.ts";
+import { agendaReuniones, enLaSala, lineaDeTiempo, SILLAS, silla, type Momento } from "../lib/oficina-reuniones.ts";
+import type { MenteId } from "../lib/mentes-inversoras.ts";
 
 type Plan = "SERVIDOR" | "CUENTA";
 type EstadoMoneda = { symbol: string; at: number; venue: string | null; registradas: number; avanzadas: number; error: string | null };
@@ -66,7 +70,20 @@ const pantalla = (e: Escritorio) => {
 };
 
 type Puesto = { e: Escritorio; x: number; y: number };
-type Pod = { mesa: MesaId; x: number; y: number; ancho: number; alto: number };
+type Pod = { mesa: MesaId | "MENTES"; x: number; y: number; ancho: number; alto: number };
+/** Las MENTES (lib/mentes-inversoras.ts) también trabajan en la oficina, en su propia mesa. */
+const MENTES_OFICINA: { id: MenteId; nombre: string }[] = [
+  { id: "BUFFETT", nombre: "Buffett" },
+  { id: "GRAHAM", nombre: "Graham" },
+  { id: "LYNCH", nombre: "Lynch" },
+  { id: "MUSK", nombre: "Musk" },
+  { id: "PTJ", nombre: "Tudor Jones" },
+  { id: "DARVAS", nombre: "Darvas" },
+  { id: "ONEIL", nombre: "O'Neil" },
+  { id: "TEMPLETON", nombre: "Templeton" },
+  { id: "DALIO", nombre: "Dalio" },
+];
+const COLOR_MENTES = "244,114,182";
 
 /** Lo que muestran los dos monitores: el acierto y el PF en papel; sin cierres, los de su historial (H); sin nada, una raya. */
 function monitores(e: Escritorio): { tipo: "papel" | "hist" | "nada"; acierto: string; pf: string } {
@@ -289,26 +306,32 @@ const fechaDia = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
  * Ubica las mesas de cristal en columnas (la más grande primero, en la columna más corta) y a cada agente en su escritorio. La
  * sala de reuniones va al frente de la columna que queda más corta. Las medidas van en unidades del piso.
  */
-function ubicar(escritorios: Escritorio[]): { puestos: Puesto[]; pods: Pod[]; ancho: number; largo: number; sala: { x: number; y: number; ancho: number; alto: number } } {
+function ubicar(escritorios: Escritorio[]): { puestos: Puesto[]; pods: Pod[]; mentes: { id: MenteId; nombre: string; x: number; y: number }[]; ancho: number; largo: number; sala: { x: number; y: number; ancho: number; alto: number } } {
   const puestos: Puesto[] = [];
   const pods: Pod[] = [];
+  const mentes: { id: MenteId; nombre: string; x: number; y: number }[] = [];
   const alturas = Array.from({ length: COLUMNAS }, () => 1.3);
-  const grupos = MESAS.map((m) => ({ mesa: m.id, suyos: escritorios.filter((e) => e.mesa === m.id) })).filter((g) => g.suyos.length);
-  for (const g of [...grupos].sort((x, y) => y.suyos.length - x.suyos.length)) {
+  const grupos: { mesa: MesaId | "MENTES"; n: number; suyos: Escritorio[] }[] = [
+    ...MESAS.map((m) => ({ mesa: m.id, suyos: escritorios.filter((e) => e.mesa === m.id) })).map((g) => ({ ...g, n: g.suyos.length })),
+    { mesa: "MENTES" as const, n: MENTES_OFICINA.length, suyos: [] as Escritorio[] },
+  ].filter((g) => g.n);
+  for (const g of [...grupos].sort((x, y) => y.n - x.n)) {
     const c = alturas.indexOf(Math.min(...alturas));
-    const filas = Math.ceil(g.suyos.length / POR_FILA);
+    const filas = Math.ceil(g.n / POR_FILA);
     const x = 0.7 + c * (ANCHO_POD + SEPARACION);
     const y = alturas[c];
     const alto = CABEZA_POD + filas * PASO_Y + 0.25;
     pods.push({ mesa: g.mesa, x, y, ancho: ANCHO_POD, alto });
-    g.suyos.forEach((e, k) => puestos.push({ e, x: x + 0.55 + (k % POR_FILA) * PASO_X, y: y + CABEZA_POD + Math.floor(k / POR_FILA) * PASO_Y }));
+    const lugar = (k: number) => ({ x: x + 0.55 + (k % POR_FILA) * PASO_X, y: y + CABEZA_POD + Math.floor(k / POR_FILA) * PASO_Y });
+    if (g.mesa === "MENTES") MENTES_OFICINA.forEach((m, k) => mentes.push({ ...m, ...lugar(k) }));
+    else g.suyos.forEach((e, k) => puestos.push({ e, ...lugar(k) }));
     alturas[c] = y + alto + SEPARACION;
   }
   const ancho = 1.4 + COLUMNAS * ANCHO_POD + (COLUMNAS - 1) * SEPARACION;
   const cs = alturas.indexOf(Math.min(...alturas));
   const sala = { x: 0.7 + cs * (ANCHO_POD + SEPARACION), y: alturas[cs] - 0.2, ancho: ANCHO_POD, alto: 3.2 };
   const largo = Math.max(...alturas, sala.y + sala.alto + 0.9);
-  return { puestos, pods, ancho, largo, sala };
+  return { puestos, pods, mentes, ancho, largo, sala };
 }
 
 function Persona({ tonoCamisa }: { tonoCamisa: string }) {
@@ -406,6 +429,22 @@ export default function LabOficina() {
   const [diaElegido, setDiaElegido] = useState<string | null>(null);
   const [lecturas, setLecturas] = useState<LecturaMapa[]>([]);
   const [orden, setOrden] = useState<"MESA" | "ACIERTO" | "PF" | "HISTORIAL">("MESA");
+  // Las mentes leen acciones y CEDEARs de BYMA (lo mismo que MERCADO AR, una vez por pestaña): sus monitores y sus reuniones.
+  const [mentesPanel, setMentesPanel] = useState<LecturaPapel[] | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const p = await panelCompleto();
+        if (vivo) setMentesPanel(p);
+      } catch {
+        // Sin BYMA las mentes quedan en sus escritorios sin opinión: sin datos, no cero.
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   // Lo que leyó el mapa de liquidaciones en este navegador: la pantalla de la pared y lo que ven los agentes al hablar.
   useEffect(() => {
@@ -562,7 +601,7 @@ export default function LabOficina() {
     </>
   );
 
-  const { puestos, pods, ancho, largo, sala } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
+  const { puestos, pods, mentes: puestosMentes, ancho, largo, sala } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
   // El encuadre se mide en la pantalla (la perspectiva y el giro cambian lo que ocupa el piso): al dibujar, al girar y al
   // cambiar el tamaño. Escribe dos variables CSS en la escena; no hay estado de React que vuelva a dibujar.
   const escenaRef = useRef<HTMLDivElement>(null);
@@ -580,11 +619,37 @@ export default function LabOficina() {
   const frases = charla(oficina);
   const propias = propuestas(oficina);
   // Lo que se oye en la oficina: lo que dice cada uno y lo que se dicen entre ellos.
-  const hablan: Frase[] = [
-    ...frases.filter((f) => f.quien !== "JARVIS"),
-    ...oficina.conversaciones.flatMap((d) => d.lineas.map((l) => ({ quien: l.quien, nombre: l.nombre, texto: l.texto, tipo: "acuerdo" as const }))),
-  ];
-  const actual: Frase | null = hablan.length ? hablan[turno % hablan.length] : null;
+  // Lo que dice cada uno en su escritorio; las conversaciones entre ellos van a la sala (lib/oficina-reuniones.ts).
+  const hablan: Frase[] = frases.filter((f) => f.quien !== "JARVIS");
+  // Las mentes se reúnen sobre el papel donde más discuten (al menos una a favor y una en contra).
+  const temaMentes = useMemo(() => {
+    if (!mentesPanel) return null;
+    const conDebate = mentesPanel.filter((l) => l.consenso.aFavor > 0 && l.consenso.enContra > 0);
+    const l = conDebate.sort((a, b) => Math.min(b.consenso.aFavor, b.consenso.enContra) - Math.min(a.consenso.aFavor, a.consenso.enContra) || b.consenso.aFavor - a.consenso.aFavor)[0];
+    return l ? { ticker: l.papel.ticker, guion: guionReunion({ ...l, cierre: l.serie.serie?.velas.at(-1)?.close ?? null }) } : null;
+  }, [mentesPanel]);
+  const tiempo = useMemo(() => lineaDeTiempo(agendaReuniones(oficina.conversaciones, temaMentes)), [oficina.conversaciones, temaMentes]);
+  const momento: Momento = tiempo[turno % tiempo.length];
+  const enSala = enLaSala(momento);
+  const actual: Frase | null =
+    momento.tipo === "HABLA"
+      ? { quien: momento.linea.quien, nombre: momento.linea.nombre, texto: momento.linea.texto, tipo: "debate" }
+      : momento.tipo === "CHARLA" && hablan.length
+        ? hablan[turno % hablan.length]
+        : null;
+  /** Cuánto camina una persona desde su escritorio hasta su silla en la sala (en unidades del piso); nada si no está en reunión. */
+  const caminar = (id: string, x: number, y: number) => {
+    if (!enSala.has(id) || momento.tipo === "CHARLA" || momento.tipo === "VUELVEN") return undefined;
+    const k = momento.reunion.participantes.indexOf(id);
+    const s = silla(k, Math.min(SILLAS, momento.reunion.participantes.length), sala);
+    return { ["--dx" as string]: sala.x + s.x - (x + 0.56), ["--dy" as string]: sala.y + s.y - y };
+  };
+  const enReunion = momento.tipo === "LLEGAN" || momento.tipo === "HABLA";
+  const opinionMente = (id: MenteId) => {
+    if (!mentesPanel) return null;
+    const de = (postura: string) => mentesPanel.filter((l) => l.mentes.find((m) => m.id === id)?.postura === postura).map((l) => l.papel.ticker);
+    return { aFavor: de("A FAVOR"), enContra: de("EN CONTRA"), lectura: mentesPanel[0]?.mentes.find((m) => m.id === id) ?? null };
+  };
   const elegidoE = oficina.escritorios.find((e) => e.id === elegido) ?? null;
   // El tablero: cada agente con su papel, su versión con el mapa y su historial. Sin dato, al final (desconocido no es cero).
   const ordenMesa = (e: Escritorio) => MESAS.findIndex((m) => m.id === e.mesa);
@@ -659,6 +724,22 @@ export default function LabOficina() {
               const suyos = oficina.escritorios.filter((e) => e.mesa === p.mesa);
               const abiertas = suyos.reduce((n, e) => n + e.abiertas.length, 0);
               const cierres = suyos.reduce((n, e) => n + e.total.cerradas, 0);
+              if (p.mesa === "MENTES") {
+                return (
+                  <div key={p.mesa} className="of-pod" style={{ ["--x" as string]: p.x, ["--y" as string]: p.y, ["--w" as string]: p.ancho, ["--h" as string]: p.alto, ["--c" as string]: COLOR_MENTES }}>
+                    <span className="of-pod-luz" aria-hidden="true" />
+                    <span className="of-vidrio of-vidrio-fondo" aria-hidden="true" />
+                    <span className="of-vidrio of-vidrio-lado" aria-hidden="true" />
+                    <span className="of-vidrio of-vidrio-lado of-vidrio-der" aria-hidden="true" />
+                    <span className="of-pod-cartel">
+                      <span>
+                        <b>Mesa de las mentes</b>
+                        <small>{MENTES_OFICINA.length} mentes · {mentesPanel ? `${mentesPanel.filter((l) => l.serie.serie).length} papeles de BYMA leídos` : "leyendo BYMA…"}</small>
+                      </span>
+                    </span>
+                  </div>
+                );
+              }
               return (
                 <div key={p.mesa} className="of-pod" style={{ ["--x" as string]: p.x, ["--y" as string]: p.y, ["--w" as string]: p.ancho, ["--h" as string]: p.alto, ["--c" as string]: COLOR_MESA[p.mesa] }}>
                   <span className="of-pod-luz" aria-hidden="true" />
@@ -667,7 +748,7 @@ export default function LabOficina() {
                   <span className="of-vidrio of-vidrio-lado of-vidrio-der" aria-hidden="true" />
                   <span className="of-pod-cartel">
                     <span>
-                      <b>{MESAS.find((m) => m.id === p.mesa)?.nombre}</b>
+                      <b>{MESAS.find((m) => m.id === p.mesa)?.nombre ?? p.mesa}</b>
                       <small>
                         {suyos.length} {suyos.length === 1 ? "agente" : "agentes"} · {abiertas} {abiertas === 1 ? "abierta" : "abiertas"} · {cierres} {cierres === 1 ? "cierre" : "cierres"}
                       </small>
@@ -711,7 +792,7 @@ export default function LabOficina() {
                       </span>
                     </span>
                   </span>
-                  <span className="of-parado">
+                  <span className="of-parado of-camina" style={caminar(e.id, x, y)}>
                     <span className="of-silla" aria-hidden="true" />
                     <Persona tonoCamisa={tono(e)} />
                     {visible ? (
@@ -729,13 +810,63 @@ export default function LabOficina() {
                 </button>
               );
             })}
+            {puestosMentes.map(({ id, nombre, x, y }) => {
+              const habla = actual?.quien === id;
+              const op = opinionMente(id);
+              const clave = `MENTE:${id}`;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`of-puesto of-pant-${op ? (op.aFavor.length && op.enContra.length ? "mixto" : op.aFavor.length ? "largo" : op.enContra.length ? "corto" : "apagado") : "apagado"}${elegido === clave ? " of-activo" : ""}${habla ? " of-habla" : ""}`}
+                  style={{ ["--x" as string]: x, ["--y" as string]: y, ["--c" as string]: COLOR_MENTES }}
+                  aria-pressed={elegido === clave}
+                  aria-label={`Mente ${nombre}: ${op ? `a favor en ${op.aFavor.length} papeles, en contra en ${op.enContra.length}` : "leyendo BYMA"}`}
+                  onClick={() => {
+                    if (arrastro.current) return;
+                    setElegido(elegido === clave ? null : clave);
+                  }}
+                >
+                  <span className="of-mueble">
+                    <span className="of-tapa" />
+                    <span className="of-frente" />
+                    <span className="of-lado" />
+                    <span className="of-pantallas">
+                      <span className="of-pantalla">
+                        <small>A FAVOR</small>
+                        {op ? op.aFavor.length : "…"}
+                      </span>
+                      <span className="of-pantalla">
+                        <small>EN CONTRA</small>
+                        {op ? op.enContra.length : "…"}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="of-parado of-camina" style={caminar(id, x, y)}>
+                    <span className="of-silla" aria-hidden="true" />
+                    <Persona tonoCamisa="mente" />
+                    {habla || elegido === clave ? (
+                      <span className={`of-globo${habla ? "" : " of-globo-nombre"}`}>
+                        <b>{nombre}</b>
+                        {habla && actual ? <span>{actual.texto}</span> : null}
+                      </span>
+                    ) : (
+                      <span className="of-etiqueta" aria-hidden="true">
+                        <b>{nombre}</b>
+                        <span>{op ? `▲${op.aFavor.length} ▼${op.enContra.length}` : "leyendo"}</span>
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
             <div className="of-sala" style={{ ["--x" as string]: sala.x, ["--y" as string]: sala.y, ["--w" as string]: sala.ancho, ["--h" as string]: sala.alto }}>
               <span className="of-vidrio of-vidrio-fondo" aria-hidden="true" />
               <span className="of-vidrio of-vidrio-lado" aria-hidden="true" />
               <span className="of-vidrio of-vidrio-lado of-vidrio-der" aria-hidden="true" />
               <span className="of-mesa-redonda" />
               <Holograma puntos={oficina.fondo.curva} activo={elegido === "JARVIS"} elegir={() => setElegido(elegido === "JARVIS" ? null : "JARVIS")} />
-              {oficina.reunion.slice(0, 4).map((e, k) => (
+              {!enReunion && oficina.reunion.slice(0, 4).map((e, k) => (
                 <span key={e.id} className="of-parado of-silla-sala" style={{ ["--k" as string]: k }}>
                   <Persona tonoCamisa={tono(e)} />
                 </span>
@@ -744,6 +875,12 @@ export default function LabOficina() {
             </div>
           </div>
         </div>
+        {momento.tipo !== "CHARLA" && (
+          <p className="of-subtitulo of-reunion-cartel" aria-live="polite">
+            <b>{momento.tipo === "VUELVEN" ? "Terminó la reunión" : "Reunión"}:</b> {momento.reunion.tema} · {momento.reunion.motivo.toLowerCase()}
+            {momento.tipo === "LLEGAN" ? " · van a la sala" : ""}
+          </p>
+        )}
         {actual && (
           <p className="of-subtitulo" aria-live="polite">
             <b>{actual.nombre}:</b> {actual.texto}
@@ -767,6 +904,30 @@ export default function LabOficina() {
         profit factor en papel; con H, los de su historial en 4 h mientras no cierre nada; con *, menos de 15 operaciones (muestra mínima).
       </p>
 
+      {elegido?.startsWith("MENTE:") &&
+        (() => {
+          const id = elegido.slice(6) as MenteId;
+          const m = MENTES_OFICINA.find((x) => x.id === id);
+          const op = opinionMente(id);
+          return (
+            <article className="of-ficha" aria-live="polite">
+              <header>
+                <b>Mente {m?.nombre}</b>
+                <span>Mesa de las mentes · BYMA</span>
+              </header>
+              <p>{op?.lectura ? `${op.lectura.mente}: ${op.lectura.idea}.` : "Leyendo acciones y CEDEARs de BYMA…"}</p>
+              {op && (
+                <dl>
+                  <div className="of-ficha-ancha"><dt>A favor en</dt><dd>{op.aFavor.join(", ") || "ningún papel"}</dd></div>
+                  <div className="of-ficha-ancha"><dt>En contra en</dt><dd>{op.enContra.join(", ") || "ningún papel"}</dd></div>
+                </dl>
+              )}
+              <p className="of-tenue">
+                Cuando no coincide con otra mente sobre un papel, van a la sala de reuniones a discutirlo. Para preguntarle algo, usá la sala de las mentes, abajo. Está inspirada en lo que esa persona publicó: no participa ni avala esto. No es asesoramiento financiero.
+              </p>
+            </article>
+          );
+        })()}
       {elegidoE && (
         <article className="of-ficha" aria-live="polite">
           <header>

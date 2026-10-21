@@ -146,8 +146,8 @@ a0bec1d6e010	165	app/lab-agente-st.tsx
 b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
-fdac540c69d5	243	app/lab-oficina.css
-ef470658cdf3	1116	app/lab-oficina.tsx
+525a37f5e879	249	app/lab-oficina.css
+f654a23c5818	1277	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -213,7 +213,7 @@ c32c087d3f1a	360	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-8e62c61cda34	387	docs/araña/objetivos.md
+e5b8236aab9a	388	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -417,6 +417,7 @@ fd19498c8d8b	115	lib/mtf-zones.ts
 1cbbe9f25773	380	lib/news-intelligence.ts
 c19d69cbdafa	25	lib/oficina-db.ts
 da3ee04e1292	52	lib/oficina-historial.ts
+575a0bd45058	96	lib/oficina-reuniones.ts
 26269a08269c	29	lib/oficina-run.ts
 873ba02df584	403	lib/oficina.ts
 780c578e3481	522	lib/order-blocks.ts
@@ -661,6 +662,7 @@ a9cc32e63faf	283	tests/mesa-sombra.test.ts
 1c697054fe3b	153	tests/mm-robot.test.ts
 6ab801ccfb7e	104	tests/mtf-zones.test.ts
 40823676548f	84	tests/news-sentiment.test.ts
+f389fa4691cb	54	tests/oficina-reuniones.test.ts
 1452725bac15	142	tests/oficina.test.ts
 6d903521a84e	209	tests/order-blocks.test.ts
 225b8a9ad252	350	tests/order-flow-brain.test.ts

@@ -240,3 +240,9 @@
 .of-t-abiertas span{padding:1px 6px;border:1px solid #23406b;border-radius:999px;font-size:10px}
 .of-t-abiertas .of-v-a_favor{border-color:#166534}
 .of-t-abiertas .of-v-en_contra{border-color:#7f1d1d;text-decoration:underline dotted}
+/* Caminar a la sala de reuniones: el personaje se corre (en el plano del piso) hasta su silla y vuelve. */
+.of-camina{transform:translate3d(calc(var(--dx,0) * var(--u)),calc(var(--dy,0) * var(--u)),0) rotateZ(calc(-1 * var(--giro))) rotateX(-90deg);transition:transform 1.8s cubic-bezier(.45,0,.25,1)}
+.of-mente .of-cuerpo{background:#db2777}
+.of-reunion-cartel{border-color:#f2b84b!important}
+.of-reunion-cartel b{color:#f2b84b}
+@media (prefers-reduced-motion: reduce){.of-camina{transition:none}}
