@@ -67,6 +67,12 @@ export type DeskSnapshot = {
   fearGreed: FearGreed | null;
   /** De dónde salió cada parte, para mostrarlo. */
   sources: string[];
+  /**
+   * Las fuentes de velas que respondieron, tal como las nombra loadRows («Binance Futures», «Binance Spot»…), para que el
+   * contexto común (lib/contexto-comun.ts) sepa de qué mercado son y no mezcle Spot con Futures. Opcional: una foto armada
+   * sin este dato queda sin mercado declarado.
+   */
+  venues?: string[];
 };
 
 /**
@@ -220,6 +226,7 @@ export function assembleSnapshot(p: SnapshotParts): DeskSnapshot {
     news: Array.isArray(sentiment?.news) ? sentiment.news : null,
     fearGreed: sentiment?.fearGreed ?? null,
     sources,
+    venues,
   };
 }
 

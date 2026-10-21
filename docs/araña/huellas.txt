@@ -149,7 +149,7 @@ dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
 2db0fd004698	134	app/layout.tsx
 a6a898fc2428	823	app/liquidation-heatmap-desk.css
-32081d501acb	4336	app/liquidation-heatmap-desk.tsx
+f36a5442b1a5	4345	app/liquidation-heatmap-desk.tsx
 39b0534ede8e	3145	app/live-bookmap.tsx
 d6e1ca037a9c	393	app/mapa-agentes.tsx
 4fb2595a8caa	4	app/market-brain.css
@@ -204,7 +204,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-68dffa466481	346	docs/araña/objetivos.md
+d4a923a876cb	360	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -220,6 +220,7 @@ bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
 ec29d0ad6d0c	166	docs/mesa-reglas-v2.md
 6ddd21b05f13	64	docs/seguridad.md
+5e8142e36e99	125	docs/terminal-unificada.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -291,6 +292,7 @@ bb80398ecb7d	76	lib/bot-journal-db.ts
 22867caddefc	328	lib/chart-patterns.ts
 5e8f8daa64d4	53	lib/confluencia.ts
 9db17d50361b	84	lib/consenso.ts
+41fe8355435e	295	lib/contexto-comun.ts
 906fb4b6f584	50	lib/corroborar.ts
 11dfd70c8233	87	lib/cost-basis.ts
 8d5433fd5fdf	148	lib/crypto-news.ts
@@ -315,7 +317,7 @@ a46bc4f80884	173	lib/fibonacci-niveles.ts
 7a92c06ed2a2	114	lib/flujo-run.ts
 0e13f43a62cd	163	lib/flujo.ts
 c6aaa6fce865	216	lib/fondeo.ts
-0b2d1bf961da	295	lib/footprint.ts
+ce068942f617	401	lib/footprint.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
 dfc52ea472c0	115	lib/futures-risk.ts
@@ -331,7 +333,7 @@ f61124d7437f	79	lib/jarvis-chat.ts
 5a9f14b0e859	477	lib/jarvis-core.ts
 7b2813e75f44	352	lib/jarvis-council.ts
 cb4645381ac1	582	lib/jarvis-desk-agents.ts
-18a6e5b9304d	250	lib/jarvis-desk-data.ts
+debf39404219	257	lib/jarvis-desk-data.ts
 d29490ffe116	101	lib/jarvis-desk-run.ts
 fa37d4a7b3d9	743	lib/jarvis-desk.ts
 7490f7cc5ddc	134	lib/jarvis-execution.ts
@@ -400,7 +402,7 @@ da3ee04e1292	52	lib/oficina-historial.ts
 873ba02df584	403	lib/oficina.ts
 780c578e3481	522	lib/order-blocks.ts
 3f86ab0657ef	438	lib/order-flow-brain.ts
-757d33d6a6c9	249	lib/order-flow.ts
+e4e5d5bbccaa	248	lib/order-flow.ts
 fe173d15015d	227	lib/oscillators.ts
 f2ad043c6c3a	431	lib/paper-bot.ts
 af80178a4c9e	158	lib/practica-gatillo.ts
@@ -553,6 +555,7 @@ bee17b9c8ee8	120	tests/bot-journal.test.ts
 d54fc2ec5b6e	154	tests/chart-patterns.test.ts
 0a78900bc6ce	136	tests/confluencia.test.ts
 525800a5a3c7	76	tests/consenso.test.ts
+9d93ee58667b	175	tests/contexto-comun.test.ts
 e954e10a7eec	85	tests/cost-basis.test.ts
 6cc784f01e52	156	tests/dca-tracker.test.ts
 3bfb5918410f	140	tests/decoupling.test.ts
@@ -570,6 +573,7 @@ bc048058d368	97	tests/fib-zone.test.ts
 7cc15141a09b	167	tests/flujo-agentes.test.ts
 5598b8ef0544	128	tests/flujo.test.ts
 990d14ba61b0	144	tests/fondeo.test.ts
+7c5540fc7cf4	89	tests/footprint-area-valor.test.ts
 70e30489d116	109	tests/footprint-signals.test.ts
 d6031202b073	89	tests/footprint-sweeps.test.ts
 79b36d34e65f	119	tests/footprint-verdict.test.ts
@@ -662,6 +666,7 @@ de58453ca449	139	tests/scenario-analysis.test.ts
 0acb179e0c9c	133	tests/signal-confluence.test.ts
 b49ac1298da8	141	tests/signal-plan-db.test.ts
 f57d24eadbd3	213	tests/signal-plan.test.ts
+d1147f079981	51	tests/sin-ordenes-reales.test.ts
 e5df5a020692	195	tests/smc-liquidez.test.ts
 cc660527d471	70	tests/sobreajuste.test.ts
 2897707d62d0	102	tests/speech-text.test.ts
