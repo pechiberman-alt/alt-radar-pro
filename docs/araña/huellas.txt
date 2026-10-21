@@ -159,7 +159,7 @@ db0be99a3f89	499	app/market-brain.tsx
 89b25149b415	141	app/market-structure-panel.tsx
 244b15230fb0	48	app/market-structure.css
 c6bfdf99d2ca	247	app/mercado-ar-desk.tsx
-5f68de06509f	281	app/mercado-ar-vistas.tsx
+e08f360935d1	406	app/mercado-ar-vistas.tsx
 88eead3e31d3	48	app/mercado-ar.css
 4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
@@ -209,7 +209,7 @@ bd6422c65a0d	358	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-b523b5977a9c	382	docs/araña/objetivos.md
+88efc2c94af9	383	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -398,6 +398,7 @@ dca52626b743	252	lib/market-structure.ts
 99f1fbbd5129	146	lib/mercado-ar-cliente.ts
 ce75623846e9	103	lib/mercado-ar-fuente.ts
 5be54e85d73d	89	lib/mercado-ar-mapa.ts
+8663f4178a63	201	lib/mercado-ar-tecnico.ts
 5055ab17957f	277	lib/mercado-ar.ts
 dd7f989876a5	57	lib/mesa-medicion.ts
 8de6a64346cf	57	lib/mesa-sombra-auditoria.ts
@@ -642,6 +643,7 @@ c90b4a2a66b4	70	tests/live-market.test.ts
 e46e93dda3df	226	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
 f48827a4672a	227	tests/mentes-ar.test.ts
+5dbee8601d14	101	tests/mercado-ar-tecnico.test.ts
 d435514e5aa5	277	tests/mercado-ar.test.ts
 4fec70e5eb48	37	tests/mesa-medicion.test.ts
 ea96d2b2093d	44	tests/mesa-sombra-auditoria.test.ts
