@@ -747,7 +747,7 @@ export const ESTRATEGIAS: Estrategia[] = [
     id: "AMD_IFVG",
     agente: "Agente AMD + IFVG",
     nombre: "Acumulación, manipulación y distribución, con entrada en el IFVG de la última pata",
-    regla: "Busca un rango de acumulación (las 20 velas anteriores, de 4 ATR de alto o menos) que una vela barre por un solo lado (manipulación). Dentro de las 12 velas siguientes espera el IFVG de la última pata: un hueco de valor justo en contra, formado desde 5 velas antes de la barrida, que una vela cierra por el otro lado, con el cierre de vuelta adentro del rango. Entra en esa vela. Stop a 0,5 ATR del extremo de la manipulación. Objetivo 2 R. Es fractal: la misma regla en cualquier temporalidad. Configuración fijada de antemano.",
+    regla: "Busca un rango de acumulación (las 20 velas anteriores, de 4 ATR de alto o menos) que una vela barre por un solo lado (manipulación). Dentro de las 12 velas siguientes espera el IFVG de la última pata: un hueco de valor justo en contra, formado desde 5 velas antes de la barrida, que una vela cierra por el otro lado, con el cierre de vuelta adentro del rango. Entra en esa vela. Stop a 0,5 ATR del extremo de la manipulación. Objetivo en el FVG de la temporalidad alta, como en el video: el hueco de valor justo sin llenar más cercano, en velas de 6 veces la temporalidad (en 4 h, el diario); si queda a menos de 1 R o no hay, no opera (PLAN_AMD_2, desde el 2026-10-21; antes era 2 R fijo y no llegó a registrar entradas). Es fractal: la misma regla en cualquier temporalidad. En el estudio pierde un poco en 1 h y 15 min y queda en cero en 4 h, sin ventaja (docs/busqueda-amd.md). Configuración fijada de antemano.",
     senal: (v, ind, i) => senalAmd(v, ind, i),
   },
   {

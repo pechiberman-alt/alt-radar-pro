@@ -86,7 +86,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `lib/mesa-sombra.ts` — Laboratorio en sombra de la mesa: busca, sin parar, variantes de filtro que habrían rendido mejor que la mesa tal cual, y las mide hacia adelante.
 - `lib/speech-text.ts` — What JARVIS writes, turned into what a Spanish voice should say.
 - `scripts/investigacion/README.md` — Investigación de la mesa
-- `scripts/investigacion/amd-estudio.ts` — Medición del agente AMD + IFVG (lib/amd-ifvg.ts, PLAN_AMD_1) con parámetros fijados antes de mirar: las 10 monedas de datos-investigacion/ en 1 h, 4 h y 15 min, con los costos y el
+- `scripts/investigacion/amd-estudio.ts` — Medición del agente AMD + IFVG (lib/amd-ifvg.ts): PLAN_AMD_2 (objetivo en el FVG de la temporalidad alta, la regla del agente) contra PLAN_AMD_1 (objetivo fijo a 2 R), con la misma
 - `scripts/investigacion/aprendizaje.ts` — ¿Puede la mesa aprender?
 - `scripts/investigacion/axi-estudio.ts` — Mide los agentes del estudio sobre un instrumento de Axi (CFD), con las mismas reglas, la misma escalera y el mismo corte 70/30 que el estudio de cripto.
 - `scripts/investigacion/breaker-busqueda.ts` — La búsqueda de la mejor confirmación y configuración del breaker block (lib/breaker-busqueda.ts) en 1 h, 4 h y 15 min, con las 10 monedas de datos-investigacion/ y los costos del e
@@ -466,7 +466,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/agentes-mente.test.ts` — Pruebas de la mente de los agentes (lib/agentes-mente.ts): las lecciones salen de sus cierres con su muestra y solo son firmes con 15 casos de cada lado; la autoevaluación dice que
 - `tests/agentes-papel.test.ts` — Pruebas de los agentes en papel (lib/agentes-papel.ts): que no se mire el futuro, que la entrada sea la apertura siguiente con la escalera completa, que la clave no duplique entrad
 - `tests/agentes-servidor.test.ts` — Pruebas de los agentes de papel del servidor (lib/agentes-servidor.ts): el turno de cada moneda, la clave, que las entradas son las mismas de los agentes del navegador y no miran e
-- `tests/amd-ifvg.test.ts` — Pruebas del agente AMD + IFVG (lib/amd-ifvg.ts): el patrón completo dispara en la vela del IFVG con su stop y objetivo, el corto es el espejo, un rango alto no es acumulación, y ni
+- `tests/amd-ifvg.test.ts` — Pruebas del agente AMD + IFVG (lib/amd-ifvg.ts): el patrón completo dispara en la vela del IFVG con su stop y objetivo, el corto es el espejo, un rango alto no es acumulación, el o
 - `tests/aprender.test.ts` — Pruebas del contenido de APRENDER (lib/aprender.ts): cada lección tiene texto y preguntas, cada respuesta correcta existe dentro de sus opciones, los ids no se repiten, el glosario
 - `tests/breaker-busqueda.test.ts` — Pruebas de la búsqueda del breaker block (lib/breaker-busqueda.ts): el caso armado a mano que lo forma, cada confirmación con su caso que la cumple y el que no, la zona que falla a
 - `tests/consenso.test.ts` — Pruebas del consenso entre agentes (lib/consenso.ts): que cuente bien quién coincide y quién va al revés, que nadie se cuente a sí mismo, y que la comparación no saque conclusiones

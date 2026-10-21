@@ -91,7 +91,7 @@ export const EXPLICADO: Record<string, Explicado> = {
   },
   AMD_IFVG: {
     mira: "Un precio quieto en un rango, un tirón falso que barre un lado, y la vuelta que deja un hueco cerrado al revés.",
-    idea: "El tirón falso junta las órdenes de los apurados; cuando el precio vuelve adentro del rango, suele ir para el otro lado.",
+    idea: "El tirón falso junta las órdenes de los apurados; cuando el precio vuelve adentro del rango, suele ir para el otro lado, hasta el hueco más cercano que quedó abierto en una temporalidad más alta.",
   },
   FIB_NIVELES: {
     mira: "Cuánto retrocedió el precio de su último tramo, en proporciones fijas, cerca de los máximos o mínimos del día o la semana.",
