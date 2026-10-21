@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 726 · objetivos: 21 · sin objetivo: 0
+- Archivos: 728 · objetivos: 21 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 62 · hosts: 63
-- Código de navegador: 77 archivos con "use client" que alcanzan 245 · problemas: 0
-- Lib sin prueba directa: 29 de 240
+- Código de navegador: 77 archivos con "use client" que alcanzan 246 · problemas: 0
+- Lib sin prueba directa: 29 de 241
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (90)
+### jarvis — JARVIS, la IA propia del software (92)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía. · Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -48,6 +48,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `lib/assistant/knowledge.ts` — Curated explanations for the concepts the terminal actually uses.
 - `lib/browser-voice.ts` — Picks the best Spanish voice the browser has.
 - `lib/hands-free.ts` — Manos libres: the rules behind JARVIS's listening mode in the browser.
+- `lib/ia-respuesta.ts` — Que la IA conteste lo que se le pregunta, con los datos, y no algo genérico.
 - `lib/jarvis-analyst.ts` — JARVIS's own analyst: every engine of ALT RADAR PRO run on one asset, on 1h, 4h and daily candles — trend and momentum by timeframe, levels with their reasons (structure, volume pr
 - `lib/jarvis-backtest-run.ts` — El backtest en el navegador: baja la historia de Binance (futuros primero, la misma fuente de la mesa) y camina de a pedazos para no trabar el celular.
 - `lib/jarvis-backtest.ts` — Backtesting de la mesa de JARVIS: la misma mesa y las mismas reglas del paper trading, caminando hacia adelante sobre velas pasadas.
@@ -104,6 +105,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `scripts/investigacion/simulador.ts` — Simulador rápido de la mesa sobre lecturas precalculadas (ver precalcular.ts).
 - `scripts/investigacion/smc-busqueda.ts` — La búsqueda del gatillo y la configuración del agente de liquidez (lib/smc-liquidez.ts): zonas FVG y OB de la temporalidad alta, con toma de liquidez, IFVG y breaker, en 1 h, 4 h y
 - `scripts/investigacion/util.ts` — Datos y escalas de tiempo de la investigación de la mesa.
+- `tests/ia-respuesta.test.ts` — Pruebas de lib/ia-respuesta.ts: qué se pregunta, la respuesta directa con el dato, el prompt de persona, la limpieza (razonamiento oculto y markdown) y el control de que la IA cont
 
 ### honestidad — Nunca inventar: probabilidades, precios, noticias (0)
 Texto: transversal a todo el producto. Lo que no se sabe se dice, no se estima a escondidas.

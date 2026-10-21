@@ -45,7 +45,7 @@ export const SIN_BALANCE: Record<string, string> = {
 /** Berkshire publica el BPA por acción clase A (1.500 clase B): no se compara con el precio de la B. */
 export const BPA_NO_COMPARABLE = new Set(["BRKB"]);
 
-export type Concepto = "ingresos" | "gananciaNeta" | "bpa" | "patrimonio" | "pasivo" | "activoCorriente" | "pasivoCorriente";
+export type Concepto = "ingresos" | "gananciaNeta" | "bpa" | "patrimonio" | "pasivo" | "deuda" | "activoCorriente" | "pasivoCorriente";
 
 /** Los nombres XBRL de cada concepto, en orden: los ingresos se reportan con distintos nombres según la empresa. */
 export const CONCEPTOS: Record<Concepto, { nombres: string[]; unidad: string; flujo: boolean }> = {
@@ -54,6 +54,8 @@ export const CONCEPTOS: Record<Concepto, { nombres: string[]; unidad: string; fl
   bpa: { nombres: ["EarningsPerShareDiluted"], unidad: "USD/shares", flujo: true },
   patrimonio: { nombres: ["StockholdersEquity"], unidad: "USD", flujo: false },
   pasivo: { nombres: ["Liabilities"], unidad: "USD", flujo: false },
+  /** Deuda financiera de largo plazo (lo que miran Buffett y virattt/ai-hedge-fund: deuda sobre patrimonio), no todo el pasivo. */
+  deuda: { nombres: ["LongTermDebt", "LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"], unidad: "USD", flujo: false },
   activoCorriente: { nombres: ["AssetsCurrent"], unidad: "USD", flujo: false },
   pasivoCorriente: { nombres: ["LiabilitiesCurrent"], unidad: "USD", flujo: false },
 };
@@ -180,7 +182,8 @@ export async function bajarFundamentales(
 
 /** Los balances cambian una vez por trimestre: se guardan 7 días en una fila de D1 por empresa. */
 export const VIDA_FUND_MS = 7 * DIA;
-export const claveFund = (simbolo: string) => `fund_sec:${simbolo}`;
+/** v2: suma la deuda financiera (lo guardado antes no la tiene y se vuelve a bajar). */
+export const claveFund = (simbolo: string) => `fund_sec2:${simbolo}`;
 
 export function leerFundGuardado(raw: string | null): Fundamentales | null {
   if (!raw) return null;
