@@ -804,4 +804,19 @@
 .ag-boton{border:1px solid #2c7a68;background:#0b221c;color:var(--cyan);font:700 9.5px var(--font-mono);letter-spacing:1px;padding:7px 10px;border-radius:5px;cursor:pointer}
 .ag-boton:hover{background:#0f2e26}
 .ag-nota{margin:10px 0 0;font:9px var(--font-mono);color:var(--muted);line-height:1.6}
+/* La mesa de flujo en el gráfico (lib/flujo-lectura.ts): marcas chicas en la vela y su resumen en el panel. */
+.ag-flujo path{stroke:#04100b;stroke-width:.8}.ag-flujo.up path{fill:#5eead4}.ag-flujo.down path{fill:#fb7185}
+.ag-flujo text{font:700 7.5px var(--font-mono);fill:#d9f7ee;paint-order:stroke;stroke:#04100b;stroke-width:2.4px;pointer-events:none}
+.ag-flujo.down text{fill:#ffe1e5}
+.ag-flujo-mesa{margin-top:12px;padding:10px 12px;border:1px solid #1d3d36;border-radius:6px;background:linear-gradient(180deg,#071613,#060d0b)}
+.ag-flujo-mesa h5{margin:0 0 8px;font:700 9.5px var(--font-mono);letter-spacing:1.3px;color:#7fe0c6}
+.ag-flujo-mesa h5 small{font-weight:400;color:var(--muted)}
+.ag-flujo-estado{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.ag-flujo-chip{font:9.5px var(--font-mono);padding:3px 7px;border-radius:4px;border:1px solid #23352f;color:#8fa098;background:#09110e}
+.ag-flujo-chip b{color:var(--cyan);margin-right:2px}
+.ag-flujo-chip.up{color:#7df5bd;border-color:#1f5a3e}.ag-flujo-chip.down{color:#ff9aa1;border-color:#5d2730}.ag-flujo-chip.sin{border-style:dashed;color:#6f7d77}
+.ag-flujo-lista{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ag-flujo-lista li{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center;padding:6px 8px;border-radius:5px;background:#0a1512;border-left:3px solid #2a3832;font-size:11px;color:#c9d6d0}
+.ag-flujo-lista li.up{border-left-color:var(--green)}.ag-flujo-lista li.down{border-left-color:var(--red)}
+.ag-flujo-lista li small{grid-column:2;font:9.5px var(--font-mono);color:#8fa098}
 @media (max-width:560px){.ag-niveles{grid-template-columns:repeat(3,minmax(0,1fr))}.ag-lecturas small{flex-basis:100%}}

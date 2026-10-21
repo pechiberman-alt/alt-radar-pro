@@ -18,7 +18,7 @@ test("hay un escritorio por agente del estudio (sin el azar) más el agente ST, 
   for (const e of ESTRATEGIAS) assert.equal(ids.includes(e.id), e.id !== "AZAR", e.id);
   assert.ok(ids.includes(ID_ST));
   assert.ok(ids.includes("AMD_IFVG"));
-  assert.ok(o.escritorios.every((e) => ["TENDENCIA", "REVERSION", "ESTRUCTURA", "METALES"].includes(mesaDe(e.id))));
+  assert.ok(o.escritorios.every((e) => ["TENDENCIA", "REVERSION", "ESTRUCTURA", "FLUJO", "METALES"].includes(mesaDe(e.id))));
 });
 
 test("las claves se leen al agente correcto; una clave desconocida no se cuenta", () => {

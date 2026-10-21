@@ -8,6 +8,7 @@
  * siguiente y el recorrido usa solo velas posteriores. Una operación por vez por moneda y estrategia.
  */
 import { senalesAmd } from "./amd-ifvg.ts";
+import { senalAbsorcion, senalBarridaVol, senalDeltaAbsorbido, senalDeltaDiv, senalEsfuerzo } from "./flujo-agentes.ts";
 import { escaleraHacia, escaleraValida, recorrer, type Escalera, type Lado } from "./escalera.ts";
 
 /** La escalera con TP1 y TP2 propios (ya llevados a la entrada real); null si no queda ordenada. */
@@ -20,7 +21,7 @@ import type { SwingCandle } from "./swing-entries.ts";
 import { CONFIGURACION_AGENTE_FIB, senalesFib } from "./fibonacci-niveles.ts";
 import { CONFIGURACION_BASE_SMC, DISPARO_DEL_AGENTE, senalesSmc, type FiltroSmc } from "./smc-liquidez.ts";
 
-export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "FIB_NIVELES" | "AMD_IFVG" | "METALES_D55" | "AZAR";
+export type EstrategiaId = "RUPTURA" | "CRUCE_EMA" | "RSI" | "BOLLINGER" | "RETROCESO" | "MACD" | "MACD_MTF_SNR" | "SUPERTREND" | "ST_VWAP" | "ST_PERFIL" | "ST_VWAP_PERFIL" | "ST_MTF" | "ST_MTF_VOL" | "SNR" | "SNR_HTF" | "TENDENCIA_LINEA" | "BREAKER_BLOCK" | "SMC_LIQUIDEZ" | "SMC_TODO" | "FIB_NIVELES" | "AMD_IFVG" | "METALES_D55" | "ABSORCION" | "ESFUERZO" | "BARRIDA_VOL" | "DELTA_DIV" | "DELTA_ABSORBIDO" | "AZAR";
 
 /** Lo que una estrategia propone en la vela i: lado, stop y objetivo final (TP3). Sin señal, null. */
 export type Senal = { lado: Lado; stop: number; objetivo: number; /** Objetivos propios de la estrategia; sin ellos, TP1 y TP2 van a un tercio y dos tercios del camino al TP3. */ tp1?: number; tp2?: number };
@@ -764,6 +765,42 @@ export const ESTRATEGIAS: Estrategia[] = [
       const c = v[i].close;
       return c > alto ? conRR("LONG", c, c - 1.5 * t, 2) : null;
     },
+  },
+  // ── Mesa de flujo de órdenes (lib/flujo-agentes.ts, PLAN_FLUJO_AGENTES_1). ──
+  {
+    id: "ABSORCION",
+    agente: "Agente Absorción",
+    nombre: "Absorción en el extremo: volumen doble que no deja seguir al precio",
+    regla: "La vela hace el mínimo (o máximo) de las 20 anteriores con el doble del volumen promedio y cierra en el 40 % del rango más lejano a ese extremo: alguien absorbió las órdenes que empujaban. Entra a favor de la vuelta. Stop a 0,25 ATR del extremo de la vela. Objetivo 2 R. Se lee con velas y volumen. Configuración fijada de antemano.",
+    senal: (v, ind, i) => senalAbsorcion(v, ind.atr14, ind.volRel, i),
+  },
+  {
+    id: "ESFUERZO",
+    agente: "Agente Esfuerzo sin resultado",
+    nombre: "Esfuerzo sin resultado: mucho volumen y poco movimiento después de un tramo",
+    regla: "Después de un tramo de 2 ATR en 5 velas, una vela con 2,5 veces el volumen promedio y un rango de 0,7 ATR o menos, que cierra en la mitad contraria al tramo: el esfuerzo no movió el precio. Entra en contra del tramo. Stop a 0,25 ATR del extremo de las últimas 3 velas. Objetivo 2 R. Se lee con velas y volumen. Configuración fijada de antemano.",
+    senal: (v, ind, i) => senalEsfuerzo(v, ind.atr14, ind.volRel, i),
+  },
+  {
+    id: "BARRIDA_VOL",
+    agente: "Agente Barrida con volumen",
+    nombre: "Barrida del extremo de 20 velas, con volumen, y vuelta adentro",
+    regla: "La vela pasa el mínimo (o máximo) de las 20 anteriores, donde se juntan los stops, con 1,5 veces el volumen promedio, y cierra de vuelta adentro en la mitad de la vuelta: se llevó la liquidez y no siguió. Entra a favor de la vuelta. Stop a 0,25 ATR de la mecha. Objetivo 2 R. Se lee con velas y volumen. Configuración fijada de antemano.",
+    senal: (v, ind, i) => senalBarridaVol(v, ind.atr14, ind.volRel, i),
+  },
+  {
+    id: "DELTA_DIV",
+    agente: "Agente Divergencia de delta",
+    nombre: "Nuevo extremo de precio sin el delta acumulado (CVD) detrás",
+    regla: "El precio hace un nuevo mínimo (o máximo) de 20 velas pero el delta acumulado de las últimas 30 (compra agresiva menos venta agresiva) queda por encima (o por debajo) del que había en el extremo anterior, y la vela cierra a favor de la vuelta: la agresión se agota. Stop a 0,25 ATR del extremo. Objetivo 2 R. Necesita el volumen agresor de Binance: en el servidor (Kraken) no dispara y el historial del estudio no lo trae, así que se mide solo hacia adelante. Configuración fijada de antemano.",
+    senal: (v, ind, i) => senalDeltaDiv(v, ind.atr14, i),
+  },
+  {
+    id: "DELTA_ABSORBIDO",
+    agente: "Agente Delta absorbido",
+    nombre: "Agresión fuerte que el precio no siguió: absorción con delta",
+    regla: "En una vela con 1,8 veces el volumen promedio, la venta agresiva supera a la compra en un 25 % del volumen (o al revés) y aun así la vela cierra para el otro lado: órdenes pasivas absorbieron la agresión. Entra a favor del cierre. Stop a 0,25 ATR del extremo de la vela. Objetivo 2 R. Necesita el volumen agresor de Binance: en el servidor (Kraken) no dispara y el historial del estudio no lo trae, así que se mide solo hacia adelante. Configuración fijada de antemano.",
+    senal: (v, ind, i) => senalDeltaAbsorbido(v, ind.atr14, ind.volRel, i),
   },
   {
     id: "AZAR",

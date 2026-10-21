@@ -93,6 +93,26 @@ export const EXPLICADO: Record<string, Explicado> = {
     mira: "Un precio quieto en un rango, un tirón falso que barre un lado, y la vuelta que deja un hueco cerrado al revés.",
     idea: "El tirón falso junta las órdenes de los apurados; cuando el precio vuelve adentro del rango, suele ir para el otro lado, hasta el hueco más cercano que quedó abierto en una temporalidad más alta.",
   },
+  ABSORCION: {
+    mira: "Una vela que llega al extremo de las últimas 20 con mucho volumen y aun así cierra lejos de ese extremo.",
+    idea: "Si entra mucho volumen empujando y el precio no sigue, alguien del otro lado está absorbiendo: el empujón se gasta.",
+  },
+  ESFUERZO: {
+    mira: "Mucho volumen y poco movimiento justo después de una subida o una bajada fuerte.",
+    idea: "Esfuerzo sin resultado: si cuesta tanto mover el precio, del otro lado hay órdenes grandes esperando.",
+  },
+  BARRIDA_VOL: {
+    mira: "Que el precio pase el mínimo o máximo de las últimas 20 velas, con volumen, y cierre de vuelta adentro.",
+    idea: "Ahí se juntan los stops: el tirón los ejecuta, y si el precio vuelve enseguida, el que barrió ya tiene lo que buscaba.",
+  },
+  DELTA_DIV: {
+    mira: "Un nuevo extremo de precio sin que el delta acumulado (compra agresiva menos venta agresiva) lo acompañe.",
+    idea: "Cuando el precio sigue pero la agresión ya no, el movimiento se queda sin combustible.",
+  },
+  DELTA_ABSORBIDO: {
+    mira: "Una vela con venta agresiva fuerte que igual cierra arriba, o compra agresiva fuerte que igual cierra abajo.",
+    idea: "Si los agresores pegan fuerte y el precio va para el otro lado, órdenes pasivas grandes los están absorbiendo.",
+  },
   FIB_NIVELES: {
     mira: "Cuánto retrocedió el precio de su último tramo, en proporciones fijas, cerca de los máximos o mínimos del día o la semana.",
     idea: "Hay proporciones de retroceso que mucha gente mira, y los niveles del día concentran órdenes.",

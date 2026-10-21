@@ -69,12 +69,13 @@ export function leccionesDe(filas: FilaAgente[]): Leccion[] {
   return out;
 }
 
-export type MesaMente = "TENDENCIA" | "REVERSION" | "ESTRUCTURA" | "METALES";
+export type MesaMente = "TENDENCIA" | "REVERSION" | "ESTRUCTURA" | "FLUJO" | "METALES";
 /** El carácter de cada mesa: cómo mira el mercado, en una frase. Es su identidad, no una predicción. */
 export const CARACTER: Record<MesaMente, string> = {
   TENDENCIA: "Soy paciente: voy con la corriente y no intento adivinar giros.",
   REVERSION: "Soy contrera: espero que el precio se pase de rosca y entro a la vuelta.",
   ESTRUCTURA: "Soy detective: leo rangos, barridas y huecos que deja el precio.",
+  FLUJO: "Soy lector de cinta: miro quién agrede y quién absorbe, y entro cuando el que empuja se queda sin fuerza.",
   METALES: "Soy del oro y la plata: espero que rompan máximos y voy solo comprado.",
 };
 
@@ -99,6 +100,7 @@ export function concienciaDe(agente: string, mesa: MesaMente, total: Estadistica
 export type AgenteMente = { id: string; agente: string; mesa: MesaMente; total: Estadistica; lecciones: Leccion[]; abiertas: { symbol: string; lado: string }[] };
 export type Dialogo = { tema: string; lineas: { quien: string; nombre: string; texto: string }[] };
 
+const NOMBRE_MESA: Record<MesaMente, string> = { TENDENCIA: "tendencia", REVERSION: "reversión", ESTRUCTURA: "estructura", FLUJO: "flujo", METALES: "metales" };
 const corto = (a: string) => a.replace(/^Agente\s+/, "");
 const linea = (a: AgenteMente, texto: string) => ({ quien: a.id, nombre: corto(a.agente), texto });
 
@@ -109,13 +111,13 @@ const linea = (a: AgenteMente, texto: string) => ({ quien: a.id, nombre: corto(a
 export function conversaciones(agentes: AgenteMente[]): Dialogo[] {
   const out: Dialogo[] = [];
   // 1. Dentro de cada mesa: el que mejor va y el que peor va, si los dos tienen cierres.
-  for (const mesa of ["TENDENCIA", "REVERSION", "ESTRUCTURA", "METALES"] as const) {
+  for (const mesa of ["TENDENCIA", "REVERSION", "ESTRUCTURA", "FLUJO", "METALES"] as const) {
     const con = agentes.filter((a) => a.mesa === mesa && a.total.cerradas > 0 && a.total.expectancia !== null).sort((a, b) => (b.total.expectancia ?? 0) - (a.total.expectancia ?? 0));
     if (con.length < 2) continue;
     const [mejor, peor] = [con[0], con[con.length - 1]];
     const chico = mejor.total.cerradas < MUESTRA_MINIMA || peor.total.cerradas < MUESTRA_MINIMA;
     out.push({
-      tema: `Mesa de ${mesa === "TENDENCIA" ? "tendencia" : mesa === "REVERSION" ? "reversión" : mesa === "METALES" ? "metales" : "estructura"}`,
+      tema: `Mesa de ${NOMBRE_MESA[mesa]}`,
       lineas: [
         linea(mejor, `Voy ${resumenGrupo(mejor.total)}.`),
         linea(peor, `Yo voy ${resumenGrupo(peor.total)}. Miramos parecido y nos va distinto.`),

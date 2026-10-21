@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 667 · objetivos: 18 · sin objetivo: 0
+- Archivos: 674 · objetivos: 18 · sin objetivo: 0
 - Tablas D1: 54 · secretos: 5 · variables de entorno: 25 · rutas /api: 57 · hosts: 60
-- Código de navegador: 70 archivos con "use client" que alcanzan 219 · problemas: 0
-- Lib sin prueba directa: 29 de 220
+- Código de navegador: 70 archivos con "use client" que alcanzan 222 · problemas: 0
+- Lib sin prueba directa: 28 de 223
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (89)
+### jarvis — JARVIS, la IA propia del software (90)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía. · Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -94,6 +94,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `scripts/investigacion/datos.py`
 - `scripts/investigacion/estrategias.ts` — El estudio de estrategias del AI TRADING LAB: cada agente mide su estrategia (lib/estrategias.ts) en las 10 monedas de datos-investigacion/, con velas de 1 h y de 4 h (y de 15 min
 - `scripts/investigacion/fib-busqueda.ts` — La búsqueda de la mejor configuración del agente Fibonacci + niveles clave (lib/fibonacci-niveles.ts) en 1 h, 4 h y 15 min, con las 10 monedas de datos-investigacion/ y los costos
+- `scripts/investigacion/flujo-estudio.ts` — Medición de la mesa de flujo (lib/flujo-agentes.ts, PLAN_FLUJO_AGENTES_1) en el historial: los tres agentes que se leen con velas y volumen (ABSORCION, ESFUERZO, BARRIDA_VOL), con
 - `scripts/investigacion/linea-busqueda.ts` — La búsqueda de la mejor confirmación y configuración de la ruptura de línea de tendencia (TENDENCIA_LINEA, lib/linea-busqueda.ts) en 1 h, 4 h y 15 min, con las 10 monedas de datos-
 - `scripts/investigacion/medir.ts` — Mide las reglas de la mesa en tres períodos que no se superponen, con costos más altos y de más de una manera.
 - `scripts/investigacion/modelos.ts` — Modelos chicos y sin dependencias para la investigación del aprendizaje: regresión ridge, regresión logística con L2, árboles potenciados poco profundos y AUC.
@@ -417,7 +418,7 @@ Pendiente: Entrar al registro unificado (FUENTES y lib/registro-db.ts) cuando un
 - `tests/axi-db.test.ts` — Pruebas del almacenamiento del diario de Axi (lib/axi-db.ts): que importar dos veces no duplique, que cada persona vea solo lo suyo, que el tope de 500 se cumpla sin COUNT(*) y que
 - `tests/axi-diario.test.ts` — Pruebas del diario de Axi (lib/axi-diario.ts): que cada ejecución del conector se valide o se rechace con su motivo, que un dato faltante no se complete con cero, que el neto sea p
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (81)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (87)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -428,7 +429,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `app/lab-fondeo.tsx` — Cuenta de fondeo y Agente Fondeo en el panel: la persona carga las reglas de su cuenta y su estado (saldo, resultado de hoy, riesgo abierto) y, al tocar «Leer la mesa», el agente p
 - `app/lab-mini-arana.tsx` — La mini araña del piso de estrategias: la misma araña del laboratorio (app/ai-trading-lab.tsx) en chico, una por agente, pintada con el color de su veredicto.
 - `app/lab-oficina.css` — La oficina 3D del fondo (app/lab-oficina.tsx).
-- `app/lab-oficina.tsx` — La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en tres mesas (tendencia, reversión y estructura), con pizarras en la pared (posiciones abier
+- `app/lab-oficina.tsx` — La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en mesas (tendencia, reversión, estructura, flujo de órdenes y metales), con pizarras en la p
 - `app/lab-piso.tsx` — El piso de estrategias del AI TRADING LAB.
 - `app/lab-universos.tsx` — Los universos de monedas en el panel: qué grupo vigila cada agente y, sobre todo, cuáles se pueden medir en el pasado y cuáles no.
 - `app/mapa-agentes.tsx` — Los agentes en el mapa de liquidaciones: el panel con sus posiciones en el par (servidor 24/7 y tu cuenta), la capa del gráfico con un marcador por posición y los niveles de la que
@@ -436,10 +437,12 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `docs/busqueda-amd.md` — Agente AMD + IFVG: medición con la regla fijada de antemano
 - `docs/busqueda-breaker.md` — Búsqueda de confirmación y configuración: breaker block
 - `docs/busqueda-fibonacci.md` — Búsqueda de configuración: Fibonacci + extensión + niveles clave
+- `docs/busqueda-flujo.md` — Mesa de flujo: medición con las reglas fijadas de antemano
 - `docs/busqueda-linea.md` — Búsqueda de confirmación y configuración: línea de tendencia
 - `docs/busqueda-smc.md` — Búsqueda del gatillo y la configuración: zonas altas + toma de liquidez + IFVG + breaker
 - `docs/estudio-axi.md` — Estudio de Axi: oro y NASDAQ
 - `docs/estudio-estrategias.md` — Estudio de estrategias del AI TRADING LAB
+- `lib/agentes-conocimiento.ts` — El conocimiento profesional que acompaña a cada agente de la oficina: los conceptos de lib/assistant/knowledge.ts (escritos y revisados una vez, no generados) que explican lo que s
 - `lib/agentes-explicado.ts` — Qué mira cada agente, en palabras de todos los días.
 - `lib/agentes-mente.ts` — La «mente» de cada agente de la oficina: identidad, memoria, lecciones, autoevaluación y conversaciones entre ellos.
 - `lib/agentes-papel.ts` — Todos los agentes del estudio corriendo hacia adelante en papel (PLAN_AGENTES_1).
@@ -456,6 +459,8 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/estudio-estrategias-datos.ts` — Resultado del estudio de estrategias (scripts/investigacion/estrategias.ts).
 - `lib/estudio-resumen.ts` — Un resumen corto y honesto del estudio de estrategias del laboratorio, para que JARVIS (Telegram y la app) hable de lo mismo que muestra el piso: qué estrategias tuvieron ventaja m
 - `lib/fibonacci-niveles.ts` — Agente Fibonacci + extensión + niveles clave: opera el retroceso de una pierna de impulso hacia la zona de Fibonacci, con la extensión de esa pierna como objetivo y, si se pide, so
+- `lib/flujo-agentes.ts` — Los agentes de flujo de órdenes (PLAN_FLUJO_AGENTES_1): cinco lecturas clásicas del orderflow, con números fijados antes de medir y una sola idea por agente.
+- `lib/flujo-lectura.ts` — La mesa de flujo mirando un gráfico: corre las cinco reglas de lib/flujo-agentes.ts (las mismas, con los mismos números) sobre las velas ya cerradas del mapa, en la temporalidad qu
 - `lib/fondeo.ts` — Cuentas de fondeo (prop firms) para XAUUSDT, XAGUSDT (plata) y NASDAQ, con prioridad, y el «Agente Fondeo»: un agente SIN estrategia propia que se conecta a los demás (la mesa de J
 - `lib/lab-arena.ts` — La arena del piso de estrategias del AI TRADING LAB: pone a todos los agentes en una misma tabla para que se vea quién gana y quién pierde, y cómo está cada uno conectado al cerebr
 - `lib/lab-evaluacion.ts` — La evaluación del AI TRADING LAB sobre un backtest de la mesa (lib/jarvis-backtest.ts): parte el período en DESARROLLO y EVALUACIÓN por fecha (corte fijado antes de mirar), y en ca
@@ -478,6 +483,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/smc-liquidez.ts` — El agente «Liquidez + IFVG + Breaker en zona de alta temporalidad» (SMC_LIQUIDEZ) y su búsqueda de disparo y configuración.
 - `lib/sobreajuste.ts` — Auditoría de sobreajuste: cuánto de un buen resultado puede ser suerte por haber probado muchas variantes.
 - `lib/universos.ts` — Los universos de monedas: grupos con los que trabajan los agentes (gemas, pumpeo, infraestructura y DeFi, las 10 del estudio).
+- `tests/agentes-conocimiento.test.ts` — Pruebas del conocimiento profesional de cada agente de la oficina (lib/agentes-conocimiento.ts): todos tienen conceptos revisados que explican su regla, los de flujo los de flujo,
 - `tests/agentes-explicado.test.ts` — Pruebas de las explicaciones de los agentes (lib/agentes-explicado.ts): que todos los agentes del estudio tengan la suya, que estén en castellano simple y que ninguna prometa ganan
 - `tests/agentes-mente.test.ts` — Pruebas de la mente de los agentes (lib/agentes-mente.ts): las lecciones salen de sus cierres con su muestra y solo son firmes con 15 casos de cada lado; la autoevaluación dice que
 - `tests/agentes-papel.test.ts` — Pruebas de los agentes en papel (lib/agentes-papel.ts): que no se mire el futuro, que la entrada sea la apertura siguiente con la escalera completa, que la clave no duplique entrad
@@ -489,6 +495,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/consenso.test.ts` — Pruebas del consenso entre agentes (lib/consenso.ts): que cuente bien quién coincide y quién va al revés, que nadie se cuente a sí mismo, y que la comparación no saque conclusiones
 - `tests/estrategias.test.ts` — pruebas: indicadores: EMA y RSI conocidos, ninguna estrategia mira el futuro: la señal en i no cambia si se borran las vela, operar: entra a la apertura siguiente, una operación por vez, con la escalera de (+1)
 - `tests/fibonacci-niveles.test.ts` — Pruebas del agente Fibonacci + extensión + niveles clave (lib/fibonacci-niveles.ts): la pierna armada a mano, la señal en la zona con su stop y su extensión, que el nivel clave la
+- `tests/flujo-agentes.test.ts` — Pruebas de los agentes de flujo de órdenes (lib/flujo-agentes.ts): cada lectura dispara en su caso de libro y no en el contrario, el delta sale del volumen agresor de Binance (sin
 - `tests/fondeo.test.ts` — Pruebas de las cuentas de fondeo y el Agente Fondeo (lib/fondeo.ts): instrumentos y prioridad, topes de las reglas, el estado de la cuenta, la compuerta (margen diario y total, col
 - `tests/lab-arena.test.ts` — Pruebas de la arena del piso de estrategias (lib/lab-arena.ts): el orden de mayor a menor R por operación, la conexión de cada agente con el cerebro, la muestra mínima, el interval
 - `tests/lab.test.ts` — AI TRADING LAB: el gestor de riesgo central frena lo que pasa los límites y nadie lo afloja más allá de los topes; la evaluación del backtest respeta la cronología; el centro de la
@@ -961,4 +968,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/mapa-agentes-db.ts`, `lib/mapa-agentes.ts`, `lib/mapa-memoria.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/mapa-agentes-db.ts`, `lib/mapa-memoria.ts`, `lib/market-brain.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

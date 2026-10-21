@@ -54,7 +54,8 @@ import { atomosMapa } from "@/lib/mapa-atomos";
 import { agruparMotivos } from "@/lib/reversal-zones";
 import { guardarLecturaMapa } from "@/lib/mapa-memoria";
 import type { MapaVivo } from "@/lib/mapa-agentes";
-import { CapaAgentes, PanelAgentes, useAgentesDelPar } from "./mapa-agentes";
+import { CapaAgentes, PanelAgentes, useAgentesDelPar, type MarcaFlujo } from "./mapa-agentes";
+import { haceVelas, lecturaFlujo } from "@/lib/flujo-lectura";
 import { findLiquidityPools, mergeMtfPools, type LiquidityPool, type MtfPool } from "@/lib/liquidity-pools";
 import { buildScenarios, type ScenarioBoard } from "@/lib/scenario-analysis";
 import { readFibZone, type FibZoneState } from "@/lib/fib-zone";
@@ -1597,6 +1598,11 @@ export default function LiquidationHeatmapDesk() {
       imanAbajo: layout.heatmap.topZoneBelow?.price ?? null,
     };
   }, [layout, livePrice, swingView, mapAtoms, pools]);
+  // La mesa de flujo leyendo las velas cerradas del gráfico (las mismas reglas de los agentes; lectura, no operación).
+  const flujoGrafico = useMemo(() => {
+    if (!layers.agentes || history.key !== `${symbol}:${timeframe}` || history.candles.length < 40) return null;
+    return { lectura: lecturaFlujo(history.candles), cerradas: history.candles, timeframe };
+  }, [layers.agentes, history, symbol, timeframe]);
   // La oficina (los agentes y JARVIS) habla con el mapa a la vista: se guarda lo leído, como mucho una vez por minuto o
   // cuando cambian las zonas (lib/mapa-memoria.ts).
   const ultimaLectura = useRef<{ clave: string; at: number }>({ clave: "", at: 0 });
@@ -1604,7 +1610,7 @@ export default function LiquidationHeatmapDesk() {
     if (!data || livePrice === null || data.heatmap.symbol !== symbol) return;
     const compra = reversalZones.filter((z) => z.side === "SOPORTE").map((z) => ({ low: z.low, high: z.high, stars: z.stars, kinds: z.kinds }));
     const venta = reversalZones.filter((z) => z.side === "RESISTENCIA").map((z) => ({ low: z.low, high: z.high, stars: z.stars, kinds: z.kinds }));
-    const clave = `${symbol}|${timeframe}|${[...compra, ...venta].map((z) => `${z.low.toPrecision(6)}-${z.stars}`).join(",")}`;
+    const clave = `${symbol}|${timeframe}|${[...compra, ...venta].map((z) => `${z.low.toPrecision(6)}-${z.stars}`).join(",")}|${flujoGrafico ? `${flujoGrafico.lectura.disparos.length}:${flujoGrafico.lectura.disparos[0]?.openTime ?? 0}` : "-"}`;
     const ahora = Date.now();
     if (clave === ultimaLectura.current.clave && ahora - ultimaLectura.current.at < 60_000) return;
     ultimaLectura.current = { clave, at: ahora };
@@ -1618,9 +1624,24 @@ export default function LiquidationHeatmapDesk() {
       imanArriba: data.heatmap.topZoneAbove?.price ?? null,
       imanAbajo: data.heatmap.topZoneBelow?.price ?? null,
       sesgo: data.heatmap.bias ?? null,
+      ...(flujoGrafico
+        ? {
+            flujo: flujoGrafico.lectura.disparos.slice(0, 5).map((d) => ({ codigo: d.codigo, regla: d.corto, lado: d.lado, hace: haceVelas(d, flujoGrafico.cerradas), cierre: d.cierre })),
+            flujoSinDelta: flujoGrafico.lectura.sinDelta,
+          }
+        : {}),
     });
-  }, [data, livePrice, reversalZones, symbol, timeframe]);
+  }, [data, livePrice, reversalZones, symbol, timeframe, flujoGrafico]);
   const agentesPar = useAgentesDelPar(symbol, layers.agentes);
+  const marcasFlujo = useMemo<MarcaFlujo[]>(() => {
+    if (!flujoGrafico || !layout) return [];
+    const indice = new Map(layout.candles.map((c, i) => [c.time, i] as const));
+    return flujoGrafico.lectura.disparos.flatMap((d) => {
+      const i = indice.get(d.openTime);
+      if (i === undefined) return [];
+      return [{ clave: `${d.id}-${d.openTime}`, x: layout.x(i), y: layout.y(d.extremo), lado: d.lado, codigo: d.codigo, titulo: `${d.corto}: ${d.lado === "LONG" ? "compra" : "venta"} al cierre ${priceLabel(d.cierre)} (lectura de la mesa de flujo, no operación)` }];
+    });
+  }, [flujoGrafico, layout]);
   const [agenteElegido, setAgenteElegido] = useState<string | null>(null);
   // Si la elegida ya no está (cambió el par o cerró), no hay elegida: se deriva, no se borra en un efecto.
   const elegidaAgente = agentesPar.abiertas.some((p) => p.clave === agenteElegido) ? agenteElegido : null;
@@ -3092,6 +3113,7 @@ export default function LiquidationHeatmapDesk() {
               {layers.agentes && (
                 <CapaAgentes
                   abiertas={agentesPar.abiertas}
+                  flujo={marcasFlujo}
                   elegida={elegidaAgente}
                   onElegir={setAgenteElegido}
                   y={layout.y}
@@ -3539,6 +3561,7 @@ export default function LiquidationHeatmapDesk() {
             <PanelAgentes
               symbol={symbol}
               datos={agentesPar}
+              flujo={flujoGrafico}
               precio={livePrice}
               mapa={mapaVivo}
               elegida={elegidaAgente}

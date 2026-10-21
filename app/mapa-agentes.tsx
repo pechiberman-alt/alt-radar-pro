@@ -10,6 +10,8 @@ import { diaAr, type Diario } from "../lib/aprendizaje-diario.ts";
 import { openLabTab } from "../lib/account-events.ts";
 import { textosFoto } from "../lib/mapa-contexto.ts";
 import { consensoPar, lecturaViva, rAhora, separar, type FilaPosicion, type MapaVivo, type PosicionAgente } from "../lib/mapa-agentes.ts";
+import { haceVelas, LECTORES_FLUJO, type LecturaFlujo } from "../lib/flujo-lectura.ts";
+import type { SwingCandle } from "../lib/swing-entries.ts";
 
 type Respuesta = { symbol: string; servidor: FilaPosicion[] | null; cuenta: FilaPosicion[] | null; sesion: boolean; diario: Diario | null };
 const REFRESCO_MS = 5 * 60_000;
@@ -68,9 +70,13 @@ const hace = (t: number) => {
 };
 const base = (symbol: string) => (symbol === "XAUUSDT" ? "ORO" : symbol === "XAGUSDT" ? "PLATA" : symbol === "PAXGUSDT" ? "ORO (PAXG)" : symbol.replace(/USDT$/, ""));
 
+/** Un disparo de la mesa de flujo dibujado en su vela: debajo del mínimo si es de compra, encima del máximo si es de venta. */
+export type MarcaFlujo = { clave: string; x: number; y: number; lado: "LONG" | "SHORT"; codigo: string; titulo: string };
+
 /** La capa del gráfico: un marcador por posición abierta en su entrada y, para la elegida, sus niveles de punta a punta. */
 export function CapaAgentes(props: {
   abiertas: PosicionAgente[];
+  flujo?: MarcaFlujo[];
   elegida: string | null;
   onElegir: (clave: string | null) => void;
   y: (precio: number) => number;
@@ -80,7 +86,7 @@ export function CapaAgentes(props: {
   abajo: number;
   fmt: (precio: number) => string;
 }) {
-  const { abiertas, elegida, onElegir, y, x0, ancho, arriba, abajo, fmt } = props;
+  const { abiertas, elegida, onElegir, y, x0, ancho, arriba, abajo, fmt, flujo = [] } = props;
   const dentro = (yy: number) => yy >= arriba && yy <= abajo;
   // Los marcadores se apilan hacia la izquierda cuando dos entradas caen a menos de 14 px.
   const marcas = [...abiertas].sort((a, b) => a.entrada - b.entrada).reduce<{ p: PosicionAgente; yy: number; col: number }[]>((acc, p) => {
@@ -102,6 +108,20 @@ export function CapaAgentes(props: {
     : [];
   return (
     <g className="ag-capa">
+      {flujo.map((m) => {
+        if (m.y < arriba - 2 || m.y > abajo + 2) return null;
+        const up = m.lado === "LONG";
+        const yy = up ? m.y + 9 : m.y - 9;
+        return (
+          <g key={m.clave} className={`ag-flujo ${up ? "up" : "down"}`} transform={`translate(${m.x},${yy})`}>
+            <title>{m.titulo}</title>
+            <path d={up ? "M-4 3 L0 -3 L4 3 Z" : "M-4 -3 L0 3 L4 -3 Z"} />
+            <text y={up ? 13 : -7} textAnchor="middle">
+              {m.codigo}
+            </text>
+          </g>
+        );
+      })}
       {sel && (
         <rect
           x={x0}
@@ -163,13 +183,15 @@ function Chips({ items }: { items: { tono: "bien" | "mal" | "neutro"; texto: str
 export function PanelAgentes(props: {
   symbol: string;
   datos: ReturnType<typeof useAgentesDelPar>;
+  /** La mesa de flujo leyendo las velas cerradas del gráfico (null mientras el mapa carga). */
+  flujo?: { lectura: LecturaFlujo; cerradas: SwingCandle[]; timeframe: string } | null;
   precio: number | null;
   mapa: MapaVivo | null;
   elegida: string | null;
   onElegir: (clave: string | null) => void;
   fmt: (precio: number) => string;
 }) {
-  const { symbol, datos, precio, mapa, elegida, onElegir, fmt } = props;
+  const { symbol, datos, precio, mapa, elegida, onElegir, fmt, flujo = null } = props;
   const { largos, cortos } = consensoPar(datos.abiertas);
   const total = largos + cortos;
   const par = base(symbol);
@@ -259,6 +281,8 @@ export function PanelAgentes(props: {
         </ul>
       )}
 
+      {flujo && <MesaFlujo flujo={flujo} par={par} fmt={fmt} />}
+
       {datos.cerradas.length > 0 && (
         <div className="ag-cierres">
           <h5>ÚLTIMOS CIERRES EN {par}</h5>
@@ -304,5 +328,48 @@ export function PanelAgentes(props: {
         financiero.
       </p>
     </section>
+  );
+}
+
+/** Lo que ve la mesa de flujo en el gráfico de ahora: las mismas cinco reglas, sobre las velas ya cerradas. Lectura, no operación. */
+function MesaFlujo({ flujo, par, fmt }: { flujo: { lectura: LecturaFlujo; cerradas: SwingCandle[]; timeframe: string }; par: string; fmt: (precio: number) => string }) {
+  const { lectura, cerradas, timeframe } = flujo;
+  const ultimos = lectura.disparos.slice(0, 6);
+  const ultimoDe = LECTORES_FLUJO.map((l) => ({ l, d: lectura.disparos.find((x) => x.id === l.id) ?? null }));
+  return (
+    <div className="ag-flujo-mesa">
+      <h5>
+        MESA DE FLUJO EN {par} {timeframe.toUpperCase()} <small>· últimas {lectura.velas} velas cerradas</small>
+      </h5>
+      <div className="ag-flujo-estado">
+        {ultimoDe.map(({ l, d }) => (
+          <span key={l.id} className={`ag-flujo-chip ${d ? (d.lado === "LONG" ? "up" : "down") : l.delta && lectura.sinDelta ? "sin" : ""}`} title={l.corto}>
+            <b>{l.codigo}</b> {d ? `${d.lado === "LONG" ? "▲" : "▼"} ${haceVelas(d, cerradas)}` : l.delta && lectura.sinDelta ? "sin volumen agresor" : "sin disparo"}
+          </span>
+        ))}
+      </div>
+      {ultimos.length ? (
+        <ul className="ag-flujo-lista">
+          {ultimos.map((d) => (
+            <li key={`${d.id}-${d.openTime}`} className={d.lado === "LONG" ? "up" : "down"}>
+              <span className="ag-cod">{d.codigo}</span>
+              <span>
+                {d.corto} {d.lado === "LONG" ? "▲ compra" : "▼ venta"} · {haceVelas(d, cerradas)} · cierre {fmt(d.cierre)}
+              </span>
+              <small>
+                SL {fmt(d.stop)} · TP {fmt(d.objetivo)} (2 R)
+              </small>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="ag-vacio">Ninguna de las cinco reglas disparó en estas velas: no hay absorción, esfuerzo, barrida ni delta que leer.</p>
+      )}
+      <p className="ag-nota">
+        Las mismas reglas de los agentes de flujo, sobre las velas cerradas de este gráfico: es una lectura para mirar, no una operación. En
+        papel operan solo en 4 h.{lectura.sinDelta ? " Estas velas no traen el volumen agresor (no vienen de Binance): las dos reglas de delta no pueden leer, y eso no es cero." : " El delta sale del volumen agresor de Binance."}{" "}
+        Medición en el historial: sin ventaja después de costos en 1 h y 15 min, sin conclusión en 4 h. No es asesoramiento financiero.
+      </p>
+    </div>
   );
 }

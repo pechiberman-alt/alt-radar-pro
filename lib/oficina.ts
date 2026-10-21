@@ -29,11 +29,12 @@ export { acuerdoDe } from "./agentes-mente.ts";
 
 export type FilaOficina = { clave: string; symbol: string; lado: string; r: number | null; desenlace: string; cerrada: number | null; detectada: number; foto?: string | null };
 
-export type MesaId = "TENDENCIA" | "REVERSION" | "ESTRUCTURA" | "METALES";
+export type MesaId = "TENDENCIA" | "REVERSION" | "ESTRUCTURA" | "FLUJO" | "METALES";
 export const MESAS: { id: MesaId; nombre: string; detalle: string }[] = [
   { id: "TENDENCIA", nombre: "Mesa de tendencia", detalle: "Siguen la dirección: medias, MACD, Supertrend y líneas." },
   { id: "REVERSION", nombre: "Mesa de reversión", detalle: "Esperan la vuelta: RSI, bandas, soportes y Fibonacci." },
   { id: "ESTRUCTURA", nombre: "Mesa de estructura", detalle: "Leen rangos, barridas y huecos: rupturas, SMC y AMD." },
+  { id: "FLUJO", nombre: "Mesa de flujo", detalle: "Leen la cinta: quién agrede, quién absorbe y dónde se barren los stops." },
   { id: "METALES", nombre: "Mesa de metales", detalle: "Solo oro y plata." },
 ];
 
@@ -43,6 +44,7 @@ const MESA_DE: Record<string, MesaId> = {
   [ID_ST]: "TENDENCIA",
   RSI: "REVERSION", BOLLINGER: "REVERSION", SNR: "REVERSION", SNR_HTF: "REVERSION", FIB_NIVELES: "REVERSION",
   RUPTURA: "ESTRUCTURA", MACD_MTF_SNR: "ESTRUCTURA", SMC_LIQUIDEZ: "ESTRUCTURA", SMC_TODO: "ESTRUCTURA", AMD_IFVG: "ESTRUCTURA",
+  ABSORCION: "FLUJO", ESFUERZO: "FLUJO", BARRIDA_VOL: "FLUJO", DELTA_DIV: "FLUJO", DELTA_ABSORBIDO: "FLUJO",
   METALES_D55: "METALES",
 };
 /** La mesa de un agente; uno nuevo sin mesa asignada va a estructura hasta que se le asigne (no se pierde). */
