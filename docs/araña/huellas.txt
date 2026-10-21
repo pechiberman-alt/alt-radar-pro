@@ -127,6 +127,7 @@ f587ee398177	49	app/futures-desk.css
 3f1ce5afa6c3	200	app/futures-log-report.tsx
 e46d0952fc25	248	app/futures-recorder.tsx
 d4d210b6bc48	9	app/globals.css
+d2e3d9959857	148	app/grafico-ar-tv.tsx
 e06ccaeb49df	30	app/install-panel.css
 def492abf855	146	app/install-panel.tsx
 08966d25ae55	67	app/institutional-desk.css
@@ -160,8 +161,8 @@ db0be99a3f89	499	app/market-brain.tsx
 89b25149b415	141	app/market-structure-panel.tsx
 244b15230fb0	48	app/market-structure.css
 6598a486ff67	349	app/mercado-ar-desk.tsx
-d1450c8e74dc	448	app/mercado-ar-vistas.tsx
-efbf0a2bc40c	111	app/mercado-ar.css
+4ba98720cfe2	322	app/mercado-ar-vistas.tsx
+6079fe3cd1d1	118	app/mercado-ar.css
 4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
 3da71069ee49	75	app/open-heatmap.css
@@ -211,7 +212,7 @@ bd6422c65a0d	358	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-d3de7da08d02	385	docs/araña/objetivos.md
+96b782b2980d	386	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -485,7 +486,7 @@ cd048d1dc164	111	lib/upstream-cache.ts
 377195420212	161	lib/web-push.ts
 19e2de71f66e	6	next-env.d.ts
 89327ac52fc9	8	next.config.ts
-d0a9b2e42716	53	package.json
+ed89cf941ea2	54	package.json
 8f8be689e9af	8	postcss.config.mjs
 220b8c8ea6cb	2	public/2ef6b9791a8f7e4abb3d34f228548ac2.txt
 676ebcb8018c	0	public/anuncio/altradar-anuncio.mp4

@@ -108,3 +108,10 @@ button.ar-agente{background:none;border:0;border-top:1px solid #17201c;color:inh
 .sm-conversa{display:grid;gap:5px;max-height:260px;overflow:auto}
 .of-sala-mentes{margin-top:18px;display:grid;gap:8px}
 .sm-globo-abajo{bottom:auto;top:calc(100% + 4px)}.sm-globo-abajo:after{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:#e7eee9}
+/* El gráfico estilo terminal (lightweight-charts). */
+.ar-tv{display:grid;gap:6px}
+.ar-tv-caja{width:100%;height:360px;border:1px solid #1e2a3d;border-radius:8px;overflow:hidden;background:#0b1220}
+@media(min-width:700px){.ar-tv-caja{height:520px}}
+.ar-tv-leyenda{display:flex;flex-wrap:wrap;gap:4px 10px;font:11px var(--font-mono);color:#9fb0c8}
+.ar-tv-leyenda b{color:var(--text)}
+.ar-tv-capas button{font-size:9px;padding:6px 8px}

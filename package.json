@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
+    "lightweight-charts": "5.1.0",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
