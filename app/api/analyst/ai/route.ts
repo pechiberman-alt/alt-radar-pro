@@ -7,6 +7,7 @@ import { getSecret } from "@/lib/app-settings";
 import { KNOWLEDGE } from "@/lib/assistant/knowledge";
 import { getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 import { listMemory, memoryBlock } from "@/lib/jarvis-memory";
+import { limpiarRespuesta, sistemaPersona, type Persona } from "@/lib/ia-respuesta";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
   const user = await getSessionUser(env.DB, session);
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
 
-  const body = (await request.json().catch(() => null)) as { question?: string; snapshot?: unknown; history?: ChatTurn[] } | null;
+  const body = (await request.json().catch(() => null)) as { question?: string; snapshot?: unknown; history?: ChatTurn[]; persona?: Persona } | null;
   const question = typeof body?.question === "string" ? body.question.trim() : "";
   if (!question) return NextResponse.json({ error: "PREGUNTA VACÍA" }, { status: 400 });
 
@@ -40,13 +41,16 @@ export async function POST(request: NextRequest) {
     { role: "user", content: buildUserMessage(question, body?.snapshot ?? {}, memoryBlock(notes)) },
   ];
   const ai = (env as unknown as { AI?: AiLike }).AI ?? null;
-  const r = await answerWithBrains(env.DB, user.id, { claude: claude.value, groq: groq.value }, ai, SYSTEM, messages);
+  // Un agente de la oficina o una mente habla con su propio prompt corto (lib/ia-respuesta.ts); JARVIS y el ANALISTA, con el suyo.
+  const p = body?.persona;
+  const persona = p && typeof p.nombre === "string" && typeof p.rol === "string" ? { nombre: p.nombre.slice(0, 80), rol: p.rol.slice(0, 160), idea: typeof p.idea === "string" ? p.idea.slice(0, 240) : undefined } : null;
+  const r = await answerWithBrains(env.DB, user.id, { claude: claude.value, groq: groq.value }, ai, persona ? sistemaPersona(persona) : SYSTEM, messages);
   if (!r.ok) {
     console.error("[ALT_RADAR_AI]", r.error, r.tried.map((t) => `${t.brain}: ${t.error}`).join(" · "));
     return NextResponse.json({ error: r.error, local: true }, { status: r.error === "SIN IA POR HOY" ? 429 : 502 });
   }
   return NextResponse.json({
-    text: r.text,
+    text: limpiarRespuesta(r.text),
     brain: r.brain,
     label: BRAIN_LABEL[r.brain],
     model: MODEL[r.brain],

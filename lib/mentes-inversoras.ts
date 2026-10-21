@@ -117,6 +117,8 @@ export type Metricas = {
   perMotivo: string | null;
   roePromedio: number | null;
   pasivoPatrimonio: number | null;
+  /** Deuda financiera de largo plazo sobre patrimonio; null si la empresa no la reporta con esos nombres. */
+  deudaPatrimonio: number | null;
   liquidez: number | null;
   /** Crecimiento anual compuesto del BPA y de los ingresos en los ejercicios disponibles. */
   cagrBpa: number | null;
@@ -166,6 +168,7 @@ export function metricas(simbolo: string, fund: Fundamentales, precioUsd: number
     perMotivo,
     roePromedio: roes.length >= 3 ? roes.reduce((s, x) => s + x, 0) / roes.length : null,
     pasivoPatrimonio: ult.pasivo !== null && ult.patrimonio !== null && ult.patrimonio > 0 ? ult.pasivo / ult.patrimonio : null,
+    deudaPatrimonio: ult.deuda !== null && ult.patrimonio !== null && ult.patrimonio > 0 ? ult.deuda / ult.patrimonio : null,
     liquidez: ult.activoCorriente !== null && ult.pasivoCorriente !== null && ult.pasivoCorriente > 0 ? ult.activoCorriente / ult.pasivoCorriente : null,
     cagrBpa: conBpa.length >= 3 ? cagr(conBpa[0].bpa, conBpa.at(-1)!.bpa, aniosEntre(conBpa[0].fin, conBpa.at(-1)!.fin)) : null,
     cagrIngresos: conIng.length >= 3 ? cagr(conIng[0].ingresos, conIng.at(-1)!.ingresos, aniosEntre(conIng[0].fin, conIng.at(-1)!.fin)) : null,
@@ -202,7 +205,7 @@ function mentesDeValor(x: EntradaMentes): LecturaMente[] {
   const buffett: Criterio[] = m
     ? [
         crit("Rentabilidad alta y estable", "ROE promedio de los ejercicios ≥ 15 %", m.roePromedio, pct, (v) => v >= 0.15),
-        crit("Poca deuda", "pasivo total ≤ 1 vez el patrimonio", m.pasivoPatrimonio, (v) => `${num(v)} veces`, (v) => v <= 1),
+        crit("Poca deuda", "deuda financiera de largo plazo ≤ 0,5 veces el patrimonio (no todo el pasivo: los anticipos de clientes o los depósitos de un banco no son deuda que hay que refinanciar)", m.deudaPatrimonio, (v) => `${num(v)} veces`, (v) => v <= 0.5, "la empresa no reporta deuda de largo plazo con ese nombre"),
         crit("Ganancias que crecen", "BPA del último ejercicio mayor que el del primero, con a lo sumo una caída", m.caidasBpa === null || m.bpaTotal === null ? null : m.bpaTotal, pct, (v) => v > 0 && (m.caidasBpa ?? 9) <= 1),
         perCrit(25),
       ]

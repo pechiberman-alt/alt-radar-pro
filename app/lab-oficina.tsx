@@ -22,6 +22,7 @@ import { MONEDAS_SERVIDOR, PLAN_SERVIDOR } from "../lib/agentes-servidor.ts";
 import { openInMap } from "../lib/account-events.ts";
 import { lecturaMapa, lecturaParaIa, lecturasMapa, onLecturaMapa, type LecturaMapa } from "../lib/mapa-memoria.ts";
 import MiniArana from "./lab-mini-arana";
+import { intencionDe, respondeLoPreguntado, respuestaDirecta, type Ficha } from "../lib/ia-respuesta.ts";
 import SalaMentes from "./sala-mentes";
 import { panelCompleto, type LecturaPapel } from "../lib/mercado-ar-cliente.ts";
 import { guionReunion } from "../lib/mercado-ar-ranking.ts";
@@ -507,7 +508,7 @@ export default function LabOficina() {
    * Hablar con alguien de la oficina (un agente o JARVIS): la misma IA que JARVIS, con sus datos y en primera persona. Sin IA,
    * responde con lo que ya dice (motor local). Nadie cambia una regla ni da órdenes desde acá.
    */
-  async function preguntar(quien: { id: string; nombre: string; instruccion: string; datos: unknown; local: string[] }) {
+  async function preguntar(quien: { id: string; nombre: string; rol: string; instruccion: string; datos: unknown; local: string[]; ficha: Ficha }) {
     const texto = pregunta.trim();
     if (!texto) return;
     const anotar = (l: Linea) => setChat((c) => ({ ...c, [quien.id]: [...(c[quien.id] ?? []), l] }));
@@ -520,12 +521,28 @@ export default function LabOficina() {
       anotar({ de: "agente", texto: concepto ?? (quien.local.length ? quien.local.join(" ") : "Todavía no tengo datos para contarte."), cerebro: `motor local (${por})` });
     // Si nombra un par que el mapa leyó hace poco, esa lectura va con la pregunta.
     const nombrados = lecturasMapa().filter((l) => new RegExp(`\\b${l.symbol.replace(/USDT$/, "")}\\b`, "i").test(texto) || (l.symbol === "PAXGUSDT" && /\boro\b/i.test(texto)));
+    // Las preguntas de siempre («¿qué tenés abierto?», «¿cómo te va?», un concepto) se contestan con el dato exacto, sin IA.
+    const intencion = intencionDe(texto, nombrados.length > 0);
+    const sobreActivo = nombrados.length
+      ? (() => {
+          const l = nombrados[0];
+          const mia = quien.ficha.abiertas.filter((a) => a.startsWith(nombreActivo(l.symbol)));
+          return `${nombreActivo(l.symbol)}: ${mia.length ? `tengo ${mia.join(", ")}` : "no tengo posición"}. Lo que leyó el mapa: ${lineasMapa(l).slice(1).join(" · ") || "sin zonas cerca"}.`;
+        })()
+      : null;
+    const directa = concepto ?? respuestaDirecta(intencion, quien.ficha, sobreActivo);
+    if (directa) {
+      anotar({ de: "agente", texto: directa, cerebro: concepto ? "conocimiento revisado" : "dato exacto" });
+      setPensando(false);
+      return;
+    }
     try {
       const r = await fetch("/api/analyst/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: `${quien.instruccion} Respondé en primera persona, corto y en español rioplatense, solo con los datos del resumen. Si un dato no está, decilo. No cambiás reglas, no das órdenes y no es asesoramiento financiero. Pregunta: ${texto}`,
+          question: texto,
+          persona: { nombre: quien.nombre, rol: quien.rol, idea: quien.instruccion },
           snapshot: { asistente: quien.nombre, datos: quien.datos, ...(nombrados.length ? { mapaDeLoQuePreguntas: nombrados.slice(0, 2).map(lecturaParaIa) } : {}) },
           history: (chat[quien.id] ?? []).slice(-6).map((l) => ({ role: l.de === "vos" ? "user" : "assistant", content: l.texto })),
         }),
@@ -534,6 +551,8 @@ export default function LabOficina() {
       if (r.status === 429) return local("se terminó la IA gratis de hoy");
       const d = (await r.json().catch(() => ({}))) as { text?: string; label?: string };
       if (!r.ok || !d.text) return local("la IA no respondió");
+      // Una respuesta que no toca lo preguntado no se muestra: contesta el motor local con los datos.
+      if (!respondeLoPreguntado(d.text, intencion, nombrados.map((l) => nombreActivo(l.symbol)))) return local("la IA se fue de tema");
       anotar({ de: "agente", texto: d.text, cerebro: d.label });
     } catch {
       local("sin conexión");
@@ -546,7 +565,17 @@ export default function LabOficina() {
   const personaAgente = (e: Escritorio) => ({
     id: e.id,
     nombre: e.agente,
-    instruccion: `Hablás como ${e.agente}, un agente de papel de la oficina del fondo. «mapa» es lo que leyó el mapa de liquidaciones en este navegador para los pares donde tenés posición (zonas de compra y de venta, imanes y lo que vio la mesa de flujo); «mapaDeLoQuePreguntas», el del par que nombra la pregunta. Usalos si te preguntan por un activo; si no están, decí que abran el mapa en ese par. «conocimiento» es la teoría profesional de lo que mirás: explicala con tus palabras y con su cuidado, sin prometer resultados.`,
+    rol: "un agente de papel de la oficina del fondo (opera con plata ficticia y se mide)",
+    instruccion: `operás con una regla fija (está en «regla»). «mapa» es lo que leyó el mapa de liquidaciones para los pares donde tenés posición; «mapaDeLoQuePreguntas», el del par que nombra la pregunta. Si te preguntan por un activo que no está ahí, decí que abran el mapa en ese par`,
+    ficha: {
+      nombre: e.agente,
+      abiertas: e.abiertas.map((a) => `${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"} desde el ${new Date(a.detectada).toLocaleDateString("es-AR")}${a.veredicto ? ` (${TEXTO_V[a.veredicto]})` : ""}`),
+      resultado: e.total.cerradas
+        ? `Llevo ${e.total.cerradas} ${e.total.cerradas === 1 ? "cerrada" : "cerradas"}: acierto ${pct(e.total.winRate)}, factor de ganancia ${n2(e.total.profitFactor)} y ${r2(e.total.expectancia)} por operación${e.total.muestra === "MINIMA" ? " (muestra mínima: todavía puede ser suerte)" : ""}. Esta semana: ${e.semana.cerradas ? `${r2(e.semana.neto)} en ${e.semana.cerradas}` : "sin cierres"}.`
+        : null,
+      regla: `Mi regla, fija: ${ESTRATEGIAS.find((x) => x.id === e.id)?.regla ?? e.mira}`,
+      aprendizajes: e.lecciones.map((l) => l.texto),
+    },
     // Sin IA contesta con lo que ya dice; si todavía no dijo nada, con cómo se ve (siempre tiene algo honesto para contar).
     local: ((propias) => (propias.length ? propias : [e.conciencia]))(frases.filter((f) => f.quien === e.id).map((f) => f.texto)),
     datos: forAi({
@@ -563,7 +592,8 @@ export default function LabOficina() {
       comoSeVe: e.conciencia,
       lecciones: e.lecciones.map((l) => l.texto),
       mapa: [...new Set(e.abiertas.map((a) => a.symbol))].map((sym) => lecturaMapa(sym)).filter((l): l is LecturaMapa => l !== null).map(lecturaParaIa),
-      conocimiento: conocimientoParaIa(conocimientoDe(e.id, e.mesa)),
+      // La teoría solo va si la pregunta es de teoría (así no la recita cuando le preguntan otra cosa).
+      ...(/\b(qu[eé] es|expl[ií]c|c[oó]mo funciona|por qu[eé]|teor[ií]a|concepto)/i.test(pregunta) ? { conocimiento: conocimientoParaIa(conocimientoDe(e.id, e.mesa)) } : {}),
       mapasLeidosEnEsteNavegador: lecturas.map((l) => nombreActivo(l.symbol)),
       diarioDeLaOficina: diarioParaIa(diaSel),
     }),
@@ -571,7 +601,15 @@ export default function LabOficina() {
   const personaJarvis = () => ({
     id: "JARVIS",
     nombre: "JARVIS",
-    instruccion: "Sos JARVIS y coordinás la oficina del fondo: ves a todos los agentes, el fondo simulado, lo que aprenden cada día (diario) y lo que leyó el mapa de liquidaciones (mapa).",
+    rol: "la IA que coordina la oficina del fondo",
+    instruccion: "ves a todos los agentes, el fondo simulado, lo que aprenden cada día (diario) y lo que leyó el mapa de liquidaciones (mapa)",
+    ficha: {
+      nombre: "JARVIS",
+      abiertas: oficina.escritorios.flatMap((e) => e.abiertas.map((a) => `${nombreCorto(e.agente)} ${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "largo" : "corto"}`)),
+      resultado: `El fondo simulado va ${usdTxt(oficina.fondo.netoUsd, true)} (${oficina.fondo.retornoPct.toFixed(2).replace(".", ",")} %) con ${oficina.fondo.cierres} cierres. Ficticio: no es dinero real.`,
+      regla: "Coordino la oficina: cada agente opera su regla fija en papel y se mide contra el azar; yo no opero ni cambio reglas.",
+      aprendizajes: [oficina.aprendizaje.texto],
+    } as Ficha,
     local: [oficina.aprendizaje.texto, `El fondo simulado va ${usdTxt(oficina.fondo.netoUsd, true)} con ${oficina.fondo.cierres} cierres.`, ...(diaSel ? [`Diario del ${fechaDia(diaSel.dia)}: ${resumenDia(diaSel)}`] : [])],
     datos: { oficina: oficinaParaIa(oficina, plan), diario: diarioParaIa(diaSel), mapa: lecturas.slice(0, 3).map(lecturaParaIa) } as unknown,
   });

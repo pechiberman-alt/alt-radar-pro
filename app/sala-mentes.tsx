@@ -14,6 +14,7 @@ import { panelCompleto, type LecturaPapel } from "@/lib/mercado-ar-cliente";
 import { guionReunion, intervencion, type Intervencion } from "@/lib/mercado-ar-ranking";
 import { AVISO_MENTES, type LecturaMente, type MenteId } from "@/lib/mentes-inversoras";
 import { openArEnMapa } from "@/lib/account-events";
+import { intencionDe, respondeLoPreguntado, respuestaDirecta } from "@/lib/ia-respuesta";
 
 /** Iniciales y lugar de cada escritorio en la sala (en % del ancho y del alto). */
 const LUGAR: Record<MenteId, { ini: string; corto: string; x: number; y: number }> = {
@@ -113,19 +114,45 @@ export default function SalaMentes() {
       const x = l ? suya(l) : null;
       anotar({ de: "mente", texto: x && l ? `${l.papel.ticker}: ${intervencion(x).texto}` : "Todavía no leí ese papel.", cerebro: `motor local (${por})` });
     };
+    // Las preguntas de siempre se contestan con el dato exacto, sin IA.
+    const aFavorEn = panel.filter((l) => suya(l)?.postura === "A FAVOR").map((l) => l.papel.ticker);
+    const enContraEn = panel.filter((l) => suya(l)?.postura === "EN CONTRA").map((l) => l.papel.ticker);
+    const intencion = /\b(compr|a favor|te gusta|recomend|eleg|mejor)/i.test(texto) && !nombrado ? "FAVORITOS" : intencionDe(texto, Boolean(nombrado));
+    const x = nombrado ? suya(nombrado) : null;
+    const directa =
+      intencion === "FAVORITOS"
+        ? `Hoy estoy a favor en ${aFavorEn.join(", ") || "ningún papel"}${enContraEn.length ? ` y en contra en ${enContraEn.join(", ")}` : ""}. Cuento criterios, no es una probabilidad ni asesoramiento financiero.`
+        : respuestaDirecta(intencion, {
+            nombre: m.mente,
+            abiertas: [],
+            resultado: `No opero: leo papeles con mis criterios. Hoy estoy a favor en ${aFavorEn.length} y en contra en ${enContraEn.length} de ${panel.length}.`,
+            regla: `${m.idea}. Miro: ${m.criterios.map((c) => `${c.nombre.toLowerCase()} (${c.regla})`).join("; ")}.`,
+            aprendizajes: [],
+          }, nombrado && x ? `${nombrado.papel.ticker}: ${intervencion(x).texto}` : null);
+    if (directa && intencion !== "ABIERTAS") {
+      anotar({ de: "mente", texto: directa, cerebro: "dato exacto" });
+      setPensando(false);
+      return;
+    }
+    if (intencion === "ABIERTAS") {
+      anotar({ de: "mente", texto: `No opero ni tengo posiciones: leo papeles. Hoy estoy a favor en ${aFavorEn.join(", ") || "ninguno"}.`, cerebro: "dato exacto" });
+      setPensando(false);
+      return;
+    }
     try {
       const r = await fetch("/api/analyst/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: `Hablás como «${m.mente}», una lente de la sala de las mentes de ALT RADAR PRO inspirada en lo que esa persona publicó: NO sos esa persona ni hablás en su nombre, y si te lo preguntan lo aclarás. Tu idea: ${m.idea}. Respondé en primera persona como la lente, corto y en español rioplatense, solo con los datos del resumen (tus criterios con sus valores en cada papel de BYMA). Si un dato no está, decilo. No das órdenes y no es asesoramiento financiero. Pregunta: ${texto}`,
+          question: texto,
+          persona: { nombre: m.mente, rol: "una de las mentes de la sala que leen acciones y CEDEARs de BYMA con criterios fijos", idea: `${m.idea}; tus criterios con sus valores en cada papel están en el SNAPSHOT` },
           snapshot: forAi({
             asistente: m.mente,
             aviso: AVISO_MENTES,
             papelPreguntado: nombrado ? { papel: nombrado.papel.ticker, nombre: nombrado.papel.nombre, lectura: suya(nombrado) } : null,
             papelDeLaReunion: actual ? { papel: actual.papel.ticker, lectura: suya(actual) } : null,
-            aFavorEn: panel.filter((l) => suya(l)?.postura === "A FAVOR").map((l) => l.papel.ticker),
-            enContraEn: panel.filter((l) => suya(l)?.postura === "EN CONTRA").map((l) => l.papel.ticker),
+            aFavorEn,
+            enContraEn,
           }),
           history: (chat[m.id] ?? []).slice(-6).map((l) => ({ role: l.de === "vos" ? "user" : "assistant", content: l.texto })),
         }),
@@ -134,6 +161,7 @@ export default function SalaMentes() {
       if (r.status === 429) return local("se terminó la IA gratis de hoy");
       const d = (await r.json().catch(() => ({}))) as { text?: string; label?: string };
       if (!r.ok || !d.text) return local("la IA no respondió");
+      if (!respondeLoPreguntado(d.text, intencion === "FAVORITOS" ? "OTRA" : intencion, nombrado ? [nombrado.papel.ticker] : [])) return local("la IA se fue de tema");
       anotar({ de: "mente", texto: d.text, cerebro: d.label });
     } catch {
       local("sin conexión");

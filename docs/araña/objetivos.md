@@ -77,8 +77,9 @@ balances: fundamentales-sec, fundamentales, sec, edgar
 
 ## jarvis — JARVIS, la IA propia del software
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
-Archivos: lib/jarvis*.ts, lib/mesa-medicion.ts, lib/mesa-sombra*.ts, lib/hands-free*.ts, lib/ai-*.ts, lib/assistant/**, lib/speech-text.ts, lib/browser-voice.ts, app/jarvis*, app/assistant-console.tsx, app/api/jarvis/**, app/api/analyst/**, app/api/telegram/webhook/**, docs/mesa-*.md, scripts/investigacion/**
+Archivos: lib/jarvis*.ts, lib/mesa-medicion.ts, lib/mesa-sombra*.ts, lib/hands-free*.ts, lib/ai-*.ts, lib/assistant/**, lib/speech-text.ts, lib/browser-voice.ts, app/jarvis*, app/assistant-console.tsx, app/api/jarvis/**, app/api/analyst/**, app/api/telegram/webhook/**, docs/mesa-*.md, scripts/investigacion/**, lib/ia-respuesta.ts, tests/ia-respuesta.test.ts
 Reglas:
+- Respuestas de la IA (lib/ia-respuesta.ts), para JARVIS, el ANALISTA, los agentes de la oficina y las MENTES: las preguntas de siempre (qué tenés abierto, cómo te va, qué mirás, qué ves en X, un concepto) se contestan con el dato exacto sin IA; lo demás va a la IA con un prompt de persona corto (inspirado en virattt/ai-hedge-fund, MIT: la persona es solo el prompt, razona con los datos que recibe y si no alcanzan lo dice), sin markdown ni razonamiento oculto, y una respuesta que no toca lo preguntado se descarta. Una persona con nombre de inversor real nunca habla como esa persona.
 - Identidad: «JARVIS — ALT RADAR PRO AI». Nunca se presenta como otra IA ni nombra el modelo.
 - El navegador nunca llama a un proveedor de IA: pasa por /api/analyst/ai o /api/jarvis/*. Las claves nunca salen del Worker.
 - Solo se recuerda lo que la persona pidió recordar (lib/jarvis-memory.ts) y va en cada pregunta.

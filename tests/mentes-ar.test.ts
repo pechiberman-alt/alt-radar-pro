@@ -73,7 +73,7 @@ function fundDe(anios: { fin: string; ing: number; gn: number; bpa: number; pat:
     fuente: "SEC",
     leido: 0,
     faltantes: [],
-    ejercicios: anios.map((a) => ({ fin: a.fin, ingresos: a.ing, gananciaNeta: a.gn, bpa: a.bpa, patrimonio: a.pat, pasivo: a.pas, activoCorriente: a.ac ?? null, pasivoCorriente: a.pc ?? null })),
+    ejercicios: anios.map((a) => ({ fin: a.fin, ingresos: a.ing, gananciaNeta: a.gn, bpa: a.bpa, patrimonio: a.pat, pasivo: a.pas, deuda: a.pas / 2, activoCorriente: a.ac ?? null, pasivoCorriente: a.pc ?? null })),
   };
 }
 

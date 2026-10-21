@@ -24,7 +24,7 @@ e23fd9d98482	81	app/alert-toasts.tsx
 19408d68277e	167	app/api/admin/settings/route.ts
 45b256c81a5a	49	app/api/alerts/latest/route.ts
 03cbeef8a626	52	app/api/alerts/prebreak/route.ts
-6b4b0cad841f	58	app/api/analyst/ai/route.ts
+5d0411f5c449	62	app/api/analyst/ai/route.ts
 5f25e873c7ca	55	app/api/arana/ultimo/route.ts
 e6ca04d22a7f	73	app/api/auth/login/route.ts
 6b5d9403bf5d	21	app/api/auth/logout/route.ts
@@ -147,7 +147,7 @@ b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
 525a37f5e879	249	app/lab-oficina.css
-f654a23c5818	1277	app/lab-oficina.tsx
+e9647da6350a	1315	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -186,7 +186,7 @@ bd46935a341e	1381	app/radar-app.tsx
 57216ff5dacb	344	app/risk-desk.tsx
 712a705a7619	25	app/robot-signals-desk.css
 bb570d5787dc	402	app/robot-signals-desk.tsx
-2a5f5b2bd3af	269	app/sala-mentes.tsx
+b3a46b3fb163	297	app/sala-mentes.tsx
 1db656ad7025	174	app/scalping-desk.css
 d180ba5315c4	324	app/scalping-desk.tsx
 12f05e090902	80	app/secure-brain.css
@@ -213,7 +213,7 @@ c32c087d3f1a	360	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-e5b8236aab9a	388	docs/araña/objetivos.md
+e0682c661c76	389	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -260,7 +260,7 @@ a5b1181badec	171	lib/agentes-mente.ts
 f6460772c0c5	23	lib/agentes-servidor-run.ts
 287c2c8299e2	109	lib/agentes-servidor.ts
 d506fd48228f	81	lib/ai-analyst-server.ts
-009e4bbb2f90	158	lib/ai-analyst.ts
+adf5f9e4d046	160	lib/ai-analyst.ts
 d42a4a08e452	193	lib/ai-brains.ts
 e00b01e9347b	87	lib/ai-cascade.ts
 b8e38621b74b	46	lib/ai-numbers.ts
@@ -327,12 +327,13 @@ a46bc4f80884	173	lib/fibonacci-niveles.ts
 0e13f43a62cd	163	lib/flujo.ts
 c6aaa6fce865	216	lib/fondeo.ts
 ce068942f617	401	lib/footprint.ts
-94380b425291	213	lib/fundamentales-sec.ts
+405bcf5618e0	216	lib/fundamentales-sec.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
 dfc52ea472c0	115	lib/futures-risk.ts
 86351172d0c2	288	lib/hands-free.ts
 4df24a38c7bb	141	lib/ia-editor.ts
+d6be0531de72	101	lib/ia-respuesta.ts
 619425206c2d	149	lib/inducement.ts
 cd4af39e8ba8	322	lib/institutional-flows.ts
 f83a7c4a72ca	222	lib/jarvis-analyst.ts
@@ -397,7 +398,7 @@ dad5e13476dd	150	lib/mapa-agentes.ts
 c5ba3f905dda	317	lib/market-fetch.ts
 92529383cd86	434	lib/market-providers.ts
 dca52626b743	252	lib/market-structure.ts
-52366d3220c1	354	lib/mentes-inversoras.ts
+d1dd9920065f	357	lib/mentes-inversoras.ts
 10b738288f9a	99	lib/mercado-ar-agentes.ts
 3f6ce36db908	214	lib/mercado-ar-cliente.ts
 ce75623846e9	103	lib/mercado-ar-fuente.ts
@@ -605,6 +606,7 @@ a3b08c3b70ce	282	tests/hands-free.test.ts
 27b5bf9632d2	26	tests/helpers/setups.ts
 12c25e790757	159	tests/herramientas.test.ts
 3140cac232eb	119	tests/ia-editor.test.ts
+5d4c8742f9ed	55	tests/ia-respuesta.test.ts
 adcae854588e	101	tests/inducement.test.ts
 edf787ad8d65	124	tests/institutional-flows.test.ts
 aaee341fbbff	431	tests/investigacion.test.ts
@@ -650,7 +652,7 @@ c90b4a2a66b4	70	tests/live-market.test.ts
 9ba8d41b41a9	95	tests/mapa-contexto.test.ts
 e46e93dda3df	226	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
-f48827a4672a	227	tests/mentes-ar.test.ts
+2e883b26c842	227	tests/mentes-ar.test.ts
 600bb362ca80	105	tests/mercado-ar-ranking.test.ts
 5dbee8601d14	101	tests/mercado-ar-tecnico.test.ts
 d435514e5aa5	277	tests/mercado-ar.test.ts
