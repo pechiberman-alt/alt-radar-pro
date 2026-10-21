@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 674 · objetivos: 18 · sin objetivo: 0
-- Tablas D1: 54 · secretos: 5 · variables de entorno: 25 · rutas /api: 57 · hosts: 60
-- Código de navegador: 70 archivos con "use client" que alcanzan 222 · problemas: 0
-- Lib sin prueba directa: 28 de 223
+- Archivos: 683 · objetivos: 19 · sin objetivo: 0
+- Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 59 · hosts: 60
+- Código de navegador: 72 archivos con "use client" que alcanzan 224 · problemas: 0
+- Lib sin prueba directa: 28 de 225
 
 ## Objetivos
 
@@ -342,9 +342,10 @@ Texto: cómo llega el código a producción, cómo corre en el Worker y la confi
 - `worker/index.ts` — Cloudflare Worker entry point for the vinext-starter template.
 - `wrangler.production.jsonc`
 
-### seguridad — Sesiones, secretos y claves (15)
+### seguridad — Sesiones, secretos y claves (16)
 Texto: quién entra, cómo se guardan los secretos y qué nunca sale del servidor.
 Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que quedaron a la vista en el chat. · Poner ENCRYPTION_KEY como secreto del Worker (ya no rompe las claves de Binance guardadas). Con dominio propio, sumar la regla de límite de pedidos del WAF.
+- `app/api/admin/cobros/route.ts` — exporta: dynamic, GET, POST
 - `app/api/admin/settings/route.ts` — exporta: dynamic, GET, POST, PUT, DELETE
 - `app/api/auth/login/route.ts` — exporta: dynamic, POST
 - `app/api/auth/logout/route.ts` — exporta: dynamic, POST
@@ -360,6 +361,18 @@ Pendiente: Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que q
 - `lib/secret-box.ts` — AES-GCM with a base64 32-byte key: iv (12 bytes) + ciphertext, base64.
 - `lib/seguridad-cabeceras.ts` — Cabeceras de seguridad en todas las respuestas: nadie puede meter la app en un marco de otro sitio (clickjacking), el navegador no adivina tipos de archivo, no se filtra la direcci
 - `tests/seguridad.test.ts` — Pruebas de la revisión de seguridad: series de velas que manda un navegador (forma, coherencia, horario), corroboración de precios, límites de intentos de login, tokens de sesión g
+
+### cobro-pro — La terminal PRO: prueba de 7 días, pago por alias y activación manual (8)
+Texto: quién usa la terminal, cómo se paga y cómo se activa; la presentación para visitantes y el muro de pago.
+Pendiente: Cargar el precio en CONFIGURACIÓN → COBROS.
+- `app/api/suscripcion/route.ts` — exporta: dynamic, GET, POST
+- `app/cobros-admin.tsx` — Los cobros de la terminal, solo para el administrador (dentro de CONFIGURACIÓN): el alias, el precio y los días; los avisos de pago para aprobar o rechazar a mano, mirando el compr
+- `app/puerta-pro.css` — La puerta PRO (app/puerta-pro.tsx): la presentación para visitantes, el muro de pago y el aviso de días dentro de la terminal.
+- `app/puerta-pro.tsx` — La puerta PRO de la terminal: quien no tiene sesión ve la presentación (qué es, qué incluye, cuánto cuesta y la cuenta para probar 7 días gratis); quien tiene la prueba o el pago v
+- `lib/suscripcion-db.ts` — El acceso PRO en la base: la prueba y el pago de cada persona (suscripciones), los avisos de pago que manda la persona (pagos_reportados) y la configuración de cobro (app_settings)
+- `lib/suscripcion.ts` — El acceso PRO de la terminal: todo es PRO, con 7 días de prueba desde el primer uso (o desde que se crea la cuenta) y después se paga por transferencia al alias (url.mp) y el admin
+- `tests/suscripcion-db.test.ts` — Pruebas del acceso PRO en la base (lib/suscripcion-db.ts) con node:sqlite haciendo de D1: la prueba arranca en el primer uso, un aviso de pago se guarda una sola vez y con tope de
+- `tests/suscripcion.test.ts` — Pruebas del acceso PRO (lib/suscripcion.ts): el estado de cada persona (prueba, pago, vencido, administrador), cuánto suma un pago aprobado, qué rutas de la API pasan por la puerta
 
 ### araña — La araña del proyecto y las instrucciones para trabajar en él (25)
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
@@ -649,7 +662,7 @@ Texto: node:test sobre TypeScript sin compilar. Todo cambio de lógica trae su p
 ### app-movil — Interfaz, PWA y celular primero (95)
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
 - `app/account-panel.css`
-- `app/account-panel.tsx` — exporta: AccountPanel, default
+- `app/account-panel.tsx` — exporta: AccountPanel, AuthForms, default
 - `app/active-signals.tsx` — exporta: ActiveSignals, default
 - `app/agenda-macro.tsx` — exporta: AgendaMacro, default
 - `app/alert-center.css`
@@ -756,7 +769,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `ai_free_usage` — crea: lib/ai-brains.ts, tests/telegram-voice.test.ts · usa: lib/ai-brains.ts, tests/ai-brains.test.ts, tests/jarvis-mind.test.ts, tests/telegram-voice.test.ts · sin índice visible en el código
 - `ai_probe` — crea: lib/ai-probe.ts · usa: lib/ai-probe.ts · sin índice visible en el código
 - `ai_usage` — crea: lib/ai-analyst-server.ts · usa: lib/ai-analyst-server.ts, tests/ai-brains.test.ts · sin índice visible en el código
-- `app_settings` — crea: lib/app-settings.ts · usa: lib/app-settings.ts, tests/app-settings.test.ts, tests/binance-account.test.ts · sin índice visible en el código
+- `app_settings` — crea: lib/app-settings.ts, tests/suscripcion-db.test.ts · usa: lib/app-settings.ts, tests/app-settings.test.ts, tests/binance-account.test.ts, tests/suscripcion-db.test.ts · sin índice visible en el código
 - `aprendizaje_diario` — crea: lib/aprendizaje-diario-db.ts · usa: lib/aprendizaje-diario-db.ts · sin índice visible en el código
 - `arana_ultimo` — crea: lib/arana-ultimo-db.ts · usa: lib/arana-ultimo-db.ts · sin índice visible en el código
 - `auth_intentos` — crea: lib/auth-limites.ts · usa: lib/auth-limites.ts · sin índice visible en el código
@@ -791,19 +804,21 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `mesa_sombra_eventos` — crea: lib/mesa-sombra-db.ts · usa: lib/mesa-sombra-db.ts · índices: mesa_sombra_eventos_tipo
 - `notas` — crea: tests/arana.test.ts · usa: tests/arana.test.ts · índices: notas_id
 - `notes` — crea: examples/d1/db/schema.ts · usa: examples/d1/app/api/notes/route.ts · sin índice visible en el código
+- `pagos_reportados` — crea: lib/suscripcion-db.ts · usa: lib/suscripcion-db.ts · índices: pagos_estado, pagos_usuario
 - `push_subscriptions` — crea: lib/web-push.ts, tests/web-push.test.ts · usa: app/api/push/subscribe/route.ts · sin índice visible en el código
 - `robot_senales` — crea: lib/robot-ledger-db.ts · usa: lib/registro-db.ts, lib/robot-ledger-db.ts, tests/registro.test.ts · índices: robot_senales_vela
 - `sessions` — crea: db/schema.ts, lib/auth.ts · usa: lib/auth.ts · sin índice visible en el código
 - `signal_records` — crea: db/schema.ts, lib/automation.ts, tests/signal-plan-db.test.ts (+1) · usa: app/api/alerts/latest/route.ts, app/api/performance/route.ts, app/api/signals/route.ts, app/api/telegram/webhook/route.ts, lib/automation.ts, lib/scalping-automation.ts (+5) · índices: signal_records_detected_idx, signal_records_symbol_side_idx, signal_records_status_idx
 - `structure_snapshots` — crea: lib/structure-archive.ts · usa: lib/jarvis-mind-db.ts, lib/structure-archive.ts, lib/telegram-ai-server.ts · índices: structure_snapshots_time_idx
+- `suscripciones` — crea: lib/suscripcion-db.ts · usa: lib/suscripcion-db.ts · sin índice visible en el código
 - `telegram_chat` — crea: lib/telegram-ai-server.ts · usa: lib/telegram-ai-server.ts · sin índice visible en el código
 - `telegram_link_codes` — crea: lib/telegram.ts · usa: app/api/telegram/link/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-dispatch.ts · sin índice visible en el código
-- `telegram_links` — crea: lib/telegram.ts, tests/telegram-signals.test.ts · usa: app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts, app/api/robot/signal/route.ts, app/api/telegram/link/route.ts, app/api/telegram/test/route.ts, app/api/telegram/webhook/route.ts (+4) · sin índice visible en el código
+- `telegram_links` — crea: lib/telegram.ts, tests/telegram-signals.test.ts · usa: app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts, app/api/robot/signal/route.ts, app/api/telegram/link/route.ts, app/api/telegram/test/route.ts, app/api/telegram/webhook/route.ts (+5) · sin índice visible en el código
 - `telegram_price_alerts` — crea: lib/price-alerts-server.ts · usa: app/api/telegram/webhook/route.ts, lib/price-alerts-server.ts · índices: telegram_price_alerts_user_idx
 - `telegram_sent` — crea: lib/telegram.ts · usa: app/api/alerts/prebreak/route.ts, app/api/robot/signal/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-dispatch.ts · sin índice visible en el código
 - `telegram_state` — crea: lib/telegram.ts, tests/telegram-signals.test.ts · usa: app/api/admin/settings/route.ts, app/api/telegram/link/route.ts, app/api/telegram/webhook/route.ts, lib/telegram-dispatch.ts, lib/telegram-jarvis.ts, lib/telegram-server.ts (+1) · sin índice visible en el código
 - `trade_journal` — crea: lib/trade-journal.ts · usa: app/api/journal/route.ts · índices: trade_journal_user_idx
-- `users` — crea: db/schema.ts, lib/auth.ts · usa: app/api/auth/login/route.ts, app/api/auth/register/route.ts, lib/auth.ts · sin índice visible en el código
+- `users` — crea: db/schema.ts, lib/auth.ts, tests/suscripcion-db.test.ts · usa: app/api/auth/login/route.ts, app/api/auth/register/route.ts, lib/auth.ts, lib/suscripcion-db.ts, tests/suscripcion-db.test.ts · sin índice visible en el código
 
 ## Secretos y variables de entorno
 
@@ -811,7 +826,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `arkham_api_key` (secreto) — lee: app/api/admin/settings/route.ts, worker/index.ts · guarda: app/api/admin/settings/route.ts
 - `cmc_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/market-structure/route.ts · guarda: app/api/admin/settings/route.ts
 - `groq_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/jarvis-mind-db.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
-- `telegram_bot_token` (secreto) — lee: app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts, app/api/robot/signal/route.ts (+4) · guarda: app/api/admin/settings/route.ts
+- `telegram_bot_token` (secreto) — lee: app/api/admin/cobros/route.ts, app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts (+6) · guarda: app/api/admin/settings/route.ts
 - variable `ALT_RADAR_DATOS` — en: scripts/investigacion/util.ts
 - variable `ALT_RADAR_SALIDA` — en: scripts/investigacion/util.ts
 - variable `ASSETS` — en: worker/index.ts
@@ -840,6 +855,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Rutas /api
 
+- `/api/admin/cobros` [GET, POST] — app/api/admin/cobros/route.ts · seguridad
 - `/api/admin/settings` [GET, POST, PUT, DELETE] — app/api/admin/settings/route.ts · seguridad
 - `/api/alerts/latest` [GET] — app/api/alerts/latest/route.ts · alertas
 - `/api/alerts/prebreak` [POST] — app/api/alerts/prebreak/route.ts · alertas
@@ -892,6 +908,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `/api/sentiment` [GET] — app/api/sentiment/route.ts · datos-mercado
 - `/api/signals` [GET, POST] — app/api/signals/route.ts · senales-radar
 - `/api/structure-trend` [GET] — app/api/structure-trend/route.ts · datos-mercado
+- `/api/suscripcion` [GET, POST] — app/api/suscripcion/route.ts · cobro-pro
 - `/api/telegram/link` [GET, POST, PUT, DELETE] — app/api/telegram/link/route.ts · telegram
 - `/api/telegram/test` [POST] — app/api/telegram/test/route.ts · telegram
 - `/api/telegram/webhook` [POST] — app/api/telegram/webhook/route.ts · jarvis
@@ -963,7 +980,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Código de navegador
 
-- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-axi-diario.tsx, app/lab-fondeo.tsx, app/lab-oficina.tsx, app/lab-piso.tsx, app/lab-universos.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/mapa-agentes.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
+- Raíz ("use client"): app/account-panel.tsx, app/active-signals.tsx, app/agenda-macro.tsx, app/ai-trading-lab.tsx, app/alert-center.tsx, app/alert-toasts.tsx, app/aprender-lab.tsx, app/arana-desk.tsx, app/arana-vivo.tsx, app/asset-flows.tsx, app/assistant-console.tsx, app/big-trades-desk.tsx, app/binance-klines.ts, app/bookmap-timeframe-chart.tsx, app/bot-desk.tsx, app/bot-journal.tsx, app/cobros-admin.tsx, app/compare-chart.tsx, app/correlation-watch.tsx, app/dashboard-settings.ts, app/dca-desk.tsx, app/decoupling-desk.tsx, app/diario-desk.tsx, app/diario-tools.tsx, app/diario-views.tsx, app/exchange-flows.tsx, app/futures-desk.tsx, app/futures-log-report.tsx, app/futures-recorder.tsx, app/install-panel.tsx, app/institutional-desk.tsx, app/jarvis-backtest.tsx, app/jarvis-council.tsx, app/jarvis-paper.tsx, app/jarvis-scan.tsx, app/jarvis-trading.tsx, app/jarvis-watch.tsx, app/jarvis.tsx, app/lab-agente-st.tsx, app/lab-axi-diario.tsx, app/lab-fondeo.tsx, app/lab-oficina.tsx, app/lab-piso.tsx, app/lab-universos.tsx, app/liquidation-heatmap-desk.tsx, app/live-bookmap.tsx, app/mapa-agentes.tsx, app/market-brain.tsx, app/market-structure-panel.tsx, app/mtf-oscillators.tsx, app/portfolio-risk.tsx, app/practica-gatillo.tsx, app/prebreak-desk.tsx, app/pressure-desk.tsx, app/puerta-pro.tsx, app/pump-radar.tsx, app/pwa-register.tsx, app/radar-app.tsx, app/risk-desk.tsx, app/robot-signals-desk.tsx, app/scalping-desk.tsx, app/sentiment-desk.tsx, app/settings-desk.tsx, app/sign-in-prompt.tsx, app/signal-ledger.tsx, app/spot-desk.tsx, app/swing-desk.tsx, app/telegram-card.tsx, app/trade-journal-desk.tsx, app/unlock-desk.tsx, app/workspace.tsx, app/zones-desk.tsx
 - Problemas: ninguno
 
 ## Lib sin prueba directa

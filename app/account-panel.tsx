@@ -184,14 +184,17 @@ export default function AccountPanel() {
   );
 }
 
-function AuthForms({
+/** Entrar o crear la cuenta. También la usa la presentación PRO (app/puerta-pro.tsx). */
+export function AuthForms({
   onSignedIn,
   expired,
   initialMode,
+  diasPrueba = 7,
 }: {
   onSignedIn: (user: SessionUser) => void;
   expired: boolean;
   initialMode: AccountMode;
+  diasPrueba?: number;
 }) {
   const [mode, setMode] = useState<AccountMode>(expired ? "login" : initialMode);
   const [email, setEmail] = useState("");
@@ -247,11 +250,11 @@ function AuthForms({
   return (
     <div className="account-body">
       <p className="eyebrow">TU CUENTA DE ALT RADAR</p>
-      <h2 className="account-title">{mode === "login" ? "Ingresar" : "Crear cuenta gratis"}</h2>
+      <h2 className="account-title">{mode === "login" ? "Ingresar" : "Crear cuenta"}</h2>
       {mode === "register" && (
         <p className="account-why">
-          Con tu cuenta activás las <b>alertas por Telegram</b>, tu <b>registro de operaciones</b>, el{" "}
-          <b>DCA</b> y la <b>IA</b>. Solo email y contraseña.
+          Con tu cuenta probás ALT RADAR PRO <b>{diasPrueba} días gratis</b>, con todo: el <b>mapa</b>, los <b>agentes</b>, la{" "}
+          <b>IA</b>, las <b>alertas por Telegram</b> y tu <b>registro</b>. Solo email y contraseña, sin tarjeta.
         </p>
       )}
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { onSession } from "@/lib/account-events";
 import SignInPrompt from "./sign-in-prompt";
+import CobrosAdmin from "./cobros-admin";
 
 type Status = {
   isAdmin: boolean;
@@ -109,6 +110,7 @@ export default function SettingsDesk() {
   };
 
   return (
+    <>
     <section className="panel settings-desk" id="configuracion">
       <div className="panel-head">
         <div>
@@ -259,5 +261,7 @@ export default function SettingsDesk() {
       )}
       {note && <p className="set-note">{note}</p>}
     </section>
+    {state === "ready" && status?.isAdmin && <CobrosAdmin />}
+    </>
   );
 }

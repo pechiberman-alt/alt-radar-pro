@@ -35,6 +35,8 @@ las dependencias y el historial de git. Lo que se pudo arreglar en el código se
 | Meter la app en un marco de otro sitio (clickjacking) y otros | Cabeceras en todas las respuestas: `X-Frame-Options`, `frame-ancestors 'self'`, `nosniff`, `Referrer-Policy`, HSTS y `Permissions-Policy` (sin cámara, ubicación ni pagos; micrófono solo la propia página). `lib/seguridad-cabeceras.ts` |
 | Llamar a la API en bucle desde una IP | Límite en el propio Worker: 300 pedidos por minuto por IP a `/api/` y 20 para entrar o crear cuenta (429 con cuánto esperar). El webhook de Telegram no se limita. `lib/limite-pedidos.ts` |
 | Activar la clave de cifrado fuerte rompía las claves de Binance ya guardadas | Ahora se pueden leer con la clave anterior: se puede activar `ENCRYPTION_KEY` sin que nadie tenga que volver a vincular. |
+| Usar la inteligencia de la terminal sin cuenta o con la prueba vencida (llamando a la API directo) | La puerta PRO está en el Worker, antes de cada ruta PRO: sin sesión, 401; con la prueba o el pago vencidos, 402. Recuerda cada sesión un minuto en memoria. Telegram (alertas y comandos) también la respeta. `lib/suscripcion.ts`, `lib/suscripcion-db.ts` |
+| Activar PRO sin pagar | No hay camino automático: el administrador aprueba cada aviso a mano mirando el comprobante. Un número de operación se puede avisar una sola vez, con 3 avisos pendientes por cuenta como mucho. |
 
 ## Pendiente (lo hace la persona, en Cloudflare)
 

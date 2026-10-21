@@ -21,6 +21,7 @@ import { collectJarvisEvents } from "./telegram-jarvis.ts";
 import { runPriceAlerts } from "./price-alerts-server.ts";
 import { saveWorld, worldDigest } from "./jarvis-world.ts";
 import { cached } from "./upstream-cache.ts";
+import { conAcceso } from "./suscripcion-db.ts";
 
 /**
  * Runs from the Worker cron every 5 minutes: collects what happened since the
@@ -34,15 +35,19 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
   for (const sql of TELEGRAM_SCHEMA) await db.prepare(sql).run();
   await ensureSignalPlanColumns(db).catch(() => undefined);
 
-  const links = (
+  const vinculados = (
     await db.prepare("SELECT user_id, chat_id, prefs FROM telegram_links").all<{ user_id: number; chat_id: string; prefs: string }>()
   ).results;
+  // Solo quien tiene acceso PRO (prueba, pago o administrador) recibe alertas. Si no se puede leer el acceso, se manda igual:
+  // un corte de la base no corta las alertas de quien pagó.
+  const permitidos = await conAcceso(db, vinculados.map((l) => l.user_id), now).catch(() => null);
+  const links = permitidos ? vinculados.filter((l) => permitidos.has(l.user_id)) : vinculados;
   if (!links.length) return { users: 0, sent: 0 };
 
   // Price alerts first: the person asked for these explicitly, and one failing
   // coin or send must not hold back the rest of the dispatch.
   try {
-    await runPriceAlerts(db, token, now);
+    await runPriceAlerts(db, token, now, permitidos);
   } catch (error) {
     console.error("[ALT_RADAR_PRICE_ALERTS]", error);
   }
