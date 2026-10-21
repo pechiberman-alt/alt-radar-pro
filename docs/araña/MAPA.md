@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 724 · objetivos: 21 · sin objetivo: 0
+- Archivos: 726 · objetivos: 21 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 62 · hosts: 63
-- Código de navegador: 77 archivos con "use client" que alcanzan 244 · problemas: 0
-- Lib sin prueba directa: 29 de 239
+- Código de navegador: 77 archivos con "use client" que alcanzan 245 · problemas: 0
+- Lib sin prueba directa: 29 de 240
 
 ## Objetivos
 
@@ -432,7 +432,7 @@ Pendiente: Entrar al registro unificado (FUENTES y lib/registro-db.ts) cuando un
 - `tests/axi-db.test.ts` — Pruebas del almacenamiento del diario de Axi (lib/axi-db.ts): que importar dos veces no duplique, que cada persona vea solo lo suyo, que el tope de 500 se cumpla sin COUNT(*) y que
 - `tests/axi-diario.test.ts` — Pruebas del diario de Axi (lib/axi-diario.ts): que cada ejecución del conector se valide o se rechace con su motivo, que un dato faltante no se complete con cero, que el neto sea p
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (90)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (92)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -492,6 +492,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/mapa-memoria.ts` — Lo último que leyó el mapa de liquidaciones en este navegador, por par: precio, zonas de compra y de venta, imanes y sesgo.
 - `lib/oficina-db.ts` — La oficina del servidor (los agentes 24/7, lib/agentes-servidor.ts) leída una vez cada 5 minutos para todos: la pantalla, Telegram y JARVIS usan la misma lectura.
 - `lib/oficina-historial.ts` — El historial de cada agente en la oficina: cómo le fue a su regla en 4 h en el tramo de evaluación de su estudio (el pasado, con costos), para ponerlo al lado de lo que mide en pap
+- `lib/oficina-reuniones.ts` — Las reuniones de la oficina: cuándo hace falta juntarse, con quién y qué se dice.
 - `lib/oficina-run.ts` — La oficina del servidor para JARVIS en la app: una lectura de /api/oficina cada 5 minutos como mucho, ya resumida para la IA (lib/oficina.ts, oficinaParaIa), con el último diario d
 - `lib/oficina.ts` — La oficina del fondo: cada agente de papel en su escritorio, agrupados en mesas como un fondo de comercio.
 - `lib/practica-gatillo.ts` — La práctica del gatillo: la persona ve las velas hasta una vela `i` y decide si la estrategia elegida dispara al cierre de esa vela y hacia dónde (LONG, SHORT o no hay gatillo).
@@ -519,6 +520,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/lectura-novato.test.ts` — Pruebas de la lectura para novatos (lib/lectura-novato.ts): que el veredicto mire primero la muestra, que detecte el caso de ganar en desarrollo y perder en evaluación, que nunca p
 - `tests/linea-busqueda.test.ts` — Pruebas de la búsqueda de confirmación y configuración de la línea de tendencia (lib/linea-busqueda.ts): cada confirmación con su caso que la cumple y el que no, la ventana del ret
 - `tests/mapa-contexto.test.ts` — Pruebas de la foto del mapa de cada entrada (lib/mapa-contexto.ts) y de los motivos compartidos con el mapa (lib/mapa-atomos.ts): zona detrás del stop, zona en el camino, liquidez
+- `tests/oficina-reuniones.test.ts` — Pruebas de las reuniones de la oficina (lib/oficina-reuniones.ts): cuándo hay reunión, quién va a la sala, el orden de la agenda y la línea de tiempo (charla, llegan, hablan, vuelv
 - `tests/oficina.test.ts` — Pruebas de la oficina del fondo (lib/oficina.ts): un escritorio por agente de papel (sin el control al azar), las cuentas por agente salen del registro unificado, la semana son los
 - `tests/preregistro-flujo.test.ts` — Tests del preregistro del flujo (lib/preregistro-flujo.ts): cada filtro usa solo datos conocidos al cierre de la vela de la señal (no mira el futuro) y un dato faltante no aprueba
 - `tests/smc-liquidez.test.ts` — Pruebas del agente de liquidez + IFVG + breaker (lib/smc-liquidez.ts): las zonas altas (FVG y OB) con casos armados a mano, su vencimiento, la toma de liquidez, el IFVG, la grilla,
