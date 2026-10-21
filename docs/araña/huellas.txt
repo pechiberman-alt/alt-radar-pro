@@ -10,7 +10,7 @@ ebfa1b2412ea	73	CLAUDE.md
 8b27e3600b59	64	README.md
 5aac31cab73c	36	THIRD_PARTY_NOTICES.md
 7d7e53d1533b	103	app/account-panel.css
-f78d8e271837	683	app/account-panel.tsx
+fdea21d992c8	686	app/account-panel.tsx
 064cf5eb7605	229	app/active-signals.tsx
 63b274d443fe	122	app/agenda-macro.tsx
 9ea588d09362	303	app/ai-trading-lab.css
@@ -19,6 +19,7 @@ bfbfb1a0c0ba	85	app/alert-center.css
 c2fe65b9229e	450	app/alert-center.tsx
 952226356517	26	app/alert-toasts.css
 e23fd9d98482	81	app/alert-toasts.tsx
+4cbabfe21eeb	92	app/api/admin/cobros/route.ts
 19408d68277e	167	app/api/admin/settings/route.ts
 45b256c81a5a	49	app/api/alerts/latest/route.ts
 03cbeef8a626	52	app/api/alerts/prebreak/route.ts
@@ -71,9 +72,10 @@ a99ad37e5d45	96	app/api/robot/signal/route.ts
 251b8971fa50	48	app/api/sentiment/route.ts
 804838666402	269	app/api/signals/route.ts
 c7d798499d22	45	app/api/structure-trend/route.ts
+0b66d50e8263	61	app/api/suscripcion/route.ts
 b0b1c9f33895	75	app/api/telegram/link/route.ts
 aa86804bf9da	24	app/api/telegram/test/route.ts
-12dd62f418af	196	app/api/telegram/webhook/route.ts
+7b49e9f93ab2	220	app/api/telegram/webhook/route.ts
 e8a7c312d5f9	126	app/api/tickers/route.ts
 dd03916b07ea	9	app/api/version/route.ts
 8889c819ef92	86	app/aprender-lab.tsx
@@ -96,6 +98,7 @@ a81c12bcbd6f	145	app/bookmap-premium.css
 4bc7e745e25a	336	app/bot-desk.tsx
 62f40a847147	229	app/bot-journal.tsx
 57f95eac1484	91	app/chatgpt-auth.ts
+ad36fe841525	214	app/cobros-admin.tsx
 91767efb80e2	32	app/compare-chart.css
 84b444a3501a	272	app/compare-chart.tsx
 44c2ba9d98e3	16	app/component-header-reset.css
@@ -143,7 +146,7 @@ af77131cadb2	27	app/lab-mini-arana.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
-be29e9072c2e	133	app/layout.tsx
+2db0fd004698	134	app/layout.tsx
 a6a898fc2428	823	app/liquidation-heatmap-desk.css
 32081d501acb	4336	app/liquidation-heatmap-desk.tsx
 39b0534ede8e	3145	app/live-bookmap.tsx
@@ -155,7 +158,7 @@ db0be99a3f89	499	app/market-brain.tsx
 4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
 3da71069ee49	75	app/open-heatmap.css
-84f8f0693036	4	app/page.tsx
+4471a9abbf33	12	app/page.tsx
 f87f234d88cd	47	app/portfolio-risk.css
 0bfe99958b31	314	app/portfolio-risk.tsx
 855a62f29ac1	249	app/practica-gatillo.tsx
@@ -164,6 +167,8 @@ f87f234d88cd	47	app/portfolio-risk.css
 1a2057124d9d	491	app/premium.css
 2937f70ab7ef	38	app/pressure-desk.css
 f6c0da2d5db5	170	app/pressure-desk.tsx
+ece7ccbad21e	206	app/puerta-pro.css
+90f0f1ea1565	642	app/puerta-pro.tsx
 9f9d72a3dd57	87	app/pump-radar.css
 74db3d1c5d80	350	app/pump-radar.tsx
 f58412c957a0	53	app/pwa-register.tsx
@@ -179,7 +184,7 @@ d180ba5315c4	324	app/scalping-desk.tsx
 61aeec6728ee	43	app/sentiment-desk.css
 17158023a26f	214	app/sentiment-desk.tsx
 2ba7c37dbc1a	26	app/settings-desk.css
-7c61f07848da	264	app/settings-desk.tsx
+f433c17a9974	268	app/settings-desk.tsx
 9acc1747570b	19	app/sign-in-prompt.tsx
 94eb31e12b92	41	app/signal-ledger.css
 2053366a2a2f	624	app/signal-ledger.tsx
@@ -198,7 +203,7 @@ d1d42e77268a	43	app/unlock-desk.css
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-0b39ebe3c93f	332	docs/araña/objetivos.md
+a610f9a9a4a0	344	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -213,7 +218,7 @@ e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
 fe0dac1515d7	26	docs/mesa-referencias.md
 ec29d0ad6d0c	166	docs/mesa-reglas-v2.md
-46ef38933aff	62	docs/seguridad.md
+6ddd21b05f13	64	docs/seguridad.md
 5df729a362af	8	drizzle.config.ts
 0af914740b3c	42	drizzle/0000_wild_nitro.sql
 b1a4a77e47dd	20	drizzle/0001_vengeful_husk.sql
@@ -253,7 +258,7 @@ b8e38621b74b	46	lib/ai-numbers.ts
 dbd75245f8b8	366	lib/alerts.ts
 58037aaa761b	203	lib/amd-ifvg.ts
 6bfed10a9b83	44	lib/aporte-velas.ts
-a860f44cf759	162	lib/app-settings.ts
+9bb15176a7b0	172	lib/app-settings.ts
 4998b2cb2829	188	lib/aprender.ts
 5b106de4c580	72	lib/aprendizaje-diario-db.ts
 59ef6540706f	208	lib/aprendizaje-diario.ts
@@ -398,7 +403,7 @@ f2ad043c6c3a	431	lib/paper-bot.ts
 af80178a4c9e	158	lib/practica-gatillo.ts
 7533116803f8	189	lib/pre-breakout.ts
 bb49b1192e80	96	lib/preregistro-flujo.ts
-6bc98e7e1a03	236	lib/price-alerts-server.ts
+6b8b4e6a2040	237	lib/price-alerts-server.ts
 268aea814077	165	lib/price-alerts.ts
 19ed36506676	86	lib/pump-plan.ts
 357bfd64bf54	170	lib/pump-pressure.ts
@@ -432,11 +437,13 @@ cfaa28b61f98	182	lib/spot-strategy.ts
 9057e303a855	189	lib/squeeze.ts
 b0595f550a8b	175	lib/structure-archive.ts
 bf7335d9b46e	223	lib/supply-demand.ts
+3fb7e30b7950	276	lib/suscripcion-db.ts
+a4a4fb4dd668	154	lib/suscripcion.ts
 ceab2b39b102	324	lib/swing-entries.ts
 c9fd83f39ff3	171	lib/swing-liquidity-filter.ts
 bff8d579fd5d	283	lib/telegram-ai-server.ts
 848f1c4d5a15	79	lib/telegram-ai.ts
-c86debc3fff0	234	lib/telegram-dispatch.ts
+e5258dc94c70	239	lib/telegram-dispatch.ts
 454b972683d0	122	lib/telegram-jarvis.ts
 e9e4bb168a91	53	lib/telegram-magnets.ts
 1dfc904341cc	67	lib/telegram-moneda.ts
@@ -650,6 +657,8 @@ cc660527d471	70	tests/sobreajuste.test.ts
 c71a0865f0b2	97	tests/spot-strategy.test.ts
 6fd2182c77cc	59	tests/structure-archive.test.ts
 faea7e4c1e9c	152	tests/supply-demand.test.ts
+a3f730f61324	83	tests/suscripcion-db.test.ts
+e08d208e69e2	94	tests/suscripcion.test.ts
 b8fae29bf022	203	tests/swing-entries.test.ts
 124ea19d3a2a	116	tests/swing-liquidity-filter.test.ts
 f6b24002aa76	40	tests/telegram-ai.test.ts
@@ -671,5 +680,5 @@ dafba0404d8e	92	tests/volume-spike.test.ts
 21b30109f4c3	79	tests/xau-alerts.test.ts
 b41bd6678407	33	tsconfig.json
 037c2ff06898	75	vite.config.ts
-c36bbfad8408	190	worker/index.ts
+cc373359d28a	202	worker/index.ts
 a49c24aef5a7	37	wrangler.production.jsonc

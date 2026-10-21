@@ -223,6 +223,18 @@ Pendiente:
 - Borrar en Cloudflare el token «Altradar 2» y rotar los tokens que quedaron a la vista en el chat.
 - Poner ENCRYPTION_KEY como secreto del Worker (ya no rompe las claves de Binance guardadas). Con dominio propio, sumar la regla de límite de pedidos del WAF.
 
+## cobro-pro — La terminal PRO: prueba de 7 días, pago por alias y activación manual
+Texto: quién usa la terminal, cómo se paga y cómo se activa; la presentación para visitantes y el muro de pago.
+Archivos: lib/suscripcion.ts, lib/suscripcion-db.ts, app/api/suscripcion/**, app/puerta-pro.tsx, app/puerta-pro.css, app/cobros-admin.tsx, tests/suscripcion.test.ts, tests/suscripcion-db.test.ts
+Reglas:
+- Todo es PRO, con prueba desde el primer uso (7 días por defecto, configurable). El administrador entra siempre.
+- Se paga por transferencia al alias (url.mp) y el administrador aprueba a mano, después de ver el comprobante. Ningún camino activa PRO solo: no agregar cobros automáticos sin pedido explícito.
+- La puerta está en el servidor (worker/index.ts con rutaPro y puertaDe): una ruta nueva con la inteligencia de la terminal va en PREFIJOS_PRO. Entrar, pagar, la versión y los datos públicos de mercado quedan abiertos. Telegram: alertas y comandos PRO solo con acceso.
+- Al avisar un pago se pide solo el número de operación: nunca claves, datos de tarjeta ni capturas con datos del banco. Lo que escribe la persona llega escapado al administrador.
+- Sin precio cargado se dice «precio a confirmar»: no se inventa. Pagar el acceso no compra promesas de ganancia: no es asesoramiento financiero.
+Pendiente:
+- Cargar el precio en CONFIGURACIÓN → COBROS.
+
 ## araña — La araña del proyecto y las instrucciones para trabajar en él
 Texto: el mapa del proyecto que se consulta sin gastar tokens: qué hace cada archivo, de quién depende y qué objetivo cumple.
 Archivos: scripts/arana.mjs, scripts/arana-vista.html, scripts/arana-vivo.html, docs/araña/**, tests/arana.test.ts, lib/arana-vivo.ts, lib/arana-vivo-auto.ts, app/arana-vivo.tsx, app/arana-desk.tsx, app/arana-desk.css, tests/arana-vivo.test.ts, tests/arana-vivo-auto.test.ts, tests/mesa-medicion.test.ts, lib/arana-ultimo.ts, lib/arana-ultimo-db.ts, app/api/arana/ultimo/**, tests/arana-ultimo.test.ts, CLAUDE.md, .mcp.json, .claude/settings.json, scripts/herramientas.mjs, scripts/verificar.mjs, scripts/subir.mjs, scripts/claude-hooks.mjs, tests/herramientas.test.ts

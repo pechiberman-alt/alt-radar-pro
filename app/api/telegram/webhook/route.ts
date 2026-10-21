@@ -17,8 +17,13 @@ import { armarDiario, diaAnterior, diaAr, textoDiarioTelegram, type Diario } fro
 import { diariosServidor } from "@/lib/aprendizaje-diario-db";
 import { PLAN_SERVIDOR } from "@/lib/agentes-servidor";
 import type { TgVoice } from "@/lib/telegram-voice";
+import { textoAcceso } from "@/lib/suscripcion";
+import { accesoDe } from "@/lib/suscripcion-db";
 
 export const dynamic = "force-dynamic";
+
+/** Lo que es PRO también en Telegram: preguntar (texto o voz), alertas y las lecturas de JARVIS, la oficina y el diario. */
+const PRO_EN_TELEGRAM = new Set(["texto", "alerta", "alertas", "borrar", "estado", "jarvis", "aprendizaje", "oficina", "agente", "diario", "resultados"]);
 
 const HELP =
   "<b>ALT RADAR PRO</b>\n" +
@@ -65,6 +70,25 @@ export async function POST(request: NextRequest) {
 
   // A voice note is a question too: heard, then answered in the same thread (lib/telegram-voice.ts).
   const voice = update?.message?.voice;
+
+  // La puerta PRO también acá: hace falta el chat vinculado y la prueba o el pago vigentes (lib/suscripcion.ts).
+  if (voice || PRO_EN_TELEGRAM.has(cmd)) {
+    const vinculo = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE chat_id = ?1").bind(chat).first<{ user_id: number }>();
+    if (!vinculo) {
+      await sendMessage(
+        token,
+        chat,
+        "Para usar ALT RADAR PRO desde acá, vinculá este chat con tu cuenta: en la app, ALERTAS → VINCULAR TELEGRAM. Si todavía no tenés cuenta, creala en la app y probá 7 días gratis.",
+      );
+      return NextResponse.json({ ok: true });
+    }
+    const acceso = await accesoDe(env.DB, vinculo.user_id).catch(() => null);
+    if (acceso && !acceso.acceso) {
+      await sendMessage(token, chat, `${textoAcceso(acceso)}
+Activalo desde la terminal: transferencia al alias y aviso con el número de operación. Lo aprueba el administrador.`);
+      return NextResponse.json({ ok: true });
+    }
+  }
   if (voice) {
     const link = await env.DB.prepare("SELECT user_id FROM telegram_links WHERE chat_id = ?1").bind(chat).first<{ user_id: number }>();
     if (!link) {

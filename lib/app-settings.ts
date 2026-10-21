@@ -138,6 +138,16 @@ export async function deleteSecret(db: D1Database, name: SecretName) {
   cache.delete(name);
 }
 
+/** Ajustes que no son secretos (por ejemplo, la configuración de cobro de lib/suscripcion-db.ts): texto plano, con prefijo propio. */
+export async function leerAjuste(db: D1Database, nombre: string): Promise<string | null> {
+  await ensure(db);
+  return read(db, `ajuste:${nombre}`);
+}
+export async function guardarAjuste(db: D1Database, nombre: string, valor: string) {
+  await ensure(db);
+  await write(db, `ajuste:${nombre}`, valor);
+}
+
 export async function adminUserId(db: D1Database): Promise<number | null> {
   await ensure(db);
   const v = await read(db, "admin_user_id");

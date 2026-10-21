@@ -182,7 +182,8 @@ export async function handleAlertCommand(
 }
 
 /** Runs from the 5-minute cron: fires every alert whose level was touched since it was created. */
-export async function runPriceAlerts(db: D1Database, token: string, now = Date.now()): Promise<{ alerts: number; fired: number }> {
+/** `permitidos`: las cuentas con acceso PRO (lib/suscripcion-db.ts); sin la lista, todas. */
+export async function runPriceAlerts(db: D1Database, token: string, now = Date.now(), permitidos: Set<number> | null = null): Promise<{ alerts: number; fired: number }> {
   await ensurePriceAlertsSchema(db);
   const rows = (
     await db
@@ -191,7 +192,7 @@ export async function runPriceAlerts(db: D1Database, token: string, now = Date.n
            JOIN telegram_links l ON l.user_id = a.user_id`,
       )
       .all<Row & { chat_id: string; prefs: string }>()
-  ).results;
+  ).results.filter((r) => !permitidos || permitidos.has(r.user_id));
   if (!rows.length) return { alerts: 0, fired: 0 };
 
   const bySymbol = new Map<string, typeof rows>();

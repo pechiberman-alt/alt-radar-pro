@@ -13,6 +13,8 @@ import { CRON_SERVIDOR } from "../lib/agentes-servidor";
 import { esHoraDelDiario, runAprendizajeDiario } from "../lib/aprendizaje-diario-db";
 import { conSeguridad } from "../lib/seguridad-cabeceras";
 import { contarPedido, respuestaLimite } from "../lib/limite-pedidos";
+import { rutaPro } from "../lib/suscripcion";
+import { puertaDe, respuestaPuerta } from "../lib/suscripcion-db";
 import type { AiLike } from "../lib/ai-brains";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
@@ -100,8 +102,18 @@ async function responder(request: Request, env: Env, ctx: ExecutionContext): Pro
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // Primer freno contra quien llama a la API en bucle desde una IP (lib/limite-pedidos.ts).
-    const espera = contarPedido(request.headers.get("cf-connecting-ip"), new URL(request.url).pathname);
+    const { pathname } = new URL(request.url);
+    const espera = contarPedido(request.headers.get("cf-connecting-ip"), pathname);
     if (espera !== null) return conSeguridad(respuestaLimite(espera));
+    // La puerta PRO (lib/suscripcion.ts): la inteligencia de la terminal pide sesión y prueba o pago vigentes. Si la base
+    // falla al leer el acceso, el pedido sigue (cada ruta tiene su propio control de sesión): un corte no deja afuera a todos.
+    if (env.DB && rutaPro(pathname)) {
+      const puerta = await puertaDe(request, env.DB).catch((error) => {
+        console.error("[ALT_RADAR_PUERTA_PRO]", error);
+        return null;
+      });
+      if (puerta && !(puerta.sesion && puerta.acceso.acceso)) return conSeguridad(respuestaPuerta(puerta));
+    }
     return conSeguridad(await responder(request, env, ctx));
   },
 
