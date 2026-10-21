@@ -4,6 +4,8 @@
  * Lee lo que ya registraron; no abre, no cierra y no cambia nada. Los números de R salen de los precios de la posición (el R
  * de cada cierre es el del registro); el R «ahora» es una lectura en vivo, sin comisiones, para mirar. Pura.
  */
+import { fotoFlujoDeJson, type FotoFlujo } from "./flujo-lectura.ts";
+import { veredictoDeFoto, type Veredicto } from "./confluencia.ts";
 import { MONEDAS_SERVIDOR } from "./agentes-servidor.ts";
 import { SIMBOLOS_PAPEL } from "./agentes-papel.ts";
 import { acuerdoDe } from "./agentes-mente.ts";
@@ -50,6 +52,9 @@ export type PosicionAgente = {
   detectada: number;
   venue: string | null;
   foto: FotoMapa | null;
+  /** La foto del flujo al entrar y el veredicto de la versión con el mapa (lib/confluencia.ts); null si entró sin las dos fotos. */
+  flujo: FotoFlujo | null;
+  veredicto: Veredicto | null;
   acuerdo: number | null;
   desenlace: string;
   r: number | null;
@@ -96,6 +101,8 @@ export function aPosicion(f: FilaPosicion, plan: PlanPosicion): PosicionAgente |
     detectada: f.detectada,
     venue: f.venue ?? null,
     foto: fotoDeJson(f.foto),
+    flujo: fotoFlujoDeJson(f.foto),
+    veredicto: veredictoDeFoto(f.foto),
     acuerdo: acuerdoDe(f.foto),
     desenlace: f.desenlace,
     r: finito(f.r) ? f.r : null,

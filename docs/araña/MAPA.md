@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 683 · objetivos: 19 · sin objetivo: 0
+- Archivos: 686 · objetivos: 19 · sin objetivo: 0
 - Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 59 · hosts: 60
-- Código de navegador: 72 archivos con "use client" que alcanzan 224 · problemas: 0
-- Lib sin prueba directa: 28 de 225
+- Código de navegador: 72 archivos con "use client" que alcanzan 226 · problemas: 0
+- Lib sin prueba directa: 28 de 227
 
 ## Objetivos
 
@@ -431,7 +431,7 @@ Pendiente: Entrar al registro unificado (FUENTES y lib/registro-db.ts) cuando un
 - `tests/axi-db.test.ts` — Pruebas del almacenamiento del diario de Axi (lib/axi-db.ts): que importar dos veces no duplique, que cada persona vea solo lo suyo, que el tope de 500 se cumpla sin COUNT(*) y que
 - `tests/axi-diario.test.ts` — Pruebas del diario de Axi (lib/axi-diario.ts): que cada ejecución del conector se valide o se rechace con su motivo, que un dato faltante no se complete con cero, que el neto sea p
 
-### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (87)
+### laboratorio — AI TRADING LAB: agentes, backtest evaluado, papel con riesgo central y la araña como centro de operaciones (90)
 Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especialistas de la mesa, backtest, papel, laboratorio en sombra, registro) en roles con entradas, salidas y estado real, con un gestor de riesgo central para toda operación simulada y JARVIS explicando los resultados. No opera con dinero real.
 - `app/ai-trading-lab.css` — AI TRADING LAB · La Araña, centro de operaciones.
 - `app/ai-trading-lab.tsx` — AI TRADING LAB · LA ARAÑA — CENTRO DE OPERACIONES.
@@ -442,7 +442,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `app/lab-fondeo.tsx` — Cuenta de fondeo y Agente Fondeo en el panel: la persona carga las reglas de su cuenta y su estado (saldo, resultado de hoy, riesgo abierto) y, al tocar «Leer la mesa», el agente p
 - `app/lab-mini-arana.tsx` — La mini araña del piso de estrategias: la misma araña del laboratorio (app/ai-trading-lab.tsx) en chico, una por agente, pintada con el color de su veredicto.
 - `app/lab-oficina.css` — La oficina 3D del fondo (app/lab-oficina.tsx).
-- `app/lab-oficina.tsx` — La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en mesas (tendencia, reversión, estructura, flujo de órdenes y metales), con pizarras en la p
+- `app/lab-oficina.tsx` — La oficina 3D del fondo: los agentes de papel en sus escritorios, en mesas de cristal (tendencia, reversión, estructura, flujo de órdenes y metales), con pantallas en la pared (pos
 - `app/lab-piso.tsx` — El piso de estrategias del AI TRADING LAB.
 - `app/lab-universos.tsx` — Los universos de monedas en el panel: qué grupo vigila cada agente y, sobre todo, cuáles se pueden medir en el pasado y cuáles no.
 - `app/mapa-agentes.tsx` — Los agentes en el mapa de liquidaciones: el panel con sus posiciones en el par (servidor 24/7 y tu cuenta), la capa del gráfico con un marcador por posición y los niveles de la que
@@ -467,6 +467,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/aprendizaje-diario-db.ts` — El aprendizaje diario del plan del servidor, guardado (lib/aprendizaje-diario.ts arma el diario; esto lo lee y lo guarda).
 - `lib/aprendizaje-diario.ts` — El aprendizaje diario de la oficina (PLAN_APRENDIZAJE_1): cada día (de Argentina) se arma un diario con lo que cerraron los agentes ese día y lo que dice el registro completo hasta
 - `lib/breaker-busqueda.ts` — La búsqueda de la mejor confirmación y configuración del breaker block (BREAKER_BLOCK): un order block (la última vela contraria antes de un impulso que rompió estructura, ver lib/
+- `lib/confluencia.ts` — La operativa con el mapa y el flujo (PLAN_CONFLUENCIA_1): cada agente sigue disparando con su regla fija, y además decide si esa entrada la toma «con el mapa»: no entra cuando el m
 - `lib/consenso.ts` — El consenso entre agentes: cuántos coincidieron en la misma moneda y la misma vela, y cuántos apuntaron al revés.
 - `lib/estrategias.ts` — El estudio de estrategias del AI TRADING LAB: cada agente tiene UNA estrategia clásica con parámetros fijos (no se buscan los que mejor dan: eso infla los resultados) y todas se mi
 - `lib/estudio-estrategias-datos.ts` — Resultado del estudio de estrategias (scripts/investigacion/estrategias.ts).
@@ -489,6 +490,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `lib/mapa-contexto.ts` — La «foto del mapa» de cada entrada de los agentes (PLAN_FOTO_MAPA_1): cómo estaba el mapa de liquidaciones en el momento de entrar, con las mismas reglas que las zonas de compra y
 - `lib/mapa-memoria.ts` — Lo último que leyó el mapa de liquidaciones en este navegador, por par: precio, zonas de compra y de venta, imanes y sesgo.
 - `lib/oficina-db.ts` — La oficina del servidor (los agentes 24/7, lib/agentes-servidor.ts) leída una vez cada 5 minutos para todos: la pantalla, Telegram y JARVIS usan la misma lectura.
+- `lib/oficina-historial.ts` — El historial de cada agente en la oficina: cómo le fue a su regla en 4 h en el tramo de evaluación de su estudio (el pasado, con costos), para ponerlo al lado de lo que mide en pap
 - `lib/oficina-run.ts` — La oficina del servidor para JARVIS en la app: una lectura de /api/oficina cada 5 minutos como mucho, ya resumida para la IA (lib/oficina.ts, oficinaParaIa), con el último diario d
 - `lib/oficina.ts` — La oficina del fondo: cada agente de papel en su escritorio, agrupados en mesas como un fondo de comercio.
 - `lib/practica-gatillo.ts` — La práctica del gatillo: la persona ve las velas hasta una vela `i` y decide si la estrategia elegida dispara al cierre de esa vela y hacia dónde (LONG, SHORT o no hay gatillo).
@@ -505,6 +507,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/aprender.test.ts` — Pruebas del contenido de APRENDER (lib/aprender.ts): cada lección tiene texto y preguntas, cada respuesta correcta existe dentro de sus opciones, los ids no se repiten, el glosario
 - `tests/aprendizaje-diario.test.ts` — Pruebas del aprendizaje diario (lib/aprendizaje-diario.ts): días de Argentina, lo del día y lo de todo el registro hasta ese día, comparaciones con su muestra (firmes solo con 15 d
 - `tests/breaker-busqueda.test.ts` — Pruebas de la búsqueda del breaker block (lib/breaker-busqueda.ts): el caso armado a mano que lo forma, cada confirmación con su caso que la cumple y el que no, la zona que falla a
+- `tests/confluencia.test.ts` — Pruebas de la operativa con el mapa y el flujo (lib/confluencia.ts, PLAN_CONFLUENCIA_1): la foto del flujo al entrar (sin la propia regla, sin mirar el futuro), el veredicto fijado
 - `tests/consenso.test.ts` — Pruebas del consenso entre agentes (lib/consenso.ts): que cuente bien quién coincide y quién va al revés, que nadie se cuente a sí mismo, y que la comparación no saque conclusiones
 - `tests/estrategias.test.ts` — pruebas: indicadores: EMA y RSI conocidos, ninguna estrategia mira el futuro: la señal en i no cambia si se borran las vela, operar: entra a la apertura siguiente, una operación por vez, con la escalera de (+1)
 - `tests/fibonacci-niveles.test.ts` — Pruebas del agente Fibonacci + extensión + niveles clave (lib/fibonacci-niveles.ts): la pierna armada a mano, la señal en la zona con su stop y su extensión, que el nivel clave la

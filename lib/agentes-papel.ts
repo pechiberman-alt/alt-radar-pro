@@ -18,6 +18,7 @@ import { ESTRATEGIAS, indicadores, operaEn, type EstrategiaId } from "./estrateg
 import type { SwingCandle } from "./swing-entries.ts";
 import { simbolosFondeo } from "./fondeo.ts";
 import { contextoDeVelas, fotoMapa, validarFotoMapa, type FotoMapa } from "./mapa-contexto.ts";
+import { codigoFlujoDe, fotoFlujo, lecturaFlujo, validarFotoFlujo, VELAS_FOTO_FLUJO, type FotoFlujo } from "./flujo-lectura.ts";
 
 export const PLAN_AGENTES = "PLAN_AGENTES_1";
 export const MARCO_AGENTES = "4h";
@@ -82,6 +83,8 @@ export type PlanPapel = {
   escalera: Escalera;
   /** Cómo estaba el mapa al entrar (lib/mapa-contexto.ts): con las velas cerradas hasta la de la señal. */
   foto: FotoMapa | null;
+  /** Lo que leía la mesa de flujo al entrar (lib/flujo-lectura.ts), con las mismas velas. Con el mapa, da el veredicto (lib/confluencia.ts). */
+  flujo?: FotoFlujo | null;
 };
 
 /**
@@ -118,9 +121,11 @@ export function leerSenalesPapel(symbol: string, velas: SwingCandle[], ahora: nu
     if (!escalera) continue;
     out.push({ estrategia: id, symbol, lado: s.lado, vela: senal.openTime, velaEntrada: entradaVela.openTime, entrada, stop, objetivo, escalera, foto: null });
   }
-  // La foto del mapa se arma una sola vez por moneda y solo si alguien entró (en la mayoría de las velas nadie entra).
+  // Las fotos del mapa y del flujo se arman una sola vez por moneda y solo si alguien entró (en la mayoría de las velas nadie entra).
   const ctx = out.length ? contextoDeVelas(cerradas) : null;
   if (ctx) for (const p of out) p.foto = fotoMapa(ctx, p.lado, p.entrada, p.stop, p.objetivo);
+  const lectura = out.length && cerradas.length >= 40 ? lecturaFlujo(cerradas, VELAS_FOTO_FLUJO) : null;
+  for (const p of out) p.flujo = lectura ? fotoFlujo(lectura, p.lado, codigoFlujoDe(p.estrategia)) : null;
   return out;
 }
 
@@ -130,6 +135,8 @@ export type SenalPapel = {
   consenso?: { acuerdo: number; contra: number; con: string[] };
   /** La foto del mapa al entrar; tampoco filtra nada. */
   mapa?: FotoMapa;
+  /** La foto del flujo al entrar; con la del mapa da el veredicto de la versión «con el mapa» (lib/confluencia.ts). */
+  flujo?: FotoFlujo;
   estrategia: string;
   symbol: string;
   lado: Lado;
@@ -192,5 +199,6 @@ export function validarSenalPapel(raw: unknown, ahora: number): SenalPapel | nul
       }
     : undefined;
   const mapa = validarFotoMapa(o.mapa) ?? undefined;
-  return { clave: clavePapel(estrategia, symbol, lado, vela), consenso, mapa, estrategia, symbol, lado, vela, detectada, entrada, stop, objetivo, tp1: e.tp1, tp2: e.tp2, tp3: e.tp3 };
+  const flujo = validarFotoFlujo(o.flujo) ?? undefined;
+  return { clave: clavePapel(estrategia, symbol, lado, vela), consenso, mapa, flujo, estrategia, symbol, lado, vela, detectada, entrada, stop, objetivo, tp1: e.tp1, tp2: e.tp2, tp3: e.tp3 };
 }

@@ -10,7 +10,8 @@ import { diaAr, type Diario } from "../lib/aprendizaje-diario.ts";
 import { openLabTab } from "../lib/account-events.ts";
 import { textosFoto } from "../lib/mapa-contexto.ts";
 import { consensoPar, lecturaViva, rAhora, separar, type FilaPosicion, type MapaVivo, type PosicionAgente } from "../lib/mapa-agentes.ts";
-import { haceVelas, LECTORES_FLUJO, type LecturaFlujo } from "../lib/flujo-lectura.ts";
+import { haceVelas, LECTORES_FLUJO, textosFlujo, type LecturaFlujo } from "../lib/flujo-lectura.ts";
+import { motivosContra, TEXTO_VEREDICTO } from "../lib/confluencia.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
 
 type Respuesta = { symbol: string; servidor: FilaPosicion[] | null; cuenta: FilaPosicion[] | null; sesion: boolean; diario: Diario | null };
@@ -265,6 +266,22 @@ export function PanelAgentes(props: {
                   <div>
                     <small>AL ENTRAR</small>
                     {p.foto ? <Chips items={textosFoto(p.foto)} /> : <em>sin foto del mapa: entró antes de que existiera</em>}
+                    {p.flujo && <Chips items={textosFlujo(p.flujo)} />}
+                  </div>
+                  <div>
+                    <small>CON EL MAPA</small>
+                    {p.veredicto ? (
+                      <Chips
+                        items={[
+                          {
+                            tono: p.veredicto === "EN_CONTRA" ? "mal" : p.veredicto === "A_FAVOR" ? "bien" : "neutro",
+                            texto: p.veredicto === "EN_CONTRA" ? `${TEXTO_VEREDICTO.EN_CONTRA} (${motivosContra(p.foto, p.flujo).join(", ")})` : TEXTO_VEREDICTO[p.veredicto],
+                          },
+                        ]}
+                      />
+                    ) : (
+                      <em>sin veredicto: entró antes de la foto del flujo</em>
+                    )}
                   </div>
                   <div>
                     <small>AHORA</small>

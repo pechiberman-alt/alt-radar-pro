@@ -1,13 +1,18 @@
 "use client";
 
 /**
- * La oficina 3D del fondo: los agentes de papel trabajando en sus escritorios, agrupados en mesas (tendencia, reversión,
- * estructura, flujo de órdenes y metales), con pizarras en la pared (posiciones abiertas y reunión de la semana) y una sala de reuniones. Los agentes
- * «hablan»: cada globo es una frase armada con un dato (lib/oficina.ts, charla), nunca inventada. Aprenden entre ellos por el
- * consenso, que informa y no filtra; las propuestas son para la persona. Los números salen del registro unificado por agente y
- * se leen una vez al abrir. La escena es CSS 3D; el movimiento es decorativo y se apaga con «reducir movimiento». Solo papel.
+ * La oficina 3D del fondo: los agentes de papel en sus escritorios, en mesas de cristal (tendencia, reversión, estructura,
+ * flujo de órdenes y metales), con pantallas en la pared (posiciones abiertas, mapa de liquidaciones y reunión de la semana) y una
+ * sala de reuniones con JARVIS. Cada escritorio tiene dos monitores: el acierto y el profit factor del agente en papel (o los de su
+ * historial, marcados H, mientras no cierre nada). Se acerca con zoom (botones, pellizco o Ctrl + rueda) y se recorre arrastrando.
+ * Los agentes «hablan»: cada globo es una frase armada con un dato (lib/oficina.ts, charla), nunca inventada. Cada uno se mide
+ * con su regla sola y con el mapa (lib/confluencia.ts). Los números salen del registro unificado por agente y se leen una vez al
+ * abrir. La escena es CSS 3D; el movimiento es decorativo y se apaga con «reducir movimiento». Solo papel.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { textoHistorial } from "../lib/oficina-historial.ts";
+import type { Estadistica } from "../lib/registro.ts";
+import type { Veredicto } from "../lib/confluencia.ts";
 import { forAi } from "../lib/ai-numbers.ts";
 import { ESTRATEGIAS, operaEn } from "../lib/estrategias.ts";
 import { conocimientoDe, conocimientoParaIa, respuestaConcepto } from "../lib/agentes-conocimiento.ts";
@@ -23,9 +28,20 @@ type EstadoMoneda = { symbol: string; at: number; venue: string | null; registra
 type Respuesta = { servidor: { filas: FilaOficina[]; estado: EstadoMoneda[] } | null; cuenta: FilaOficina[] | null; sesion: boolean; diarios?: unknown[] };
 type Linea = { de: "vos" | "agente"; texto: string; cerebro?: string };
 
-const POR_FILA = 4;
-/** El largo de piso (en unidades) que entra entero en la escena; más largo, se achica. */
-const ESCENA_FILAS = 21.5;
+/** Escritorios por fila dentro de cada mesa de cristal, y la separación entre ellos (en unidades del piso). */
+const POR_FILA = 3;
+const PASO_X = 1.55;
+const PASO_Y = 1.7;
+/** Las mesas van en columnas: más cuadrado el piso, más grande entra en la pantalla. */
+const COLUMNAS = 3;
+const ANCHO_POD = POR_FILA * PASO_X + 0.8;
+const CABEZA_POD = 1.05;
+const SEPARACION = 0.8;
+/** Color de cada mesa (r, g, b): el cristal, el cartel y la tarjeta del tablero. */
+const COLOR_MESA: Record<MesaId, string> = { TENDENCIA: "59,130,246", REVERSION: "168,85,247", ESTRUCTURA: "34,211,238", FLUJO: "52,211,153", METALES: "242,184,75" };
+const ZOOM_MAX = 4;
+/** Desde este zoom se ven las etiquetas con el nombre y los números de cada agente. */
+const ZOOM_CERCA = 1.6;
 const CAMBIO_FRASE_MS = 4500;
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)} %`);
 const r2 = (v: number | null) => {
@@ -49,6 +65,19 @@ const pantalla = (e: Escritorio) => {
 };
 
 type Puesto = { e: Escritorio; x: number; y: number };
+type Pod = { mesa: MesaId; x: number; y: number; ancho: number; alto: number };
+
+/** Lo que muestran los dos monitores: el acierto y el PF en papel; sin cierres, los de su historial (H); sin nada, una raya. */
+function monitores(e: Escritorio): { tipo: "papel" | "hist" | "nada"; acierto: string; pf: string } {
+  if (e.total.cerradas > 0) return { tipo: "papel", acierto: e.total.winRate === null ? "—" : `${Math.round(e.total.winRate * 100)}%`, pf: n2(e.total.profitFactor) };
+  const h = e.historial;
+  if (h && h.operaciones > 0) return { tipo: "hist", acierto: h.winRate === null ? "—" : `${Math.round(h.winRate * 100)}%`, pf: n2(h.profitFactor) };
+  return { tipo: "nada", acierto: "—", pf: "—" };
+}
+/** Una estadística del registro en una línea: acierto, PF, R por operación y muestra; sin cierres, lo dice. */
+const lineaEst = (t: Estadistica) =>
+  t.cerradas === 0 ? "sin cierres" : `${pct(t.winRate)} · PF ${n2(t.profitFactor)} · ${r2(t.expectancia)} · n=${t.cerradas}${t.cerradas < 15 ? " (muestra mínima)" : ""}`;
+const TEXTO_V: Record<Veredicto, string> = { A_FAVOR: "mapa a favor", NEUTRA: "mapa neutro", EN_CONTRA: "mapa en contra" };
 
 /**
  * Encuadra la escena: mide lo que tiene que verse entero (el piso, la pared con las pizarras, la sala de reuniones y JARVIS) y
@@ -60,6 +89,11 @@ function encuadrarEscena(escena: HTMLElement) {
   if (!piso) return;
   const transicion = piso.style.transition;
   piso.style.transition = "none";
+  // Se mide sin zoom: el zoom va encima (lib/useZoomEscena) y se vuelve a poner al terminar.
+  const zoomAntes = ["--zoom", "--px", "--py"].map((k) => [k, escena.style.getPropertyValue(k)] as const);
+  escena.style.setProperty("--zoom", "1");
+  escena.style.setProperty("--px", "0px");
+  escena.style.setProperty("--py", "0px");
   let fit = 1;
   let sube = 0;
   escena.style.setProperty("--fit", "1");
@@ -86,6 +120,152 @@ function encuadrarEscena(escena: HTMLElement) {
   }
   void piso.offsetWidth;
   piso.style.transition = transicion;
+  for (const [k, v] of zoomAntes) if (v) escena.style.setProperty(k, v);
+}
+
+/**
+ * El zoom de la escena: la cámara (una capa 2D por encima de la perspectiva) se agranda y se corre sin volver a dibujar la
+ * oficina. Botones, pellizco con dos dedos, Ctrl + rueda (el pellizco del touchpad) y doble toque en el piso. Con zoom, un dedo
+ * o el mouse arrastran la vista; sin zoom, un dedo hace scroll de la página como siempre. El punto bajo los dedos queda quieto.
+ */
+function useZoomEscena(escenaRef: RefObject<HTMLDivElement | null>) {
+  const estado = useRef({ zoom: 1, px: 0, py: 0 });
+  const arrastro = useRef(false);
+  const etiqueta = useRef<HTMLSpanElement | null>(null);
+  const [cerca, setCerca] = useState(false);
+  const [activo, setActivo] = useState(false);
+
+  const aplicar = useCallback(
+    (zoom: number, px: number, py: number) => {
+      const el = escenaRef.current;
+      if (!el) return;
+      const z = Math.min(ZOOM_MAX, Math.max(1, zoom));
+      // No se puede correr la vista más allá del borde de la oficina agrandada.
+      const limX = (el.clientWidth / 2) * (z - 1);
+      const limY = (el.clientHeight / 2) * (z - 1);
+      const x = Math.max(-limX, Math.min(limX, px));
+      const y = Math.max(-limY, Math.min(limY, py));
+      estado.current = { zoom: z, px: x, py: y };
+      el.style.setProperty("--zoom", z.toFixed(3));
+      el.style.setProperty("--px", `${x.toFixed(1)}px`);
+      el.style.setProperty("--py", `${y.toFixed(1)}px`);
+      if (etiqueta.current) etiqueta.current.textContent = `${Math.round(z * 100)} %`;
+      setCerca(z >= ZOOM_CERCA);
+      setActivo(z > 1.01);
+    },
+    [escenaRef],
+  );
+
+  const zoomEn = useCallback(
+    (nuevo: number, cx?: number, cy?: number) => {
+      const el = escenaRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const ox = r.left + r.width / 2;
+      const oy = r.top + r.height / 2;
+      const ax = cx ?? ox;
+      const ay = cy ?? oy;
+      const { zoom, px, py } = estado.current;
+      const z = Math.min(ZOOM_MAX, Math.max(1, nuevo));
+      aplicar(z, ax - ox - (z * (ax - ox - px)) / zoom, ay - oy - (z * (ay - oy - py)) / zoom);
+    },
+    [aplicar, escenaRef],
+  );
+
+  useEffect(() => {
+    const el = escenaRef.current;
+    if (!el) return;
+    const dedos = new Map<number, { x: number; y: number }>();
+    let base: { zoom: number; px: number; py: number; x: number; y: number; dist: number } | null = null;
+    let movido = 0;
+    let ultimoToque = { t: 0, x: 0, y: 0 };
+    const empezar = () => {
+      const ps = [...dedos.values()];
+      const { zoom, px, py } = estado.current;
+      if (ps.length === 1) base = { zoom, px, py, x: ps[0].x, y: ps[0].y, dist: 0 };
+      else if (ps.length >= 2) base = { zoom, px, py, x: (ps[0].x + ps[1].x) / 2, y: (ps[0].y + ps[1].y) / 2, dist: Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y) };
+    };
+    const abajo = (ev: PointerEvent) => {
+      if (ev.pointerType === "mouse" && ev.button !== 0) return;
+      dedos.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (dedos.size === 1) {
+        movido = 0;
+        arrastro.current = false;
+      }
+      empezar();
+    };
+    const mueve = (ev: PointerEvent) => {
+      if (!dedos.has(ev.pointerId) || !base) return;
+      dedos.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      const ps = [...dedos.values()];
+      if (ps.length >= 2 && base.dist > 0) {
+        const r = el.getBoundingClientRect();
+        const ox = r.left + r.width / 2;
+        const oy = r.top + r.height / 2;
+        const mx = (ps[0].x + ps[1].x) / 2;
+        const my = (ps[0].y + ps[1].y) / 2;
+        const z = Math.min(ZOOM_MAX, Math.max(1, base.zoom * (Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y) / base.dist)));
+        const ux = (base.x - ox - base.px) / base.zoom;
+        const uy = (base.y - oy - base.py) / base.zoom;
+        aplicar(z, mx - ox - z * ux, my - oy - z * uy);
+        arrastro.current = true;
+        return;
+      }
+      const dx = ev.clientX - base.x;
+      const dy = ev.clientY - base.y;
+      movido = Math.max(movido, Math.hypot(dx, dy));
+      if (movido > 6 && estado.current.zoom > 1.01) {
+        if (!arrastro.current) el.setPointerCapture?.(ev.pointerId);
+        arrastro.current = true;
+        aplicar(base.zoom, base.px + dx, base.py + dy);
+      }
+    };
+    const arriba = (ev: PointerEvent) => {
+      if (!dedos.has(ev.pointerId)) return;
+      dedos.delete(ev.pointerId);
+      if (dedos.size) {
+        empezar();
+        return;
+      }
+      base = null;
+      // Doble toque en el piso (no en un escritorio): acerca ahí, o vuelve a la vista entera.
+      const enBoton = (ev.target as Element | null)?.closest?.("button");
+      if (ev.pointerType !== "mouse" && movido <= 6 && !enBoton) {
+        if (ev.timeStamp - ultimoToque.t < 320 && Math.hypot(ev.clientX - ultimoToque.x, ev.clientY - ultimoToque.y) < 30) {
+          zoomEn(estado.current.zoom < 1.5 ? 2.2 : 1, ev.clientX, ev.clientY);
+          ultimoToque = { t: 0, x: 0, y: 0 };
+        } else ultimoToque = { t: ev.timeStamp, x: ev.clientX, y: ev.clientY };
+      }
+    };
+    const doble = (ev: MouseEvent) => {
+      if ((ev.target as Element | null)?.closest?.("button")) return;
+      zoomEn(estado.current.zoom < 1.5 ? 2.2 : 1, ev.clientX, ev.clientY);
+    };
+    const rueda = (ev: WheelEvent) => {
+      if (!ev.ctrlKey && !ev.metaKey) return;
+      ev.preventDefault();
+      zoomEn(estado.current.zoom * Math.exp(-ev.deltaY * 0.01), ev.clientX, ev.clientY);
+    };
+    el.addEventListener("pointerdown", abajo);
+    el.addEventListener("pointermove", mueve);
+    window.addEventListener("pointerup", arriba);
+    window.addEventListener("pointercancel", arriba);
+    el.addEventListener("dblclick", doble);
+    el.addEventListener("wheel", rueda, { passive: false });
+    return () => {
+      el.removeEventListener("pointerdown", abajo);
+      el.removeEventListener("pointermove", mueve);
+      window.removeEventListener("pointerup", arriba);
+      window.removeEventListener("pointercancel", arriba);
+      el.removeEventListener("dblclick", doble);
+      el.removeEventListener("wheel", rueda);
+    };
+  }, [aplicar, zoomEn, escenaRef]);
+
+  const acercar = useCallback(() => zoomEn(estado.current.zoom * 1.5), [zoomEn]);
+  const alejar = useCallback(() => zoomEn(estado.current.zoom / 1.5), [zoomEn]);
+  const entera = useCallback(() => aplicar(1, 0, 0), [aplicar]);
+  return { cerca, activo, arrastro, etiqueta, acercar, alejar, entera };
 }
 
 const precioCorto = (v: number) => v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : v >= 1 ? 2 : 5 });
@@ -102,21 +282,30 @@ function lineasMapa(l: LecturaMapa | null): string[] {
 }
 const fechaDia = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
 
-/** Ubica los escritorios: cada mesa en su bloque de filas, con un pasillo entre mesas. La sala de reuniones va al fondo. */
-function ubicar(escritorios: Escritorio[]): { puestos: Puesto[]; filas: number; bloques: { mesa: MesaId; y: number; filas: number }[] } {
+/**
+ * Ubica las mesas de cristal en columnas (la más grande primero, en la columna más corta) y a cada agente en su escritorio. La
+ * sala de reuniones va al frente de la columna que queda más corta. Las medidas van en unidades del piso.
+ */
+function ubicar(escritorios: Escritorio[]): { puestos: Puesto[]; pods: Pod[]; ancho: number; largo: number; sala: { x: number; y: number; ancho: number; alto: number } } {
   const puestos: Puesto[] = [];
-  const bloques: { mesa: MesaId; y: number; filas: number }[] = [];
-  let y = 1.2;
-  for (const m of MESAS) {
-    const suyos = escritorios.filter((e) => e.mesa === m.id);
-    if (!suyos.length) continue;
-    const filas = Math.ceil(suyos.length / POR_FILA);
-    bloques.push({ mesa: m.id, y, filas });
-    suyos.forEach((e, k) => puestos.push({ e, x: 1 + (k % POR_FILA) * 1.5, y: y + Math.floor(k / POR_FILA) * 1.6 }));
-    // El pasillo deja lugar al globo con el nombre de la primera fila, para que no tape el cartel de la mesa de atrás.
-    y += filas * 1.6 + 1.8;
+  const pods: Pod[] = [];
+  const alturas = Array.from({ length: COLUMNAS }, () => 1.3);
+  const grupos = MESAS.map((m) => ({ mesa: m.id, suyos: escritorios.filter((e) => e.mesa === m.id) })).filter((g) => g.suyos.length);
+  for (const g of [...grupos].sort((x, y) => y.suyos.length - x.suyos.length)) {
+    const c = alturas.indexOf(Math.min(...alturas));
+    const filas = Math.ceil(g.suyos.length / POR_FILA);
+    const x = 0.7 + c * (ANCHO_POD + SEPARACION);
+    const y = alturas[c];
+    const alto = CABEZA_POD + filas * PASO_Y + 0.25;
+    pods.push({ mesa: g.mesa, x, y, ancho: ANCHO_POD, alto });
+    g.suyos.forEach((e, k) => puestos.push({ e, x: x + 0.55 + (k % POR_FILA) * PASO_X, y: y + CABEZA_POD + Math.floor(k / POR_FILA) * PASO_Y }));
+    alturas[c] = y + alto + SEPARACION;
   }
-  return { puestos, filas: y + 3, bloques };
+  const ancho = 1.4 + COLUMNAS * ANCHO_POD + (COLUMNAS - 1) * SEPARACION;
+  const cs = alturas.indexOf(Math.min(...alturas));
+  const sala = { x: 0.7 + cs * (ANCHO_POD + SEPARACION), y: alturas[cs] - 0.2, ancho: ANCHO_POD, alto: 3.2 };
+  const largo = Math.max(...alturas, sala.y + sala.alto + 0.9);
+  return { puestos, pods, ancho, largo, sala };
 }
 
 function Persona({ tonoCamisa }: { tonoCamisa: string }) {
@@ -213,6 +402,7 @@ export default function LabOficina() {
   const [pensando, setPensando] = useState(false);
   const [diaElegido, setDiaElegido] = useState<string | null>(null);
   const [lecturas, setLecturas] = useState<LecturaMapa[]>([]);
+  const [orden, setOrden] = useState<"MESA" | "ACIERTO" | "PF" | "HISTORIAL">("MESA");
 
   // Lo que leyó el mapa de liquidaciones en este navegador: la pantalla de la pared y lo que ven los agentes al hablar.
   useEffect(() => {
@@ -369,10 +559,11 @@ export default function LabOficina() {
     </>
   );
 
-  const { puestos, filas, bloques } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
+  const { puestos, pods, ancho, largo, sala } = useMemo(() => ubicar(oficina.escritorios), [oficina.escritorios]);
   // El encuadre se mide en la pantalla (la perspectiva y el giro cambian lo que ocupa el piso): al dibujar, al girar y al
   // cambiar el tamaño. Escribe dos variables CSS en la escena; no hay estado de React que vuelva a dibujar.
   const escenaRef = useRef<HTMLDivElement>(null);
+  const { cerca: zoomCerca, activo: zoomActivo, arrastro, etiqueta: etiquetaZoom, acercar, alejar, entera } = useZoomEscena(escenaRef);
   useLayoutEffect(() => {
     const escena = escenaRef.current;
     if (!escena) return;
@@ -382,7 +573,7 @@ export default function LabOficina() {
     const ro = new ResizeObserver(encuadrar);
     ro.observe(escena);
     return () => ro.disconnect();
-  }, [filas, giro, estado]);
+  }, [ancho, largo, giro, estado]);
   const frases = charla(oficina);
   const propias = propuestas(oficina);
   // Lo que se oye en la oficina: lo que dice cada uno y lo que se dicen entre ellos.
@@ -392,6 +583,15 @@ export default function LabOficina() {
   ];
   const actual: Frase | null = hablan.length ? hablan[turno % hablan.length] : null;
   const elegidoE = oficina.escritorios.find((e) => e.id === elegido) ?? null;
+  // El tablero: cada agente con su papel, su versión con el mapa y su historial. Sin dato, al final (desconocido no es cero).
+  const ordenMesa = (e: Escritorio) => MESAS.findIndex((m) => m.id === e.mesa);
+  const tablero = [...oficina.escritorios].sort((a, b) => {
+    const nulos = (x: number | null | undefined, y: number | null | undefined) => (x === null || x === undefined ? (y === null || y === undefined ? 0 : 1) : y === null || y === undefined ? -1 : y - x);
+    if (orden === "ACIERTO") return nulos(a.total.cerradas ? a.total.winRate : null, b.total.cerradas ? b.total.winRate : null) || b.total.cerradas - a.total.cerradas;
+    if (orden === "PF") return nulos(a.total.cerradas ? a.total.profitFactor : null, b.total.cerradas ? b.total.profitFactor : null) || b.total.cerradas - a.total.cerradas;
+    if (orden === "HISTORIAL") return nulos(a.historial?.profitFactor, b.historial?.profitFactor);
+    return ordenMesa(a) - ordenMesa(b) || a.agente.localeCompare(b.agente);
+  });
   const enDirecto = oficina.escritorios.flatMap((e) => e.abiertas.map((a) => ({ e, a }))).sort((x, y) => y.a.detectada - x.a.detectada);
   const lineasDirecto = enDirecto.slice(0, 7).map(({ e, a }) => `${nombreCorto(e.agente)} · ${nombreActivo(a.symbol)} ${a.lado === "LONG" ? "▲" : "▼"}`);
   const lineasReunion = oficina.reunion.slice(0, 7).map((e) => `${nombreCorto(e.agente)} · ${r2(e.semana.neto)} · n=${e.semana.cerradas}`);
@@ -402,8 +602,9 @@ export default function LabOficina() {
       <header className="of-cabecera">
         <h3 id="of-titulo" className="lab-sub">La oficina del fondo</h3>
         <p>
-          Cada agente en su escritorio, en tres mesas. Hablan con lo que muestran sus datos y aprenden entre ellos comparando cuándo
-          les va mejor: acompañados o solos. Todo es papel. Tocá un escritorio para ver su ficha.
+          Cada agente en su escritorio, en cinco mesas de cristal, con su acierto y su profit factor en los monitores. Cada uno opera con
+          su regla y, además, con el mapa de liquidaciones y el flujo de órdenes: si los tiene en contra, esa versión no entra. Las dos se
+          miden en papel para saber si mirar el mapa los hace mejores. Tocá un escritorio para ver su ficha.
         </p>
         <div className="of-planes" role="tablist" aria-label="Qué agentes ver">
           <button type="button" role="tab" aria-selected={plan === "SERVIDOR"} onClick={() => setPlan("SERVIDOR")}>SERVIDOR 24/7</button>
@@ -437,65 +638,107 @@ export default function LabOficina() {
         {oficina.incompleta && <p className="of-tenue">Se leyeron las últimas 1.000 entradas: lo más viejo no entra.</p>}
       </header>
 
-      {/* Con más mesas el piso es más largo: se encuadra (encuadrarEscena) para que la pared, la sala y JARVIS entren siempre. */}
-      <div ref={escenaRef} className="of-escena" style={{ ["--giro" as string]: `${giro}deg`, ["--filas" as string]: filas, ["--esc" as string]: Math.min(1, ESCENA_FILAS / filas) }}>
-        <div className="of-piso">
-          <span className="of-luz" style={{ ["--y" as string]: 3 }} aria-hidden="true" />
-          <span className="of-luz" style={{ ["--y" as string]: filas - 5 }} aria-hidden="true" />
-          <div className="of-pared of-pared-fondo">
-            <Pizarra titulo="EN DIRECTO" filas={lineasDirecto} vacio="Sin posiciones abiertas" />
-            <Pizarra titulo="MAPA DE LIQUIDACIONES" filas={lineasMapa(lecturas[0] ?? null)} vacio="Abrí el mapa: lo que lea aparece acá" />
-            <Pizarra titulo="REUNIÓN DE LA SEMANA" filas={lineasReunion} vacio="Nadie cerró en 7 días" />
-            <Arana activa={elegido === "ARANA"} elegir={() => setElegido(elegido === "ARANA" ? null : "ARANA")} falla={plan === "SERVIDOR" && fallas.length > 0} />
-          </div>
-          {bloques.map((b) => (
-            <div key={b.mesa} className={`of-alfombra of-alf-${b.mesa.toLowerCase()}`} style={{ ["--y" as string]: b.y - 0.4, ["--alto" as string]: b.filas * 1.6 }}>
-              <span>{MESAS.find((m) => m.id === b.mesa)?.nombre}</span>
+      {/* Las mesas van en columnas y la escena se encuadra midiendo (encuadrarEscena); el zoom va por encima (useZoomEscena). */}
+      <div
+        ref={escenaRef}
+        className={`of-escena${zoomCerca ? " of-cerca" : ""}${zoomActivo ? " of-zoom" : ""}`}
+        style={{ ["--giro" as string]: `${giro}deg`, ["--ancho" as string]: ancho, ["--largo" as string]: largo }}
+      >
+        <div className="of-camara">
+          <div className="of-piso">
+            <div className="of-pared of-pared-fondo">
+              <Pizarra titulo="EN DIRECTO" filas={lineasDirecto} vacio="Sin posiciones abiertas" />
+              <Pizarra titulo="MAPA DE LIQUIDACIONES" filas={lineasMapa(lecturas[0] ?? null)} vacio="Abrí el mapa: lo que lea aparece acá" />
+              <Pizarra titulo="REUNIÓN DE LA SEMANA" filas={lineasReunion} vacio="Nadie cerró en 7 días" />
+              <Arana activa={elegido === "ARANA"} elegir={() => setElegido(elegido === "ARANA" ? null : "ARANA")} falla={plan === "SERVIDOR" && fallas.length > 0} />
             </div>
-          ))}
-          <Planta x={0.15} y={0.6} />
-          <Planta x={6.9} y={0.6} />
-          <Planta x={6.9} y={filas - 3.2} />
-          {puestos.map(({ e, x, y }) => {
-            const habla = actual?.quien === e.id;
-            const visible = habla || elegido === e.id;
-            return (
-              <button
-                key={e.id}
-                type="button"
-                className={`of-puesto of-pant-${pantalla(e)}${elegido === e.id ? " of-activo" : ""}${habla ? " of-habla" : ""}`}
-                style={{ ["--x" as string]: x, ["--y" as string]: y }}
-                aria-pressed={elegido === e.id}
-                aria-label={`${e.agente}: ${e.abiertas.length} abiertas, ${e.semana.cerradas} cerradas esta semana`}
-                onClick={() => setElegido(elegido === e.id ? null : e.id)}
-              >
-                <span className="of-mueble">
-                  <span className="of-tapa" />
-                  <span className="of-frente" />
-                  <span className="of-lado" />
-                  <span className={`of-monitor${e.total.muestra === "MINIMA" ? " of-monitor-poca" : ""}`} title="Acierto">{e.total.winRate === null ? "—" : `${Math.round(e.total.winRate * 100)}%`}</span>
-                </span>
-                <span className="of-parado">
-                  <Persona tonoCamisa={tono(e)} />
-                  {visible && (
-                    <span className={`of-globo${habla ? "" : " of-globo-nombre"}`}>
-                      <b>{nombreCorto(e.agente)}</b>
-                      {habla && actual ? <span>{actual.texto}</span> : null}
+            {pods.map((p) => {
+              const suyos = oficina.escritorios.filter((e) => e.mesa === p.mesa);
+              const abiertas = suyos.reduce((n, e) => n + e.abiertas.length, 0);
+              const cierres = suyos.reduce((n, e) => n + e.total.cerradas, 0);
+              return (
+                <div key={p.mesa} className="of-pod" style={{ ["--x" as string]: p.x, ["--y" as string]: p.y, ["--w" as string]: p.ancho, ["--h" as string]: p.alto, ["--c" as string]: COLOR_MESA[p.mesa] }}>
+                  <span className="of-pod-luz" aria-hidden="true" />
+                  <span className="of-vidrio of-vidrio-fondo" aria-hidden="true" />
+                  <span className="of-vidrio of-vidrio-lado" aria-hidden="true" />
+                  <span className="of-vidrio of-vidrio-lado of-vidrio-der" aria-hidden="true" />
+                  <span className="of-pod-cartel">
+                    <span>
+                      <b>{MESAS.find((m) => m.id === p.mesa)?.nombre}</b>
+                      <small>
+                        {suyos.length} {suyos.length === 1 ? "agente" : "agentes"} · {abiertas} {abiertas === 1 ? "abierta" : "abiertas"} · {cierres} {cierres === 1 ? "cierre" : "cierres"}
+                      </small>
                     </span>
-                  )}
+                  </span>
+                </div>
+              );
+            })}
+            <Planta x={0.1} y={0.45} />
+            <Planta x={ancho - 0.6} y={0.45} />
+            <Planta x={ancho - 0.6} y={largo - 0.9} />
+            {puestos.map(({ e, x, y }) => {
+              const habla = actual?.quien === e.id;
+              const visible = habla || elegido === e.id;
+              const m = monitores(e);
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  className={`of-puesto of-pant-${pantalla(e)}${elegido === e.id ? " of-activo" : ""}${habla ? " of-habla" : ""}`}
+                  style={{ ["--x" as string]: x, ["--y" as string]: y, ["--c" as string]: COLOR_MESA[e.mesa] }}
+                  aria-pressed={elegido === e.id}
+                  aria-label={`${e.agente}: ${m.tipo === "nada" ? "sin cierres" : `${m.tipo === "hist" ? "historial, " : ""}acierto ${m.acierto}, profit factor ${m.pf}`}, ${e.abiertas.length} abiertas`}
+                  onClick={() => {
+                    if (arrastro.current) return;
+                    setElegido(elegido === e.id ? null : e.id);
+                  }}
+                >
+                  <span className="of-mueble">
+                    <span className="of-tapa" />
+                    <span className="of-frente" />
+                    <span className="of-lado" />
+                    <span className={`of-pantallas of-m-${m.tipo}`}>
+                      <span className="of-pantalla">
+                        <small>{m.tipo === "hist" ? "H · ACIERTO" : "ACIERTO"}</small>
+                        {m.acierto}
+                      </span>
+                      <span className="of-pantalla">
+                        <small>{m.tipo === "hist" ? "H · PF" : "PF"}</small>
+                        {m.pf}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="of-parado">
+                    <span className="of-silla" aria-hidden="true" />
+                    <Persona tonoCamisa={tono(e)} />
+                    {visible ? (
+                      <span className={`of-globo${habla ? "" : " of-globo-nombre"}`}>
+                        <b>{nombreCorto(e.agente)}</b>
+                        {habla && actual ? <span>{actual.texto}</span> : null}
+                      </span>
+                    ) : (
+                      <span className="of-etiqueta" aria-hidden="true">
+                        <b>{nombreCorto(e.agente)}</b>
+                        <span>{m.tipo === "nada" ? "sin cierres" : `${m.tipo === "hist" ? "H " : ""}${m.acierto} · PF ${m.pf}`}</span>
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+            <div className="of-sala" style={{ ["--x" as string]: sala.x, ["--y" as string]: sala.y, ["--w" as string]: sala.ancho, ["--h" as string]: sala.alto }}>
+              <span className="of-vidrio of-vidrio-fondo" aria-hidden="true" />
+              <span className="of-vidrio of-vidrio-lado" aria-hidden="true" />
+              <span className="of-vidrio of-vidrio-lado of-vidrio-der" aria-hidden="true" />
+              <span className="of-mesa-redonda" />
+              <Holograma puntos={oficina.fondo.curva} activo={elegido === "JARVIS"} elegir={() => setElegido(elegido === "JARVIS" ? null : "JARVIS")} />
+              {oficina.reunion.slice(0, 4).map((e, k) => (
+                <span key={e.id} className="of-parado of-silla-sala" style={{ ["--k" as string]: k }}>
+                  <Persona tonoCamisa={tono(e)} />
                 </span>
-              </button>
-            );
-          })}
-          <div className="of-sala" style={{ ["--y" as string]: filas - 2.5 }}>
-            <span className="of-mesa-redonda" />
-            <Holograma puntos={oficina.fondo.curva} activo={elegido === "JARVIS"} elegir={() => setElegido(elegido === "JARVIS" ? null : "JARVIS")} />
-            {oficina.reunion.slice(0, 4).map((e, k) => (
-              <span key={e.id} className="of-parado of-silla" style={{ ["--k" as string]: k }}>
-                <Persona tonoCamisa={tono(e)} />
-              </span>
-            ))}
-            <span className="of-sala-nombre">Sala de reuniones</span>
+              ))}
+              <span className="of-sala-nombre">Sala de reuniones</span>
+            </div>
           </div>
         </div>
         {actual && (
@@ -503,7 +746,23 @@ export default function LabOficina() {
             <b>{actual.nombre}:</b> {actual.texto}
           </p>
         )}
+        <div className="of-zoom-controles" role="group" aria-label="Zoom de la oficina">
+          <button type="button" onClick={alejar} aria-label="Alejar">
+            −
+          </button>
+          <span ref={etiquetaZoom}>100 %</span>
+          <button type="button" onClick={acercar} aria-label="Acercar">
+            +
+          </button>
+          <button type="button" onClick={entera} aria-label="Ver la oficina entera" title="Ver la oficina entera">
+            ⤢
+          </button>
+        </div>
       </div>
+      <p className="of-tenue of-pista">
+        Acercate con + o pellizcando (en la compu, Ctrl + rueda o doble clic en el piso) y arrastrá para recorrer. En los monitores: acierto y
+        profit factor en papel; con H, los de su historial en 4 h mientras no cierre nada.
+      </p>
 
       {elegidoE && (
         <article className="of-ficha" aria-live="polite">
@@ -525,6 +784,21 @@ export default function LabOficina() {
             <div><dt>Factor de ganancia</dt><dd>{n2(elegidoE.total.profitFactor)}</dd></div>
             <div><dt>Por operación</dt><dd>{r2(elegidoE.total.expectancia)}</dd></div>
             <div><dt>Semana</dt><dd>{elegidoE.semana.cerradas ? `${r2(elegidoE.semana.neto)} · n=${elegidoE.semana.cerradas}` : "sin cierres"}</dd></div>
+            <div className="of-ficha-ancha">
+              <dt>Con el mapa y el flujo</dt>
+              <dd>
+                {lineaEst(elegidoE.conMapa)}
+                <small>
+                  {" "}
+                  · {elegidoE.frenadas.cerradas} {elegidoE.frenadas.cerradas === 1 ? "frenada" : "frenadas"}
+                  {elegidoE.frenadas.cerradas ? ` (${r2(elegidoE.frenadas.expectancia)} por op.)` : ""} · {elegidoE.conVeredicto} con las dos fotos
+                </small>
+              </dd>
+            </div>
+            <div className="of-ficha-ancha">
+              <dt>Historial 4 h (estudio)</dt>
+              <dd>{textoHistorial(elegidoE.historial)}</dd>
+            </div>
             <div>
               <dt>PnL simulado</dt>
               <dd className={elegidoE.capital.netoUsd > 0 ? "of-sube" : elegidoE.capital.netoUsd < 0 ? "of-baja" : ""}>{usdTxt(elegidoE.capital.netoUsd, true)}</dd>
@@ -536,7 +810,8 @@ export default function LabOficina() {
               <span>Abiertas</span>
               {elegidoE.abiertas.map((a) => (
                 <button key={`${a.symbol}-${a.detectada}`} type="button" className={a.lado === "LONG" ? "of-sube" : "of-baja"} onClick={() => openInMap(a.symbol, "4h")} title="Ver la posición y sus niveles en el mapa de liquidaciones">
-                  {nombreActivo(a.symbol)} {a.lado === "LONG" ? "▲" : "▼"} · VER EN EL MAPA
+                  {nombreActivo(a.symbol)} {a.lado === "LONG" ? "▲" : "▼"}
+                  {a.veredicto ? ` · ${TEXTO_V[a.veredicto]}` : ""} · VER EN EL MAPA
                 </button>
               ))}
             </div>
@@ -627,34 +902,69 @@ export default function LabOficina() {
         </article>
       )}
 
-      <div className="of-tabla-caja">
-        <h4>Acierto de cada uno</h4>
-        <p className="of-tenue">Ordenado por el piso del intervalo del 90 %: premia la muestra, no la suerte. Con menos de 15 cierres, muestra mínima.</p>
-        {oficina.ranking.length ? (
-          <table className="of-tabla">
-            <thead>
-              <tr><th>Agente</th><th>Cierres</th><th>Acierto (IC 90 %)</th><th>PF</th><th>Por op.</th><th>PnL simulado</th></tr>
-            </thead>
-            <tbody>
-              {oficina.ranking.map((e) => (
-                <tr key={e.id} className={e.total.muestra === "MINIMA" ? "of-fila-poca" : ""} onClick={() => setElegido(e.id)}>
-                  <td>{nombreCorto(e.agente)}</td>
-                  <td>{e.total.cerradas}</td>
-                  <td>
-                    {pct(e.total.winRate)}
-                    {e.total.intervalo ? ` (${pct(e.total.intervalo.low)}–${pct(e.total.intervalo.high)})` : ""}
-                  </td>
-                  <td>{n2(e.total.profitFactor)}</td>
-                  <td>{r2(e.total.expectancia)}</td>
-                  <td className={e.capital.netoUsd > 0 ? "of-sube" : e.capital.netoUsd < 0 ? "of-baja" : ""}>{usdTxt(e.capital.netoUsd, true)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="of-tenue">Nadie cerró todavía: el acierto aparece con el primer cierre.</p>
-        )}
-        <p className="of-tenue">{oficina.escritorios.length - oficina.ranking.length} agentes todavía sin cierres.</p>
+      <div className="of-tablero-caja">
+        <div className="of-tablero-cab">
+          <h4>Tablero de agentes</h4>
+          <div className="of-orden" role="tablist" aria-label="Ordenar el tablero">
+            {(
+              [
+                ["MESA", "Por mesa"],
+                ["ACIERTO", "Acierto"],
+                ["PF", "PF"],
+                ["HISTORIAL", "Historial"],
+              ] as const
+            ).map(([k, t]) => (
+              <button key={k} type="button" role="tab" aria-selected={orden === k} onClick={() => setOrden(k)}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="of-tenue">
+          Papel: el registro de cada agente con su regla sola. Con el mapa: las mismas entradas sin las que el mapa o el flujo tenían en contra
+          (desde que se guardan las dos fotos). Historial: su regla en 4 h en la evaluación de su estudio, con costos. Con menos de 15 cierres,
+          muestra mínima. No es asesoramiento financiero.
+        </p>
+        <div className="of-tablero">
+          {tablero.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              className={`of-tarjeta${elegido === e.id ? " of-activo" : ""}`}
+              style={{ ["--c" as string]: COLOR_MESA[e.mesa] }}
+              onClick={() => {
+                setElegido(e.id);
+                escenaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              <span className="of-t-cab">
+                <b>{nombreCorto(e.agente)}</b>
+                <i>{MESAS.find((m) => m.id === e.mesa)?.nombre.replace("Mesa de ", "")}</i>
+              </span>
+              <span className="of-t-fila">
+                <em>PAPEL</em>
+                <span className={e.total.cerradas ? "" : "of-tenue"}>{lineaEst(e.total)}</span>
+              </span>
+              <span className="of-t-fila">
+                <em>CON MAPA</em>
+                <span className={e.conMapa.cerradas ? "" : "of-tenue"}>{lineaEst(e.conMapa)}</span>
+              </span>
+              <span className="of-t-fila">
+                <em>HISTORIAL</em>
+                <span className={e.historial ? "" : "of-tenue"}>{textoHistorial(e.historial)}</span>
+              </span>
+              {e.abiertas.length > 0 && (
+                <span className="of-t-abiertas">
+                  {e.abiertas.slice(0, 4).map((a) => (
+                    <span key={`${a.symbol}-${a.detectada}`} className={`${a.lado === "LONG" ? "of-sube" : "of-baja"}${a.veredicto ? ` of-v-${a.veredicto.toLowerCase()}` : ""}`} title={a.veredicto ? TEXTO_V[a.veredicto] : "sin veredicto del mapa"}>
+                      {nombreActivo(a.symbol)} {a.lado === "LONG" ? "▲" : "▼"}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="of-tabla-caja of-diario">
