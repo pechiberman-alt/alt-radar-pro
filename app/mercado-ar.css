@@ -1,0 +1,47 @@
+/* MERCADO AR: panel, escáner de agentes y mentes, y la vista de un papel en el MAPA. Celular primero. */
+.ar-wrap{display:grid;gap:12px;padding:12px}
+.ar-tabs{display:flex;gap:6px;overflow-x:auto}
+.ar-tabs button,.ar-chip-btn{border:1px solid var(--line);background:#0c130f;color:var(--muted);font:10px var(--font-mono);letter-spacing:1px;padding:8px 10px;border-radius:5px;cursor:pointer;white-space:nowrap}
+.ar-tabs button.on,.ar-chip-btn.on{color:var(--green);border-color:var(--green2);background:#0c2d20}
+.ar-list{border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ar-row{display:grid;grid-template-columns:64px 1fr auto auto;gap:8px;align-items:center;width:100%;padding:10px 12px;border:0;border-bottom:1px solid #17201c;background:none;text-align:left;cursor:pointer;font:11px var(--font-mono);color:var(--text)}
+.ar-row:hover{background:#111914}
+.ar-row b{color:var(--green)}
+.ar-row small{color:var(--muted);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ar-up{color:var(--green)}.ar-down{color:var(--red)}.ar-mute{color:var(--muted)}.ar-warn{color:var(--amber)}
+.ar-chip{display:inline-block;font:9px var(--font-mono);letter-spacing:1px;padding:3px 6px;border:1px solid var(--line);border-radius:3px;color:var(--muted)}
+.ar-chip.ok{color:var(--green);border-color:#2c493b}.ar-chip.mal{color:var(--red);border-color:#673238}.ar-chip.alerta{color:var(--amber);border-color:#7b5f29}
+.ar-box{border:1px solid var(--line);border-radius:6px;padding:12px;background:#0b110e;display:grid;gap:8px}
+.ar-box h3{margin:0;font:10px var(--font-mono);letter-spacing:1.5px;color:var(--muted);font-weight:400}
+.ar-box p{margin:0;color:#9ca8a1;font-size:11px;line-height:1.45}
+.ar-flag{border:1px solid #7b5f29;background:#1d170b;color:#e8d3a4;border-radius:6px;padding:10px 12px;font:10px var(--font-mono);line-height:1.5}
+.ar-flag b{color:var(--amber)}
+.ar-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;font:11px var(--font-mono)}
+.ar-grid span{color:var(--muted);font-size:9px;display:block}
+.ar-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.ar-head h2{font:26px var(--font-mono);margin:0}
+.ar-head small{color:var(--muted);font-size:11px}
+.ar-svg{width:100%;height:auto;display:block;background:#070b09;border:1px solid var(--line);border-radius:6px}
+.ar-mente{border-top:1px solid #17201c;padding:9px 0;display:grid;gap:4px}
+.ar-mente:first-of-type{border-top:0}
+.ar-mente>div{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.ar-mente b{font-size:12px}
+.ar-mente em{color:var(--muted);font-size:10px;font-style:normal}
+.ar-crit{display:grid;grid-template-columns:14px 1fr auto;gap:6px;font:10px var(--font-mono);color:#b7c2bc}
+.ar-crit i{font-style:normal}
+.ar-agente{border-top:1px solid #17201c;padding:8px 0;display:grid;gap:3px;font:10px var(--font-mono)}
+.ar-agente:first-of-type{border-top:0}
+.ar-plan{color:var(--green);background:#0c2d20;border:1px solid var(--green2);border-radius:4px;padding:6px 8px}
+.ar-table{width:100%;border-collapse:collapse}
+.ar-table td,.ar-table th{padding:8px 8px;font:10px var(--font-mono);border-bottom:1px solid #17201c;white-space:nowrap}
+.ar-table th{color:var(--muted);font-size:9px;text-align:left}
+.ar-scroll{overflow-x:auto}
+.ar-progress{height:3px;background:#1d2c25;border-radius:2px;overflow:hidden}
+.ar-progress i{display:block;height:100%;background:var(--green)}
+.ar-detail{position:fixed;inset:0;z-index:60;background:#000c;display:flex;justify-content:flex-end}
+.ar-detail>div{width:min(560px,100vw);height:100%;overflow:auto;background:#09100d;border-left:1px solid #31483d;padding:16px;display:grid;gap:12px;align-content:start}
+.ar-close{justify-self:end;border:1px solid var(--line);background:#101713;width:34px;height:34px;border-radius:5px;cursor:pointer;font-size:16px}
+.liq-ar-hits{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.liq-ar-hits button{border:1px solid #2c493b;background:#0c2d20;color:var(--green);font:10px var(--font-mono);padding:6px 8px;border-radius:4px;cursor:pointer}
+@media(min-width:900px){.ar-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+button.ar-agente{background:none;border:0;border-top:1px solid #17201c;color:inherit;text-align:left;cursor:pointer;width:100%}
