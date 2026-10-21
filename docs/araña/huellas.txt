@@ -207,7 +207,7 @@ bd6422c65a0d	358	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-a4ffeec19316	376	docs/araña/objetivos.md
+7941e6d9c116	376	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -448,7 +448,7 @@ cfaa28b61f98	182	lib/spot-strategy.ts
 b0595f550a8b	175	lib/structure-archive.ts
 bf7335d9b46e	223	lib/supply-demand.ts
 3fb7e30b7950	276	lib/suscripcion-db.ts
-a4a4fb4dd668	154	lib/suscripcion.ts
+fda9aee0d4ca	154	lib/suscripcion.ts
 ceab2b39b102	324	lib/swing-entries.ts
 c9fd83f39ff3	171	lib/swing-liquidity-filter.ts
 bff8d579fd5d	283	lib/telegram-ai-server.ts
@@ -634,7 +634,7 @@ c90b4a2a66b4	70	tests/live-market.test.ts
 9ba8d41b41a9	95	tests/mapa-contexto.test.ts
 e46e93dda3df	226	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
-31d1d7a40de0	277	tests/mercado-ar.test.ts
+d435514e5aa5	277	tests/mercado-ar.test.ts
 4fec70e5eb48	37	tests/mesa-medicion.test.ts
 ea96d2b2093d	44	tests/mesa-sombra-auditoria.test.ts
 21cf8ab702fe	99	tests/mesa-sombra-db.test.ts
@@ -680,7 +680,7 @@ c71a0865f0b2	97	tests/spot-strategy.test.ts
 6fd2182c77cc	59	tests/structure-archive.test.ts
 faea7e4c1e9c	152	tests/supply-demand.test.ts
 a3f730f61324	83	tests/suscripcion-db.test.ts
-e08d208e69e2	94	tests/suscripcion.test.ts
+c933f0c9f416	94	tests/suscripcion.test.ts
 b8fae29bf022	203	tests/swing-entries.test.ts
 124ea19d3a2a	116	tests/swing-liquidity-filter.test.ts
 f6b24002aa76	40	tests/telegram-ai.test.ts

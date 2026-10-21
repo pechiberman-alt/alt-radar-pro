@@ -371,7 +371,7 @@ Pendiente: Cargar el precio en CONFIGURACIÓN → COBROS.
 - `app/puerta-pro.css` — La puerta PRO (app/puerta-pro.tsx): la presentación para visitantes, el muro de pago y el aviso de días dentro de la terminal.
 - `app/puerta-pro.tsx` — La puerta PRO de la terminal: quien no tiene sesión ve la presentación (qué es, qué incluye, cuánto cuesta y la cuenta para probar 7 días gratis); quien tiene la prueba o el pago v
 - `lib/suscripcion-db.ts` — El acceso PRO en la base: la prueba y el pago de cada persona (suscripciones), los avisos de pago que manda la persona (pagos_reportados) y la configuración de cobro (app_settings)
-- `lib/suscripcion.ts` — El acceso PRO de la terminal: todo es PRO, con 7 días de prueba desde el primer uso (o desde que se crea la cuenta) y después se paga por transferencia al alias (url.mp) y el admin
+- `lib/suscripcion.ts` — El acceso PRO de la terminal: todo es PRO, con 7 días de prueba desde el primer uso (o desde que se crea la cuenta) y después se paga por transferencia al alias (url.fx) y el admin
 - `tests/suscripcion-db.test.ts` — Pruebas del acceso PRO en la base (lib/suscripcion-db.ts) con node:sqlite haciendo de D1: la prueba arranca en el primer uso, un aviso de pago se guarda una sola vez y con tope de
 - `tests/suscripcion.test.ts` — Pruebas del acceso PRO (lib/suscripcion.ts): el estado de cada persona (prueba, pago, vencido, administrador), cuánto suma un pago aprobado, qué rutas de la API pasan por la puerta
 
