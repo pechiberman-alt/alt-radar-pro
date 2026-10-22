@@ -19,7 +19,7 @@ import type { Razonamiento, FamiliaMente } from "./mentes-metodo.ts";
 
 export type Lado = "LARGO" | "CORTO" | "ESPERA" | "AFUERA" | "ABSTIENE";
 export type Direccion = "LARGO" | "CORTO";
-export type FamiliaVoz = FamiliaMente | "AGENTE" | "ZONA" | "MAPA" | "MESA" | "RIESGO_MESA";
+export type FamiliaVoz = FamiliaMente | "AGENTE" | "ZONA" | "MAPA" | "MESA" | "NUCLEO" | "RIESGO_MESA";
 
 export type Voz = {
   id: string;
@@ -203,7 +203,7 @@ export function vocesDeConsejo(c: {
 
 // ── La deliberación ──
 
-const ORDEN_FAMILIA: FamiliaVoz[] = ["MESA", "ZONA", "MAPA", "AGENTE", "MOMENTUM", "VALOR", "CRECIMIENTO", "CONTRARIA", "RIESGO", "RIESGO_MESA"];
+const ORDEN_FAMILIA: FamiliaVoz[] = ["MESA", "NUCLEO", "ZONA", "MAPA", "AGENTE", "MOMENTUM", "VALOR", "CRECIMIENTO", "CONTRARIA", "RIESGO", "RIESGO_MESA"];
 const orden = (a: Voz, b: Voz) => ORDEN_FAMILIA.indexOf(a.familia) - ORDEN_FAMILIA.indexOf(b.familia) || (b.muestra ?? 0) - (a.muestra ?? 0);
 
 /** FNV-1a de 32 bits, en hexadecimal: una huella corta y estable (no es criptográfica). */

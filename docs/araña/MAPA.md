@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 748 · objetivos: 21 · sin objetivo: 0
-- Tablas D1: 59 · secretos: 6 · variables de entorno: 25 · rutas /api: 63 · hosts: 64
+- Archivos: 752 · objetivos: 21 · sin objetivo: 0
+- Tablas D1: 61 · secretos: 6 · variables de entorno: 25 · rutas /api: 63 · hosts: 64
 - Código de navegador: 80 archivos con "use client" que alcanzan 252 · problemas: 0
-- Lib sin prueba directa: 33 de 250
+- Lib sin prueba directa: 35 de 253
 
 ## Objetivos
 
@@ -533,7 +533,7 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 
 ### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (29)
 Texto: acciones del panel líder y CEDEARs con ruedas diarias de Yahoo Finance (con demora), dentro del panel MERCADO AR y del MAPA (el buscador del mapa encuentra papeles de BYMA y muestra su vista). Las MENTES (Buffett, Graham, Lynch, crecimiento al estilo Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes del laboratorio leen cada papel y todo el panel. Balances de SEC EDGAR para los CEDEARs de empresas de EE. UU.
-Pendiente: Pizarra de cripto en el servidor (con el núcleo de JARVIS) para registrar sus decisiones sin depender de que alguien abra la pantalla. · Balances de empresas argentinas si aparece una fuente gratis en datos. · Lecturas de agentes en el mapa de footprint cripto.
+Pendiente: Balances de empresas argentinas si aparece una fuente gratis en datos. · Lecturas de agentes en el mapa de footprint cripto.
 - `app/api/mercado-ar/fundamentales/route.ts` — Balances anuales de la empresa de afuera de un CEDEAR, de SEC EDGAR, para las mentes de valor (Buffett, Graham, Lynch, crecimiento).
 - `app/api/mercado-ar/lote/route.ts` — Varias series de MERCADO AR en un solo pedido (hasta 12), en formato compacto (lib/mercado-ar-lote.ts): el panel entero llega en unos pocos pedidos en lugar de cien.
 - `app/api/mercado-ar/route.ts` — Velas diarias de una acción argentina o un CEDEAR (y de su acción de afuera), de Yahoo Finance, para el panel MERCADO AR.
@@ -564,15 +564,19 @@ Pendiente: Pizarra de cripto en el servidor (con el núcleo de JARVIS) para regi
 - `tests/mercado-ar-tecnico.test.ts` — Pruebas del análisis técnico de un papel de BYMA (lib/mercado-ar-tecnico.ts): la zona de compra de Fibonacci, su historial (aguantó, falló, abierta), las semanas armadas con ruedas
 - `tests/mercado-ar.test.ts` — Mercado argentino: parse Yahoo, diagnósticos, lecturas diarias.
 
-### terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato (7)
+### terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato (11)
 Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
 Pendiente: Fase C: que la mesa de JARVIS, la araña y los agentes lean el contexto común y se abstengan con su motivo; footprint, CVD por operación y libro dentro del contexto. · Unificar las dos implementaciones de footprint (unidades y desequilibrio). · Registro auditable de cada decisión (la pizarra ya calcula su huella; falta guardarla en el registro unificado) con el id del contexto, los agentes consultados y el veto; motor de day trading; riesgo agregado por correlación; deslizamiento con el libro. · Fase F: rediseño visual, celular primero.
 - `app/pizarra-cripto.tsx` — La pizarra (lib/pizarra.ts) de una criptomoneda: las mentes de precio (las de valor se abstienen: no hay balances), la estructura, la mesa de JARVIS con sus compuertas y los agente
 - `docs/terminal-unificada.md` — ALT RADAR PRO — plataforma unificada: auditoría y primer incremento
 - `lib/contexto-comun.ts` — El contexto común de la terminal (docs/terminal-unificada.md, fase B): la forma en que un dato llega a cualquier agente, con su fuente, su mercado (Spot o Futures), la hora del dat
 - `lib/pizarra-activos.ts` — Arma la pizarra (lib/pizarra.ts) de un activo concreto con todo lo que ya se leyó de él: para una acción o un CEDEAR de BYMA, las nueve mentes con su método, los agentes que dispar
+- `lib/pizarra-servidor-db.ts` — La base de la pizarra de cripto del servidor (lib/pizarra-servidor.ts): una tabla global de decisiones registradas, con índice por moneda y estado (las abiertas) y por fecha (regis
+- `lib/pizarra-servidor-run.ts` — La corrida del cron de la pizarra de cripto (lib/pizarra-servidor.ts): a la moneda de turno le trae las velas de 4 h y diarias de Kraken (o Coinbase; nunca Binance, que responde 40
+- `lib/pizarra-servidor.ts` — La pizarra de cripto en el servidor (PLAN_PIZARRA_1), con la app cerrada: cada 4 horas, después de que cierra la vela y de que corren los agentes del servidor, una moneda por minut
 - `lib/pizarra.ts` — La PIZARRA: donde se coordinan todos los que opinan sobre un activo, sea una acción de BYMA, un CEDEAR o una criptomoneda.
 - `tests/pizarra-activos.test.ts` — Pruebas de la pizarra por activo (lib/pizarra-activos.ts): BYMA con las nueve mentes, los agentes, Fibonacci y el riesgo; cripto con la mesa de JARVIS (su veto gana) y las lentes d
+- `tests/pizarra-servidor.test.ts` — Pruebas de la pizarra de cripto del servidor (lib/pizarra-servidor.ts): el turno, las voces del núcleo (las de sombra no opinan), la dirección, el plan fresco a favor, la entrada a
 - `tests/pizarra.test.ts` — Pruebas de la pizarra (lib/pizarra.ts): las voces de cada fuente y las reglas de la deliberación: el veto de riesgo gana, una abstención no es un voto en contra, sin plan completo
 
 ### calidad — Pruebas (140)
@@ -809,7 +813,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `app/zones-desk.css`
 - `app/zones-desk.tsx` — exporta: ZonesDesk, default
 - `lib/account-events.ts` — Small browser events so any panel can open the account drawer, and every panel learns when someone signs in or out without reloading the page.
-- `lib/hoy-db.ts` — Lo que lee la pantalla HOY (lib/hoy.ts) de la base: el registro unificado global, el estado de BYMA, los avisos y las señales abiertas del núcleo.
+- `lib/hoy-db.ts` — Lo que lee la pantalla HOY (lib/hoy.ts) de la base: el registro unificado global, el estado de BYMA, los avisos, las señales abiertas del núcleo y la última discusión de la pizarra
 - `lib/hoy.ts` — La pantalla HOY: lo que importa hoy en una sola vista, pensada primero para el celular.
 - `lib/tutorial.ts` — El tutorial paso a paso de toda la plataforma, por capítulos: empezá acá (RESUMEN, JARVIS, señales), el MAPA y sus niveles, señales y entradas, acciones y CEDEARs (Fibonacci, mente
 - `lib/visible-interval.ts` — setInterval that only runs while the tab is visible.
@@ -881,6 +885,8 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `notas` — crea: tests/arana.test.ts · usa: tests/arana.test.ts · índices: notas_id
 - `notes` — crea: examples/d1/db/schema.ts · usa: examples/d1/app/api/notes/route.ts · sin índice visible en el código
 - `pagos_reportados` — crea: lib/suscripcion-db.ts · usa: lib/suscripcion-db.ts · índices: pagos_estado, pagos_usuario
+- `pizarra_cripto` — crea: lib/pizarra-servidor-db.ts · usa: lib/pizarra-servidor-db.ts · índices: pizarra_cripto_abiertas, pizarra_cripto_reciente
+- `pizarra_cripto_estado` — crea: lib/pizarra-servidor-db.ts · usa: lib/pizarra-servidor-db.ts · sin índice visible en el código
 - `push_subscriptions` — crea: lib/web-push.ts, tests/web-push.test.ts · usa: app/api/push/subscribe/route.ts · sin índice visible en el código
 - `robot_senales` — crea: lib/robot-ledger-db.ts · usa: lib/registro-db.ts, lib/robot-ledger-db.ts, tests/registro.test.ts · índices: robot_senales_vela
 - `sessions` — crea: db/schema.ts, lib/auth.ts · usa: lib/auth.ts · sin índice visible en el código
@@ -1070,4 +1076,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/ai-gemini-server.ts`, `lib/ar-senales-db.ts`, `lib/ar-senales-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/hoy-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/mapa-agentes-db.ts`, `lib/mapa-memoria.ts`, `lib/market-brain.ts`, `lib/mercado-ar-cliente.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/ai-gemini-server.ts`, `lib/ar-senales-db.ts`, `lib/ar-senales-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/hoy-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/mapa-agentes-db.ts`, `lib/mapa-memoria.ts`, `lib/market-brain.ts`, `lib/mercado-ar-cliente.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/pizarra-servidor-db.ts`, `lib/pizarra-servidor-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

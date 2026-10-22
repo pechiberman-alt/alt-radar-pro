@@ -6,6 +6,7 @@
  * se marca como incompleta. Si una fuente no se puede leer, dice «sin datos»: nunca cero.
  */
 import { filasAr } from "./ar-senales-db.ts";
+import { filasPizarra } from "./pizarra-servidor-db.ts";
 import type { FuenteAr } from "./ar-senales.ts";
 import type { CoreCounters } from "./jarvis-core.ts";
 import { readCoreCounters } from "./jarvis-core-db.ts";
@@ -180,6 +181,12 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
   const agenteSt = userId === null ? null : await seguro("agente supertrend", () => leerAgenteSt(db, userId));
   const agentesAr = await seguro("agentes de BYMA", () => sharedJson("ar-agentes-registro-v1", 300, () => leerAr(db, "AGENTE")));
   const pizarraAr = await seguro("pizarra de BYMA", () => sharedJson("ar-pizarra-registro-v1", 300, () => leerAr(db, "PIZARRA")));
+  const pizarraCripto = await seguro("pizarra cripto", () =>
+    sharedJson("pizarra-cripto-registro-v1", 300, async () => {
+      const filas = await filasPizarra(db, LIMITE_HISTORIA);
+      return { conteo: contar(operacionesDeRobot(filas)), incompleta: filas.length >= LIMITE_HISTORIA, ...cierresDeFilas(filas) };
+    }),
+  );
   const servidor = await seguro("agentes del servidor", () => sharedJson("agentes-servidor-registro-v1", 300, () => leerAgentesServidor(db)));
   // Sin la serie del núcleo, el capital final sigue saliendo exacto de los contadores; solo falta la curva.
   const nucleoCierres = nucleo ? await seguro("núcleo cierres", async () => cierresDeNucleo(await leerCierresNucleo(db))) : null;
@@ -201,6 +208,7 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
     { id: "AGENTES_SERVIDOR", conteo: servidor?.conteo ?? null, incompleta: servidor?.incompleta, cierres: servidor?.cierres, desde: servidor?.desde },
     { id: "AGENTES_AR", conteo: agentesAr?.conteo ?? null, incompleta: agentesAr?.incompleta, cierres: agentesAr?.cierres, desde: agentesAr?.desde },
     { id: "PIZARRA_AR", conteo: pizarraAr?.conteo ?? null, incompleta: pizarraAr?.incompleta, cierres: pizarraAr?.cierres, desde: pizarraAr?.desde },
+    { id: "PIZARRA_CRIPTO", conteo: pizarraCripto?.conteo ?? null, incompleta: pizarraCripto?.incompleta, cierres: pizarraCripto?.cierres, desde: pizarraCripto?.desde },
   ];
   return armarRegistro(entradas, ahora);
 }

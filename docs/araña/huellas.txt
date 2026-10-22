@@ -218,7 +218,7 @@ e4fbc338f605	360	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-9c30bd278855	395	docs/araña/objetivos.md
+30c9b307ab5b	395	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -341,7 +341,7 @@ ce068942f617	401	lib/footprint.ts
 1dee6c89644e	274	lib/futures-log.ts
 dfc52ea472c0	115	lib/futures-risk.ts
 86351172d0c2	288	lib/hands-free.ts
-f64d3c0694bf	38	lib/hoy-db.ts
+15fb60f69c14	42	lib/hoy-db.ts
 1ceb40b0526b	89	lib/hoy.ts
 4df24a38c7bb	141	lib/ia-editor.ts
 d6be0531de72	101	lib/ia-respuesta.ts
@@ -439,7 +439,10 @@ e4e5d5bbccaa	248	lib/order-flow.ts
 fe173d15015d	227	lib/oscillators.ts
 f2ad043c6c3a	431	lib/paper-bot.ts
 6f67b7495ddb	183	lib/pizarra-activos.ts
-e9c5c6fb8d53	298	lib/pizarra.ts
+19a6f01caa42	99	lib/pizarra-servidor-db.ts
+7a2cf1ab53a7	45	lib/pizarra-servidor-run.ts
+9ec9c2bf275c	123	lib/pizarra-servidor.ts
+7011f554bdb4	298	lib/pizarra.ts
 af80178a4c9e	158	lib/practica-gatillo.ts
 7533116803f8	189	lib/pre-breakout.ts
 bb49b1192e80	96	lib/preregistro-flujo.ts
@@ -449,9 +452,9 @@ bb49b1192e80	96	lib/preregistro-flujo.ts
 357bfd64bf54	170	lib/pump-pressure.ts
 067ef991f873	300	lib/pump-radar.ts
 519f91b497f6	533	lib/radar.ts
-907f132d64a4	207	lib/registro-db.ts
+5653d578a83e	215	lib/registro-db.ts
 62a90a1d0b2d	43	lib/registro-run.ts
-5910d2ad4f4f	304	lib/registro.ts
+dd522a1d9b9f	306	lib/registro.ts
 e0131be986df	114	lib/reversal-zones.ts
 bc992c13bd28	130	lib/risk-calc.ts
 00e3d377935b	129	lib/robot-ledger-db.ts
@@ -690,6 +693,7 @@ fc5082678796	301	tests/order-flow.test.ts
 17cc5595f11b	110	tests/oscillators.test.ts
 c5804356dfb9	336	tests/paper-bot.test.ts
 0d09e878b2f8	121	tests/pizarra-activos.test.ts
+b7c9e2b9b96a	72	tests/pizarra-servidor.test.ts
 fe75356da15e	175	tests/pizarra.test.ts
 6f83bc824c5b	154	tests/practica-gatillo.test.ts
 776df4f83f9f	79	tests/pre-breakout.test.ts
@@ -745,5 +749,5 @@ dafba0404d8e	92	tests/volume-spike.test.ts
 21b30109f4c3	79	tests/xau-alerts.test.ts
 b41bd6678407	33	tsconfig.json
 037c2ff06898	75	vite.config.ts
-0b77523c26ef	218	worker/index.ts
+d64d2b52135a	225	worker/index.ts
 a49c24aef5a7	37	wrangler.production.jsonc
