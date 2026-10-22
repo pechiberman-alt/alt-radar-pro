@@ -352,18 +352,18 @@ Reglas:
 - Diagnóstico horario de Yahoo en el cron de 15 minutos (`ajuste:mercado_ar_estado`, las últimas 12 pruebas).
 - Todo texto visible en español rioplatense; no es asesoramiento financiero.
 Pendiente:
-- Pizarra de cripto en el servidor (con el núcleo de JARVIS) para registrar sus decisiones sin depender de que alguien abra la pantalla.
 - Balances de empresas argentinas si aparece una fuente gratis en datos.
 - Lecturas de agentes en el mapa de footprint cripto.
 
 ## terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato
 Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
-Archivos: lib/contexto-comun.ts, docs/terminal-unificada.md, lib/pizarra.ts, lib/pizarra-activos.ts, app/pizarra-cripto.tsx, tests/pizarra.test.ts, tests/pizarra-activos.test.ts
+Archivos: lib/contexto-comun.ts, docs/terminal-unificada.md, lib/pizarra.ts, lib/pizarra-activos.ts, app/pizarra-cripto.tsx, tests/pizarra.test.ts, tests/pizarra-activos.test.ts, lib/pizarra-servidor.ts, lib/pizarra-servidor-db.ts, lib/pizarra-servidor-run.ts, tests/pizarra-servidor.test.ts
 Reglas:
 - Un dato que falta es DATA UNAVAILABLE, uno viejo STALE DATA y uno con muestra corta o incoherente INSUFFICIENT DATA, siempre con el motivo. Nunca cero ni un valor supuesto.
 - Spot y Futures no se mezclan: si las fuentes no declaran el mismo mercado, el contexto queda sin mercado y lo avisa. El footprint de operaciones de futuros solo se dibuja sobre velas de futuros.
 - El footprint sale solo de operaciones ejecutadas con lado agresor; una vela con huecos en los ids de aggTrade es parcial. El área de valor es la banda contigua alrededor del POC (método CBOT, 70 %), igual en el mapa y en el bookmap.
 - Pizarra (lib/pizarra.ts, lib/pizarra-activos.ts): donde se coordinan mentes, agentes de papel, Fibonacci, estructura, gestor de riesgo y la mesa de JARVIS sobre un activo (BYMA o cripto). Cada fuente deja una voz (largo, corto, espera, afuera o se abstiene) con su motivo, su muestra y qué la cambiaría. Reglas fijas y a la vista: el veto del gestor de riesgo gana a cualquier cantidad de votos; con menos de 3 voces que opinen no hay decisión (una abstención no es un voto en contra); sin plan completo (entrada, SL, TP1, TP2 y TP3 en orden) no hay operación; «hay plan» pide 2 familias distintas a favor y al menos 2 votos más a favor que en contra (una ventaja de uno es un empate de hecho). Las lentes de las mentes son de compra: en una discusión de cortos, las que no compran se abstienen. La huella identifica la decisión; no se guarda en la base todavía.
+- Pizarra cripto en el servidor (lib/pizarra-servidor*.ts, PLAN_PIZARRA_1; tablas pizarra_cripto y pizarra_cripto_estado): cada 4 h (minutos 31 a 40 de las horas múltiplo de 4 UTC, una moneda por minuto, las 10 de los agentes del servidor) con velas de 4 h y diarias de Kraken o Coinbase. Opinan las mentes de precio, la estructura, los agentes del servidor con posición abierta y las señales tomadas del núcleo; la mesa de JARVIS corre en el navegador y no opina acá. El plan es la señal a favor más reciente de las últimas 8 h; con «hay plan» se registra al cierre de la última vela de 4 h cerrada si la escalera queda en orden, y se resuelve con el horizonte y la comisión de los agentes del servidor. Va al registro como PIZARRA_CRIPTO, global y fuera del total. HOY muestra su última discusión.
 - Nada de esta rama va a main ni a producción sin revisión de la persona. Ningún camino envía órdenes reales (tests/sin-ordenes-reales.test.ts).
 Pendiente:
 - Fase C: que la mesa de JARVIS, la araña y los agentes lean el contexto común y se abstengan con su motivo; footprint, CVD por operación y libro dentro del contexto.

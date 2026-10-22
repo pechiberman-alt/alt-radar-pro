@@ -20,6 +20,7 @@ import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structu
 import { recordStructureSnapshot } from "../lib/structure-archive";
 import { probarMercadoAr, tocaPruebaAr } from "../lib/mercado-ar-fuente";
 import { runArSenales } from "../lib/ar-senales-run";
+import { runPizarraServidor } from "../lib/pizarra-servidor-run";
 
 /**
  * Free sources publish dominance only as a current value. Recording it on a
@@ -147,6 +148,12 @@ const worker = {
       ctx.waitUntil(
         runArSenales(env.DB, controller.scheduledTime).catch((error) => {
           console.error("[ALT_RADAR_AR_SENALES]", error);
+        }),
+      );
+      // Pizarra de cripto: una moneda por minuto, a los 31–40 de cada hora múltiplo de 4 UTC (lib/pizarra-servidor.ts).
+      ctx.waitUntil(
+        runPizarraServidor(env.DB, controller.scheduledTime).catch((error) => {
+          console.error("[ALT_RADAR_PIZARRA]", error);
         }),
       );
       // JARVIS CORE: one small job per minute, 24/7 (lib/jarvis-core.ts).
