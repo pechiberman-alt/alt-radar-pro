@@ -1,3 +1,4 @@
+import { geminiConfig } from "./ai-gemini-server.ts";
 import {
   addFreeUsage,
   askOpenAICompatible,
@@ -7,6 +8,7 @@ import {
   freeUsage,
   GROQ_BASE,
   GROQ_MODEL,
+  GEMINI_BASE,
   neuronsFor,
   roughTokens,
   WORKERS_MODEL,
@@ -85,10 +87,10 @@ export async function runMindHour(db: D1Database, env: SettingsEnv & { AI?: AiLi
   if (!(await claimHour(db, Math.floor(now / H)))) return null;
 
   const day = new Date(now).toISOString().slice(0, 10);
-  const [groq, free] = await Promise.all([getSecret(db, env, "groq_api_key").catch(() => ({ value: null })), freeUsage(db, day, MIND_USER)]);
+  const [groq, gemini, free] = await Promise.all([getSecret(db, env, "groq_api_key").catch(() => ({ value: null })), geminiConfig(db, env), freeUsage(db, day, MIND_USER)]);
   const ai = env.AI ?? null;
   const useWorkers = ai !== null && free.neuronsAll < FREE_DAILY_NEURONS - MIND_RESERVE;
-  if (!groq.value && !useWorkers) {
+  if (!groq.value && !gemini && !useWorkers) {
     await setStatus(db, { at: now, ok: false, error: "SIN CUPO DE IA GRATIS" });
     return null;
   }
@@ -124,6 +126,7 @@ export async function runMindHour(db: D1Database, env: SettingsEnv & { AI?: AiLi
     const key = groq.value;
     calls.push({ brain: "groq", run: () => askOpenAICompatible(GROQ_BASE, key, GROQ_MODEL, MIND_SYSTEM, messages, MIND_MAX_OUTPUT) });
   }
+  if (gemini) calls.push({ brain: "gemini", run: () => askOpenAICompatible(GEMINI_BASE, gemini.key, gemini.model, MIND_SYSTEM, messages, MIND_MAX_OUTPUT) });
   if (useWorkers && ai) calls.push({ brain: "cloudflare", run: () => askWorkersAI(ai, MIND_SYSTEM, messages, MIND_MAX_OUTPUT) });
   const got = await firstAnswer(calls);
   if (got.brain === null) {
@@ -179,7 +182,7 @@ export async function runMindHour(db: D1Database, env: SettingsEnv & { AI?: AiLi
   const reading: MindReading = {
     at: now,
     brain: got.brain,
-    model: got.brain === "groq" ? GROQ_MODEL : WORKERS_MODEL,
+    model: got.brain === "groq" ? GROQ_MODEL : got.brain === "gemini" ? (gemini?.model ?? "Gemini") : WORKERS_MODEL,
     ...text,
     sesgoAnterior: previous?.sesgo ?? null,
     tesis: kept,

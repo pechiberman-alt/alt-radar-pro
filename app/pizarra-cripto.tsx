@@ -2,12 +2,14 @@
 
 /**
  * La pizarra (lib/pizarra.ts) de una criptomoneda: las mentes de precio (las de valor se abstienen: no hay balances), la
- * estructura y la mesa de JARVIS con sus compuertas, deliberando sobre lo que la mesa ya leyó. No pide datos nuevos si la
- * mesa ya los tiene; si no, un botón la arma con la misma lectura que JARVIS TRADING. Ver app/pizarra-panel.tsx.
+ * estructura, la mesa de JARVIS con sus compuertas y los agentes del servidor con posición abierta en el activo, deliberando
+ * sobre lo que la mesa ya leyó. No pide datos nuevos si la mesa ya los tiene; si no, un botón la arma con la misma lectura que
+ * JARVIS TRADING. Ver app/pizarra-panel.tsx.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cachedEntry, deskFor } from "@/lib/jarvis-desk-run";
-import { pizarraCripto } from "@/lib/pizarra-activos";
+import { pizarraCripto, type EscritorioLite } from "@/lib/pizarra-activos";
+import { escritoriosServidor } from "@/lib/oficina-run";
 import { PizarraPanel, RazonamientoMente } from "./pizarra-panel";
 
 export default function PizarraCripto({ symbol, abierta = false }: { symbol: string; abierta?: boolean }) {
@@ -15,9 +17,20 @@ export default function PizarraCripto({ symbol, abierta = false }: { symbol: str
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mente, setMente] = useState<string | null>(null);
+  const [oficina, setOficina] = useState<EscritorioLite[]>([]);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const e = await escritoriosServidor();
+      if (vivo && e) setOficina(e);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `vuelta` fuerza volver a leer lo que la mesa ya guardó
   const entrada = useMemo(() => cachedEntry(symbol), [symbol, vuelta]);
-  const p = useMemo(() => (entrada ? pizarraCripto(entrada) : null), [entrada]);
+  const p = useMemo(() => (entrada ? pizarraCripto(entrada, oficina) : null), [entrada, oficina]);
 
   const armar = async () => {
     setCargando(true);

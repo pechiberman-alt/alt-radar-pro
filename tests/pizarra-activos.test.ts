@@ -101,3 +101,20 @@ test("el guion de la oficina: abre JARVIS, hablan las mentes que discuten y cier
   assert.deepEqual(agenda[0].lineas.map((l) => l.texto), ["abre", "a", "b", "resumen", "cierra"]);
   assert.deepEqual(agenda[0].participantes, ["PTJ", "DARVAS"]);
 });
+
+test("los agentes de la oficina con posición abierta en el activo opinan, con su registro y su muestra", async () => {
+  const { vocesDeOficina } = await import("../lib/pizarra-activos.ts");
+  const total = { cerradas: 4, ganadas: 2, perdidas: 2, abiertas: 1, winRate: 0.5, expectancia: 0.1, profitFactor: 1.2, intervalo: null, muestra: "MINIMA" } as never;
+  const v = vocesDeOficina(
+    [
+      { id: "RSI", agente: "Agente RSI", abiertas: [{ symbol: "BTCUSDT", lado: "SHORT", detectada: 1 }], total },
+      { id: "SNR", agente: "Agente SNR", abiertas: [{ symbol: "ETHUSDT", lado: "LONG", detectada: 1 }], total },
+    ],
+    "BTCUSDT",
+  );
+  assert.equal(v.length, 1, "solo el que tiene algo abierto en ese activo");
+  assert.equal(v[0].lado, "CORTO");
+  assert.equal(v[0].muestra, 4);
+  assert.match(v[0].motivo, /Kraken/);
+  assert.match(v[0].motivo, /muestra mínima/);
+});

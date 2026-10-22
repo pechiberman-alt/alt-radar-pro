@@ -96,8 +96,8 @@ test("the first brain that answers wins; the ones that failed are reported", asy
   ]);
   assert.equal(r.brain, "groq");
   assert.deepEqual(r.tried, [{ brain: "claude", error: "ERROR DE LA IA" }]);
-  assert.deepEqual(freeAllowance({ answers: FREE_USER_DAILY, neuronsAll: 0 }), { groq: false, cloudflare: false });
-  assert.deepEqual(freeAllowance({ answers: 3, neuronsAll: FREE_DAILY_NEURONS }), { groq: true, cloudflare: false });
+  assert.deepEqual(freeAllowance({ answers: FREE_USER_DAILY, neuronsAll: 0 }), { groq: false, gemini: false, cloudflare: false });
+  assert.deepEqual(freeAllowance({ answers: 3, neuronsAll: FREE_DAILY_NEURONS }), { groq: true, gemini: true, cloudflare: false });
 });
 
 const claudeOk = (async () => ({ ok: true as const, text: "Claude responde", usage: null })) as unknown as typeof askClaude;

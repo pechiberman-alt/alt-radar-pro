@@ -5,7 +5,7 @@
  */
 import { diarioParaIa, leerDiario } from "./aprendizaje-diario.ts";
 import { lecturaParaIa, lecturasMapa } from "./mapa-memoria.ts";
-import { armarOficina, oficinaParaIa, type FilaOficina } from "./oficina.ts";
+import { armarOficina, oficinaParaIa, type Escritorio, type FilaOficina } from "./oficina.ts";
 
 const VIDA_MS = 5 * 60_000;
 let guardada: { at: number; valor: { oficina: unknown; diario: unknown } | null } | null = null;
@@ -22,6 +22,22 @@ export async function oficinaParaJarvis(): Promise<unknown> {
       : null;
     guardada = { at: Date.now(), valor };
     return valor ? { ...valor, mapa } : null;
+  } catch {
+    return null;
+  }
+}
+
+let escritorios: { at: number; valor: Escritorio[] | null } | null = null;
+
+/** Los escritorios de los agentes del servidor (para la pizarra cripto): la misma lectura de /api/oficina, 5 minutos como mucho. */
+export async function escritoriosServidor(): Promise<Escritorio[] | null> {
+  if (escritorios && Date.now() - escritorios.at < VIDA_MS) return escritorios.valor;
+  try {
+    const r = await fetch("/api/oficina", { credentials: "same-origin", cache: "no-store" });
+    const d = r.ok ? ((await r.json()) as { servidor?: { filas: FilaOficina[] } | null }) : null;
+    const valor = d?.servidor ? armarOficina(d.servidor.filas, Date.now(), "SERVIDOR").escritorios : null;
+    escritorios = { at: Date.now(), valor };
+    return valor;
   } catch {
     return null;
   }

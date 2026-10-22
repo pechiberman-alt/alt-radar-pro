@@ -1,6 +1,6 @@
 /**
  * La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el
- * cupo de la persona), después por Groq (si hay clave gratis) y después por el modelo gratis
+ * cupo de la persona), después por Groq y Gemini (si hay clave gratis) y después por el modelo gratis
  * de Cloudflare, y la respuesta dice cuál habló. Cada cerebro está en lib/ai-brains.ts.
  * La usan /api/analyst/ai y el bot de Telegram.
  */
@@ -16,6 +16,7 @@ import {
   freeUsage,
   GROQ_BASE,
   GROQ_MODEL,
+  GEMINI_BASE,
   neuronsFor,
   roughTokens,
   type AiLike,
@@ -35,7 +36,7 @@ export type CascadeFail = { ok: false; error: "SIN IA POR HOY" | "LA IA NO RESPO
 export async function answerWithBrains(
   db: D1Database,
   userId: number,
-  keys: { claude: string | null; groq: string | null },
+  keys: { claude: string | null; groq: string | null; gemini?: { key: string; model: string } | null },
   ai: AiLike | null,
   system: string,
   messages: ChatTurn[],
@@ -60,6 +61,10 @@ export async function answerWithBrains(
     const key = keys.groq;
     calls.push({ brain: "groq", run: () => askOpenAICompatible(GROQ_BASE, key, GROQ_MODEL, system, messages) });
   }
+  if (keys.gemini && allow.gemini) {
+    const g = keys.gemini;
+    calls.push({ brain: "gemini", run: () => askOpenAICompatible(GEMINI_BASE, g.key, g.model, system, messages) });
+  }
   if (ai && allow.cloudflare) calls.push({ brain: "cloudflare", run: () => askWorkersAI(ai, system, messages) });
   if (!calls.length) return { ok: false, error: "SIN IA POR HOY", tried: [] };
 
@@ -73,7 +78,7 @@ export async function answerWithBrains(
     await consumeQuota(db, userId, quota.day);
   } else {
     const usage = got.usage ?? { input: roughTokens(system + messages.map((m) => m.content).join("\n")), output: roughTokens(got.text) };
-    // Groq's tokens are free and counted by Groq; Cloudflare's come out of the account's neurons.
+    // Groq's and Gemini's tokens are free and counted by them; Cloudflare's come out of the account's neurons.
     await addFreeUsage(db, day, userId, got.brain === "cloudflare" ? neuronsFor(usage) : 0);
   }
   return {

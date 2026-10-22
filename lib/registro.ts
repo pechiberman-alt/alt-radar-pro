@@ -9,7 +9,7 @@ import { wilson } from "./jarvis-stats.ts";
 /** Por debajo de esta cantidad de operaciones cerradas el porcentaje sigue visible, pero marcado como muestra mínima. */
 export const MUESTRA_MINIMA = 15;
 
-export type FuenteId = "NUCLEO_ROMPE" | "NUCLEO_IMAN" | "NUCLEO_IA" | "NUCLEO_SOMBRA" | "PAPEL" | "ROBOT" | "FLUJO" | "AGENTE_ST" | "AGENTES_SERVIDOR";
+export type FuenteId = "NUCLEO_ROMPE" | "NUCLEO_IMAN" | "NUCLEO_IA" | "NUCLEO_SOMBRA" | "PAPEL" | "ROBOT" | "FLUJO" | "AGENTE_ST" | "AGENTES_SERVIDOR" | "AGENTES_AR" | "PIZARRA_AR";
 
 export type Conteo = {
   abiertas: number;
@@ -107,6 +107,9 @@ export const FUENTES: Record<FuenteId, { nombre: string; ambito: Ambito; enTotal
   AGENTE_ST: { nombre: "Agente Supertrend MTF + Volumen · tu cuenta", ambito: "CUENTA", enTotal: true },
   // Velas de Kraken (otra serie que la de Binance): se muestra aparte y no se suma al total.
   AGENTES_SERVIDOR: { nombre: "Agentes de papel · servidor 24/7 (velas de Kraken)", ambito: "GLOBAL", enTotal: false },
+  // BYMA: ruedas diarias de Yahoo, en pesos, otro mercado y otro horizonte: aparte y fuera del total (lib/ar-senales.ts).
+  AGENTES_AR: { nombre: "Agentes sobre BYMA · servidor (ruedas diarias, en pesos)", ambito: "GLOBAL", enTotal: false },
+  PIZARRA_AR: { nombre: "Pizarra de BYMA · decisiones con plan (servidor)", ambito: "GLOBAL", enTotal: false },
 };
 
 // ── Capital simulado: cuánto dinero virtual tendría cada bot si hubiera operado todo lo que registró ──

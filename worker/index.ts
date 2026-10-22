@@ -19,6 +19,7 @@ import type { AiLike } from "../lib/ai-brains";
 import { parseCoinGeckoGlobal, parseCoinLoreGlobal } from "../lib/market-structure";
 import { recordStructureSnapshot } from "../lib/structure-archive";
 import { probarMercadoAr, tocaPruebaAr } from "../lib/mercado-ar-fuente";
+import { runArSenales } from "../lib/ar-senales-run";
 
 /**
  * Free sources publish dominance only as a current value. Recording it on a
@@ -140,6 +141,12 @@ const worker = {
       ctx.waitUntil(
         runMindHour(env.DB, env as unknown as { AI?: AiLike }, controller.scheduledTime).catch((error) => {
           console.error("[ALT_RADAR_JARVIS_MIND]", error);
+        }),
+      );
+      // BYMA: un papel por minuto, de lunes a viernes a las 21 UTC, con el mercado cerrado (lib/ar-senales.ts).
+      ctx.waitUntil(
+        runArSenales(env.DB, controller.scheduledTime).catch((error) => {
+          console.error("[ALT_RADAR_AR_SENALES]", error);
         }),
       );
       // JARVIS CORE: one small job per minute, 24/7 (lib/jarvis-core.ts).

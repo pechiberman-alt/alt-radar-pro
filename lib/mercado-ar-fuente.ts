@@ -9,11 +9,31 @@
  */
 import { guardarAjuste, leerAjuste } from "./app-settings.ts";
 import { estadoSerie, leerYahooChart, SIMBOLOS_PERMITIDOS, type SerieAr } from "./mercado-ar.ts";
+import { cached } from "./upstream-cache.ts";
 
 export const HOSTS_YAHOO = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
 export const FUENTE_AR = "Yahoo Finance";
 
 export type ResultadoAr = { serie: SerieAr | null; fuente: string | null; http: number | null; error: string | null };
+
+/**
+ * La serie de un símbolo con la caché compartida (15 minutos; si Yahoo no responde, lo último hasta 3 días, con su edad): la
+ * usan la ruta /api/mercado-ar y las señales del servidor (lib/ar-senales-run.ts), así leen lo mismo.
+ */
+export async function serieArCacheada(simbolo: string): Promise<{ resultado: ResultadoAr | null; edadMs: number; error: string | null }> {
+  let ultimoError: string | null = null;
+  const r = await cached<ResultadoAr>(
+    `mercado-ar:${simbolo}`,
+    15 * 60_000,
+    async () => {
+      const x = await bajarSerieAr(simbolo);
+      ultimoError = x.error;
+      return x.serie ? x : null;
+    },
+    3 * 86_400_000,
+  );
+  return { resultado: r.value ?? null, edadMs: r.ageMs, error: r.value ? null : (ultimoError ?? "la fuente no respondió") };
+}
 
 export async function bajarSerieAr(
   simbolo: string,

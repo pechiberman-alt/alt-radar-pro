@@ -7,6 +7,7 @@
  */
 import { buildSystemPrompt, buildUserMessage, type ChatTurn } from "./ai-analyst.ts";
 import { addFreeNeurons, BRAIN_LABEL, FREE_DAILY_NEURONS, freeUsage, type AiLike } from "./ai-brains.ts";
+import { geminiConfig } from "./ai-gemini-server.ts";
 import { answerWithBrains } from "./ai-cascade.ts";
 import { getSecret, type SettingsEnv } from "./app-settings.ts";
 import { KNOWLEDGE } from "./assistant/knowledge.ts";
@@ -154,9 +155,10 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?:
   try {
     await tg(token, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => undefined);
 
-    const [claudeKey, groqKey, notes] = await Promise.all([
+    const [claudeKey, groqKey, gemini, notes] = await Promise.all([
       getSecret(db, env, "anthropic_api_key"),
       getSecret(db, env, "groq_api_key"),
+      geminiConfig(db, env),
       listMemory(db, userId).catch(() => []),
     ]);
 
@@ -177,7 +179,7 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?:
     const snapshot = { ...(core ? { ...base, jarvis: coreContext(core, Date.now()).nucleo } : base), ...extra };
     const messages: ChatTurn[] = [...history, { role: "user", content: buildUserMessage(question, snapshot, memoryBlock(notes)) }];
     // Claude first, then the free brains (lib/ai-brains.ts); only the one that answered is counted.
-    const answer = await answerWithBrains(db, userId, { claude: claudeKey.value, groq: groqKey.value }, env.AI ?? null, SYSTEM, messages);
+    const answer = await answerWithBrains(db, userId, { claude: claudeKey.value, groq: groqKey.value, gemini }, env.AI ?? null, SYSTEM, messages);
     if (!answer.ok) {
       await sendMessage(
         token,

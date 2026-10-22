@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { AI_DAILY_LIMIT, AI_MODEL, buildSystemPrompt, buildUserMessage, trimHistory, type ChatTurn } from "@/lib/ai-analyst";
+import { geminiConfig } from "@/lib/ai-gemini-server";
 import { BRAIN_LABEL, GROQ_MODEL, WORKERS_MODEL, type AiLike } from "@/lib/ai-brains";
 import { answerWithBrains } from "@/lib/ai-cascade";
 import { getSecret } from "@/lib/app-settings";
@@ -12,7 +13,7 @@ import { limpiarRespuesta, sistemaPersona, type Persona } from "@/lib/ia-respues
 export const dynamic = "force-dynamic";
 
 const SYSTEM = buildSystemPrompt(KNOWLEDGE);
-const MODEL = { claude: AI_MODEL, groq: GROQ_MODEL, cloudflare: WORKERS_MODEL } as const;
+const MODEL = { claude: AI_MODEL, groq: GROQ_MODEL, gemini: "Gemini Flash", cloudflare: WORKERS_MODEL } as const;
 
 /**
  * Free questions to the AI (ANALISTA and JARVIS). Signed-in users only. The
@@ -31,9 +32,10 @@ export async function POST(request: NextRequest) {
   const question = typeof body?.question === "string" ? body.question.trim() : "";
   if (!question) return NextResponse.json({ error: "PREGUNTA VACÍA" }, { status: 400 });
 
-  const [claude, groq, notes] = await Promise.all([
+  const [claude, groq, gemini, notes] = await Promise.all([
     getSecret(env.DB, env, "anthropic_api_key"),
     getSecret(env.DB, env, "groq_api_key"),
+    geminiConfig(env.DB, env),
     listMemory(env.DB, user.id).catch(() => []),
   ]);
   const messages: ChatTurn[] = [
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
   // Un agente de la oficina o una mente habla con su propio prompt corto (lib/ia-respuesta.ts); JARVIS y el ANALISTA, con el suyo.
   const p = body?.persona;
   const persona = p && typeof p.nombre === "string" && typeof p.rol === "string" ? { nombre: p.nombre.slice(0, 80), rol: p.rol.slice(0, 160), idea: typeof p.idea === "string" ? p.idea.slice(0, 240) : undefined } : null;
-  const r = await answerWithBrains(env.DB, user.id, { claude: claude.value, groq: groq.value }, ai, persona ? sistemaPersona(persona) : SYSTEM, messages);
+  const r = await answerWithBrains(env.DB, user.id, { claude: claude.value, groq: groq.value, gemini }, ai, persona ? sistemaPersona(persona) : SYSTEM, messages);
   if (!r.ok) {
     console.error("[ALT_RADAR_AI]", r.error, r.tried.map((t) => `${t.brain}: ${t.error}`).join(" · "));
     return NextResponse.json({ error: r.error, local: true }, { status: r.error === "SIN IA POR HOY" ? 429 : 502 });

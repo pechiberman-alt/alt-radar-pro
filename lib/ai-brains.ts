@@ -7,9 +7,11 @@ import type { ChatTurn } from "./ai-analyst.ts";
  *      credit, so each person gets AI_DAILY_LIMIT a day.
  *   2. Groq, when the owner saves a free Groq key: gpt-oss-120b, about 200.000
  *      tokens a day at no cost (roughly 50 answers), for the whole app.
- *   3. Cloudflare Workers AI, with no key at all: Qwen3 30B on the account's
+ *   3. Google Gemini (Flash), when the owner saves a free key from Google AI Studio (no card). On the free tier Google
+ *      may use what is sent to improve its products: questions and market data, never keys.
+ *   4. Cloudflare Workers AI, with no key at all: Qwen3 30B on the account's
  *      free daily neurons, which it shares with the neural voice.
- *   4. The app's own analyst, in the browser (jarvis-local.ts): no limit, it
+ *   5. The app's own analyst, in the browser (jarvis-local.ts): no limit, it
  *      reads the same live data with fixed rules.
  *
  * Every brain gets the same instructions, the same live data and the same
@@ -18,10 +20,11 @@ import type { ChatTurn } from "./ai-analyst.ts";
  * there so that it is rarely needed.
  */
 
-export type Brain = "claude" | "groq" | "cloudflare";
+export type Brain = "claude" | "groq" | "gemini" | "cloudflare";
 export const BRAIN_LABEL: Record<Brain | "local", string> = {
   claude: "Claude",
   groq: "IA gratis · Groq",
+  gemini: "IA gratis · Gemini",
   cloudflare: "IA gratis · Cloudflare",
   local: "motor local",
 };
@@ -47,6 +50,27 @@ export const FREE_MAX_OUTPUT = 1400;
 export const GROQ_BASE = "https://api.groq.com/openai/v1";
 export const GROQ_MODEL = "openai/gpt-oss-120b";
 export const isGroqKey = (k: string) => /^gsk_[A-Za-z0-9]{20,}$/.test(k.trim());
+
+/** Gemini por su API compatible con OpenAI (ai.google.dev/gemini-api/docs/openai). */
+export const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai";
+/** El modelo de los ejemplos de Google (octubre de 2026); al guardar la clave se elige el Flash más nuevo que la cuenta tenga. */
+export const GEMINI_MODEL = "gemini-3.8-flash";
+/** El ajuste (no secreto) donde queda el modelo elegido al guardar la clave. */
+export const AJUSTE_MODELO_GEMINI = "gemini_modelo";
+export const isGeminiKey = (k: string) => /^AIza[0-9A-Za-z_-]{30,}$/.test(k.trim());
+
+/**
+ * El Flash más nuevo de la lista de modelos de la cuenta (GET /models): «gemini-X.Y-flash», sin variantes (lite, imagen,
+ * voz, vista previa). Si la lista no trae ninguno, el de los ejemplos de Google.
+ */
+export function modeloGemini(json: unknown): string {
+  const ids = ((json as { data?: { id?: unknown }[] } | null)?.data ?? []).map((m) => String(m?.id ?? "").replace(/^models\//, ""));
+  const flash = ids
+    .map((id) => ({ id, v: /^gemini-(\d+(?:\.\d+)?)-flash$/.exec(id)?.[1] }))
+    .filter((x): x is { id: string; v: string } => Boolean(x.v))
+    .sort((a, b) => Number(b.v) - Number(a.v));
+  return flash[0]?.id ?? GEMINI_MODEL;
+}
 
 export const neuronsFor = (u: Usage) => (u.input * WORKERS_NEURONS.input + u.output * WORKERS_NEURONS.output) / 1e6;
 
@@ -114,7 +138,7 @@ export async function askWorkersAI(ai: AiLike, system: string, messages: ChatTur
   }
 }
 
-/** Any OpenAI-compatible chat API (Groq). */
+/** Any OpenAI-compatible chat API (Groq, Gemini). */
 export async function askOpenAICompatible(base: string, key: string, model: string, system: string, messages: ChatTurn[], maxTokens = FREE_MAX_OUTPUT): Promise<BrainResult> {
   let r: Response;
   try {
@@ -188,5 +212,5 @@ export async function addFreeNeurons(db: D1Database, day: string, neurons: numbe
 
 /** What the free brains may still do today for this person. */
 export function freeAllowance(u: FreeUsage) {
-  return { groq: u.answers < FREE_USER_DAILY, cloudflare: u.answers < FREE_USER_DAILY && u.neuronsAll < FREE_DAILY_NEURONS };
+  return { groq: u.answers < FREE_USER_DAILY, gemini: u.answers < FREE_USER_DAILY, cloudflare: u.answers < FREE_USER_DAILY && u.neuronsAll < FREE_DAILY_NEURONS };
 }
