@@ -56,6 +56,20 @@ export const sinEstudioPrevio = (symbol: string) => SIMBOLOS_FONDEO_PAPEL.includ
  */
 export const AGENTES_PAPEL: EstrategiaId[] = ESTRATEGIAS.map((e) => e.id).filter((id) => id !== "AZAR");
 
+/**
+ * Agentes en pausa por decisión de la persona (22/10/2026), después del estudio agente por agente (docs/estudio-agentes.md):
+ * pierden en los tres períodos de 2021 a 2026 con los dos costos. No abren operaciones nuevas (ni en el servidor ni en tu
+ * cuenta) y no opinan en la pizarra; lo que tenían abierto se cierra con su regla y su historial queda en el registro. Sus
+ * reglas no se cambian para que el pasado dé bien: volver a activarlos es otra decisión de la persona.
+ */
+export const AGENTES_PAUSADOS: Readonly<Record<string, string>> = {
+  SNR: "perdió en 2021–2022, 2023–2024 y 2025–2026 (t entre −17 y −26)",
+  SNR_HTF: "perdió en 2021–2022, 2023–2024 y 2025–2026 (t entre −11 y −19)",
+  RSI: "perdió en los tres períodos (t −2,5 y −5 en dos de ellos)",
+  BOLLINGER: "perdió en los tres períodos (t −2,4 en 2023–2024)",
+};
+export const agentePausado = (id: string): boolean => Object.prototype.hasOwnProperty.call(AGENTES_PAUSADOS, id);
+
 /** La clave de una entrada: una por agente, moneda y vela, así que reintentar no la duplica. */
 export const clavePapel = (estrategia: string, symbol: string, lado: Lado, vela: number) => `ag:${estrategia}:${symbol}:${MARCO_AGENTES}:${lado}:${vela}`;
 
@@ -105,6 +119,7 @@ export function leerSenalesPapel(symbol: string, velas: SwingCandle[], ahora: nu
   const ind = indicadores(cerradas);
   const out: PlanPapel[] = [];
   for (const id of AGENTES_PAPEL) {
+    if (agentePausado(id)) continue;
     const e = ESTRATEGIAS.find((x) => x.id === id);
     if (!e || !operaEn(e, symbol)) continue;
     const s = e.senal(cerradas, ind, i);
@@ -176,7 +191,7 @@ export function validarSenalPapel(raw: unknown, ahora: number): SenalPapel | nul
   const objetivo = num(o.objetivo);
   const vela = num(o.vela);
   const detectada = num(o.detectada);
-  if (!(AGENTES_PAPEL as string[]).includes(estrategia) || !SIMBOLOS_PAPEL.includes(symbol)) return null;
+  if (!(AGENTES_PAPEL as string[]).includes(estrategia) || agentePausado(estrategia) || !SIMBOLOS_PAPEL.includes(symbol)) return null;
   if (!lado || entrada === null || stop === null || objetivo === null || vela === null || detectada === null) return null;
   if (Math.abs(detectada - ahora) > 2 * 60_000) return null;
   if (!Number.isInteger(vela) || vela % MARCO_AGENTES_MS !== 0) return null;

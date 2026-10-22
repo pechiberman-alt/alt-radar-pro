@@ -107,7 +107,7 @@ test("los agentes de la oficina con posición abierta en el activo opinan, con s
   const total = { cerradas: 4, ganadas: 2, perdidas: 2, abiertas: 1, winRate: 0.5, expectancia: 0.1, profitFactor: 1.2, intervalo: null, muestra: "MINIMA" } as never;
   const v = vocesDeOficina(
     [
-      { id: "RSI", agente: "Agente RSI", abiertas: [{ symbol: "BTCUSDT", lado: "SHORT", detectada: 1 }], total },
+      { id: "SUPERTREND", agente: "Agente Supertrend", abiertas: [{ symbol: "BTCUSDT", lado: "SHORT", detectada: 1 }], total },
       { id: "SNR", agente: "Agente SNR", abiertas: [{ symbol: "ETHUSDT", lado: "LONG", detectada: 1 }], total },
     ],
     "BTCUSDT",
@@ -117,4 +117,11 @@ test("los agentes de la oficina con posición abierta en el activo opinan, con s
   assert.equal(v[0].muestra, 4);
   assert.match(v[0].motivo, /Kraken/);
   assert.match(v[0].motivo, /muestra mínima/);
+});
+
+test("un agente en pausa no opina en la pizarra aunque tenga algo abierto", async () => {
+  const { vocesDeOficina } = await import("../lib/pizarra-activos.ts");
+  const total = { cerradas: 4, ganadas: 2, perdidas: 2, abiertas: 1, winRate: 0.5, expectancia: 0.1, profitFactor: 1.2, intervalo: null, muestra: "MINIMA" } as never;
+  const v = vocesDeOficina([{ id: "SNR", agente: "Agente SNR", abiertas: [{ symbol: "BTCUSDT", lado: "LONG", detectada: 1 }], total }], "BTCUSDT");
+  assert.equal(v.length, 0);
 });

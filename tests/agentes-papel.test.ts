@@ -10,6 +10,8 @@ import {
   clavePapel,
   leerClavePapel,
   leerSenalesPapel,
+  AGENTES_PAUSADOS,
+  agentePausado,
   validarSenalPapel,
   PLAN_AGENTES,
   PLAN_FONDEO,
@@ -216,4 +218,17 @@ test("el servidor acepta una entrada de oro y sigue rechazando un símbolo de fu
   const ahora = T0 + MARCO_AGENTES_MS + 60_000;
   assert.ok(validarSenalPapel({ ...base(ahora), symbol: "XAUUSDT" }, ahora));
   assert.equal(validarSenalPapel({ ...base(ahora), symbol: "PEPEUSDT" }, ahora), null);
+});
+
+test("los agentes en pausa no abren nada nuevo, ni en el servidor ni en tu cuenta", () => {
+  assert.deepEqual(Object.keys(AGENTES_PAUSADOS).sort(), ["BOLLINGER", "RSI", "SNR", "SNR_HTF"]);
+  for (let semilla = 1; semilla <= 12; semilla += 1) {
+    const v = serie(400, semilla);
+    assert.ok(!leerSenalesPapel("BTCUSDT", v, ahoraDe(v)).some((p) => agentePausado(p.estrategia)), `semilla ${semilla}`);
+  }
+  const ahora = T0 + MARCO_AGENTES_MS + 60_000;
+  assert.equal(validarSenalPapel({ ...base(ahora), estrategia: "SNR" }, ahora), null, "el servidor rechaza una señal de un agente en pausa");
+  assert.ok(validarSenalPapel(base(ahora), ahora), "los demás siguen");
+  // Siguen en la lista (para mostrar su historial), solo que en pausa.
+  assert.ok(AGENTES_PAPEL.includes("SNR" as never));
 });
