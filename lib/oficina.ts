@@ -11,7 +11,7 @@
  * Las propuestas son para la persona: ninguna se aplica sola.
  */
 import { explicadoDe } from "./agentes-explicado.ts";
-import { leerClavePapel } from "./agentes-papel.ts";
+import { AGENTES_PAUSADOS, agentePausado, leerClavePapel } from "./agentes-papel.ts";
 import { leerClaveServidor } from "./agentes-servidor.ts";
 import { forAi } from "./ai-numbers.ts";
 import { acuerdoDe, concienciaDe, conversaciones, leccionesDe, type Dialogo, type Leccion } from "./agentes-mente.ts";
@@ -160,7 +160,7 @@ export function armarOficina(filas: FilaOficina[] | null, ahora: number, plan: "
       semana: estadistica(contar(semana.map(leida))),
       abiertas: suyas.filter((f) => f.desenlace === "ABIERTA").map((f) => ({ symbol: f.symbol, lado: f.lado, detectada: f.detectada, veredicto: veredictos.get(f) ?? null })),
       lecciones,
-      conciencia: concienciaDe(p.agente, mesaDe(p.id), total, lecciones),
+      conciencia: agentePausado(p.id) ? `Estoy en pausa: ${AGENTES_PAUSADOS[p.id]}. No abro operaciones nuevas; lo que tenía abierto se cierra con mi regla. Volver a activarme lo decide la persona. ${concienciaDe(p.agente, mesaDe(p.id), total, lecciones)}` : concienciaDe(p.agente, mesaDe(p.id), total, lecciones),
       capital: simularCapital(conteo, cierresSuyos, suyas.length ? Math.min(...suyas.map((f) => f.detectada)) : null),
     };
   });

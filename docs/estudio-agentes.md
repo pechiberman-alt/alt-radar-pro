@@ -51,4 +51,7 @@ Pasan el criterio: ninguno (de 23).
 - Pausar o revisar un agente lo decide la persona (regla del laboratorio): este estudio da los números para decidir, no cambia
   nada solo.
 
+**Decisión (22/10/2026):** la persona pausó SNR, SNR_HTF, RSI y BOLLINGER (`AGENTES_PAUSADOS` en `lib/agentes-papel.ts`): no abren
+operaciones nuevas ni opinan en la pizarra; su historial queda. Volver a activarlos es otra decisión.
+
 Es pasado y de papel: no garantiza nada. No es asesoramiento financiero.

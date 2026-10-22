@@ -150,7 +150,7 @@ b4142ca7071c	341	app/lab-axi-diario.tsx
 88816a98bf60	195	app/lab-fondeo.tsx
 af77131cadb2	27	app/lab-mini-arana.tsx
 525a37f5e879	249	app/lab-oficina.css
-08f201258940	1315	app/lab-oficina.tsx
+5424496e4fd7	1316	app/lab-oficina.tsx
 33fe43aff7d1	320	app/lab-piso.tsx
 dd29b7d560c2	57	app/lab-universos.tsx
 aa4d7c876c20	51	app/laptop.css
@@ -218,7 +218,7 @@ e4fbc338f605	360	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-e095777139a1	395	docs/araña/objetivos.md
+66271e052609	396	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -226,7 +226,7 @@ fc6042bacccc	116	docs/busqueda-fibonacci.md
 8d04963b24d7	78	docs/busqueda-flujo.md
 25e7d2744ee2	187	docs/busqueda-linea.md
 5656d4c4c99f	215	docs/busqueda-smc.md
-5ffcf9ce0db4	55	docs/estudio-agentes.md
+a008b03592a2	58	docs/estudio-agentes.md
 1d364b489717	51	docs/estudio-axi.md
 615d9e91548e	120	docs/estudio-estrategias.md
 2a58fa50dd34	61	docs/estudio-pizarra.md
@@ -262,7 +262,7 @@ f997c496526e	156	lib/agente-st.ts
 4ceff0db69ff	58	lib/agentes-conocimiento.ts
 345c6bb32dc9	131	lib/agentes-explicado.ts
 a5b1181badec	171	lib/agentes-mente.ts
-04fb6c0c76a4	205	lib/agentes-papel.ts
+6b240839782e	220	lib/agentes-papel.ts
 88047fb7ec1b	106	lib/agentes-servidor-db.ts
 f6460772c0c5	23	lib/agentes-servidor-run.ts
 287c2c8299e2	109	lib/agentes-servidor.ts
@@ -434,13 +434,13 @@ c19d69cbdafa	25	lib/oficina-db.ts
 da3ee04e1292	52	lib/oficina-historial.ts
 a61041b99ea6	98	lib/oficina-reuniones.ts
 6ff0f8e818e0	45	lib/oficina-run.ts
-873ba02df584	403	lib/oficina.ts
+ff0abab236d8	403	lib/oficina.ts
 780c578e3481	522	lib/order-blocks.ts
 3f86ab0657ef	438	lib/order-flow-brain.ts
 e4e5d5bbccaa	248	lib/order-flow.ts
 fe173d15015d	227	lib/oscillators.ts
 f2ad043c6c3a	431	lib/paper-bot.ts
-6f67b7495ddb	183	lib/pizarra-activos.ts
+2faf5aade8ce	185	lib/pizarra-activos.ts
 19a6f01caa42	99	lib/pizarra-servidor-db.ts
 7a2cf1ab53a7	45	lib/pizarra-servidor-run.ts
 9ec9c2bf275c	123	lib/pizarra-servidor.ts
@@ -564,7 +564,7 @@ a6bc231bf554	374	tests/account-journal.test.ts
 8f97cc0b92d6	37	tests/agentes-explicado.test.ts
 beea37118afc	51	tests/agentes-mcp.test.ts
 4cc52ac09665	80	tests/agentes-mente.test.ts
-e08b579f6073	220	tests/agentes-papel.test.ts
+a739e82cee79	235	tests/agentes-papel.test.ts
 f64c343cc710	163	tests/agentes-servidor.test.ts
 bc528d50d94b	74	tests/ai-analyst.test.ts
 669bffea2683	181	tests/ai-brains.test.ts
@@ -696,7 +696,7 @@ f389fa4691cb	54	tests/oficina-reuniones.test.ts
 fc5082678796	301	tests/order-flow.test.ts
 17cc5595f11b	110	tests/oscillators.test.ts
 c5804356dfb9	336	tests/paper-bot.test.ts
-0d09e878b2f8	121	tests/pizarra-activos.test.ts
+ecfd59163c2a	128	tests/pizarra-activos.test.ts
 b7c9e2b9b96a	72	tests/pizarra-servidor.test.ts
 fe75356da15e	175	tests/pizarra.test.ts
 6f83bc824c5b	154	tests/practica-gatillo.test.ts

@@ -24,6 +24,7 @@ import { lecturaMapa, lecturaParaIa, lecturasMapa, onLecturaMapa, type LecturaMa
 import MiniArana from "./lab-mini-arana";
 import { intencionDe, respondeLoPreguntado, respuestaDirecta, type Ficha } from "../lib/ia-respuesta.ts";
 import SalaMentes from "./sala-mentes";
+import { agentePausado } from "../lib/agentes-papel.ts";
 import { panelCompleto, type LecturaPapel } from "../lib/mercado-ar-cliente.ts";
 import { guionDeDeliberacion } from "../lib/pizarra-activos.ts";
 import { agendaReuniones, enLaSala, lineaDeTiempo, SILLAS, silla, type Momento } from "../lib/oficina-reuniones.ts";
@@ -835,7 +836,7 @@ export default function LabOficina() {
                     <Persona tonoCamisa={tono(e)} />
                     {visible ? (
                       <span className={`of-globo${habla ? "" : " of-globo-nombre"}`}>
-                        <b>{nombreCorto(e.agente)}</b>
+                        <b>{nombreCorto(e.agente)}{agentePausado(e.id) ? " · EN PAUSA" : ""}</b>
                         {habla && actual ? <span>{actual.texto}</span> : null}
                       </span>
                     ) : (

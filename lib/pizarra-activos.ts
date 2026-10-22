@@ -18,6 +18,7 @@ import type { Intervencion } from "./mercado-ar-ranking.ts";
 import type { PapelAr } from "./mercado-ar.ts";
 import type { Fundamentales } from "./fundamentales-sec.ts";
 import { resumenGrupo } from "./agentes-mente.ts";
+import { agentePausado } from "./agentes-papel.ts";
 import type { Estadistica } from "./registro.ts";
 import type { Voz } from "./pizarra.ts";
 
@@ -107,6 +108,7 @@ const fechaCorta = (t: number) => new Date(t).toLocaleString("es-AR", { timeZone
 export function vocesDeOficina(escritorios: EscritorioLite[], symbol: string): Voz[] {
   const out: Voz[] = [];
   for (const e of escritorios) {
+    if (agentePausado(e.id)) continue; // en pausa: no opina (docs/estudio-agentes.md)
     const a = e.abiertas.filter((x) => x.symbol === symbol).sort((x, y) => y.detectada - x.detectada)[0];
     if (!a) continue;
     const lado = a.lado === "SHORT" ? "CORTO" : "LARGO";
