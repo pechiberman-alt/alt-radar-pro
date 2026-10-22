@@ -16,6 +16,8 @@ import { TEXTO_SIN_LIQUIDACIONES } from "@/lib/mercado-ar-mapa";
 import { analisisAr, type AnalisisAr } from "@/lib/mercado-ar-tecnico";
 import { cargarPanel, leerPapel, type LecturaPapel } from "@/lib/mercado-ar-cliente";
 import GraficoTv from "./grafico-ar-tv";
+import { PizarraPanel, RazonamientoMente } from "./pizarra-panel";
+import type { Razonamiento } from "@/lib/mentes-metodo";
 import type { SwingCandle } from "@/lib/swing-entries";
 
 export const fmt = (x: number | null | undefined, d = 2) =>
@@ -149,7 +151,7 @@ function Ficha({ velas }: { velas: SwingCandle[] }) {
 
 // ── Mentes ──
 
-export function MentesPanel({ mentes, consenso }: { mentes: LecturaMente[]; consenso: Consenso }) {
+export function MentesPanel({ mentes, consenso, razon }: { mentes: LecturaMente[]; consenso: Consenso; razon?: Razonamiento[] }) {
   const [abierta, setAbierta] = useState<string | null>(null);
   return (
     <div className="ar-box">
@@ -173,13 +175,17 @@ export function MentesPanel({ mentes, consenso }: { mentes: LecturaMente[]; cons
           <em>{m.idea}</em>
           {abierta === m.id && (
             <>
-              {m.criterios.map((c) => (
-                <div className="ar-crit" key={c.nombre} title={c.regla}>
-                  <i className={c.cumple === null ? "ar-mute" : c.cumple ? "ar-up" : "ar-down"}>{c.cumple === null ? "?" : c.cumple ? "✓" : "✗"}</i>
-                  <span>{c.nombre}</span>
-                  <span className="ar-mute">{c.valor}</span>
-                </div>
-              ))}
+              {razon?.find((r) => r.id === m.id) ? (
+                <RazonamientoMente r={razon.find((r) => r.id === m.id)!} />
+              ) : (
+                m.criterios.map((c) => (
+                  <div className="ar-crit" key={c.nombre} title={c.regla}>
+                    <i className={c.cumple === null ? "ar-mute" : c.cumple ? "ar-up" : "ar-down"}>{c.cumple === null ? "?" : c.cumple ? "✓" : "✗"}</i>
+                    <span>{c.nombre}</span>
+                    <span className="ar-mute">{c.valor}</span>
+                  </div>
+                ))
+              )}
               <p>{m.nota}</p>
             </>
           )}
@@ -307,7 +313,8 @@ export function MapaAr({ papel, onSalir }: { papel: PapelAr; onSalir: () => void
             </>
           )}
           {velas.length > 1 && <TecnicoPanel analisis={analisis} />}
-          <MentesPanel mentes={lectura.mentes} consenso={lectura.consenso} />
+          <PizarraPanel d={lectura.pizarra} />
+          <MentesPanel mentes={lectura.mentes} consenso={lectura.consenso} razon={lectura.razon} />
           {lectura.mentes.some((m) => m.criterios.some((c) => c.valor.startsWith("falta el"))) && (
             <button className="ar-chip-btn" onClick={() => void leerPanel()} disabled={panel !== null}>
               {panel ? `LEYENDO EL PANEL ${panel.hechos}/${panel.total}…` : "LEER TODO EL PANEL PARA COMPARAR (fuerza relativa y riesgo)"}

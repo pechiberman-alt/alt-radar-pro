@@ -35,6 +35,7 @@ import {
 import { mismoMercado } from "@/lib/contexto-comun";
 import { buscarPapeles, papelPorTicker, type PapelAr } from "@/lib/mercado-ar";
 import { MapaAr } from "./mercado-ar-vistas";
+import PizarraCripto from "./pizarra-cripto";
 import { buildLiquidationLives, gridColor, liquidationGrid, type LiquidationLife } from "@/lib/liquidation-columns";
 import { findScalpSignals, scalpStats } from "@/lib/scalp-signals";
 import { atrOf, buildLevels, replayLevels, sourcesAt, type Level, type LevelSource } from "@/lib/level-engine";
@@ -1895,6 +1896,8 @@ export default function LiquidationHeatmapDesk() {
               )}
             </div>
           )}
+
+          <PizarraCripto symbol={symbol} />
 
           <div className="liq-summary">
           <div
