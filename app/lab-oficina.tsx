@@ -25,7 +25,7 @@ import MiniArana from "./lab-mini-arana";
 import { intencionDe, respondeLoPreguntado, respuestaDirecta, type Ficha } from "../lib/ia-respuesta.ts";
 import SalaMentes from "./sala-mentes";
 import { panelCompleto, type LecturaPapel } from "../lib/mercado-ar-cliente.ts";
-import { guionReunion } from "../lib/mercado-ar-ranking.ts";
+import { guionDeDeliberacion } from "../lib/pizarra-activos.ts";
 import { agendaReuniones, enLaSala, lineaDeTiempo, SILLAS, silla, type Momento } from "../lib/oficina-reuniones.ts";
 import type { MenteId } from "../lib/mentes-inversoras.ts";
 
@@ -664,7 +664,7 @@ export default function LabOficina() {
     if (!mentesPanel) return null;
     const conDebate = mentesPanel.filter((l) => l.consenso.aFavor > 0 && l.consenso.enContra > 0);
     const l = conDebate.sort((a, b) => Math.min(b.consenso.aFavor, b.consenso.enContra) - Math.min(a.consenso.aFavor, a.consenso.enContra) || b.consenso.aFavor - a.consenso.aFavor)[0];
-    return l ? { ticker: l.papel.ticker, guion: guionReunion({ ...l, cierre: l.serie.serie?.velas.at(-1)?.close ?? null }) } : null;
+    return l ? { ticker: l.papel.ticker, guion: guionDeDeliberacion(l.pizarra) } : null;
   }, [mentesPanel]);
   const tiempo = useMemo(() => lineaDeTiempo(agendaReuniones(oficina.conversaciones, temaMentes)), [oficina.conversaciones, temaMentes]);
   const momento: Momento = tiempo[turno % tiempo.length];

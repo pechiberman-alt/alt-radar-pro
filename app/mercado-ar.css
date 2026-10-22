@@ -134,3 +134,21 @@ button.ar-agente{background:none;border:0;border-top:1px solid #17201c;color:inh
 .tut-cap{font:9px var(--font-mono);letter-spacing:1.5px;color:var(--green2)}
 .tut-indice{display:flex;flex-wrap:wrap;gap:5px}
 .tut-indice button{border:1px solid #2c493b;background:#0b110e;color:#c9d4ce;font:9px var(--font-mono);letter-spacing:.8px;padding:6px 8px;border-radius:14px;cursor:pointer}
+
+/* ── La pizarra y el método de cada mente (app/pizarra-panel.tsx) ── */
+.pz summary{cursor:pointer;list-style:none}
+.pz summary::-webkit-details-marker{display:none}
+.pz-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.pz-grupo{display:grid;gap:5px;align-content:start}
+.pz-grupo h4{margin:0;font:9px var(--font-mono);letter-spacing:1.5px;color:var(--muted);font-weight:400}
+.pz-voz{display:grid;gap:2px;padding:6px 8px;border-left:2px solid var(--line);background:#0e1612;border-radius:3px}
+.pz-voz b{font:11px var(--font-mono);color:#d5dfd9}
+.pz-voz span,.pz-voz em{font-size:11px;color:#9ca8a1;font-style:normal;line-height:1.4}
+.pz-voz em{color:var(--amber)}
+.pz-veto{border-left-color:var(--red)}
+.pz-plan{font:10px var(--font-mono);color:#b7c2bc}
+.pz-razon{display:grid;gap:6px;padding:8px;border:1px solid var(--line);border-radius:4px;background:#0e1612}
+.pz-razon p{margin:0}
+@media (max-width:520px){.pz-cols{grid-template-columns:1fr}}
+.pz-razon .ar-crit{grid-template-columns:14px 1fr}
+.pz-razon .ar-crit span:last-child{grid-column:2;margin-top:-2px}

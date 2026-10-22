@@ -53,11 +53,13 @@ export function agendaReuniones(dialogos: Dialogo[], mentes: { ticker: string; g
         if (contra[k]) habla.push(contra[k]);
       }
       const jarvis = mentes.guion.filter((g) => g.quien === "JARVIS");
+      const abre = mentes.guion[0]?.quien === "JARVIS" ? jarvis[0] : null;
+      const cierres = jarvis.slice(abre ? 1 : 0);
       out.push({
         tema: `Las mentes sobre ${mentes.ticker}`,
         motivo: "LAS MENTES NO COINCIDEN",
         participantes: habla.map((g) => g.quien).slice(0, SILLAS),
-        lineas: [...(jarvis[0] ? [jarvis[0]] : []), ...habla, ...(jarvis[1] ? [jarvis[1]] : [])].map((g) => ({ quien: g.quien, nombre: g.nombre.split(" (")[0], texto: g.texto })),
+        lineas: [...(abre ? [abre] : []), ...habla, ...cierres].map((g) => ({ quien: g.quien, nombre: g.nombre.split(" (")[0], texto: g.texto })),
       });
     }
   }

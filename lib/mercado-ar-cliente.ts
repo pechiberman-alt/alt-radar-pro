@@ -6,6 +6,9 @@
  * Nada de esto se guarda en el navegador ni pide historial en intervalos.
  */
 import { INDICE_EEUU, INDICE_MERVAL, PAPELES_AR, estadoSerie, type EstadoSerie, type PapelAr, type SerieAr } from "./mercado-ar.ts";
+import { pizarraAr } from "./pizarra-activos.ts";
+import type { Deliberacion } from "./pizarra.ts";
+import type { Razonamiento } from "./mentes-metodo.ts";
 import { consenso, leerMentes, percentiles, rendimiento, sma, volatilidadAnual, type Consenso, type LecturaMente } from "./mentes-inversoras.ts";
 import { estudiarPapel, type AgenteEnPapel } from "./mercado-ar-agentes.ts";
 import { EMPRESAS_SEC, SIN_BALANCE, type Fundamentales } from "./fundamentales-sec.ts";
@@ -137,6 +140,10 @@ export type LecturaPapel = {
   /** La zona de compra de Fibonacci de la serie que se opera (en pesos). */
   fib: ZonaFibAr | null;
   fibMotivo: string | null;
+  /** El método de cada mente sobre este papel (lib/mentes-metodo.ts). */
+  razon: Razonamiento[];
+  /** La pizarra: mentes, agentes, Fibonacci, estructura y riesgo deliberando sobre el papel (lib/pizarra.ts). */
+  pizarra: Deliberacion;
 };
 
 /** Todo lo de un papel: su serie, la de afuera si es CEDEAR, los balances, las mentes y los agentes. */
@@ -153,7 +160,7 @@ export async function leerPapel(papel: PapelAr, u?: Universo): Promise<LecturaPa
   const fuerza = k >= 0 && tickers.length >= 10 ? pcts[k] : null;
   // Los CEDEARs se leen técnicamente sobre la acción de afuera en dólares (la tendencia de la empresa, sin el dólar local).
   const tecnica = papel.tipo === "CEDEAR" && subyacente?.serie?.velas.length ? subyacente : serie;
-  const mentes = leerMentes({
+  const entradaMentes = {
     simbolo: papel.ticker,
     velas: velasDe(tecnica),
     moneda: tecnica.serie?.meta.moneda ?? null,
@@ -164,9 +171,13 @@ export async function leerPapel(papel: PapelAr, u?: Universo): Promise<LecturaPa
     mercadoAlcista: uni.mercado[papel.tipo],
     mercadoNombre: papel.tipo === "ACCION" ? "el Merval" : "el S&P 500 (SPY)",
     volMediana: uni.volMediana[papel.tipo],
-  });
-  const z = zonaFib(velasDe(serie));
-  return { papel, serie, subyacente, fund, mentes, consenso: consenso(mentes), agentes: estudiarPapel(papel.ticker, velasDe(serie)), fib: z.fib, fibMotivo: z.motivo };
+  };
+  const mentes = leerMentes(entradaMentes);
+  const velasPapel = velasDe(serie);
+  const agentes = estudiarPapel(papel.ticker, velasPapel);
+  const z = zonaFib(velasPapel);
+  const p = pizarraAr({ ticker: papel.ticker, nombre: papel.nombre, velas: velasPapel, fib: z.fib, fibMotivo: z.motivo, agentes, mentes: entradaMentes });
+  return { papel, serie, subyacente, fund, mentes, consenso: consenso(mentes), agentes, fib: z.fib, fibMotivo: z.motivo, razon: p.razon, pizarra: p.deliberacion };
 }
 
 /** Baja todo el panel (o una parte) en lotes, de a 3 lotes por vez, avisando el avance. */

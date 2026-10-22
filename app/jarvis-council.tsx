@@ -7,6 +7,7 @@ import { capitalAtRisk, council, fix2, gates, record, signed, tape, type Capital
 import type { PaperTrade } from "@/lib/jarvis-paper";
 import { lastPrice } from "@/lib/jarvis-paper-run";
 import type { usePaper } from "./jarvis-paper";
+import PizarraCripto from "./pizarra-cripto";
 
 /**
  * El tablero de mando de JARVIS TRADING: la misma decisión de la mesa, vista
@@ -290,6 +291,7 @@ export function CommandBoard({ d, settings, paper }: { d: DeskDecision; settings
         <CouncilPanel c={c} d={d} />
         <PaperPanel d={d} settings={settings} paper={paper} />
       </div>
+      <PizarraCripto symbol={d.symbol} />
       <p className="jt-note">
         El consenso mide cuánto coinciden los especialistas, no la probabilidad de acertar: lo único medido es el registro del papel, con su muestra. Este tablero no ejecuta nada en ninguna cuenta. Los resultados simulados no garantizan resultados futuros. No es asesoramiento financiero.
       </p>

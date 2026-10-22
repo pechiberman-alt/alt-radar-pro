@@ -334,7 +334,7 @@ Reglas:
 
 ## mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes
 Texto: acciones del panel líder y CEDEARs con ruedas diarias de Yahoo Finance (con demora), dentro del panel MERCADO AR y del MAPA (el buscador del mapa encuentra papeles de BYMA y muestra su vista). Las MENTES (Buffett, Graham, Lynch, crecimiento al estilo Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes del laboratorio leen cada papel y todo el panel. Balances de SEC EDGAR para los CEDEARs de empresas de EE. UU.
-Archivos: lib/mercado-ar*.ts, lib/mentes-inversoras.ts, lib/fundamentales-sec.ts, app/mercado-ar*.tsx, app/mercado-ar.css, app/api/mercado-ar/**, tests/mercado-ar.test.ts, tests/mentes-ar.test.ts, tests/mercado-ar-tecnico.test.ts, tests/mercado-ar-ranking.test.ts, app/sala-mentes.tsx, app/grafico-ar-tv.tsx
+Archivos: lib/mercado-ar*.ts, lib/mentes-inversoras.ts, lib/fundamentales-sec.ts, app/mercado-ar*.tsx, app/mercado-ar.css, app/api/mercado-ar/**, tests/mercado-ar.test.ts, tests/mentes-ar.test.ts, tests/mercado-ar-tecnico.test.ts, tests/mercado-ar-ranking.test.ts, app/sala-mentes.tsx, app/grafico-ar-tv.tsx, lib/mentes-metodo.ts, tests/mentes-metodo.test.ts, app/pizarra-panel.tsx
 Reglas:
 - Lista fija de papeles (23 acciones + 25 CEDEARs, más el Merval y SPY como índices): un símbolo fuera de la lista es error 400. Nunca un proxy abierto.
 - Sin footprint ni mapa de liquidaciones para BYMA: no se publica el lado agresor de cada operación ni el apalancamiento de las posiciones. Se dice en pantalla (TEXTO_SIN_FOOTPRINT, TEXTO_SIN_LIQUIDACIONES); nunca se dibuja uno aproximado. El perfil de volumen es aproximado por rueda y lo dice.
@@ -345,25 +345,27 @@ Reglas:
 - Gráfico de un papel (app/grafico-ar-tv.tsx): lightweight-charts de TradingView (Apache 2.0, gratis, en el navegador, con su marca de atribución), versión fija 5.1.0; capas de medias, niveles, Fibonacci y líneas de tendencia; en el celular las líneas no llevan nombre para no tapar las velas.
 - Las series viajan en lotes de hasta 12 en formato compacto (/api/mercado-ar/lote, lib/mercado-ar-lote.ts), con la misma caché por símbolo. Mejores compras Fibonacci (lib/mercado-ar-ranking.ts): solo precio dentro de la zona o hasta 5 % arriba, piernas no invalidadas; el orden pesa lo que aguantó en el papel solo con 3 casos resueltos o más; es un orden, no una probabilidad.
 - Sala de las mentes (app/sala-mentes.tsx, también en la oficina del laboratorio): reuniones y visitas entre escritorios con frases armadas de criterios medidos (guionReunion); cada mente responde preguntas como una lente inspirada en esa persona, nunca como la persona. El movimiento es decorativo y respeta «reducir movimiento».
+- Método de cada mente (lib/mentes-metodo.ts): además de los criterios, el orden de preguntas de su método, lo que la frena de plano, su plan (Buffett sin stop por precio; Graham con valor √(22,5·BPA·valor libro) y colchón de un tercio; Lynch clasifica la acción antes de juzgarla; Tudor Jones y Darvas con el stop primero; O'Neil corta a 8 %), lo que la haría cambiar de idea y lo que esta app no puede medir. «Fuera de mi método» (valor con un criptoactivo) no es «en contra». Contesta las preguntas sobre su método (respuestaDeMetodo) sin IA; la IA recibe ese razonamiento como contexto. Ninguna habla como la persona real.
 - Diagnóstico horario de Yahoo en el cron de 15 minutos (`ajuste:mercado_ar_estado`, las últimas 12 pruebas).
 - Todo texto visible en español rioplatense; no es asesoramiento financiero.
 Pendiente:
 - Señales AR en el registro unificado (resolverlas con ruedas diarias en el servidor).
 - Balances de empresas argentinas si aparece una fuente gratis en datos.
-- Agentes moviéndose en la oficina cuando coinciden o discrepan; lecturas de agentes en el mapa de footprint cripto.
+- Lecturas de agentes en el mapa de footprint cripto.
 
 ## terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato
 Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
-Archivos: lib/contexto-comun.ts, docs/terminal-unificada.md
+Archivos: lib/contexto-comun.ts, docs/terminal-unificada.md, lib/pizarra.ts, lib/pizarra-activos.ts, app/pizarra-cripto.tsx, tests/pizarra.test.ts, tests/pizarra-activos.test.ts
 Reglas:
 - Un dato que falta es DATA UNAVAILABLE, uno viejo STALE DATA y uno con muestra corta o incoherente INSUFFICIENT DATA, siempre con el motivo. Nunca cero ni un valor supuesto.
 - Spot y Futures no se mezclan: si las fuentes no declaran el mismo mercado, el contexto queda sin mercado y lo avisa. El footprint de operaciones de futuros solo se dibuja sobre velas de futuros.
 - El footprint sale solo de operaciones ejecutadas con lado agresor; una vela con huecos en los ids de aggTrade es parcial. El área de valor es la banda contigua alrededor del POC (método CBOT, 70 %), igual en el mapa y en el bookmap.
+- Pizarra (lib/pizarra.ts, lib/pizarra-activos.ts): donde se coordinan mentes, agentes de papel, Fibonacci, estructura, gestor de riesgo y la mesa de JARVIS sobre un activo (BYMA o cripto). Cada fuente deja una voz (largo, corto, espera, afuera o se abstiene) con su motivo, su muestra y qué la cambiaría. Reglas fijas y a la vista: el veto del gestor de riesgo gana a cualquier cantidad de votos; con menos de 3 voces que opinen no hay decisión (una abstención no es un voto en contra); sin plan completo (entrada, SL, TP1, TP2 y TP3 en orden) no hay operación; «hay plan» pide 2 familias distintas a favor y al menos 2 votos más a favor que en contra (una ventaja de uno es un empate de hecho). Las lentes de las mentes son de compra: en una discusión de cortos, las que no compran se abstienen. La huella identifica la decisión; no se guarda en la base todavía.
 - Nada de esta rama va a main ni a producción sin revisión de la persona. Ningún camino envía órdenes reales (tests/sin-ordenes-reales.test.ts).
 Pendiente:
 - Fase C: que la mesa de JARVIS, la araña y los agentes lean el contexto común y se abstengan con su motivo; footprint, CVD por operación y libro dentro del contexto.
 - Unificar las dos implementaciones de footprint (unidades y desequilibrio).
-- Registro auditable de cada decisión de JARVIS con el id del contexto; motor de day trading; riesgo agregado por correlación; deslizamiento con el libro.
+- Registro auditable de cada decisión (la pizarra ya calcula su huella; falta guardarla en el registro unificado) con el id del contexto, los agentes consultados y el veto; motor de day trading; riesgo agregado por correlación; deslizamiento con el libro.
 - Fase F: rediseño visual, celular primero.
 
 ## calidad — Pruebas

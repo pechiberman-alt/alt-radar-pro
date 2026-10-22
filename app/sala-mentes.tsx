@@ -11,7 +11,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { forAi } from "@/lib/ai-numbers";
 import { panelCompleto, type LecturaPapel } from "@/lib/mercado-ar-cliente";
-import { guionReunion, intervencion, type Intervencion } from "@/lib/mercado-ar-ranking";
+import { intervencion, type Intervencion } from "@/lib/mercado-ar-ranking";
+import { guionDeDeliberacion } from "@/lib/pizarra-activos";
+import { respuestaDeMetodo } from "@/lib/mentes-metodo";
+import { PizarraPanel, RazonamientoMente } from "./pizarra-panel";
 import { AVISO_MENTES, type LecturaMente, type MenteId } from "@/lib/mentes-inversoras";
 import { openArEnMapa } from "@/lib/account-events";
 import { intencionDe, respondeLoPreguntado, respuestaDirecta } from "@/lib/ia-respuesta";
@@ -74,8 +77,7 @@ export default function SalaMentes() {
   };
 
   const actual = useMemo(() => panel?.find((l) => l.papel.ticker === tema) ?? null, [panel, tema]);
-  const leido = useMemo(() => (actual ? { ...actual, cierre: actual.serie.serie?.velas.at(-1)?.close ?? null } : null), [actual]);
-  const guion = useMemo(() => (leido ? guionReunion(leido) : []), [leido]);
+  const guion = useMemo(() => (actual ? guionDeDeliberacion(actual.pizarra) : []), [actual]);
   const habla: Intervencion | null = reunion && guion.length ? guion[turno % guion.length] : null;
   const mentePorId = (id: MenteId): LecturaMente | null => actual?.mentes.find((m) => m.id === id) ?? null;
 
@@ -119,6 +121,15 @@ export default function SalaMentes() {
     const enContraEn = panel.filter((l) => suya(l)?.postura === "EN CONTRA").map((l) => l.papel.ticker);
     const intencion = /\b(compr|a favor|te gusta|recomend|eleg|mejor)/i.test(texto) && !nombrado ? "FAVORITOS" : intencionDe(texto, Boolean(nombrado));
     const x = nombrado ? suya(nombrado) : null;
+    // Lo que pregunta sobre su método (qué haría, dónde sale, qué lo cambiaría, qué no sabe) lo contesta su propio razonamiento.
+    const lectura = nombrado ?? actual;
+    const razon = lectura?.razon.find((r) => r.id === m.id) ?? null;
+    const porMetodo = razon && intencion !== "FAVORITOS" ? respuestaDeMetodo(razon, texto, lectura!.papel.ticker) : null;
+    if (porMetodo) {
+      anotar({ de: "mente", texto: porMetodo, cerebro: "su método" });
+      setPensando(false);
+      return;
+    }
     const directa =
       intencion === "FAVORITOS"
         ? `Hoy estoy a favor en ${aFavorEn.join(", ") || "ningún papel"}${enContraEn.length ? ` y en contra en ${enContraEn.join(", ")}` : ""}. Cuento criterios, no es una probabilidad ni asesoramiento financiero.`
@@ -145,11 +156,13 @@ export default function SalaMentes() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: texto,
-          persona: { nombre: m.mente, rol: "una de las mentes de la sala que leen acciones y CEDEARs de BYMA con criterios fijos", idea: `${m.idea}; tus criterios con sus valores en cada papel están en el SNAPSHOT` },
+          persona: { nombre: m.mente, rol: "una de las mentes de la sala que leen acciones y CEDEARs de BYMA con criterios fijos", idea: `${m.idea}; razoná con el método y los pasos de SNAPSHOT.razonamiento, en ese orden, sin inventar ningún dato que no esté ahí; lo que dice noSabe, lo admitís` },
           snapshot: forAi({
             asistente: m.mente,
             aviso: AVISO_MENTES,
             papelPreguntado: nombrado ? { papel: nombrado.papel.ticker, nombre: nombrado.papel.nombre, lectura: suya(nombrado) } : null,
+            razonamiento: razon ? { papel: lectura!.papel.ticker, clase: razon.clase, veredicto: razon.veredicto, porQue: razon.porQue, pasos: razon.pasos.map((p) => ({ pregunta: p.pregunta, hallazgo: p.hallazgo, resultado: p.resultado })), plan: razon.plan, cambiaria: razon.cambiaria, noSabe: razon.noSabe } : null,
+            pizarra: lectura ? { veredicto: lectura.pizarra.veredicto, razon: lectura.pizarra.razon, aFavor: lectura.pizarra.aFavor.map((v) => v.nombre), enContra: lectura.pizarra.enContra.map((v) => v.nombre), abstienen: lectura.pizarra.abstienen.map((v) => v.nombre) } : null,
             papelDeLaReunion: actual ? { papel: actual.papel.ticker, lectura: suya(actual) } : null,
             aFavorEn,
             enContraEn,
@@ -249,6 +262,8 @@ export default function SalaMentes() {
         </div>
       )}
 
+      {actual && <PizarraPanel d={actual.pizarra} abierta={false} />}
+
       {elegidaM && (
         <div className="ar-box">
           <div className="ar-head">
@@ -256,13 +271,17 @@ export default function SalaMentes() {
             <span className={`ar-chip ${elegidaM.postura === "A FAVOR" ? "ok" : elegidaM.postura === "EN CONTRA" ? "mal" : "alerta"}`}>{elegidaM.postura}</span>
           </div>
           <p>{elegidaM.idea}</p>
-          {elegidaM.criterios.map((c) => (
-            <div className="ar-crit" key={c.nombre} title={c.regla}>
-              <i className={c.cumple === null ? "ar-mute" : c.cumple ? "ar-up" : "ar-down"}>{c.cumple === null ? "?" : c.cumple ? "✓" : "✗"}</i>
-              <span>{c.nombre}</span>
-              <span className="ar-mute">{c.valor}</span>
-            </div>
-          ))}
+          {actual?.razon.find((r) => r.id === elegidaM.id) ? (
+            <RazonamientoMente r={actual.razon.find((r) => r.id === elegidaM.id)!} />
+          ) : (
+            elegidaM.criterios.map((c) => (
+              <div className="ar-crit" key={c.nombre} title={c.regla}>
+                <i className={c.cumple === null ? "ar-mute" : c.cumple ? "ar-up" : "ar-down"}>{c.cumple === null ? "?" : c.cumple ? "✓" : "✗"}</i>
+                <span>{c.nombre}</span>
+                <span className="ar-mute">{c.valor}</span>
+              </div>
+            ))
+          )}
           <p className="ar-mute">{elegidaM.nota}</p>
           <p className="ar-mute">
             A favor en: {panel.filter((l) => l.mentes.find((x) => x.id === elegidaM.id)?.postura === "A FAVOR").map((l) => l.papel.ticker).join(", ") || "ninguno"}
@@ -283,7 +302,7 @@ export default function SalaMentes() {
               void preguntar(elegidaM);
             }}
           >
-            <input value={pregunta} onChange={(ev) => setPregunta(ev.target.value)} placeholder="Preguntale por un papel (ej.: ¿qué ves en KO?)" maxLength={300} aria-label={`Pregunta para ${elegidaM.mente}`} />
+            <input value={pregunta} onChange={(ev) => setPregunta(ev.target.value)} placeholder="Preguntale por un papel (ej.: ¿qué harías con KO? ¿dónde salís?)" maxLength={300} aria-label={`Pregunta para ${elegidaM.mente}`} />
             <button type="submit" className="ar-chip-btn on" disabled={pensando || !pregunta.trim()}>
               PREGUNTAR
             </button>

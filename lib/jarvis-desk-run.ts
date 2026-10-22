@@ -94,6 +94,12 @@ export function cachedDesk(symbol: string): DeskDecision | null {
   return cache.get(symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`)?.decision ?? null;
 }
 
+/** La decisión y la foto de datos ya leídas de un activo (para la pizarra), sin pedir nada; null si todavía no se leyó. */
+export function cachedEntry(symbol: string): { decision: DeskDecision | null; snapshot: DeskSnapshot } | null {
+  const hit = cache.get(symbol.toUpperCase().endsWith("USDT") ? symbol.toUpperCase() : `${symbol.toUpperCase()}USDT`);
+  return hit ? { decision: hit.decision, snapshot: hit.snapshot } : null;
+}
+
 /** Pide a la sección JARVIS TRADING que muestre un activo (y la abre), en un modo si se pide. */
 export function showInDesk(symbol: string, compareWith?: string, mode?: "ANALISIS" | "PAPEL" | "REAL") {
   window.dispatchEvent(new CustomEvent(DESK_SHOW_EVENT, { detail: { symbol, compareWith, mode } }));
