@@ -4,14 +4,14 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 752 · objetivos: 21 · sin objetivo: 0
+- Archivos: 754 · objetivos: 21 · sin objetivo: 0
 - Tablas D1: 61 · secretos: 6 · variables de entorno: 25 · rutas /api: 63 · hosts: 64
 - Código de navegador: 80 archivos con "use client" que alcanzan 252 · problemas: 0
 - Lib sin prueba directa: 35 de 253
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (94)
+### jarvis — JARVIS, la IA propia del software (95)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
 Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía. · Cargar una clave gratis de Gemini (aistudio.google.com) o de Groq en CONFIGURACIÓN: más respuestas gratis y MENTE más rápida (sin ellas usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
@@ -101,6 +101,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `scripts/investigacion/medir.ts` — Mide las reglas de la mesa en tres períodos que no se superponen, con costos más altos y de más de una manera.
 - `scripts/investigacion/modelos.ts` — Modelos chicos y sin dependencias para la investigación del aprendizaje: regresión ridge, regresión logística con L2, árboles potenciados poco profundos y AUC.
 - `scripts/investigacion/perfiles.ts` — La mesa con otras velas base: 15 min, 1 h (la de la app), 2 h, 4 h, 6 h y 12 h, con las dos versiones de reglas y dos niveles de costo.
+- `scripts/investigacion/pizarra-estudio.ts` — Estudio de la pizarra de cripto del servidor (lib/pizarra-servidor.ts) sobre el pasado: las mismas reglas, sin tocarlas, vela de 4 h por vela de 4 h, con solo lo que se sabía en ca
 - `scripts/investigacion/precalcular.ts` — Precalcula lo que la mesa veía en cada cierre de 4 velas base (solo velas cerradas) para un perfil de velas.
 - `scripts/investigacion/preregistro-flujo.ts` — Mide el preregistro del flujo (lib/preregistro-flujo.ts): el Agente Supertrend MTF + Volumen en 4 h con cada uno de los cuatro filtros fijados el 14/10/2026, con las mismas velas,
 - `scripts/investigacion/simulador.ts` — Simulador rápido de la mesa sobre lecturas precalculadas (ver precalcular.ts).
@@ -564,10 +565,11 @@ Pendiente: Balances de empresas argentinas si aparece una fuente gratis en datos
 - `tests/mercado-ar-tecnico.test.ts` — Pruebas del análisis técnico de un papel de BYMA (lib/mercado-ar-tecnico.ts): la zona de compra de Fibonacci, su historial (aguantó, falló, abierta), las semanas armadas con ruedas
 - `tests/mercado-ar.test.ts` — Mercado argentino: parse Yahoo, diagnósticos, lecturas diarias.
 
-### terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato (11)
+### terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato (12)
 Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
 Pendiente: Fase C: que la mesa de JARVIS, la araña y los agentes lean el contexto común y se abstengan con su motivo; footprint, CVD por operación y libro dentro del contexto. · Unificar las dos implementaciones de footprint (unidades y desequilibrio). · Registro auditable de cada decisión (la pizarra ya calcula su huella; falta guardarla en el registro unificado) con el id del contexto, los agentes consultados y el veto; motor de day trading; riesgo agregado por correlación; deslizamiento con el libro. · Fase F: rediseño visual, celular primero.
 - `app/pizarra-cripto.tsx` — La pizarra (lib/pizarra.ts) de una criptomoneda: las mentes de precio (las de valor se abstienen: no hay balances), la estructura, la mesa de JARVIS con sus compuertas y los agente
+- `docs/estudio-pizarra.md` — Estudio de la pizarra de cripto sobre el pasado
 - `docs/terminal-unificada.md` — ALT RADAR PRO — plataforma unificada: auditoría y primer incremento
 - `lib/contexto-comun.ts` — El contexto común de la terminal (docs/terminal-unificada.md, fase B): la forma en que un dato llega a cualquier agente, con su fuente, su mercado (Spot o Futures), la hora del dat
 - `lib/pizarra-activos.ts` — Arma la pizarra (lib/pizarra.ts) de un activo concreto con todo lo que ya se leyó de él: para una acción o un CEDEAR de BYMA, las nueve mentes con su método, los agentes que dispar
@@ -910,8 +912,8 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `gemini_api_key` (secreto) — lee: app/api/admin/settings/route.ts, lib/ai-gemini-server.ts · guarda: app/api/admin/settings/route.ts
 - `groq_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/jarvis-mind-db.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
 - `telegram_bot_token` (secreto) — lee: app/api/admin/cobros/route.ts, app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts (+6) · guarda: app/api/admin/settings/route.ts
-- variable `ALT_RADAR_DATOS` — en: scripts/investigacion/util.ts
-- variable `ALT_RADAR_SALIDA` — en: scripts/investigacion/util.ts
+- variable `ALT_RADAR_DATOS` — en: scripts/investigacion/pizarra-estudio.ts, scripts/investigacion/util.ts
+- variable `ALT_RADAR_SALIDA` — en: scripts/investigacion/pizarra-estudio.ts, scripts/investigacion/util.ts
 - variable `ASSETS` — en: worker/index.ts
 - variable `CLAUDE_PROJECT_DIR` — en: scripts/claude-hooks.mjs
 - variable `CODEX_SANDBOX` — en: vite.config.ts

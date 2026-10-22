@@ -130,7 +130,7 @@ e46d0952fc25	248	app/futures-recorder.tsx
 d4d210b6bc48	9	app/globals.css
 d2e3d9959857	148	app/grafico-ar-tv.tsx
 a6786f814c31	32	app/hoy.css
-6ef55b1ca9b7	205	app/hoy.tsx
+9974aceabd0d	206	app/hoy.tsx
 e06ccaeb49df	30	app/install-panel.css
 def492abf855	146	app/install-panel.tsx
 08966d25ae55	67	app/institutional-desk.css
@@ -218,7 +218,7 @@ e4fbc338f605	360	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-30c9b307ab5b	395	docs/araña/objetivos.md
+73d4c1b7fa9d	395	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -228,6 +228,7 @@ fc6042bacccc	116	docs/busqueda-fibonacci.md
 5656d4c4c99f	215	docs/busqueda-smc.md
 1d364b489717	51	docs/estudio-axi.md
 615d9e91548e	120	docs/estudio-estrategias.md
+2a58fa50dd34	61	docs/estudio-pizarra.md
 73897aeae6f3	48	docs/ia-editor.md
 e4390e843ac9	115	docs/mesa-aprendizaje.md
 bbf611cc1b26	177	docs/mesa-perfiles.md
@@ -545,6 +546,7 @@ c83b5a866c3f	296	scripts/investigacion/linea-busqueda.ts
 36d231690dfe	238	scripts/investigacion/medir.ts
 2dea6b11e55f	236	scripts/investigacion/modelos.ts
 3d2f8d602cf9	110	scripts/investigacion/perfiles.ts
+226589bfea1b	206	scripts/investigacion/pizarra-estudio.ts
 7d2ffebb4423	85	scripts/investigacion/precalcular.ts
 de7b856aefe5	73	scripts/investigacion/preregistro-flujo.ts
 831478cc318c	377	scripts/investigacion/simulador.ts
