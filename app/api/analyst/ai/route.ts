@@ -8,6 +8,8 @@ import { getSecret } from "@/lib/app-settings";
 import { KNOWLEDGE } from "@/lib/assistant/knowledge";
 import { getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
 import { listMemory, memoryBlock } from "@/lib/jarvis-memory";
+import { respuestaSinIa } from "@/lib/jarvis-todo";
+import { contextoTodo } from "@/lib/jarvis-todo-db";
 import { limpiarRespuesta, sistemaPersona, type Persona } from "@/lib/ia-respuesta";
 
 export const dynamic = "force-dynamic";
@@ -38,17 +40,21 @@ export async function POST(request: NextRequest) {
     geminiConfig(env.DB, env),
     listMemory(env.DB, user.id).catch(() => []),
   ]);
-  const messages: ChatTurn[] = [
-    ...trimHistory(Array.isArray(body?.history) ? body!.history : []),
-    { role: "user", content: buildUserMessage(question, body?.snapshot ?? {}, memoryBlock(notes)) },
-  ];
-  const ai = (env as unknown as { AI?: AiLike }).AI ?? null;
-  // Un agente de la oficina o una mente habla con su propio prompt corto (lib/ia-respuesta.ts); JARVIS y el ANALISTA, con el suyo.
+  const history = trimHistory(Array.isArray(body?.history) ? body!.history : []);
+  // Los agentes y las mentes hablan con su propio dato; JARVIS y el ANALISTA suman lo común: BYMA, la pizarra, HOY y el registro.
   const p = body?.persona;
   const persona = p && typeof p.nombre === "string" && typeof p.rol === "string" ? { nombre: p.nombre.slice(0, 80), rol: p.rol.slice(0, 160), idea: typeof p.idea === "string" ? p.idea.slice(0, 240) : undefined } : null;
+  const base = body?.snapshot && typeof body.snapshot === "object" && !Array.isArray(body.snapshot) ? (body.snapshot as Record<string, unknown>) : {};
+  const todo = persona ? null : await contextoTodo(env.DB, question, history.filter((t) => t.role === "user").map((t) => t.content)).catch(() => null);
+  const messages: ChatTurn[] = [...history, { role: "user", content: buildUserMessage(question, todo ? { ...base, todo } : base, memoryBlock(notes)) }];
+  const ai = (env as unknown as { AI?: AiLike }).AI ?? null;
+  // Un agente de la oficina o una mente habla con su propio prompt corto (lib/ia-respuesta.ts); JARVIS y el ANALISTA, con el suyo.
   const r = await answerWithBrains(env.DB, user.id, { claude: claude.value, groq: groq.value, gemini }, ai, persona ? sistemaPersona(persona) : SYSTEM, messages);
   if (!r.ok) {
     console.error("[ALT_RADAR_AI]", r.error, r.tried.map((t) => `${t.brain}: ${t.error}`).join(" · "));
+    // Sin IA, un papel de BYMA se contesta igual con los números y las reglas de la pizarra (sin modelo).
+    const sinIa = respuestaSinIa(todo);
+    if (sinIa) return NextResponse.json({ text: sinIa, brain: "local", label: "motor local · datos de la app", model: "reglas de la app", remaining: null, limit: AI_DAILY_LIMIT, freeLeft: null });
     return NextResponse.json({ error: r.error, local: true }, { status: r.error === "SIN IA POR HOY" ? 429 : 502 });
   }
   return NextResponse.json({

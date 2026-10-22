@@ -26,6 +26,8 @@ import { coreContext } from "./jarvis-core.ts";
 import { coreSnapshot } from "./jarvis-core-db.ts";
 import { sharedJson } from "./shared-cache.ts";
 import { listMemory, memoryBlock } from "./jarvis-memory.ts";
+import { papelesPedidos, respuestaSinIa } from "./jarvis-todo.ts";
+import { contextoTodo } from "./jarvis-todo-db.ts";
 import { DEFAULT_NEURAL, VOICE_MAX_CHARS } from "./jarvis-voice.ts";
 import { addUsage, allowance, synthesize, usageToday } from "./jarvis-voice-server.ts";
 import { downloadVoice, escapeHtml, sendVoiceNote, speechFor, transcribe, transcribeWorkers, voiceProblem, whisperNeurons, type TgVoice } from "./telegram-voice.ts";
@@ -79,7 +81,7 @@ async function monedaPedida(base: string, now: number): Promise<{ existe: boolea
 /** Lo que se suma al resumen del servidor según la pregunta y la cuenta: monedas pedidas, el estudio y el agente de papel. */
 export async function datosExtraTelegram(db: D1Database, userId: number, question: string, now = Date.now()): Promise<Pick<ServerSnapshot, "pedidas" | "noEncontradas" | "estudio" | "agenteSt" | "oficina">> {
   const [pedidas, filas, oficina] = await Promise.all([
-    Promise.all(candidatosMoneda(question).map(async (b) => ({ b, ...(await monedaPedida(b, now)) }))),
+    Promise.all(candidatosMoneda(question).filter((b) => !papelesPedidos(b).length).map(async (b) => ({ b, ...(await monedaPedida(b, now)) }))),
     resultadosSt(db, userId, 50).catch(() => []),
     oficinaServidor(db, now).catch(() => null),
   ]);
@@ -175,12 +177,22 @@ export async function answerInTelegram(db: D1Database, env: SettingsEnv & { AI?:
       loadServerSnapshot(db),
       sharedJson("jarvis-core-v1", 60, () => coreSnapshot(db, Date.now())).catch(() => null),
     ]);
-    const extra = await datosExtraTelegram(db, userId, question).catch(() => ({}));
-    const snapshot = { ...(core ? { ...base, jarvis: coreContext(core, Date.now()).nucleo } : base), ...extra };
+    const [extra, todo] = await Promise.all([
+      datosExtraTelegram(db, userId, question).catch(() => ({})),
+      // Lo mismo que ve JARVIS en la app: BYMA con su pizarra, HOY y el registro (lib/jarvis-todo.ts).
+      contextoTodo(db, question, history.filter((t) => t.role === "user").map((t) => t.content)).catch(() => null),
+    ]);
+    const snapshot = { ...(core ? { ...base, jarvis: coreContext(core, Date.now()).nucleo } : base), ...extra, ...(todo ? { todo } : {}) };
     const messages: ChatTurn[] = [...history, { role: "user", content: buildUserMessage(question, snapshot, memoryBlock(notes)) }];
     // Claude first, then the free brains (lib/ai-brains.ts); only the one that answered is counted.
     const answer = await answerWithBrains(db, userId, { claude: claudeKey.value, groq: groqKey.value, gemini }, env.AI ?? null, SYSTEM, messages);
     if (!answer.ok) {
+      // Sin IA, un papel de BYMA se contesta igual con los números y las reglas de la pizarra (sin modelo).
+      const sinIa = respuestaSinIa(todo);
+      if (sinIa) {
+        for (const part of splitForTelegram(`${escapeHtml(sinIa)}\n<i>Respondió: motor local (sin IA por ahora).</i>`)) await sendMessage(token, chatId, part);
+        return null;
+      }
       await sendMessage(
         token,
         chatId,
