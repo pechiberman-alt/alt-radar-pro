@@ -44,6 +44,7 @@ const PREFIJOS_PRO = [
   "/api/oficina",
   "/api/mapa/",
   "/api/registro",
+  "/api/hoy",
   "/api/arana/",
   "/api/telegram/link",
   "/api/telegram/test",

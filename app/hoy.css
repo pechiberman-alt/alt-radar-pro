@@ -1,0 +1,31 @@
+/* La pantalla HOY (app/hoy.tsx): primero el celular (una columna, botones grandes); en la notebook, columnas. */
+.hoy{display:grid;gap:12px;padding:14px;background:linear-gradient(145deg,rgba(15,22,18,.94),rgba(8,13,11,.94));border:1px solid var(--line);border-radius:8px}
+.hoy-cabeza{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.hoy-cabeza h2{font:22px var(--font-mono);letter-spacing:2px;margin:0}
+.hoy-titular{margin:6px 0 0;font-size:14px;line-height:1.45;color:#d5dfd9;max-width:760px}
+.hoy-recargar{flex:0 0 auto;min-height:44px;padding:0 14px;border:1px solid #2c493b;border-radius:6px;background:#0c1712;color:var(--green);font:11px var(--font-mono);letter-spacing:1px;cursor:pointer}
+.hoy-atajos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.hoy-atajos button{display:grid;gap:4px;justify-items:center;min-height:64px;padding:8px 4px;border:1px solid var(--line);border-radius:8px;background:#0e1612;color:#d5dfd9;font:10px var(--font-mono);letter-spacing:1px;cursor:pointer}
+.hoy-atajos button b{font-size:20px;color:var(--green)}
+.hoy-atajos button:active,.hoy-lista button:active,.hoy-chips button:active{transform:scale(.98)}
+.hoy-grilla{display:grid;grid-template-columns:1fr;gap:10px}
+.hoy-tarjeta{display:grid;gap:8px;align-content:start;padding:14px;border:1px solid var(--line);border-radius:8px;background:#0b110e}
+.hoy-tarjeta h3{margin:0;font:10px var(--font-mono);letter-spacing:1.5px;color:var(--muted);font-weight:400}
+.hoy-tarjeta p{margin:0;font-size:13px;line-height:1.5;color:#b7c2bc}
+.hoy-vacio{color:var(--muted)!important;font-size:12px!important}
+.hoy-lista,.hoy-avisos,.hoy-semaforo{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.hoy-lista button{display:grid;gap:3px;width:100%;min-height:52px;padding:10px 12px;text-align:left;border:1px solid var(--line);border-left:3px solid var(--green2);border-radius:6px;background:#0e1612;cursor:pointer}
+.hoy-lista b{font:14px var(--font-mono);color:#e7eee9}
+.hoy-lista span{font-size:12px;color:#b7c2bc;line-height:1.4}
+.hoy-lista small{font:10px var(--font-mono);color:var(--muted)}
+.hoy-chips{display:flex;flex-wrap:wrap;gap:6px}
+.hoy-chips button{min-height:40px;padding:0 14px;border:1px solid #2c493b;border-radius:20px;background:#0c2519;color:var(--green);font:12px var(--font-mono);cursor:pointer}
+.hoy-avisos li{padding:10px 12px;border-radius:6px;background:#0e1612;font-size:12px;line-height:1.5;color:#c9d3cd}
+.hoy-semaforo li{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;padding:8px 0;border-bottom:1px solid #16221d}
+.hoy-semaforo li small{grid-column:1/3;font-size:11px;color:var(--muted);line-height:1.45}
+.hoy-semaforo b{font-size:12px;color:#d5dfd9}
+.hoy-tarjeta .ar-chip-btn{min-height:44px;justify-self:start}
+.hoy-pie{margin:0;font:10px var(--font-mono);color:var(--muted);line-height:1.5}
+@media (min-width:760px){.hoy{padding:18px 22px}.hoy-grilla{grid-template-columns:repeat(2,minmax(0,1fr))}.hoy-ancha{grid-column:1/-1}.hoy-atajos{max-width:520px}}
+@media (min-width:1200px){.hoy-grilla{grid-template-columns:repeat(3,minmax(0,1fr))}.hoy-ancha{grid-column:span 2}}
+@media (max-width:380px){.hoy-atajos{grid-template-columns:repeat(2,1fr)}}

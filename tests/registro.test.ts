@@ -9,7 +9,7 @@ import {
   conteoDeNucleo, leerRegistroUnificado, LIMITE_HISTORIA, operacionesDePapel, operacionesDeRobot,
 } from "../lib/registro-db.ts";
 import {
-  armarRegistro, CONTEO_CERO, contar, estadistica, lineaFuente, MUESTRA_MINIMA, sumarConteos, type Conteo,
+  armarRegistro, CONTEO_CERO, contar, estadistica, evidenciaDe, lineaFuente, MUESTRA_MINIMA, sumarConteos, type Conteo,
 } from "../lib/registro.ts";
 
 /**
@@ -53,7 +53,7 @@ test("nothing closed means no rate and no factor, never zero pretending to be a 
 test("no losses: the profit factor is not divided by zero", () => {
   const s = estadistica(contar(R(1, 2)));
   assert.equal(s.profitFactor, null);
-  assert.match(lineaFuente({ ...s, id: "PAPEL", nombre: "x", ambito: "CUENTA", enTotal: true, disponible: true, incompleta: false, capital: null }), /sin pérdidas/);
+  assert.match(lineaFuente({ ...s, id: "PAPEL", nombre: "x", ambito: "CUENTA", enTotal: true, disponible: true, incompleta: false, capital: null, evidencia: evidenciaDe(s.cerradas, null) }), /sin pérdidas/);
 });
 
 test("sample: under 15 closed is 'muestra mínima'; from 15 on, 'razonable'", () => {
@@ -161,4 +161,23 @@ test("db: a user's robot and paper rows are read from their own history, and onl
   assert.equal(papel.cerradas, 1);
   assert.equal(papel.abiertas, 1);
   assert.equal(papel.incompleta, false);
+});
+
+test("semáforo de evidencia: muestra mínima, sin ventaja clara, positiva y negativa con la expectancia contra su error", () => {
+  const cierre = (r: number, k: number) => ({ r, cerradaA: k, abiertaA: null });
+  assert.equal(evidenciaDe(0, []).nivel, "SIN DATOS");
+  assert.equal(evidenciaDe(MUESTRA_MINIMA - 1, []).nivel, "MUESTRA MÍNIMA");
+  assert.equal(evidenciaDe(20, null).nivel, "SIN SERIE", "sin la serie no se inventa el desvío");
+  const mezcla = Array.from({ length: 20 }, (_, k) => cierre(k % 2 ? 1 : -1, k));
+  assert.equal(evidenciaDe(20, mezcla).nivel, "SIN VENTAJA CLARA");
+  const buena = Array.from({ length: 30 }, (_, k) => cierre(k % 3 === 0 ? -1 : 2, k));
+  const e = evidenciaDe(30, buena);
+  assert.equal(e.nivel, "POSITIVA");
+  assert.ok(e.t! >= 2);
+  assert.match(e.texto, /Igual es pasado/);
+  const mala = Array.from({ length: 30 }, (_, k) => cierre(k % 4 === 0 ? 1 : -1, k));
+  assert.equal(evidenciaDe(30, mala).nivel, "NEGATIVA");
+  // El registro la trae en cada fuente.
+  const reg = armarRegistro([{ id: "PAPEL", conteo: contar(mala.map((c) => ({ r: c.r, abierta: false }))), cierres: mala }], 0);
+  assert.equal(reg.fuentes[0].evidencia.nivel, "NEGATIVA");
 });

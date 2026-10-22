@@ -42,6 +42,7 @@ export type WorkspaceGroup = (typeof WORKSPACE_GROUPS)[number];
  */
 export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
   // EMPEZÁ ACÁ — orientation. Open by default; everything else is not.
+  { id: "hoy", label: "HOY", primary: true, group: "EMPEZÁ ACÁ" },
   { id: "resumen", label: "RESUMEN", primary: true, group: "EMPEZÁ ACÁ" },
   { id: "jarvis-trading", label: "JARVIS TRADING", primary: true, group: "EMPEZÁ ACÁ" },
   { id: "alertas", label: "ALERTAS", primary: true, group: "EMPEZÁ ACÁ" },
@@ -90,13 +91,13 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
 ];
 
 /**
- * ESSENTIAL: what someone needs on day one — the market at a glance, JARVIS, the robot's signals, the liquidity map,
+ * ESSENTIAL: what someone needs on day one — HOY (what matters today), the market at a glance, JARVIS, the robot's signals, the liquidity map,
  * Argentine stocks, alerts, their own journal and settings. The other panels are real tools, but a second step: with 33
  * sections always listed, the first impression was a wall, and with ten it still was. They live under AVANZADO, one tap
  * away, and opening any of them from elsewhere in the app (the tutorial too) turns AVANZADO on by itself. POR ROMPER and
  * SUBEN SOLAS moved there in October 2026.
  */
-export const ESSENTIAL_IDS = new Set(["resumen", "jarvis-trading", "inteligencia", "liquidaciones", "mercado-ar", "alertas", "diario", "configuracion"]);
+export const ESSENTIAL_IDS = new Set(["hoy", "resumen", "jarvis-trading", "inteligencia", "liquidaciones", "mercado-ar", "alertas", "diario", "configuracion"]);
 const ADVANCED_KEY = "alt-radar-pro:workspace:advanced:v1";
 const ADVANCED_EVENT = "alt-radar:advanced";
 

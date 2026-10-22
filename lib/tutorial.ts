@@ -23,6 +23,13 @@ export const PASOS_TUTORIAL: PasoTutorial[] = [
     accion: null,
   },
   {
+    id: "hoy",
+    capitulo: "EMPEZÁ ACÁ",
+    titulo: "HOY",
+    texto: "Lo primero que ves: los planes de la pizarra, los papeles en zona de compra, las señales abiertas y el semáforo que dice si cada fuente ya demostró algo. Si no hay plan, esperar también es una decisión.",
+    accion: { tipo: "seccion", destino: "hoy", boton: "VER HOY" },
+  },
+  {
     id: "resumen",
     capitulo: "EMPEZÁ ACÁ",
     titulo: "El RESUMEN",

@@ -6,6 +6,7 @@ import "./open-heatmap.css";
 import "./premium.css";
 import "./bookmap-pro.css";
 import "./mercado-ar.css";
+import "./hoy.css";
 import "./bookmap-timeframe.css";
 import "./bookmap-interactions.css";
 import "./bookmap-premium.css";
