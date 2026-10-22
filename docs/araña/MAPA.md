@@ -4,10 +4,10 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 760 · objetivos: 21 · sin objetivo: 0
-- Tablas D1: 61 · secretos: 6 · variables de entorno: 25 · rutas /api: 63 · hosts: 64
+- Archivos: 761 · objetivos: 21 · sin objetivo: 0
+- Tablas D1: 62 · secretos: 6 · variables de entorno: 25 · rutas /api: 63 · hosts: 64
 - Código de navegador: 80 archivos con "use client" que alcanzan 252 · problemas: 0
-- Lib sin prueba directa: 37 de 256
+- Lib sin prueba directa: 36 de 256
 
 ## Objetivos
 
@@ -74,7 +74,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `lib/jarvis-scan-run.ts` — El escáner de todo el mercado en el navegador: baja de Binance Futures las velas de cada moneda de a poco, corre la mesa (lib/jarvis-scan.ts) y relee completas las aprobadas.
 - `lib/jarvis-scan.ts` — El escáner de todo el mercado de JARVIS TRADING: la misma mesa de siempre, moneda por moneda, sobre todos los contratos de Binance Futures con volumen suficiente.
 - `lib/jarvis-stats.ts` — Estadística de la mesa, en pura matemática sobre listas de resultados en R (una operación = un número).
-- `lib/jarvis-todo-db.ts` — El contexto común de JARVIS (lib/jarvis-todo.ts) leído del servidor, una sola vez para la app y para Telegram: HOY (lo que ya guardó la base, con su caché de 5 minutos) y la lectur
+- `lib/jarvis-todo-db.ts` — El contexto común de JARVIS (lib/jarvis-todo.ts) leído del servidor, una sola vez para la app y para Telegram: HOY (lo que ya guardó la base, con su caché de 5 minutos) y, de cada
 - `lib/jarvis-todo.ts` — El contexto común de JARVIS: lo que la app y Telegram le dan a la IA además del radar de cripto, para que conteste de todo lo que la terminal sabe y no solo de cripto.
 - `lib/jarvis-voice-server.ts` — Server side of JARVIS's neural voice: synthesis with fallbacks, a daily allowance in D1 (two rows per day: the person and everyone), and a shared cache so a phrase said before cost
 - `lib/jarvis-voice.ts` — JARVIS's neural voice, shared by the server route and the app.
@@ -535,10 +535,10 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 - `tests/universos.test.ts` — Pruebas de los universos de monedas (lib/universos.ts): que no se diga que un universo se puede medir cuando no hay velas descargadas, que las monedas con datos sean exactamente la
 
-### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (30)
+### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (31)
 Texto: acciones del panel líder y CEDEARs con ruedas diarias de Yahoo Finance (con demora), dentro del panel MERCADO AR y del MAPA (el buscador del mapa encuentra papeles de BYMA y muestra su vista). Las MENTES (Buffett, Graham, Lynch, crecimiento al estilo Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes del laboratorio leen cada papel y todo el panel. Balances de SEC EDGAR para los CEDEARs de empresas de EE. UU.
 Pendiente: Balances de empresas argentinas si aparece una fuente gratis en datos. · Lecturas de agentes en el mapa de footprint cripto.
-- `app/api/mercado-ar/fundamentales/route.ts` — Balances anuales de la empresa de afuera de un CEDEAR, de SEC EDGAR, para las mentes de valor (Buffett, Graham, Lynch, crecimiento).
+- `app/api/mercado-ar/fundamentales/route.ts` — Balances anuales de la empresa de un papel (la de afuera si es CEDEAR, la argentina si presenta 20-F), de SEC EDGAR, para las mentes de valor (Buffett, Graham, Lynch, crecimiento).
 - `app/api/mercado-ar/lote/route.ts` — Varias series de MERCADO AR en un solo pedido (hasta 12), en formato compacto (lib/mercado-ar-lote.ts): el panel entero llega en unos pocos pedidos en lugar de cien.
 - `app/api/mercado-ar/route.ts` — Velas diarias de una acción argentina o un CEDEAR (y de su acción de afuera), de Yahoo Finance, para el panel MERCADO AR.
 - `app/grafico-ar-tv.tsx` — El gráfico de un papel de BYMA con el estilo de las terminales (el mismo que usa open.bymadata): lightweight-charts de TradingView (Apache 2.0, gratis, corre en el navegador).
@@ -549,7 +549,7 @@ Pendiente: Balances de empresas argentinas si aparece una fuente gratis en datos
 - `app/sala-mentes.tsx` — La sala de las MENTES (lib/mentes-inversoras.ts): los nueve agentes inspirados en Buffett, Graham, Lynch, Musk, Tudor Jones, Darvas, O'Neil, Templeton y Dalio en sus escritorios.
 - `lib/ar-lectura.ts` — La lectura completa de un papel de BYMA en el servidor, una sola para todos: sus ruedas (la misma caché que la app), la acción de afuera si es CEDEAR, el índice de referencia y los
 - `lib/ar-senales-db.ts` — La base de las señales de BYMA del servidor (lib/ar-senales.ts): una tabla global con índice por papel y estado (las abiertas) y por fuente y fecha (el registro), el estado de cada
-- `lib/ar-senales-run.ts` — La corrida del cron de las señales de BYMA (lib/ar-senales.ts): al papel de turno le lee sus ruedas, los agentes, Fibonacci y la pizarra (lib/ar-lectura.ts, la misma lectura que us
+- `lib/ar-senales-run.ts` — La corrida del cron de las señales de BYMA (lib/ar-senales.ts): al papel de turno le lee sus ruedas, los agentes, Fibonacci (de compra y de venta), las zonas y la pizarra (lib/ar-l
 - `lib/ar-senales.ts` — Las señales de BYMA en el servidor (PLAN_AR_1): una vez por rueda, con el mercado cerrado, cada papel del panel se lee con lo mismo que en la app (agentes de lib/mercado-ar-agentes
 - `lib/fundamentales-sec.ts` — Los balances de las empresas de afuera que hay detrás de los CEDEARs, de SEC EDGAR (XBRL, gratis y oficial): ingresos, ganancia neta, BPA diluido, patrimonio, pasivo y activo/pasiv
 - `lib/mentes-inversoras.ts` — Las MENTES: agentes que leen un papel con las reglas públicas de inversores famosos (Buffett, Graham, Lynch, la prédica de crecimiento de Musk, Paul Tudor Jones, Darvas, O'Neil, Te
@@ -563,6 +563,7 @@ Pendiente: Balances de empresas argentinas si aparece una fuente gratis en datos
 - `lib/mercado-ar-tecnico.ts` — El análisis técnico de un papel de BYMA con ruedas diarias, con los mismos motores del mapa cripto: zona de compra de Fibonacci (retroceso 0,618–0,786 de la última pierna alcista,
 - `lib/mercado-ar.ts` — El mercado argentino en la terminal: acciones del panel líder de BYMA y CEDEARs, con velas DIARIAS de Yahoo Finance (BYMA llega con demora; Yahoo dice cuántos minutos en `exchangeD
 - `tests/ar-senales.test.ts` — Pruebas de las señales de BYMA del servidor (lib/ar-senales.ts): el turno (un papel por minuto, días hábiles, 21 UTC), que solo entra la rueda del día, las entradas de agentes y de
+- `tests/fundamentales-niif.test.ts` — Pruebas de los balances NIIF de las empresas argentinas (lib/fundamentales-sec.ts): se leen del 20-F con la taxonomía ifrs-full, la moneda la fija el primer concepto y no se mezcla
 - `tests/mentes-ar.test.ts` — Pruebas de las MENTES (lib/mentes-inversoras.ts), los balances de SEC (lib/fundamentales-sec.ts), los agentes sobre ruedas de BYMA (lib/mercado-ar-agentes.ts) y el mapa de un papel
 - `tests/mentes-metodo.test.ts` — Pruebas del método de cada mente (lib/mentes-metodo.ts): el orden de sus preguntas, sus vetos, su plan y que, sin balances o con un criptoactivo, las lentes de valor se abstengan e
 - `tests/mercado-ar-ranking.test.ts` — Pruebas de las listas de MERCADO AR (lib/mercado-ar-ranking.ts: mejores compras Fibonacci, señales con mentes y el guion de la reunión) y del formato compacto de los lotes (lib/mer
@@ -858,6 +859,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `aprendizaje_diario` — crea: lib/aprendizaje-diario-db.ts · usa: lib/aprendizaje-diario-db.ts · sin índice visible en el código
 - `ar_avisos` — crea: lib/ar-senales-db.ts · usa: lib/ar-senales-db.ts · índices: ar_avisos_at
 - `ar_estado` — crea: lib/ar-senales-db.ts · usa: lib/ar-senales-db.ts · sin índice visible en el código
+- `ar_lectura` — crea: lib/ar-senales-db.ts · usa: lib/ar-senales-db.ts · sin índice visible en el código
 - `ar_senales` — crea: lib/ar-senales-db.ts · usa: lib/ar-senales-db.ts · índices: ar_senales_abiertas, ar_senales_fuente
 - `arana_ultimo` — crea: lib/arana-ultimo-db.ts · usa: lib/arana-ultimo-db.ts · sin índice visible en el código
 - `auth_intentos` — crea: lib/auth-limites.ts · usa: lib/auth-limites.ts · sin índice visible en el código
@@ -1084,4 +1086,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/ai-gemini-server.ts`, `lib/ar-lectura.ts`, `lib/ar-senales-db.ts`, `lib/ar-senales-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/hoy-db.ts`, `lib/jarvis-todo-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/mapa-agentes-db.ts`, `lib/mapa-memoria.ts`, `lib/market-brain.ts`, `lib/mercado-ar-cliente.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/pizarra-servidor-db.ts`, `lib/pizarra-servidor-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/ai-gemini-server.ts`, `lib/ar-senales-db.ts`, `lib/ar-senales-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/hoy-db.ts`, `lib/jarvis-todo-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/mapa-agentes-db.ts`, `lib/mapa-memoria.ts`, `lib/market-brain.ts`, `lib/mercado-ar-cliente.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/pizarra-servidor-db.ts`, `lib/pizarra-servidor-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

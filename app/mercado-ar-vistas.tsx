@@ -33,7 +33,7 @@ const CLASE_POSTURA: Record<string, string> = { "A FAVOR": "ok", "EN CONTRA": "m
 const tasa = (a: number, n: number) => (n ? `${fmt((a / n) * 100, 0)} %` : "—");
 
 export function TecnicoPanel({ analisis }: { analisis: AnalisisAr }) {
-  const { fib, estructura, ruptura, banderas, wyckoff, preRuptura, divergencias, fvg, niveles } = analisis;
+  const { fib, fibVenta, zonas, estructura, ruptura, banderas, wyckoff, preRuptura, divergencias, fvg, niveles } = analisis;
   const chips: { texto: string; clase: string }[] = [];
   chips.push({ texto: `ESTRUCTURA · ${estructura.tendencia}${estructura.tendencia !== "SIN DATOS" ? ` · ${estructura.detalle}` : ""}`, clase: estructura.tendencia === "ALCISTA" ? "ok" : estructura.tendencia === "BAJISTA" ? "mal" : "alerta" });
   if (ruptura) chips.push({ texto: `RUPTURA ${ruptura.direction} (línea) · ${ruptura.confirmed ? "confirmada" : "sin confirmar"} · ${ruptura.outcome.toLowerCase()}${ruptura.volumeMultiple ? ` · ${fmt(ruptura.volumeMultiple, 1)}× vol` : ""}`, clase: ruptura.direction === "ALCISTA" ? "ok" : "mal" });
@@ -44,11 +44,13 @@ export function TecnicoPanel({ analisis }: { analisis: AnalisisAr }) {
   if (fvg.length) chips.push({ texto: `FVG · ${fvg.filter((f) => f.side === "ALCISTA").length} de compra · ${fvg.filter((f) => f.side === "BAJISTA").length} de venta`, clase: "" });
   const h = fib?.historial;
   const resueltas = h ? h.aguantaron + h.fallaron : 0;
+  const hv = fibVenta?.historial;
+  const resueltasV = hv ? hv.aguantaron + hv.fallaron : 0;
   return (
     <>
       <div className="ar-box">
         <h3>ZONA DE COMPRA FIBONACCI</h3>
-        {!fib && <p>{analisis.fibMotivo}</p>}
+        {!fib && <p>{analisis.fibMotivo}{fibVenta ? " Más abajo está la zona de venta." : ""}</p>}
         {fib && (
           <>
             <div className="ar-head">
@@ -83,6 +85,61 @@ export function TecnicoPanel({ analisis }: { analisis: AnalisisAr }) {
               {resueltas < 15 ? " · muestra mínima" : ""}. Si en una misma rueda pasan las dos cosas, cuenta como falla. No es una probabilidad.
             </p>
           </>
+        )}
+      </div>
+      {fibVenta && (
+        <div className="ar-box">
+          <h3>ZONA DE VENTA FIBONACCI</h3>
+          <div className="ar-head">
+            <span>
+              Pierna bajista {fmt(fibVenta.pierna.origen)} → {fmt(fibVenta.pierna.extremo)} (terminó el {fecha(fibVenta.desde)})
+            </span>
+            <span className={`ar-chip ${fibVenta.estado === "EN LA ZONA" ? "mal" : fibVenta.estado === "INVALIDADA" ? "" : "alerta"}`}>{fibVenta.estado}</span>
+          </div>
+          <div className="ar-grid">
+            {fibVenta.niveles.map((n) => (
+              <div key={n.r}>
+                <span>REBOTE {String(n.r).replace(".", ",")}</span>
+                {fmt(n.precio)}
+              </div>
+            ))}
+            {fibVenta.extensiones.map((n) => (
+              <div key={n.r}>
+                <span>OBJETIVO ABAJO {String(n.r).replace(".", ",")}</span>
+                {fmt(n.precio)}
+              </div>
+            ))}
+          </div>
+          <div className="ar-plan">
+            ZONA {fmt(fibVenta.zona.bajo)} – {fmt(fibVenta.zona.alto)}
+            {fibVenta.plan
+              ? ` · entrada ${fmt(fibVenta.plan.entrada)} · SL ${fmt(fibVenta.plan.stop)} · TP1 ${fmt(fibVenta.plan.tp1)} · TP2 ${fmt(fibVenta.plan.tp2)} · TP3 ${fmt(fibVenta.plan.tp3)} · R:R ${fmt(fibVenta.plan.rr, 1)}`
+              : " · sin plan: el precio superó el origen de la caída (la pierna quedó invalidada)"}
+          </div>
+          <p>
+            Es el espejo de la zona de compra: si el precio rebota hasta acá, es donde un papel en caída suele frenarse. Para quien lo tiene, es la zona para tomar ganancias o reducir; el corto minorista en BYMA es limitado, así que no es una orden. En este papel el rebote llegó a la zona {hv!.probadas} {hv!.probadas === 1 ? "vez" : "veces"}: aguantó (volvió a caer al mínimo antes de superar el origen) {hv!.aguantaron}, falló {hv!.fallaron}
+            {hv!.abiertas ? `, ${hv!.abiertas} sin resolver` : ""}. {resueltasV ? `Aguantó ${tasa(hv!.aguantaron, resueltasV)} de ${resueltasV}` : "Sin casos resueltos"}
+            {resueltasV < 15 ? " · muestra mínima" : ""}. Si en una misma rueda pasan las dos cosas, cuenta como falla. No es una probabilidad.
+          </p>
+        </div>
+      )}
+      <div className="ar-box">
+        <h3>ZONAS DE COMPRA Y DE VENTA · CONFLUENCIA</h3>
+        {zonas.length ? (
+          <>
+            {zonas.map((z, k) => (
+              <div key={k} className="ar-plan">
+                <span className={z.side === "SOPORTE" ? "ar-up" : "ar-down"}>
+                  {estrellas(z.stars)} {z.side === "SOPORTE" ? "COMPRA" : "VENTA"}
+                </span>{" "}
+                {fmt(z.low)} – {fmt(z.high)} · {z.kinds.join(" + ")}
+                {z.kinds.length < 2 ? " (1 motivo)" : ""} · a {fmt(z.distancePct, 1)} % del precio
+              </div>
+            ))}
+            <p>Donde coinciden motivos distintos (estructura, máximos y mínimos previos, POC, números redondos, Fibonacci, huecos de valor) sube la chance de reacción; no garantiza un giro ni es una probabilidad. Una zona con un solo motivo es solo un nivel.</p>
+          </>
+        ) : (
+          <p>No hay suficientes ruedas para marcar zonas.</p>
         )}
       </div>
       <div className="ar-box">

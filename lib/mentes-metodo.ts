@@ -139,6 +139,9 @@ function fueraDeMetodo(id: MenteId, mente: string, motivo: string, noSabe: strin
   return { id, mente, familia: FAMILIA[id], clase: null, pasos: [], veredicto: "FUERA DE MI MÉTODO", porQue: motivo, plan: null, cambiaria: ["Nada de lo que cambie en el precio: el método necesita datos que este activo no tiene."], noSabe };
 }
 
+/** Si las cifras del balance se pueden comparar con el precio: están en dólares (lo de antes no decía la moneda). En pesos NIIF, no. */
+const comparableConPrecio = (x: EntradaMentes) => !x.fund?.moneda || x.fund.moneda === "USD";
+
 function sinBalances(id: MenteId, mente: string, x: EntradaMentes): Razonamiento {
   const motivo = x.sinFund ?? "sin balances para este papel";
   return { id, mente, familia: FAMILIA[id], clase: null, pasos: [], veredicto: "SIN DATOS", porQue: `No puedo ni empezar: ${motivo}.`, plan: null, cambiaria: ["Que haya balances anuales del papel."], noSabe: ["los balances de la empresa"] };
@@ -168,7 +171,7 @@ function buffett(x: EntradaMentes, tipo: TipoActivo): Razonamiento {
   const frena = calidad.some((p) => p.resultado === "FRENA");
   const noSe = calidad.filter((p) => p.resultado === "NO SE").length;
   const bpa = ult.bpa;
-  const objetivo = bpa !== null && bpa > 0 ? 25 * bpa : null;
+  const objetivo = comparableConPrecio(x) && bpa !== null && bpa > 0 ? 25 * bpa : null;
   let veredicto: Veredicto;
   let porQue: string;
   if (corta) {
@@ -221,10 +224,10 @@ function graham(x: EntradaMentes, tipo: TipoActivo): Razonamiento {
   const acciones = accionesImplicitas(x);
   const bpa = e.bpa;
   const vlpa = acciones !== null && e.patrimonio !== null && e.patrimonio > 0 ? e.patrimonio / acciones : null;
-  const valor = bpa !== null && bpa > 0 && vlpa !== null ? Math.sqrt(22.5 * bpa * vlpa) : null;
+  const valor = comparableConPrecio(x) && bpa !== null && bpa > 0 && vlpa !== null ? Math.sqrt(22.5 * bpa * vlpa) : null;
   const precio = x.precioUsd;
   const margen = valor !== null && precio !== null && valor > 0 ? 1 - precio / valor : null;
-  const ncav = acciones !== null && e.activoCorriente !== null && e.pasivo !== null ? (e.activoCorriente - e.pasivo) / acciones : null;
+  const ncav = comparableConPrecio(x) && acciones !== null && e.activoCorriente !== null && e.pasivo !== null ? (e.activoCorriente - e.pasivo) / acciones : null;
   const pasos: Paso[] = [
     paso("¿Ganó plata todos los años? (el defensivo no compra pérdidas)", m.siempreGano === null ? "faltan ejercicios" : m.siempreGano ? `sí, en los ${m.anios} ejercicios` : "hubo al menos un año con pérdida", m.siempreGano, true),
     paso("¿Es una empresa sólida (activo corriente ≥ 2 veces el pasivo corriente)?", m.liquidez === null ? "la empresa no reporta esas cuentas (bancos y aseguradoras)" : `${num(m.liquidez)} veces`, m.liquidez === null ? null : m.liquidez >= 2),
@@ -241,7 +244,7 @@ function graham(x: EntradaMentes, tipo: TipoActivo): Razonamiento {
     porQue = "Perdió plata algún año: el inversor defensivo no compra eso.";
   } else if (valor === null || precio === null || margen === null) {
     veredicto = "SIN DATOS";
-    porQue = "No puedo calcular el valor sin BPA positivo, patrimonio y el precio de la acción de afuera.";
+    porQue = comparableConPrecio(x) ? "No puedo calcular el valor sin BPA positivo, patrimonio y el precio de la acción de afuera." : `No calculo el valor contra el precio: ${m.perMotivo}.`;
   } else if (margen >= 1 / 3) {
     veredicto = "COMPRARÍA";
     porQue = `Paga ${usd(precio)} por algo que vale ${usd(valor)}: colchón de ${pct(margen)}. Ese colchón es el negocio.`;
@@ -287,7 +290,7 @@ function lynch(x: EntradaMentes, tipo: TipoActivo): Razonamiento {
   let veredicto: Veredicto;
   let porQue: string;
   let salida: string;
-  const entradaPeg = e.bpa !== null && e.bpa > 0 && m.cagrBpa !== null && m.cagrBpa > 0 ? e.bpa * m.cagrBpa * 100 : null;
+  const entradaPeg = comparableConPrecio(x) && e.bpa !== null && e.bpa > 0 && m.cagrBpa !== null && m.cagrBpa > 0 ? e.bpa * m.cagrBpa * 100 : null;
   if (clase === null) {
     veredicto = "SIN DATOS";
     porQue = "Sin tres ejercicios de BPA no puedo ni clasificarla, y sin clase no hay regla.";

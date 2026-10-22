@@ -7,8 +7,11 @@
  * argentino) antes de llegar al modelo. Lo que falta se dice: desconocido no es cero. No es asesoramiento financiero. Pura.
  */
 import type { Hoy } from "./hoy.ts";
-import type { LecturaPapelAr } from "./ar-lectura.ts";
+import type { AgenteEnPapel } from "./mercado-ar-agentes.ts";
 import { ACCIONES_AR, CEDEARS, PAPELES_AR, lecturaDiaria, type PapelAr } from "./mercado-ar.ts";
+import { zonaFib, zonaVentaFib, type AnalisisAr } from "./mercado-ar-tecnico.ts";
+import type { PizarraActivo } from "./pizarra-activos.ts";
+import type { SwingCandle } from "./swing-entries.ts";
 import { arNumber } from "./ai-numbers.ts";
 import type { Voz } from "./pizarra.ts";
 
@@ -95,37 +98,67 @@ const corto = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1).tri
 const voz = (v: Voz) => ({ quien: v.nombre, porQue: corto(v.motivo, 170), ...(v.muestra !== null ? { muestra: v.muestra } : {}) });
 const fecha = (t: number) => new Date(t).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "numeric" });
 
-/** Lo que la IA necesita de un papel: su pizarra con razones a favor y en contra, Fibonacci, agentes que disparan y su lectura diaria. */
-export function resumenPapel(l: LecturaPapelAr) {
-  const d = l.pizarra.deliberacion;
+export type TecnicoResumen = Pick<AnalisisAr, "fib" | "fibMotivo" | "fibVenta" | "zonas" | "niveles">;
+export type EntradaResumen = {
+  papel: PapelAr;
+  moneda: string | null;
+  velas: SwingCandle[];
+  agentes: AgenteEnPapel[];
+  tecnico: TecnicoResumen;
+  /** Null si todavía no se calculó la pizarra de este papel (la lectura rápida, sin el cierre del servidor). */
+  pizarra: PizarraActivo | null;
+};
+
+/**
+ * Lo que la IA necesita de un papel: su pizarra con razones a favor y en contra, las zonas de Fibonacci de compra y de venta,
+ * las zonas por confluencia, los niveles con estrellas, los agentes que disparan y su lectura diaria.
+ */
+export function resumenPapel(l: EntradaResumen) {
+  const d = l.pizarra?.deliberacion ?? null;
   const dia = lecturaDiaria(l.velas);
   const ultima = l.velas.at(-1);
+  const t = l.tecnico;
   return {
     ticker: l.papel.ticker,
     nombre: l.papel.nombre,
     tipo: l.papel.tipo,
-    moneda: l.serie.meta.moneda,
+    moneda: l.moneda,
     ultimaRueda: ultima ? fecha(ultima.openTime) : null,
     lecturaDiaria: dia
       ? { cierre: dia.cierre, var1: dia.var1, var5: dia.var5, var20: dia.var20, tendencia: dia.tendencia, rsi14: dia.rsi14, atrPct: dia.atrPct, desdeMaximo52s: dia.desdeMaximo, desdeMinimo52s: dia.desdeMinimo, volumenRelativo: dia.volumenRelativo, faltantes: dia.faltantes }
       : null,
-    fibonacci: l.fib
-      ? { estado: l.fib.estado, zonaDeCompra: l.fib.zona, plan: l.fib.plan, historialEnEstePapel: l.fib.historial }
-      : { estado: "SIN ZONA", motivo: l.fibMotivo },
-    pizarra: {
-      veredicto: d.veredicto,
-      razon: d.razon,
-      aFavor: d.aFavor.slice(0, 5).map(voz),
-      enContra: d.enContra.slice(0, 5).map(voz),
-      esperan: d.espera.length,
-      seAbstienen: d.abstienen.map((v) => ({ quien: v.nombre, falta: v.falta ? corto(v.falta, 110) : null })).slice(0, 4),
-      plan: d.plan,
-      paraQueCambie: d.destraba.slice(0, 3),
-      decision: d.huella,
-    },
+    fibonacci: t.fib ? { estado: t.fib.estado, zonaDeCompra: t.fib.zona, plan: t.fib.plan, historialEnEstePapel: t.fib.historial } : { estado: "SIN ZONA DE COMPRA", motivo: t.fibMotivo },
+    fibonacciVenta: t.fibVenta
+      ? { estado: t.fibVenta.estado, zonaDeVenta: t.fibVenta.zona, objetivosHaciaAbajo: t.fibVenta.extensiones, plan: t.fibVenta.plan, historialEnEstePapel: t.fibVenta.historial, nota: "para quien tiene el papel es la zona donde tomar ganancias o reducir; el corto minorista en BYMA es limitado" }
+      : null,
+    zonasPorConfluencia: t.zonas.map((z) => ({ lado: z.side === "SOPORTE" ? "compra" : "venta", estrellas: z.stars, desde: z.low, hasta: z.high, motivos: z.kinds, distanciaPct: z.distancePct })),
+    niveles: t.niveles.slice(0, 8).map((n) => ({ precio: n.price, tipo: n.kind === "SOPORTE" ? "soporte" : "resistencia", estrellas: n.stars, distanciaPct: n.distancePct })),
+    pizarra: d
+      ? {
+          veredicto: d.veredicto,
+          razon: d.razon,
+          aFavor: d.aFavor.slice(0, 5).map(voz),
+          enContra: d.enContra.slice(0, 5).map(voz),
+          esperan: d.espera.length,
+          seAbstienen: d.abstienen.map((v) => ({ quien: v.nombre, falta: v.falta ? corto(v.falta, 110) : null })).slice(0, 4),
+          plan: d.plan,
+          paraQueCambie: d.destraba.slice(0, 3),
+          decision: d.huella,
+        }
+      : null,
+    pizarraNota: d ? null : "la pizarra de este papel todavía no se calculó (se arma una vez por rueda, después del cierre); lo de arriba es la lectura rápida de las ruedas",
     agentesQueDisparanHoy: l.agentes.filter((a) => a.senalHoy).map((a) => ({ agente: a.agente, entrada: a.senalHoy!.referencia, stop: a.senalHoy!.escalera.stop, tp1: a.senalHoy!.escalera.tp1, tp2: a.senalHoy!.escalera.tp2, tp3: a.senalHoy!.escalera.tp3 })),
-    avisoDeDatos: "velas diarias de Yahoo Finance con demora; sin footprint; sin balances de empresas argentinas",
+    avisoDeDatos: "velas diarias de Yahoo Finance con demora; sin footprint; balances solo si la empresa presenta ante la SEC",
   };
+}
+
+/** Lo que se guarda por papel: el resumen y de cuándo es. */
+export type PapelGuardado = ReturnType<typeof resumenPapel> & { lecturaDel?: string };
+
+/** La lectura rápida de un papel, sin la pizarra: solo lo barato (ruedas, Fibonacci de compra y de venta). Para antes de que el servidor lo calcule. */
+export function resumenRapido(papel: PapelAr, velas: SwingCandle[], moneda: string | null) {
+  const z = zonaFib(velas);
+  return resumenPapel({ papel, moneda, velas, agentes: [], tecnico: { fib: z.fib, fibMotivo: z.motivo, fibVenta: zonaVentaFib(velas), zonas: [], niveles: [] }, pizarra: null });
 }
 
 export type PapelParaIa = ReturnType<typeof resumenPapel> | { ticker: string; nombre: string; noSePudoLeer: string };
@@ -178,11 +211,19 @@ export function textoDePapel(p: PapelParaIa): string {
   if (z) {
     const pl = "plan" in f ? f.plan : null;
     const plan = pl ? ` Plan si se compra en la zona: entrada ${n(pl.entrada)}, SL ${n(pl.stop)}, TP1 ${n(pl.tp1)}, TP2 ${n(pl.tp2)}, TP3 ${n(pl.tp3)}.` : "";
-    partes.push(`Fibonacci: ${f.estado}. Zona de compra ${n(z.bajo)} a ${n(z.alto)}.${plan}`);
+    partes.push(`Zona de compra de Fibonacci: ${f.estado}, de ${n(z.bajo)} a ${n(z.alto)}.${plan}`);
+  } else if (p.fibonacciVenta) {
+    const v = p.fibonacciVenta;
+    const pl = v.plan ? ` Plan de venta en la zona: entrada ${n(v.plan.entrada)}, SL ${n(v.plan.stop)}, TP1 ${n(v.plan.tp1)}, TP2 ${n(v.plan.tp2)}, TP3 ${n(v.plan.tp3)}.` : "";
+    partes.push(`Sin zona de compra (la última pierna es bajista). Zona de venta de Fibonacci: ${v.estado}, de ${n(v.zonaDeVenta.bajo)} a ${n(v.zonaDeVenta.alto)}.${pl}`);
   } else partes.push(`Fibonacci: sin zona de compra${"motivo" in f && f.motivo ? ` (${f.motivo})` : ""}.`);
-  partes.push(`Pizarra: ${p.pizarra.veredicto}. ${p.pizarra.razon}`);
-  if (p.pizarra.aFavor.length) partes.push(`A favor: ${p.pizarra.aFavor.map((v) => v.quien).join(", ")}.`);
-  if (p.pizarra.enContra.length) partes.push(`En contra: ${p.pizarra.enContra.map((v) => v.quien).join(", ")}.`);
+  const conf = p.zonasPorConfluencia.filter((x) => x.motivos.length >= 2);
+  if (conf.length) partes.push(`Zonas por confluencia: ${conf.map((x) => `${x.lado} ${n(x.desde)} a ${n(x.hasta)} (${"★".repeat(x.estrellas)}, ${x.motivos.join(" + ")})`).join("; ")}.`);
+  if (p.pizarra) {
+    partes.push(`Pizarra: ${p.pizarra.veredicto}. ${p.pizarra.razon}`);
+    if (p.pizarra.aFavor.length) partes.push(`A favor: ${p.pizarra.aFavor.map((v) => v.quien).join(", ")}.`);
+    if (p.pizarra.enContra.length) partes.push(`En contra: ${p.pizarra.enContra.map((v) => v.quien).join(", ")}.`);
+  } else if (p.pizarraNota) partes.push(`Pizarra: ${p.pizarraNota}.`);
   partes.push("Es lectura en papel con velas diarias, no es asesoramiento financiero.");
   return partes.join(" ");
 }

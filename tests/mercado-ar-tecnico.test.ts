@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { SwingCandle } from "../lib/swing-entries.ts";
-import { analisisAr, estructura, historialFib, semanales, zonaFib } from "../lib/mercado-ar-tecnico.ts";
+import { analisisAr, estructura, historialFib, semanales, zonaFib, zonasConfluencia, zonaVentaFib } from "../lib/mercado-ar-tecnico.ts";
+import type { Level } from "../lib/level-engine.ts";
 
 const DIA = 86_400_000;
 const T0 = Date.UTC(2025, 0, 6); // un lunes
@@ -97,4 +98,57 @@ test("no mira el futuro: el análisis de un día no cambia con las ruedas que vi
   const a = analisisAr(v);
   assert.ok(a.niveles.length > 0, "con 420 ruedas hay niveles");
   assert.ok(a.niveles.every((n) => n.stars >= 1 && n.stars <= 3));
+});
+
+const serieBajista = (rebote: number) => [...Array(40).fill(0).map((_, k) => 170 + k * 0.75), ...Array(25).fill(0).map((_, k) => 199.25 - (k + 1) * 4), ...Array(12).fill(0).map((_, k) => 99.25 + (k + 1) * rebote)];
+
+test("zona de venta: el espejo de la compra, con la escalera ordenada hacia abajo", () => {
+  const v = desdeCierres(serieBajista(5.5));
+  assert.equal(zonaFib(v).fib, null, "no hay zona de compra con la última pierna bajista");
+  const z = zonaVentaFib(v);
+  assert.ok(z);
+  assert.equal(z.pierna.lado, "SHORT");
+  const rango = z.pierna.origen - z.pierna.extremo;
+  assert.ok(Math.abs(z.zona.bajo - (z.pierna.extremo + 0.618 * rango)) < 1e-9);
+  assert.ok(Math.abs(z.zona.alto - (z.pierna.extremo + 0.786 * rango)) < 1e-9);
+  assert.equal(z.estado, "EN LA ZONA");
+  const p = z.plan!;
+  assert.ok(p.stop > z.pierna.origen && p.stop > p.entrada && p.entrada > p.tp1 && p.tp1 > p.tp2 && p.tp2 > p.tp3, "SL arriba y TP1 > TP2 > TP3 hacia abajo");
+  assert.ok(Math.abs(p.tp3 - (z.pierna.origen - 1.618 * rango)) < 1e-9);
+  // Si todavía no rebotó hasta la zona, está debajo; y con una pierna alcista no hay zona de venta.
+  assert.equal(zonaVentaFib(desdeCierres(serieBajista(1.5)))!.estado, "DEBAJO DE LA ZONA");
+  assert.equal(zonaVentaFib(desdeCierres([...Array(40).fill(0).map((_, k) => 130 - k * 0.75), ...Array(25).fill(0).map((_, k) => 100.75 + (k + 1) * 4)])), null);
+});
+
+test("historial de la zona de venta: aguantó (volvió a caer al mínimo), falló (superó el origen) y no probada", () => {
+  const base: SwingCandle = { openTime: 0, open: 150, high: 151, low: 149, close: 150, volume: 1, quoteVolume: 1 };
+  const mk = (rows: [number, number][]) => rows.map(([lo, hi], k) => ({ ...base, openTime: k * DIA, low: lo, high: hi }));
+  const pierna = { lado: "SHORT" as const, origen: 200, extremo: 100, i: 0, conocida: 0 };
+  // Zona baja = 100 + 0,618 × 100 = 161,8: el rebote la toca y después vuelve al mínimo.
+  assert.deepEqual(historialFib(mk([[150, 155], [150, 165], [99, 150]]), [pierna], 80, "SHORT"), { probadas: 1, aguantaron: 1, fallaron: 0, abiertas: 0 });
+  assert.deepEqual(historialFib(mk([[150, 155], [150, 165], [160, 201]]), [pierna], 80, "SHORT"), { probadas: 1, aguantaron: 0, fallaron: 1, abiertas: 0 });
+  // Sigue cayendo sin rebotar: no se probó. Y una pierna alcista no cuenta en el historial de venta.
+  assert.deepEqual(historialFib(mk([[150, 155], [90, 150]]), [pierna], 80, "SHORT"), { probadas: 0, aguantaron: 0, fallaron: 0, abiertas: 0 });
+  assert.equal(historialFib(mk([[150, 165]]), [{ ...pierna, lado: "LONG" as const, origen: 100, extremo: 200 }], 80, "SHORT").probadas, 0);
+});
+
+test("zonas por confluencia: motivos distintos juntos hacen zona; los niveles de Fibonacci cuentan como un solo motivo", () => {
+  const lvl = (price: number, kinds: string[]): Level => ({ price, low: price, high: price, kind: price < 100 ? "SOPORTE" : "RESISTENCIA", score: 4, stars: 2, distancePct: Math.abs(price - 100), sources: kinds.map((k) => ({ kind: k, label: k, price, weight: 2 })) });
+  // Compra en 90: estructura + POC → dos motivos. Venta en 110: Fibonacci 0,618 y 0,786 juntos → un solo motivo.
+  const z = zonasConfluencia(100, 1, [lvl(90, ["S/R 1d", "POC"]), lvl(110, ["FIB 0.618", "FIB 0.786"])], [], null, null);
+  const compra = z.find((x) => x.side === "SOPORTE")!;
+  const venta = z.find((x) => x.side === "RESISTENCIA")!;
+  assert.deepEqual([...compra.kinds].sort(), ["ESTRUCTURA", "POC"]);
+  assert.equal(venta.kinds.length, 1);
+  assert.equal(venta.stars, 1, "un solo motivo: una estrella, no confluencia");
+  assert.deepEqual(zonasConfluencia(0, 1, [], [], null, null), []);
+});
+
+test("el análisis trae la zona de venta y zonas ordenadas de mayor a menor precio", () => {
+  const a = analisisAr(desdeCierres(serieBajista(5.5)));
+  assert.equal(a.fib, null);
+  assert.ok(a.fibVenta);
+  const precios = a.zonas.map((z) => z.mid);
+  assert.deepEqual([...precios].sort((x, y) => y - x), precios);
+  for (const z of a.zonas) assert.ok(z.low <= z.high);
 });

@@ -5,10 +5,11 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { armarTodo, papelesDeLaConversacion, papelesPedidos, resumenHoy, resumenPapel, respuestaSinIa, textoDePapel } from "../lib/jarvis-todo.ts";
+import { armarTodo, papelesDeLaConversacion, papelesPedidos, resumenHoy, resumenPapel, resumenRapido, respuestaSinIa, textoDePapel } from "../lib/jarvis-todo.ts";
 import type { LecturaPapelAr } from "../lib/ar-lectura.ts";
 import { estudiarPapel } from "../lib/mercado-ar-agentes.ts";
-import { zonaFib } from "../lib/mercado-ar-tecnico.ts";
+import { analisisAr } from "../lib/mercado-ar-tecnico.ts";
+import { paraResumen } from "../lib/ar-lectura.ts";
 import { PAPELES_AR, papelPorTicker, type SerieAr } from "../lib/mercado-ar.ts";
 import { entradaMentesAr, pizarraAr } from "../lib/pizarra-activos.ts";
 import type { SwingCandle } from "../lib/swing-entries.ts";
@@ -64,24 +65,24 @@ function lectura(): LecturaPapelAr {
   const v = velas(300);
   const serie = { meta: { simbolo: papel.yahoo, moneda: "ARS", bolsa: "BUE", demoraMin: 20, precio: null, horaPrecio: null }, velas: v } as unknown as SerieAr;
   const agentes = estudiarPapel(papel.ticker, v);
-  const z = zonaFib(v);
+  const analisis = analisisAr(v);
   const mentes = entradaMentesAr({ papel, velasPapel: v, monedaPapel: "ARS", velasAfuera: null, monedaAfuera: null, fund: null, fundError: null, fuerzaRelativa: null, mercadoAlcista: null, volMediana: null });
-  const pizarra = pizarraAr({ ticker: papel.ticker, nombre: papel.nombre, velas: v, fib: z.fib, fibMotivo: z.motivo, agentes, mentes });
-  return { papel, serie, velas: v, agentes, fib: z.fib, fibMotivo: z.motivo, pizarra };
+  const pizarra = pizarraAr({ ticker: papel.ticker, nombre: papel.nombre, velas: v, fib: analisis.fib, fibMotivo: analisis.fibMotivo, agentes, mentes });
+  return { papel, serie, velas: v, agentes, analisis, pizarra };
 }
 
 test("el resumen del papel trae pizarra, Fibonacci, lectura diaria y lo que falta", () => {
-  const r = resumenPapel(lectura());
+  const r = resumenPapel(paraResumen(lectura()));
   assert.equal(r.ticker, "YPFD");
-  assert.ok(r.pizarra.veredicto.length > 0);
-  assert.ok(r.pizarra.razon.length > 0);
+  assert.ok(r.pizarra!.veredicto.length > 0);
+  assert.ok(r.pizarra!.razon.length > 0);
   assert.ok(r.lecturaDiaria && r.lecturaDiaria.cierre > 0);
   assert.ok(r.avisoDeDatos.includes("sin footprint"));
-  assert.ok(r.pizarra.aFavor.length <= 5 && r.pizarra.enContra.length <= 5);
+  assert.ok(r.pizarra!.aFavor.length <= 5 && r.pizarra!.enContra.length <= 5);
 });
 
 test("sin IA, la respuesta sale de las reglas, con números argentinos y sin asesoramiento", () => {
-  const t = textoDePapel(resumenPapel(lectura()));
+  const t = textoDePapel(resumenPapel(paraResumen(lectura())));
   assert.match(t, /YPF \(YPFD\)/);
   assert.match(t, /Pizarra: /);
   assert.match(t, /no es asesoramiento financiero/);
@@ -95,7 +96,7 @@ test("el todo trae la cobertura y la lista de BYMA, y dice si HOY no se pudo lee
   assert.ok(sin.cobertura.includes("menos de 15 cierres es muestra mínima"));
   assert.equal(sin.papelesDeBymaQueCubro.acciones.length + sin.papelesDeBymaQueCubro.cedears.length, PAPELES_AR.length);
   assert.equal(respuestaSinIa(sin), null);
-  const con = armarTodo({ hoy: null, papeles: [resumenPapel(lectura())] });
+  const con = armarTodo({ hoy: null, papeles: [resumenPapel(paraResumen(lectura()))] });
   assert.ok(respuestaSinIa(con)?.includes("YPFD"));
 });
 
@@ -119,4 +120,28 @@ test("el resumen de HOY marca lo viejo y deja afuera los planes viejos", () => {
   assert.deepEqual(r.papelesEnZonaDeCompraFibonacci, ["GGAL"]);
   assert.equal(r.avisosDeLas24h[0], "GGAL entró & zona");
   assert.ok(r.noSePudoLeer.includes("el registro unificado"));
+});
+
+test("la lectura rápida (antes del cierre del servidor) no trae pizarra y lo dice", () => {
+  const l = lectura();
+  const r = resumenRapido(l.papel, l.velas, "ARS");
+  assert.equal(r.pizarra, null);
+  assert.match(r.pizarraNota ?? "", /todavía no se calculó/);
+  assert.ok(r.lecturaDiaria);
+  const t = textoDePapel(r);
+  assert.match(t, /Pizarra: la pizarra de este papel todavía no se calculó/);
+  assert.doesNotMatch(t, /undefined|NaN/);
+});
+
+test("con la última pierna bajista el resumen trae la zona de venta y el texto la nombra", () => {
+  // Suba, caída fuerte y un rebote que llega a la zona 0,618–0,786.
+  const c = [...Array(40).fill(0).map((_, k) => 170 + k * 0.75), ...Array(25).fill(0).map((_, k) => 199.25 - (k + 1) * 4), ...Array(12).fill(0).map((_, k) => 99.25 + (k + 1) * 5.5)];
+  const v: SwingCandle[] = c.map((x, k) => ({ openTime: Date.UTC(2025, 0, 1) + k * 86_400_000, open: x, high: x * 1.004, low: x * 0.996, close: x, volume: 1000, quoteVolume: 1000 * x }));
+  const papel = papelPorTicker("EDN")!;
+  const analisis = analisisAr(v);
+  const r = resumenPapel({ papel, moneda: "ARS", velas: v, agentes: [], tecnico: analisis, pizarra: null });
+  assert.equal(r.fibonacci.estado, "SIN ZONA DE COMPRA");
+  assert.ok(r.fibonacciVenta);
+  assert.equal(r.fibonacciVenta!.estado, "EN LA ZONA");
+  assert.match(textoDePapel(r), /Zona de venta de Fibonacci: EN LA ZONA/);
 });

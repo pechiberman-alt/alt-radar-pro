@@ -11,7 +11,7 @@ import type { Deliberacion } from "./pizarra.ts";
 import type { Razonamiento } from "./mentes-metodo.ts";
 import { consenso, leerMentes, percentiles, rendimiento, sma, volatilidadAnual, type Consenso, type LecturaMente } from "./mentes-inversoras.ts";
 import { estudiarPapel, type AgenteEnPapel } from "./mercado-ar-agentes.ts";
-import { EMPRESAS_SEC, SIN_BALANCE, type Fundamentales } from "./fundamentales-sec.ts";
+import { empresaSec, motivoSinBalance, type Fundamentales } from "./fundamentales-sec.ts";
 import { expandir, MAX_LOTE, type ItemLote } from "./mercado-ar-lote.ts";
 import { zonaFib, type ZonaFibAr } from "./mercado-ar-tecnico.ts";
 
@@ -77,8 +77,8 @@ let colaFund: Promise<unknown> = Promise.resolve();
 export function cargarFund(ticker: string): Promise<FundCargado> {
   const ya = balances.get(ticker);
   if (ya) return ya;
-  if (!EMPRESAS_SEC[ticker]) {
-    const p = Promise.resolve({ fund: null, viejo: false, error: SIN_BALANCE[ticker] ?? "sin balances para este papel" });
+  if (!empresaSec(ticker)) {
+    const p = Promise.resolve({ fund: null, viejo: false, error: motivoSinBalance(ticker) });
     balances.set(ticker, p);
     return p;
   }
@@ -151,7 +151,7 @@ export async function leerPapel(papel: PapelAr, u?: Universo): Promise<LecturaPa
   const [serie, subyacente, fund] = await Promise.all([
     cargarSerie(papel.yahoo),
     papel.subyacente ? cargarSerie(papel.subyacente) : Promise.resolve(null),
-    papel.tipo === "CEDEAR" ? cargarFund(papel.ticker) : Promise.resolve(null),
+    cargarFund(papel.ticker),
   ]);
   const uni = u ?? (await universoCargado());
   const tickers = [...uni.rend6m.keys()].filter((t) => PAPELES_AR.find((p) => p.ticker === t)?.tipo === papel.tipo);
