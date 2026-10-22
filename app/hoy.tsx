@@ -106,6 +106,7 @@ export default function HoyPanel() {
                 ))}
               </ul>
             )}
+            {hoy.planesCripto.length > 0 && <p className="hoy-vacio">La pizarra de cripto se probó con 2021–2026: pierde menos que los agentes sueltos, pero no demostró ventaja. Sus planes se miden en papel; no son una recomendación.</p>}
           </article>
 
           <article className="hoy-tarjeta">
