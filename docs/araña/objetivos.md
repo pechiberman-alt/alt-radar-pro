@@ -357,7 +357,7 @@ Pendiente:
 
 ## terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato
 Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
-Archivos: lib/contexto-comun.ts, docs/terminal-unificada.md, lib/pizarra.ts, lib/pizarra-activos.ts, app/pizarra-cripto.tsx, tests/pizarra.test.ts, tests/pizarra-activos.test.ts, lib/pizarra-servidor.ts, lib/pizarra-servidor-db.ts, lib/pizarra-servidor-run.ts, tests/pizarra-servidor.test.ts, docs/estudio-pizarra.md
+Archivos: lib/contexto-comun.ts, docs/terminal-unificada.md, lib/pizarra.ts, lib/pizarra-activos.ts, app/pizarra-cripto.tsx, tests/pizarra.test.ts, tests/pizarra-activos.test.ts, lib/pizarra-servidor.ts, lib/pizarra-servidor-db.ts, lib/pizarra-servidor-run.ts, tests/pizarra-servidor.test.ts, docs/estudio-pizarra.md, docs/estudio-agentes.md
 Reglas:
 - Un dato que falta es DATA UNAVAILABLE, uno viejo STALE DATA y uno con muestra corta o incoherente INSUFFICIENT DATA, siempre con el motivo. Nunca cero ni un valor supuesto.
 - Spot y Futures no se mezclan: si las fuentes no declaran el mismo mercado, el contexto queda sin mercado y lo avisa. El footprint de operaciones de futuros solo se dibuja sobre velas de futuros.

@@ -218,7 +218,7 @@ e4fbc338f605	360	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-73d4c1b7fa9d	395	docs/araña/objetivos.md
+e095777139a1	395	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -226,6 +226,7 @@ fc6042bacccc	116	docs/busqueda-fibonacci.md
 8d04963b24d7	78	docs/busqueda-flujo.md
 25e7d2744ee2	187	docs/busqueda-linea.md
 5656d4c4c99f	215	docs/busqueda-smc.md
+5ffcf9ce0db4	55	docs/estudio-agentes.md
 1d364b489717	51	docs/estudio-axi.md
 615d9e91548e	120	docs/estudio-estrategias.md
 2a58fa50dd34	61	docs/estudio-pizarra.md
@@ -533,6 +534,7 @@ d13ecf4702a3	63	scripts/claude-hooks.mjs
 b36fd1c34b30	183	scripts/herramientas.mjs
 4347662f5847	175	scripts/ia-editor.mjs
 33685c4edfb7	74	scripts/investigacion/README.md
+c65457461237	80	scripts/investigacion/agentes-estudio.ts
 c5f9020cfd4a	176	scripts/investigacion/amd-estudio.ts
 8c4c7a95adb2	250	scripts/investigacion/aprendizaje.ts
 bc4d23a74d94	123	scripts/investigacion/axi-estudio.ts
