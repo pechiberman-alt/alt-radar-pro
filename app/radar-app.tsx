@@ -54,6 +54,7 @@ import Tutorial from "./tutorial";
 import AiTradingLab from "./ai-trading-lab";
 import SettingsDesk from "./settings-desk";
 import SwingDesk from "./swing-desk";
+import HoyPanel from "./hoy";
 import { Collapsible, WelcomeHint, WorkspaceBar, useWorkspace, isVisibleSection, useAdvanced } from "./workspace";
 import type { AssistantContext } from "@/lib/assistant/index";
 import type { PumpReading } from "@/lib/pump-radar";
@@ -82,6 +83,7 @@ const STABLE_BASES = new Set([
 ]);
 
 const NAV_ITEMS = [
+  { label: "HOY", mobile: "HOY", icon: "☀", id: "hoy" },
   { label: "RESUMEN", mobile: "INICIO", icon: "⌂", id: "resumen" },
   { label: "JARVIS TRADING", mobile: "TRADING", icon: "◬", id: "jarvis-trading" },
   { label: "ESCÁNER", mobile: "SCAN", icon: "⌕", id: "scanner" },
@@ -539,7 +541,7 @@ export default function RadarApp() {
   const [data, setData] = useState<RadarPayload | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("RESUMEN");
+  const [tab, setTab] = useState("HOY");
   const [selected, setSelected] = useState<ScoredAsset | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
@@ -989,6 +991,10 @@ export default function RadarApp() {
             <a href="#inteligencia-global">VER PANEL DE NOTICIAS →</a>
           </div>
         )}
+
+        <Collapsible id="hoy" label="HOY" open={workspace.open["hoy"]} onToggle={workspace.toggle}>
+          <HoyPanel />
+        </Collapsible>
 
         <Collapsible id="resumen" label="RESUMEN" open={workspace.open["resumen"]} onToggle={workspace.toggle}>
         <section className="hero-grid" id="resumen">

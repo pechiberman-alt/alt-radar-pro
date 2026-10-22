@@ -212,6 +212,31 @@ export type EntradaRegistro = {
   desde?: number | null;
 };
 
+/**
+ * El semáforo de evidencia de una fuente: si sus resultados ya dicen algo. Con menos de MUESTRA_MINIMA cierres, MUESTRA
+ * MÍNIMA. Con más, se mira la expectancia contra su error (t = promedio de R ÷ (desvío ÷ √n)): t ≥ 2 → POSITIVA, t ≤ −2 →
+ * NEGATIVA, en el medio SIN VENTAJA CLARA (puede ser suerte para cualquier lado). Es aproximado: supone cierres
+ * independientes. Sin la serie de cierres no se puede calcular el desvío y se dice (SIN SERIE). No es una probabilidad.
+ */
+export type NivelEvidencia = "SIN DATOS" | "MUESTRA MÍNIMA" | "SIN SERIE" | "SIN VENTAJA CLARA" | "POSITIVA" | "NEGATIVA";
+export type Evidencia = { nivel: NivelEvidencia; n: number; t: number | null; texto: string };
+
+export function evidenciaDe(cerradas: number, cierres: Cierre[] | null | undefined): Evidencia {
+  if (cerradas === 0) return { nivel: "SIN DATOS", n: 0, t: null, texto: "Todavía no cerró ninguna operación." };
+  if (cerradas < MUESTRA_MINIMA) return { nivel: "MUESTRA MÍNIMA", n: cerradas, t: null, texto: `${cerradas} ${cerradas === 1 ? "cierre" : "cierres"}: faltan ${MUESTRA_MINIMA - cerradas} para que los números digan algo.` };
+  const rs = (cierres ?? []).map((c) => c.r).filter((r) => Number.isFinite(r));
+  if (rs.length < MUESTRA_MINIMA) return { nivel: "SIN SERIE", n: cerradas, t: null, texto: "Hay cierres, pero no la serie para medir su dispersión." };
+  const n = rs.length;
+  const m = rs.reduce((s, r) => s + r, 0) / n;
+  const de = Math.sqrt(rs.reduce((s, r) => s + (r - m) ** 2, 0) / (n - 1));
+  const t = de > 0 ? m / (de / Math.sqrt(n)) : m > 0 ? Infinity : m < 0 ? -Infinity : 0;
+  const tt = Number.isFinite(t) ? Math.round(t * 100) / 100 : t;
+  const prom = `${m > 0 ? "+" : ""}${m.toFixed(2).replace(".", ",")} R por operación en ${n}`;
+  if (t >= 2) return { nivel: "POSITIVA", n, t: tt, texto: `${prom}: la ventaja es mayor que el ruido (t ${String(tt).replace(".", ",")}). Igual es pasado.` };
+  if (t <= -2) return { nivel: "NEGATIVA", n, t: tt, texto: `${prom}: pierde más de lo que explica el azar (t ${String(tt).replace(".", ",")}).` };
+  return { nivel: "SIN VENTAJA CLARA", n, t: tt, texto: `${prom}: con esta dispersión puede ser suerte, para bien o para mal (t ${String(tt).replace(".", ",")}).` };
+}
+
 export type FuenteRegistro = Estadistica & {
   id: FuenteId;
   nombre: string;
@@ -221,6 +246,8 @@ export type FuenteRegistro = Estadistica & {
   incompleta: boolean;
   /** El capital simulado del bot; null si la fuente no se pudo leer. */
   capital: Capital | null;
+  /** El semáforo: si sus resultados ya dicen algo. */
+  evidencia: Evidencia;
 };
 
 export type Registro = {
@@ -240,6 +267,7 @@ export function armarRegistro(entradas: EntradaRegistro[], generado: number): Re
     disponible: e.conteo !== null,
     incompleta: Boolean(e.incompleta),
     capital: e.conteo === null ? null : simularCapital(e.conteo, e.cierres ?? null, e.desde ?? null),
+    evidencia: e.conteo === null ? { nivel: "SIN DATOS", n: 0, t: null, texto: "No se pudo leer." } : evidenciaDe(e.conteo.cerradas, e.cierres),
   }));
   const sumables = entradas.filter((e) => e.conteo !== null && FUENTES[e.id].enTotal).map((e) => e.conteo as Conteo);
   return { generado, fuentes, total: estadistica(sumarConteos(sumables)) };
@@ -270,5 +298,6 @@ export function lineaFuente(f: FuenteRegistro): string {
   const exp = f.expectancia !== null ? `expectancia ${signo(f.expectancia)} R` : "expectancia sin dato";
   const muestra = f.muestra === "MINIMA" ? " · muestra mínima" : "";
   const inc = f.incompleta ? " · lectura incompleta" : "";
-  return `${f.nombre}: ${f.cerradas} cerradas · acierto ${porcentaje(f.winRate)}${iv} · ${pf} · ${exp} · ${lineaCapital(f.capital)}${muestra}${inc}`;
+  const ev = f.evidencia && f.evidencia.nivel !== "MUESTRA MÍNIMA" ? ` · evidencia: ${f.evidencia.nivel.toLowerCase()}` : "";
+  return `${f.nombre}: ${f.cerradas} cerradas · acierto ${porcentaje(f.winRate)}${iv} · ${pf} · ${exp} · ${lineaCapital(f.capital)}${muestra}${ev}${inc}`;
 }

@@ -268,6 +268,7 @@ Reglas:
 Texto: el único lugar donde la app calcula el acierto, el profit factor y la expectancia. Cada fuente (JARVIS, el bot de papel, el robot) con su muestra y su intervalo; lo que no se pudo leer dice «sin datos», no cero.
 Archivos: lib/registro.ts, lib/registro-db.ts, lib/registro-run.ts, app/api/registro/**, lib/flujo.ts, lib/flujo-db.ts, lib/flujo-run.ts, lib/agente-st.ts, lib/agente-st-db.ts, lib/agente-st-run.ts, tests/registro.test.ts, tests/flujo.test.ts, tests/agente-st.test.ts
 Reglas:
+- Semáforo de evidencia (evidenciaDe en lib/registro.ts): SIN DATOS, MUESTRA MÍNIMA (menos de 15), SIN SERIE (no hay cierres para medir la dispersión), y con muestra la expectancia contra su error: t ≥ 2 POSITIVA, t ≤ −2 NEGATIVA, si no SIN VENTAJA CLARA. Aproximado (supone cierres independientes) y no es una probabilidad; va en cada fuente y en HOY.
 - Un resultado cuenta una sola vez: R mayor que 0 gana, menor que 0 pierde, igual a 0 empata. Las abiertas no entran al acierto. Una cerrada sin resultado conocido no cuenta ni como acierto ni como cero.
 - Todo porcentaje va con su muestra y su intervalo de Wilson al 90 %; menos de 15 cerradas se marca «muestra mínima». El profit factor no se divide por cero: sin pérdidas dice «sin pérdidas».
 - Nada fuera de este registro calcula aciertos. La araña y la app muestran estos números tal cual; el diario del bot es una copia del papel y no se cuenta dos veces. Las señales del radar (signal_records) no entran hasta definir qué es un acierto para un plan sin R.
@@ -382,8 +383,9 @@ Reglas:
 
 ## app-movil — Interfaz, PWA y celular primero
 Texto: la app que se ve y se usa, pensada primero para el celular (mobile first) y después tablet y escritorio.
-Archivos: app/*.tsx, app/*.css, app/*.ts, public/**, lib/account-events*.ts, lib/visible-interval*.ts, lib/tutorial.ts
+Archivos: app/*.tsx, app/*.css, app/*.ts, public/**, lib/account-events*.ts, lib/visible-interval*.ts, lib/tutorial.ts, lib/hoy.ts, lib/hoy-db.ts, app/api/hoy/**, tests/hoy.test.ts
 Reglas:
+- Pantalla HOY (lib/hoy.ts, lib/hoy-db.ts, /api/hoy, app/hoy.tsx): la primera sección. Planes de la pizarra (BYMA y cripto), papeles en zona de compra de Fibonacci, avisos de 24 h, señales abiertas del núcleo y el semáforo de evidencia del registro. Lee lo que el servidor ya guardó: una lectura al abrir, igual para todos y guardada 5 minutos (caché compartida); sin intervalos. Lo viejo se marca y lo que no se pudo leer se dice. Botones de 44 px o más; una columna en el celular, dos o tres en la notebook.
 - Tutorial de toda la plataforma (lib/tutorial.ts, app/tutorial.tsx): por capítulos, cada paso con un botón que lleva a esa sección (tests/tutorial.test.ts chequea que existan). Se abre solo la primera vez y con ?tutorial=1 (el QR impreso); después, con TUTORIAL en la barra de paneles. Si se agrega o renombra una sección, revisar sus pasos.
 - Celular > tablet > escritorio. Nada sale de la pantalla ni hay scroll horizontal; margen lateral de 16 px.
 - Todo texto visible va en español rioplatense (vos, «comprá», decimales con coma).
