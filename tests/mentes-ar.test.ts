@@ -96,7 +96,7 @@ test("metricas: PER, ROE, crecimiento y número de Graham con las acciones impl�
   // Valor libro por acción = 160 / (44 / 4,4) = 16 → P/VL 2,75 → 10 × 2,75 = 27,5.
   assert.ok(Math.abs((m.perPorPvl ?? 0) - 27.5) < 1e-9);
   assert.equal(metricas("BRKB", SOLIDA, 44).per, null, "Berkshire publica el BPA de la clase A");
-  assert.equal(metricas("AAPL", SOLIDA, null).perMotivo, "sin precio en dólares de la acción de afuera");
+  assert.equal(metricas("AAPL", SOLIDA, null).perMotivo, "sin un precio en dólares que se pueda comparar con el balance");
 });
 
 test("mentes de valor: Buffett a favor con una empresa sólida; sin balances dicen SIN DATOS", () => {

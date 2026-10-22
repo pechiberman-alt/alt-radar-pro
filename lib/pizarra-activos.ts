@@ -26,7 +26,7 @@ export type PizarraActivo = { razon: Razonamiento[]; deliberacion: Deliberacion 
 
 // ── Acciones y CEDEARs de BYMA ──
 
-export const SIN_BALANCES_AR = "no hay una fuente gratis de balances de empresas argentinas en formato de datos (la CNV publica PDF)";
+export const SIN_BALANCES_AR = "la empresa no presenta balances ante la SEC y en Argentina la CNV los publica en PDF, sin datos abiertos";
 
 /**
  * La entrada de las mentes para un papel de BYMA, igual en el navegador y en el servidor: los CEDEARs se leen técnicamente
@@ -51,7 +51,7 @@ export function entradaMentesAr(x: {
     moneda: afuera ? x.monedaAfuera : x.monedaPapel,
     precioUsd: x.velasAfuera?.at(-1)?.close ?? null,
     fund: x.fund,
-    sinFund: x.papel.tipo === "ACCION" ? SIN_BALANCES_AR : x.fundError,
+    sinFund: x.fundError ?? (x.papel.tipo === "ACCION" ? SIN_BALANCES_AR : null),
     fuerzaRelativa: x.fuerzaRelativa,
     mercadoAlcista: x.mercadoAlcista,
     mercadoNombre: x.papel.tipo === "ACCION" ? "el Merval" : "el S&P 500 (SPY)",

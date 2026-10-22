@@ -4,13 +4,14 @@
  * (lib/pizarra-activos.ts). La usan el cron de las señales (lib/ar-senales-run.ts) y las respuestas de JARVIS en la app y en
  * Telegram (lib/jarvis-todo-db.ts): así los tres leen lo mismo. Si Yahoo no responde, devuelve el motivo: desconocido no es cero.
  */
-import { EMPRESAS_SEC, fundamentalesDe } from "./fundamentales-sec.ts";
+import { empresaSec, fundamentalesDe, motivoSinBalance } from "./fundamentales-sec.ts";
 import { sma } from "./mentes-inversoras.ts";
 import { estudiarPapel, type AgenteEnPapel } from "./mercado-ar-agentes.ts";
 import { serieArCacheada } from "./mercado-ar-fuente.ts";
-import { zonaFib, type ZonaFibAr } from "./mercado-ar-tecnico.ts";
+import { analisisAr, type AnalisisAr } from "./mercado-ar-tecnico.ts";
 import { INDICE_EEUU, INDICE_MERVAL, type PapelAr, type SerieAr } from "./mercado-ar.ts";
 import { entradaMentesAr, pizarraAr, type PizarraActivo } from "./pizarra-activos.ts";
+import type { EntradaResumen } from "./jarvis-todo.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 
 export type LecturaPapelAr = {
@@ -18,8 +19,8 @@ export type LecturaPapelAr = {
   serie: SerieAr;
   velas: SwingCandle[];
   agentes: AgenteEnPapel[];
-  fib: ZonaFibAr | null;
-  fibMotivo: string | null;
+  /** Todos los motores técnicos del papel: Fibonacci de compra y de venta, niveles, zonas por confluencia. */
+  analisis: AnalisisAr;
   pizarra: PizarraActivo;
 };
 
@@ -29,7 +30,7 @@ export async function leerPapelAr(db: D1Database, papel: PapelAr): Promise<{ ok:
       serieArCacheada(papel.yahoo),
       papel.subyacente ? serieArCacheada(papel.subyacente) : Promise.resolve(null),
       serieArCacheada(papel.tipo === "ACCION" ? INDICE_MERVAL : INDICE_EEUU),
-      papel.tipo === "CEDEAR" && EMPRESAS_SEC[papel.ticker] ? fundamentalesDe(db, papel.ticker).catch(() => null) : Promise.resolve(null),
+      empresaSec(papel.ticker) ? fundamentalesDe(db, papel.ticker).catch(() => null) : Promise.resolve(null),
     ]);
     const serie = propia.resultado?.serie;
     if (!serie || !serie.velas.length) return { ok: false, error: `sin ruedas de ${papel.yahoo}: ${propia.error ?? "la fuente no respondió"}` };
@@ -43,16 +44,19 @@ export async function leerPapelAr(db: D1Database, papel: PapelAr): Promise<{ ok:
       velasAfuera: afuera?.resultado?.serie?.velas ?? null,
       monedaAfuera: afuera?.resultado?.serie?.meta.moneda ?? null,
       fund: fund?.fund ?? null,
-      fundError: papel.tipo === "CEDEAR" ? (fund?.error ?? (EMPRESAS_SEC[papel.ticker] ? "SEC no respondió" : "sin balances de SEC para este papel")) : null,
+      fundError: fund?.fund ? null : (fund?.error ?? (empresaSec(papel.ticker) ? "SEC no respondió" : motivoSinBalance(papel.ticker))),
       fuerzaRelativa: null,
       mercadoAlcista: m200 === null ? null : vIndice.at(-1)!.close > m200,
       volMediana: null,
     });
     const agentes = estudiarPapel(papel.ticker, velas);
-    const z = zonaFib(velas);
-    const pizarra = pizarraAr({ ticker: papel.ticker, nombre: papel.nombre, velas, fib: z.fib, fibMotivo: z.motivo, agentes, mentes });
-    return { ok: true, lectura: { papel, serie, velas, agentes, fib: z.fib, fibMotivo: z.motivo, pizarra } };
+    const analisis = analisisAr(velas);
+    const pizarra = pizarraAr({ ticker: papel.ticker, nombre: papel.nombre, velas, fib: analisis.fib, fibMotivo: analisis.fibMotivo, agentes, mentes });
+    return { ok: true, lectura: { papel, serie, velas, agentes, analisis, pizarra } };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message.slice(0, 200) : "error" };
   }
 }
+
+/** La lectura como la necesita el resumen para JARVIS (lib/jarvis-todo.ts). */
+export const paraResumen = (l: LecturaPapelAr): EntradaResumen => ({ papel: l.papel, moneda: l.serie.meta.moneda, velas: l.velas, agentes: l.agentes, tecnico: l.analisis, pizarra: l.pizarra });

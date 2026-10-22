@@ -2,6 +2,9 @@
  * Los balances de las empresas de afuera que hay detrás de los CEDEARs, de SEC EDGAR (XBRL, gratis y oficial): ingresos,
  * ganancia neta, BPA diluido, patrimonio, pasivo y activo/pasivo corriente de los últimos ejercicios anuales (10-K).
  * Es lo que necesitan las mentes de valor (lib/mentes-inversoras.ts: Buffett, Graham, Lynch, crecimiento).
+ * También las empresas argentinas y de la región que presentan 20-F ante la SEC en NIIF (YPF, Galicia, Macro, BBVA, Supervielle,
+ * Pampa, Central Puerto, Edenor, Loma Negra, IRSA, Cresud, Vista): las cifras vienen en su moneda (pesos ajustados por inflación
+ * a la fecha del balance, o dólares) y se dice cuál; un precio de hoy en pesos no se compara con ellas (lib/mentes-inversoras.ts).
  *
  * Solo empresas de la lista fija con su CIK; cada respuesta se controla contra el nombre esperado (si el CIK no
  * corresponde, no se usa). Quedan afuera los ETF (no tienen balance propio), Alibaba (presenta en yuanes) y Vista
@@ -34,12 +37,45 @@ export const EMPRESAS_SEC: Record<string, { cik: number; nombre: string }> = {
   JNJ: { cik: 200406, nombre: "johnsonjohnson" },
 };
 
+/**
+ * Empresas que presentan 20-F en NIIF (taxonomía ifrs-full): su CIK y pedazos de su nombre oficial (basta que el nombre que
+ * devuelve SEC contenga uno) para controlar la respuesta. Los CIK salen de los archivos que cada una presentó en sec.gov.
+ */
+export const EMPRESAS_NIIF: Record<string, { cik: number; nombres: string[] }> = {
+  YPFD: { cik: 904851, nombres: ["ypf"] },
+  GGAL: { cik: 1114700, nombres: ["galicia"] },
+  BMA: { cik: 1347426, nombres: ["macro"] },
+  BBAR: { cik: 913059, nombres: ["bbva"] },
+  SUPV: { cik: 1517399, nombres: ["supervielle"] },
+  PAMP: { cik: 1469395, nombres: ["pampa"] },
+  CEPU: { cik: 1717161, nombres: ["centralpuerto"] },
+  EDN: { cik: 1395213, nombres: ["edenor", "comercializadoranorte"] },
+  LOMA: { cik: 1711375, nombres: ["lomanegra"] },
+  IRSA: { cik: 933267, nombres: ["irsa"] },
+  CRES: { cik: 1034957, nombres: ["cresud"] },
+  VIST: { cik: 1762506, nombres: ["vista"] },
+};
+
+export type EmpresaSec = { cik: number; nombres: string[]; niif: boolean };
+
+/** La empresa de SEC detrás de un papel (10-K de EE. UU. o 20-F en NIIF); null si no presenta balances ante la SEC. */
+export function empresaSec(simbolo: string): EmpresaSec | null {
+  const a = EMPRESAS_SEC[simbolo];
+  if (a) return { cik: a.cik, nombres: [a.nombre], niif: false };
+  const b = EMPRESAS_NIIF[simbolo];
+  return b ? { cik: b.cik, nombres: b.nombres, niif: true } : null;
+}
+
+/** Por qué un papel no tiene balances de SEC. */
+export function motivoSinBalance(simbolo: string): string {
+  return SIN_BALANCE[simbolo] ?? "la empresa no presenta balances ante la SEC (en Argentina la CNV los publica en PDF, sin datos abiertos)";
+}
+
 /** Por qué un CEDEAR no tiene balances de SEC. */
 export const SIN_BALANCE: Record<string, string> = {
   SPY: "es un ETF: no tiene balance propio",
   QQQ: "es un ETF: no tiene balance propio",
   BABA: "presenta sus balances en yuanes: sin una conversión confiable no se compara con el precio en dólares",
-  VIST: "presenta sus balances en NIIF (no en el formato de SEC que se lee acá)",
 };
 
 /** Berkshire publica el BPA por acción clase A (1.500 clase B): no se compara con el precio de la B. */
@@ -60,6 +96,28 @@ export const CONCEPTOS: Record<Concepto, { nombres: string[]; unidad: string; fl
   pasivoCorriente: { nombres: ["LiabilitiesCurrent"], unidad: "USD", flujo: false },
 };
 
+/** Los nombres ifrs-full de cada concepto (taxonomía NIIF de los 20-F); `porAccion`: la unidad es moneda por acción. */
+export const CONCEPTOS_NIIF: Record<Concepto, { nombres: string[]; flujo: boolean; porAccion?: boolean }> = {
+  ingresos: { nombres: ["Revenue", "RevenueFromContractsWithCustomers"], flujo: true },
+  gananciaNeta: { nombres: ["ProfitLossAttributableToOwnersOfParent", "ProfitLoss"], flujo: true },
+  bpa: { nombres: ["DilutedEarningsLossPerShare", "BasicAndDilutedEarningsLossPerShare", "BasicEarningsLossPerShare"], flujo: true, porAccion: true },
+  patrimonio: { nombres: ["EquityAttributableToOwnersOfParent", "Equity"], flujo: false },
+  pasivo: { nombres: ["Liabilities"], flujo: false },
+  deuda: { nombres: ["LongtermBorrowings"], flujo: false },
+  activoCorriente: { nombres: ["CurrentAssets"], flujo: false },
+  pasivoCorriente: { nombres: ["CurrentLiabilities"], flujo: false },
+};
+
+/** Las monedas en que se prueba un 20-F, en orden: la primera con datos fija la moneda de todos los conceptos. */
+export const MONEDAS_NIIF = ["ARS", "USD"];
+
+/** La clave de unidad de una respuesta para una moneda: «ARS», o «ARS/shares» (o similar) para lo que es por acción. */
+export function claveUnidad(json: unknown, moneda: string, porAccion: boolean): string | null {
+  const claves = Object.keys((json as { units?: Record<string, unknown> } | null)?.units ?? {});
+  if (!porAccion) return claves.includes(moneda) ? moneda : null;
+  return claves.find((k) => k.toUpperCase().startsWith(moneda) && k.toUpperCase() !== moneda && /\/|PER|SHARE/i.test(k)) ?? null;
+}
+
 export type Ejercicio = { fin: string } & Record<Concepto, number | null>;
 
 export type Fundamentales = {
@@ -71,6 +129,8 @@ export type Fundamentales = {
   leido: number;
   /** Conceptos que la empresa no reporta con esos nombres. */
   faltantes: Concepto[];
+  /** La moneda de las cifras: «USD» si no se dice (lo guardado antes). Las NIIF en pesos están ajustadas por inflación a la fecha del balance. */
+  moneda?: string;
 };
 
 type FilaXbrl = { start?: string; end?: string; val?: number; form?: string; fp?: string; filed?: string };
@@ -119,20 +179,21 @@ export type ResultadoFund = { fund: Fundamentales | null; error: string | null }
 /** User-Agent que pide SEC: quién consulta y, si está cargado, un contacto. */
 export const agenteSec = (contacto: string | null) => `ALT RADAR PRO url.fx${contacto ? ` ${contacto}` : ""}`;
 
-/** Baja los conceptos de una empresa de SEC. `fetchImpl` y el reloj se inyectan en las pruebas. */
+/** Baja los conceptos de una empresa de SEC (10-K en us-gaap, o 20-F en ifrs-full). `fetchImpl` y el reloj se inyectan en las pruebas. */
 export async function bajarFundamentales(
   simbolo: string,
   opts: { fetchImpl?: typeof fetch; ahora?: number; contacto?: string | null; timeoutMs?: number } = {},
 ): Promise<ResultadoFund> {
-  const emp = EMPRESAS_SEC[simbolo];
-  if (!emp) return { fund: null, error: SIN_BALANCE[simbolo] ?? "sin balances de SEC para este papel" };
+  const emp = empresaSec(simbolo);
+  if (!emp) return { fund: null, error: motivoSinBalance(simbolo) };
   const fetchImpl = opts.fetchImpl ?? fetch;
   const cik = `CIK${String(emp.cik).padStart(10, "0")}`;
+  const taxonomia = emp.niif ? "ifrs-full" : "us-gaap";
   let entidad = "";
   let ultimoError: string | null = null;
   const pedir = async (nombre: string): Promise<unknown | null> => {
     try {
-      const r = await fetchImpl(`https://data.sec.gov/api/xbrl/companyconcept/${cik}/us-gaap/${nombre}.json`, {
+      const r = await fetchImpl(`https://data.sec.gov/api/xbrl/companyconcept/${cik}/${taxonomia}/${nombre}.json`, {
         headers: { "User-Agent": agenteSec(opts.contacto ?? null), Accept: "application/json" },
         signal: AbortSignal.timeout(opts.timeoutMs ?? 8000),
       });
@@ -143,7 +204,8 @@ export async function bajarFundamentales(
       }
       const j = (await r.json()) as { entityName?: unknown };
       if (typeof j.entityName === "string") {
-        if (!normal(j.entityName).includes(emp.nombre)) {
+        const oficial = normal(j.entityName);
+        if (!emp.nombres.some((n) => oficial.includes(n))) {
           ultimoError = `el CIK devolvió «${j.entityName}», no la empresa esperada`;
           return null;
         }
@@ -157,25 +219,45 @@ export async function bajarFundamentales(
   };
   const valores: Partial<Record<Concepto, Map<string, number>>> = {};
   const faltantes: Concepto[] = [];
+  // En NIIF, la moneda la fija el primer concepto con datos y los demás tienen que venir en esa misma: no se mezclan monedas.
+  let moneda: string | null = emp.niif ? null : "USD";
   // De a un pedido por vez: SEC pide no pasar de 10 por segundo y bloquea a quien se pasa.
   const ultimo = (x: Map<string, number> | null) => (x && x.size ? [...x.keys()].sort().at(-1)! : "");
   for (const c of Object.keys(CONCEPTOS) as Concepto[]) {
-    const def = CONCEPTOS[c];
+    const def = emp.niif ? CONCEPTOS_NIIF[c] : { ...CONCEPTOS[c], porAccion: false };
     let mejor: Map<string, number> | null = null;
+    let monedaDeMejor: string | null = null;
     for (const nombre of def.nombres) {
       const j = await pedir(nombre);
       if (!j) continue;
-      const m = anualesDe(j, def.unidad, def.flujo);
-      if (m.size && ultimo(m) > ultimo(mejor)) mejor = m;
+      for (const m of moneda ? [moneda] : MONEDAS_NIIF) {
+        const unidad = emp.niif ? claveUnidad(j, m, !!def.porAccion) : (CONCEPTOS[c].unidad);
+        if (!unidad) continue;
+        const mapa = anualesDe(j, unidad, def.flujo);
+        if (mapa.size && ultimo(mapa) > ultimo(mejor)) {
+          mejor = mapa;
+          monedaDeMejor = m;
+        }
+      }
     }
-    if (mejor) valores[c] = mejor;
-    else faltantes.push(c);
+    if (mejor) {
+      valores[c] = mejor;
+      if (!moneda) moneda = monedaDeMejor;
+    } else faltantes.push(c);
     if ((ultimoError as string | null)?.startsWith("el CIK")) break; // no es la empresa: no seguir pidiendo
   }
   const ejercicios = armarEjercicios(valores);
-  if (!ejercicios.length || !entidad) return { fund: null, error: (ultimoError as string | null) ?? "SEC no devolvió ejercicios anuales" };
+  if (!ejercicios.length || !entidad || !moneda) return { fund: null, error: (ultimoError as string | null) ?? "SEC no devolvió ejercicios anuales" };
   return {
-    fund: { simbolo, entidad, ejercicios, fuente: "SEC EDGAR (XBRL, 10-K)", leido: opts.ahora ?? Date.now(), faltantes: faltantes.sort() },
+    fund: {
+      simbolo,
+      entidad,
+      ejercicios,
+      fuente: emp.niif ? "SEC EDGAR (XBRL, NIIF, 20-F)" : "SEC EDGAR (XBRL, 10-K)",
+      leido: opts.ahora ?? Date.now(),
+      faltantes: faltantes.sort(),
+      moneda,
+    },
     error: null,
   };
 }

@@ -141,7 +141,8 @@ export function metricas(simbolo: string, fund: Fundamentales, precioUsd: number
   let per: number | null = null;
   let perMotivo: string | null = null;
   if (BPA_NO_COMPARABLE.has(simbolo)) perMotivo = "el BPA se publica por acción clase A: no se compara con este precio";
-  else if (precioUsd === null) perMotivo = "sin precio en dólares de la acción de afuera";
+  else if (fund.moneda && fund.moneda !== "USD") perMotivo = `las cifras están en ${fund.moneda} (NIIF, ajustadas por inflación a la fecha del balance) y el precio de hoy no se compara con ellas sin ese ajuste: no se calcula`;
+  else if (precioUsd === null) perMotivo = "sin un precio en dólares que se pueda comparar con el balance";
   else if (ult.bpa === null) perMotivo = "la empresa no reporta BPA diluido";
   else if (ult.bpa <= 0) perMotivo = "BPA negativo: el PER no tiene sentido";
   else per = precioUsd / ult.bpa;
@@ -198,7 +199,7 @@ export function posturaDe(criterios: Criterio[], minimo: number): Postura {
 function mentesDeValor(x: EntradaMentes): LecturaMente[] {
   const sinBal = x.sinFund ?? "sin balances para este papel";
   const m = x.fund ? metricas(x.simbolo, x.fund, x.precioUsd) : null;
-  const notaBal = x.fund ? `Balances: ${x.fund.fuente}, ${m!.anios} ejercicios hasta ${x.fund.ejercicios.at(-1)!.fin}. Precio: la acción de afuera en dólares.` : `Sin balances: ${sinBal}.`;
+  const notaBal = x.fund ? `Balances: ${x.fund.fuente}, ${m!.anios} ejercicios hasta ${x.fund.ejercicios.at(-1)!.fin}. ${x.fund.moneda && x.fund.moneda !== "USD" ? `Cifras en ${x.fund.moneda}: miro calidad, deuda y crecimiento; el precio no se compara.` : "Precio: la acción de afuera en dólares."}` : `Sin balances: ${sinBal}.`;
   const perCrit = (umbral: number) =>
     crit(`PER ≤ ${umbral}`, "precio sobre ganancia por acción del último ejercicio", m?.per ?? null, (v) => num(v, 1), (v) => v <= umbral, m?.perMotivo ?? "sin dato");
 

@@ -60,7 +60,7 @@ dac8ac9522e3	103	app/api/liquidity-history/route.ts
 24fcf3c46bae	30	app/api/mapa/agentes/route.ts
 a9e76218b723	216	app/api/market-structure/route.ts
 3356888e120f	49	app/api/market/derivatives/route.ts
-a7f8ef491113	23	app/api/mercado-ar/fundamentales/route.ts
+ad7317aa9250	23	app/api/mercado-ar/fundamentales/route.ts
 7387b111870c	35	app/api/mercado-ar/lote/route.ts
 78641b038fcd	30	app/api/mercado-ar/route.ts
 037cfd21c11f	27	app/api/oficina/route.ts
@@ -164,7 +164,7 @@ db0be99a3f89	499	app/market-brain.tsx
 89b25149b415	141	app/market-structure-panel.tsx
 244b15230fb0	48	app/market-structure.css
 0f764caf6293	358	app/mercado-ar-desk.tsx
-87ad1f1cf664	329	app/mercado-ar-vistas.tsx
+77e88ab3bc35	386	app/mercado-ar-vistas.tsx
 75c0447a6efd	155	app/mercado-ar.css
 4c825afb6f6f	417	app/mobile-pro.css
 541f89793909	131	app/mtf-oscillators.tsx
@@ -218,7 +218,7 @@ e4fbc338f605	360	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-5ed5522e442a	397	docs/araña/objetivos.md
+3c9fec96dd10	398	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -267,7 +267,7 @@ a5b1181badec	171	lib/agentes-mente.ts
 f6460772c0c5	23	lib/agentes-servidor-run.ts
 287c2c8299e2	109	lib/agentes-servidor.ts
 d506fd48228f	81	lib/ai-analyst-server.ts
-246186006cb8	161	lib/ai-analyst.ts
+83c8c2d0f554	161	lib/ai-analyst.ts
 5ac04d6c42a9	217	lib/ai-brains.ts
 d806274577b4	92	lib/ai-cascade.ts
 e199856baab6	12	lib/ai-gemini-server.ts
@@ -281,9 +281,9 @@ c9557e9b8266	174	lib/app-settings.ts
 4998b2cb2829	188	lib/aprender.ts
 5b106de4c580	72	lib/aprendizaje-diario-db.ts
 4099bd34b76e	219	lib/aprendizaje-diario.ts
-f568e5839fe5	59	lib/ar-lectura.ts
-ebc4163d88ce	128	lib/ar-senales-db.ts
-11636a1e04ae	32	lib/ar-senales-run.ts
+a3dd2d667ff2	63	lib/ar-lectura.ts
+7104d23bb89c	140	lib/ar-senales-db.ts
+505006ea8a45	36	lib/ar-senales-run.ts
 f497fb8a5a5c	132	lib/ar-senales.ts
 8bc8d3dc5620	41	lib/arana-ultimo-db.ts
 8e5f0ea3f30d	35	lib/arana-ultimo.ts
@@ -339,7 +339,7 @@ a46bc4f80884	173	lib/fibonacci-niveles.ts
 0e13f43a62cd	163	lib/flujo.ts
 c6aaa6fce865	216	lib/fondeo.ts
 ce068942f617	401	lib/footprint.ts
-405bcf5618e0	216	lib/fundamentales-sec.ts
+e01dda303d19	298	lib/fundamentales-sec.ts
 36b7706db8ff	71	lib/futures-log-db.ts
 1dee6c89644e	274	lib/futures-log.ts
 dfc52ea472c0	115	lib/futures-risk.ts
@@ -374,8 +374,8 @@ cf67397ebde0	654	lib/jarvis-paper.ts
 e3ccab89cd1b	330	lib/jarvis-scan-run.ts
 1f2ad361d4f7	296	lib/jarvis-scan.ts
 187b69f4e8e6	367	lib/jarvis-stats.ts
-4fc86eeb1867	26	lib/jarvis-todo-db.ts
-60460672decc	194	lib/jarvis-todo.ts
+c01d07f5d106	43	lib/jarvis-todo-db.ts
+f76de92e4c5e	235	lib/jarvis-todo.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
 4b677046fbed	39	lib/jarvis-voice.ts
 53060301e170	160	lib/jarvis-watch-run.ts
@@ -414,15 +414,15 @@ dad5e13476dd	150	lib/mapa-agentes.ts
 c5ba3f905dda	317	lib/market-fetch.ts
 92529383cd86	434	lib/market-providers.ts
 dca52626b743	252	lib/market-structure.ts
-d1dd9920065f	357	lib/mentes-inversoras.ts
-b15627eb1f28	647	lib/mentes-metodo.ts
+05901b068282	358	lib/mentes-inversoras.ts
+21ced5d8c0a5	650	lib/mentes-metodo.ts
 10b738288f9a	99	lib/mercado-ar-agentes.ts
-739bb0d7a24e	223	lib/mercado-ar-cliente.ts
+aa55f3da1f7b	223	lib/mercado-ar-cliente.ts
 0da11ad62221	123	lib/mercado-ar-fuente.ts
 3b3668054ce0	33	lib/mercado-ar-lote.ts
 5be54e85d73d	89	lib/mercado-ar-mapa.ts
 d65060e8502e	97	lib/mercado-ar-ranking.ts
-8663f4178a63	201	lib/mercado-ar-tecnico.ts
+37311074b0e0	281	lib/mercado-ar-tecnico.ts
 5055ab17957f	277	lib/mercado-ar.ts
 dd7f989876a5	57	lib/mesa-medicion.ts
 8de6a64346cf	57	lib/mesa-sombra-auditoria.ts
@@ -443,7 +443,7 @@ ff0abab236d8	403	lib/oficina.ts
 e4e5d5bbccaa	248	lib/order-flow.ts
 fe173d15015d	227	lib/oscillators.ts
 f2ad043c6c3a	431	lib/paper-bot.ts
-2faf5aade8ce	185	lib/pizarra-activos.ts
+9a47fb1b7407	185	lib/pizarra-activos.ts
 19a6f01caa42	99	lib/pizarra-servidor-db.ts
 7a2cf1ab53a7	45	lib/pizarra-servidor-run.ts
 9ec9c2bf275c	123	lib/pizarra-servidor.ts
@@ -625,6 +625,7 @@ bc048058d368	97	tests/fib-zone.test.ts
 70e30489d116	109	tests/footprint-signals.test.ts
 d6031202b073	89	tests/footprint-sweeps.test.ts
 79b36d34e65f	119	tests/footprint-verdict.test.ts
+97bde62f2a59	122	tests/fundamentales-niif.test.ts
 6ef376781704	137	tests/futures-log.test.ts
 4ea64afcb20f	108	tests/futures-risk.test.ts
 a3b08c3b70ce	282	tests/hands-free.test.ts
@@ -657,7 +658,7 @@ c977b546798a	414	tests/jarvis-paper.test.ts
 871655c35609	284	tests/jarvis-rules-v2.test.ts
 40e3c48ab0e9	583	tests/jarvis-scan.test.ts
 2275cc0e95f8	173	tests/jarvis-stats.test.ts
-c501ec7e6dad	123	tests/jarvis-todo.test.ts
+e9fc5e21a05a	148	tests/jarvis-todo.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
 cc263e715076	62	tests/jarvis-watch-run.test.ts
 503532a31b9f	186	tests/jarvis-watch.test.ts
@@ -680,10 +681,10 @@ c90b4a2a66b4	70	tests/live-market.test.ts
 9ba8d41b41a9	95	tests/mapa-contexto.test.ts
 e46e93dda3df	226	tests/market-providers.test.ts
 9894e04aa97c	43	tests/market-structure-cmc.test.ts
-2e883b26c842	227	tests/mentes-ar.test.ts
+3aeb734bd263	227	tests/mentes-ar.test.ts
 88030dfa4e8e	238	tests/mentes-metodo.test.ts
 600bb362ca80	105	tests/mercado-ar-ranking.test.ts
-5dbee8601d14	101	tests/mercado-ar-tecnico.test.ts
+d74d57aed386	155	tests/mercado-ar-tecnico.test.ts
 d435514e5aa5	277	tests/mercado-ar.test.ts
 4fec70e5eb48	37	tests/mesa-medicion.test.ts
 ea96d2b2093d	44	tests/mesa-sombra-auditoria.test.ts

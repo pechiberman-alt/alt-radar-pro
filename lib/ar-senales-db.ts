@@ -25,6 +25,7 @@ export async function ensureArSenales(db: D1Database) {
       `CREATE TABLE IF NOT EXISTS ar_estado (
         ticker TEXT PRIMARY KEY, at INTEGER NOT NULL, vela INTEGER, fib TEXT, veredicto TEXT, huella TEXT, registradas INTEGER NOT NULL, avanzadas INTEGER NOT NULL, error TEXT)`,
     ),
+    db.prepare("CREATE TABLE IF NOT EXISTS ar_lectura (ticker TEXT PRIMARY KEY, at INTEGER NOT NULL, json TEXT NOT NULL)"),
     db.prepare("CREATE TABLE IF NOT EXISTS ar_avisos (clave TEXT PRIMARY KEY, ticker TEXT NOT NULL, at INTEGER NOT NULL, texto TEXT NOT NULL)"),
     db.prepare("CREATE INDEX IF NOT EXISTS ar_avisos_at ON ar_avisos (at)"),
   ]);
@@ -93,6 +94,17 @@ export async function guardarEstadoAr(db: D1Database, e: EstadoAr) {
     )
     .bind(e.ticker, e.at, e.vela, e.fib, e.veredicto, e.huella, e.registradas, e.avanzadas, e.error)
     .run();
+}
+
+/** La lectura resumida de un papel (la que le llega a JARVIS): una fila por papel, se reescribe en cada rueda. */
+export async function guardarLecturaAr(db: D1Database, ticker: string, at: number, json: string) {
+  await ensureArSenales(db);
+  await db.prepare("INSERT INTO ar_lectura (ticker, at, json) VALUES (?1, ?2, ?3) ON CONFLICT(ticker) DO UPDATE SET at = ?2, json = ?3").bind(ticker, at, json).run();
+}
+
+export async function leerLecturaAr(db: D1Database, ticker: string): Promise<{ at: number; json: string } | null> {
+  await ensureArSenales(db);
+  return db.prepare("SELECT at, json FROM ar_lectura WHERE ticker = ?1").bind(ticker).first<{ at: number; json: string }>();
 }
 
 export async function estadosAr(db: D1Database): Promise<EstadoAr[]> {
