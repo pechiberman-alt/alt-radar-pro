@@ -24,7 +24,7 @@ e23fd9d98482	81	app/alert-toasts.tsx
 f772692820bc	188	app/api/admin/settings/route.ts
 45b256c81a5a	49	app/api/alerts/latest/route.ts
 03cbeef8a626	52	app/api/alerts/prebreak/route.ts
-a7dee0459649	64	app/api/analyst/ai/route.ts
+a841f3182d0c	70	app/api/analyst/ai/route.ts
 5f25e873c7ca	55	app/api/arana/ultimo/route.ts
 e6ca04d22a7f	73	app/api/auth/login/route.ts
 6b5d9403bf5d	21	app/api/auth/logout/route.ts
@@ -218,7 +218,7 @@ e4fbc338f605	360	app/workspace.tsx
 b2efb66df63e	165	app/zones-desk.tsx
 5f0021f310f0	14	db/index.ts
 c197d32e2599	181	db/schema.ts
-66271e052609	396	docs/araña/objetivos.md
+5ed5522e442a	397	docs/araña/objetivos.md
 cfa5deb48c62	40	docs/axi-diario.md
 5262cc8813c0	62	docs/busqueda-amd.md
 db6358216fcf	188	docs/busqueda-breaker.md
@@ -267,7 +267,7 @@ a5b1181badec	171	lib/agentes-mente.ts
 f6460772c0c5	23	lib/agentes-servidor-run.ts
 287c2c8299e2	109	lib/agentes-servidor.ts
 d506fd48228f	81	lib/ai-analyst-server.ts
-adf5f9e4d046	160	lib/ai-analyst.ts
+246186006cb8	161	lib/ai-analyst.ts
 5ac04d6c42a9	217	lib/ai-brains.ts
 d806274577b4	92	lib/ai-cascade.ts
 e199856baab6	12	lib/ai-gemini-server.ts
@@ -281,8 +281,9 @@ c9557e9b8266	174	lib/app-settings.ts
 4998b2cb2829	188	lib/aprender.ts
 5b106de4c580	72	lib/aprendizaje-diario-db.ts
 4099bd34b76e	219	lib/aprendizaje-diario.ts
+f568e5839fe5	59	lib/ar-lectura.ts
 ebc4163d88ce	128	lib/ar-senales-db.ts
-268b11a37168	61	lib/ar-senales-run.ts
+11636a1e04ae	32	lib/ar-senales-run.ts
 f497fb8a5a5c	132	lib/ar-senales.ts
 8bc8d3dc5620	41	lib/arana-ultimo-db.ts
 8e5f0ea3f30d	35	lib/arana-ultimo.ts
@@ -373,6 +374,8 @@ cf67397ebde0	654	lib/jarvis-paper.ts
 e3ccab89cd1b	330	lib/jarvis-scan-run.ts
 1f2ad361d4f7	296	lib/jarvis-scan.ts
 187b69f4e8e6	367	lib/jarvis-stats.ts
+4fc86eeb1867	26	lib/jarvis-todo-db.ts
+60460672decc	194	lib/jarvis-todo.ts
 a1ff217956a7	117	lib/jarvis-voice-server.ts
 4b677046fbed	39	lib/jarvis-voice.ts
 53060301e170	160	lib/jarvis-watch-run.ts
@@ -486,7 +489,7 @@ bf7335d9b46e	223	lib/supply-demand.ts
 abdf3deeb699	155	lib/suscripcion.ts
 ceab2b39b102	324	lib/swing-entries.ts
 c9fd83f39ff3	171	lib/swing-liquidity-filter.ts
-03a8b2105452	285	lib/telegram-ai-server.ts
+64bf1acd5c29	297	lib/telegram-ai-server.ts
 848f1c4d5a15	79	lib/telegram-ai.ts
 866441f3f838	247	lib/telegram-dispatch.ts
 454b972683d0	122	lib/telegram-jarvis.ts
@@ -654,6 +657,7 @@ c977b546798a	414	tests/jarvis-paper.test.ts
 871655c35609	284	tests/jarvis-rules-v2.test.ts
 40e3c48ab0e9	583	tests/jarvis-scan.test.ts
 2275cc0e95f8	173	tests/jarvis-stats.test.ts
+c501ec7e6dad	123	tests/jarvis-todo.test.ts
 d8668acd6dc2	73	tests/jarvis-voice.test.ts
 cc263e715076	62	tests/jarvis-watch-run.test.ts
 503532a31b9f	186	tests/jarvis-watch.test.ts
