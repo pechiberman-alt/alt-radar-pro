@@ -5,6 +5,8 @@
  * se hace en memoria sobre a lo sumo LIMITE_HISTORIA filas por fuente, y si hay más o hay filas ilegibles, la fuente
  * se marca como incompleta. Si una fuente no se puede leer, dice «sin datos»: nunca cero.
  */
+import { filasAr } from "./ar-senales-db.ts";
+import type { FuenteAr } from "./ar-senales.ts";
 import type { CoreCounters } from "./jarvis-core.ts";
 import { readCoreCounters } from "./jarvis-core-db.ts";
 import type { PaperTrade } from "./jarvis-paper.ts";
@@ -149,6 +151,12 @@ async function leerAgentesServidor(db: D1Database): Promise<Lectura> {
   return { conteo: contar(operacionesDeRobot(filas)), incompleta: filas.length >= LIMITE_HISTORIA, ...cierresDeFilas(filas) };
 }
 
+/** BYMA del servidor (global): las últimas LIMITE_HISTORIA entradas de una fuente, por fecha. */
+async function leerAr(db: D1Database, fuente: FuenteAr): Promise<Lectura> {
+  const filas = await filasAr(db, fuente, LIMITE_HISTORIA);
+  return { conteo: contar(operacionesDeRobot(filas)), incompleta: filas.length >= LIMITE_HISTORIA, ...cierresDeFilas(filas) };
+}
+
 async function leerRobot(db: D1Database, userId: number): Promise<Lectura> {
   await ensureRobotLedger(db);
   const filas = (
@@ -170,6 +178,8 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
   const robot = userId === null ? null : await seguro("robot", () => leerRobot(db, userId));
   const flujo = userId === null ? null : await seguro("flujo", () => leerFlujo(db, userId));
   const agenteSt = userId === null ? null : await seguro("agente supertrend", () => leerAgenteSt(db, userId));
+  const agentesAr = await seguro("agentes de BYMA", () => sharedJson("ar-agentes-registro-v1", 300, () => leerAr(db, "AGENTE")));
+  const pizarraAr = await seguro("pizarra de BYMA", () => sharedJson("ar-pizarra-registro-v1", 300, () => leerAr(db, "PIZARRA")));
   const servidor = await seguro("agentes del servidor", () => sharedJson("agentes-servidor-registro-v1", 300, () => leerAgentesServidor(db)));
   // Sin la serie del núcleo, el capital final sigue saliendo exacto de los contadores; solo falta la curva.
   const nucleoCierres = nucleo ? await seguro("núcleo cierres", async () => cierresDeNucleo(await leerCierresNucleo(db))) : null;
@@ -189,6 +199,8 @@ export async function leerRegistroUnificado(db: D1Database, userId: number | nul
     { id: "FLUJO", conteo: flujo?.conteo ?? null, incompleta: flujo?.incompleta, cierres: flujo?.cierres, desde: flujo?.desde },
     { id: "AGENTE_ST", conteo: agenteSt?.conteo ?? null, incompleta: agenteSt?.incompleta, cierres: agenteSt?.cierres, desde: agenteSt?.desde },
     { id: "AGENTES_SERVIDOR", conteo: servidor?.conteo ?? null, incompleta: servidor?.incompleta, cierres: servidor?.cierres, desde: servidor?.desde },
+    { id: "AGENTES_AR", conteo: agentesAr?.conteo ?? null, incompleta: agentesAr?.incompleta, cierres: agentesAr?.cierres, desde: agentesAr?.desde },
+    { id: "PIZARRA_AR", conteo: pizarraAr?.conteo ?? null, incompleta: pizarraAr?.incompleta, cierres: pizarraAr?.cierres, desde: pizarraAr?.desde },
   ];
   return armarRegistro(entradas, ahora);
 }

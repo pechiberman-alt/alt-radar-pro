@@ -77,13 +77,13 @@ balances: fundamentales-sec, fundamentales, sec, edgar
 
 ## jarvis — JARVIS, la IA propia del software
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
-Archivos: lib/jarvis*.ts, lib/mesa-medicion.ts, lib/mesa-sombra*.ts, lib/hands-free*.ts, lib/ai-*.ts, lib/assistant/**, lib/speech-text.ts, lib/browser-voice.ts, app/jarvis*, app/assistant-console.tsx, app/api/jarvis/**, app/api/analyst/**, app/api/telegram/webhook/**, docs/mesa-*.md, scripts/investigacion/**, lib/ia-respuesta.ts, tests/ia-respuesta.test.ts
+Archivos: lib/jarvis*.ts, lib/mesa-medicion.ts, lib/mesa-sombra*.ts, lib/hands-free*.ts, lib/ai-*.ts, lib/assistant/**, lib/speech-text.ts, lib/browser-voice.ts, app/jarvis*, app/assistant-console.tsx, app/api/jarvis/**, app/api/analyst/**, app/api/telegram/webhook/**, tests/ai-gemini.test.ts, docs/mesa-*.md, scripts/investigacion/**, lib/ia-respuesta.ts, tests/ia-respuesta.test.ts
 Reglas:
 - Respuestas de la IA (lib/ia-respuesta.ts), para JARVIS, el ANALISTA, los agentes de la oficina y las MENTES: las preguntas de siempre (qué tenés abierto, cómo te va, qué mirás, qué ves en X, un concepto) se contestan con el dato exacto sin IA; lo demás va a la IA con un prompt de persona corto (inspirado en virattt/ai-hedge-fund, MIT: la persona es solo el prompt, razona con los datos que recibe y si no alcanzan lo dice), sin markdown ni razonamiento oculto, y una respuesta que no toca lo preguntado se descarta. Una persona con nombre de inversor real nunca habla como esa persona.
 - Identidad: «JARVIS — ALT RADAR PRO AI». Nunca se presenta como otra IA ni nombra el modelo.
 - El navegador nunca llama a un proveedor de IA: pasa por /api/analyst/ai o /api/jarvis/*. Las claves nunca salen del Worker.
 - Solo se recuerda lo que la persona pidió recordar (lib/jarvis-memory.ts) y va en cada pregunta.
-- Cascada: Claude (25 por persona y día, pago) → Groq (gratis con clave) → Workers AI (Qwen3, 3.500 neuronas/día) → motor local del navegador (sin límite).
+- Cascada: Claude (25 por persona y día, pago) → Groq (gratis con clave) → Gemini Flash (gratis con clave de Google AI Studio, sin tarjeta; al guardarla se elige el Flash más nuevo de la cuenta y queda en el ajuste gemini_modelo) → Workers AI (Qwen3, 3.500 neuronas/día) → motor local del navegador (sin límite). Groq y Gemini cuentan dentro de las 60 respuestas gratis por persona y día. En el plan gratis Google puede usar lo que se le manda para mejorar sus productos: se dice en CONFIGURACIÓN. No hay una IA gratis sin clave confiable (octubre 2026): Pollinations quitó el acceso anónimo.
 - Claude nunca en tareas programadas: cuesta por respuesta.
 - Los números van a las IAs ya en formato argentino (lib/ai-numbers.ts): copian, no convierten.
 - JARVIS TRADING (lib/jarvis-desk*.ts): la mesa de especialistas es determinista y corre en el navegador; ninguna IA decide la dirección, solo la conversa con los números de la mesa.
@@ -108,7 +108,7 @@ Reglas:
 - Backtesting (lib/jarvis-backtest*.ts): la misma mesa y las reglas del papel sobre velas pasadas, una operación a la vez; en cada cierre de 4 h solo ve lo cerrado (test de no mirar el futuro). Lo que no tiene historial (derivados, noticias, sentimiento, calendario) pesa cero y se dice. Nunca se presenta como garantía.
 Pendiente:
 - Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía.
-- Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI).
+- Cargar una clave gratis de Gemini (aistudio.google.com) o de Groq en CONFIGURACIÓN: más respuestas gratis y MENTE más rápida (sin ellas usa Workers AI).
 - Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó.
 - Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda.
 - El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador.
@@ -160,6 +160,7 @@ Archivos: lib/telegram*.ts, lib/price-alerts*.ts, app/api/telegram/**, app/teleg
 Reglas:
 - Ballenas de Arkham (lib/arkham-ballenas.ts): con la clave de Arkham del administrador (CONFIGURACIÓN o el secreto ARKHAM_API_KEY), el cron de 5 minutos hace una consulta a GET /transfers (1 por segundo como máximo) y avisa por Telegram las transferencias on-chain de 5 M de dólares o más, con emisor y receptor según Arkham, valor histórico en USD y aviso de que no dice hacia dónde va el precio. Categoría BALLENAS, sin base de datos; una clave rechazada se registra, no se toma por "sin novedades".
 - Monedas pedidas por nombre (lib/telegram-moneda.ts): si la persona pregunta por una moneda que JARVIS no vigila (ej. ONDO), el servidor trae su precio y sus velas de 4 h de Binance y le da al modelo una lectura corta con los indicadores del estudio, sobre velas cerradas; si Binance no reconoce el par, el bot lo dice. También le llegan el resumen del estudio del laboratorio (lib/estudio-resumen.ts) y el estado del agente de papel de la cuenta con su muestra. Hasta tres consultas por mensaje.
+- BYMA (categoría BYMA, prendida por defecto): una vez por día, con el mercado cerrado, el papel que entra en la zona de compra de Fibonacci (no en la primera lectura: sin estado anterior no se sabe si «entró») y cada plan que registra la pizarra, con SL, TP1, TP2 y TP3 y «no es asesoramiento financiero» (tabla ar_avisos, últimas 24 h).
 - Cada evento se manda una sola vez (telegram_sent).
 - El webhook exige el secreto de Telegram y siempre responde 200 para que Telegram no reintente.
 - Una pregunta por Telegram usa la misma memoria y la misma cascada que la app.
@@ -334,7 +335,7 @@ Reglas:
 
 ## mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes
 Texto: acciones del panel líder y CEDEARs con ruedas diarias de Yahoo Finance (con demora), dentro del panel MERCADO AR y del MAPA (el buscador del mapa encuentra papeles de BYMA y muestra su vista). Las MENTES (Buffett, Graham, Lynch, crecimiento al estilo Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes del laboratorio leen cada papel y todo el panel. Balances de SEC EDGAR para los CEDEARs de empresas de EE. UU.
-Archivos: lib/mercado-ar*.ts, lib/mentes-inversoras.ts, lib/fundamentales-sec.ts, app/mercado-ar*.tsx, app/mercado-ar.css, app/api/mercado-ar/**, tests/mercado-ar.test.ts, tests/mentes-ar.test.ts, tests/mercado-ar-tecnico.test.ts, tests/mercado-ar-ranking.test.ts, app/sala-mentes.tsx, app/grafico-ar-tv.tsx, lib/mentes-metodo.ts, tests/mentes-metodo.test.ts, app/pizarra-panel.tsx
+Archivos: lib/mercado-ar*.ts, lib/mentes-inversoras.ts, lib/fundamentales-sec.ts, app/mercado-ar*.tsx, app/mercado-ar.css, app/api/mercado-ar/**, tests/mercado-ar.test.ts, tests/mentes-ar.test.ts, tests/mercado-ar-tecnico.test.ts, tests/mercado-ar-ranking.test.ts, app/sala-mentes.tsx, app/grafico-ar-tv.tsx, lib/ar-senales.ts, lib/ar-senales-db.ts, lib/ar-senales-run.ts, tests/ar-senales.test.ts, lib/mentes-metodo.ts, tests/mentes-metodo.test.ts, app/pizarra-panel.tsx
 Reglas:
 - Lista fija de papeles (23 acciones + 25 CEDEARs, más el Merval y SPY como índices): un símbolo fuera de la lista es error 400. Nunca un proxy abierto.
 - Sin footprint ni mapa de liquidaciones para BYMA: no se publica el lado agresor de cada operación ni el apalancamiento de las posiciones. Se dice en pantalla (TEXTO_SIN_FOOTPRINT, TEXTO_SIN_LIQUIDACIONES); nunca se dibuja uno aproximado. El perfil de volumen es aproximado por rueda y lo dice.
@@ -346,10 +347,11 @@ Reglas:
 - Las series viajan en lotes de hasta 12 en formato compacto (/api/mercado-ar/lote, lib/mercado-ar-lote.ts), con la misma caché por símbolo. Mejores compras Fibonacci (lib/mercado-ar-ranking.ts): solo precio dentro de la zona o hasta 5 % arriba, piernas no invalidadas; el orden pesa lo que aguantó en el papel solo con 3 casos resueltos o más; es un orden, no una probabilidad.
 - Sala de las mentes (app/sala-mentes.tsx, también en la oficina del laboratorio): reuniones y visitas entre escritorios con frases armadas de criterios medidos (guionReunion); cada mente responde preguntas como una lente inspirada en esa persona, nunca como la persona. El movimiento es decorativo y respeta «reducir movimiento».
 - Método de cada mente (lib/mentes-metodo.ts): además de los criterios, el orden de preguntas de su método, lo que la frena de plano, su plan (Buffett sin stop por precio; Graham con valor √(22,5·BPA·valor libro) y colchón de un tercio; Lynch clasifica la acción antes de juzgarla; Tudor Jones y Darvas con el stop primero; O'Neil corta a 8 %), lo que la haría cambiar de idea y lo que esta app no puede medir. «Fuera de mi método» (valor con un criptoactivo) no es «en contra». Contesta las preguntas sobre su método (respuestaDeMetodo) sin IA; la IA recibe ese razonamiento como contexto. Ninguna habla como la persona real.
+- Señales de BYMA en el servidor (lib/ar-senales*.ts, PLAN_AR_1; tablas ar_senales, ar_estado, ar_avisos): un papel por minuto, de lunes a viernes a las 21 UTC (cron de cada minuto, sin tocar wrangler), con la misma caché de Yahoo que la app (serieArCacheada). Registra cada compra de un agente y cada «hay plan» de la pizarra con entrada al cierre de la rueda y su escalera; se resuelven con las ruedas siguientes (20 ruedas, 0,6 % por lado, si toca stop y objetivo cuenta el stop). Solo entra la rueda del día (feriado: nada nuevo). Van al registro unificado como AGENTES_AR y PIZARRA_AR, globales y fuera del total (otro mercado, en pesos). En el servidor la fuerza relativa y el riesgo del universo quedan «sin dato»: su pizarra puede diferir de la de la app y se dice.
 - Diagnóstico horario de Yahoo en el cron de 15 minutos (`ajuste:mercado_ar_estado`, las últimas 12 pruebas).
 - Todo texto visible en español rioplatense; no es asesoramiento financiero.
 Pendiente:
-- Señales AR en el registro unificado (resolverlas con ruedas diarias en el servidor).
+- Pizarra de cripto en el servidor (con el núcleo de JARVIS) para registrar sus decisiones sin depender de que alguien abra la pantalla.
 - Balances de empresas argentinas si aparece una fuente gratis en datos.
 - Lecturas de agentes en el mapa de footprint cripto.
 

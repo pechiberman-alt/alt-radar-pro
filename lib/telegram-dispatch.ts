@@ -18,6 +18,7 @@ import { collectVolumeEvents } from "./telegram-volume.ts";
 import { collectBallenaEvents } from "./arkham-ballenas.ts";
 import { collectMagnetEvents } from "./telegram-magnets.ts";
 import { collectJarvisEvents } from "./telegram-jarvis.ts";
+import { avisosRecientesAr } from "./ar-senales-db.ts";
 import { runPriceAlerts } from "./price-alerts-server.ts";
 import { saveWorld, worldDigest } from "./jarvis-world.ts";
 import { cached } from "./upstream-cache.ts";
@@ -130,6 +131,13 @@ export async function runTelegramDispatch(db: D1Database, token: string, now = D
     shared.push(...(await collectMagnetEvents(db, now)));
   } catch {
     // Exchange data down: the other categories still go out.
+  }
+
+  // BYMA: Fibonacci zone entries and the board's plans, written once a day by the server (lib/ar-senales.ts).
+  try {
+    for (const a of await avisosRecientesAr(db, now)) shared.push({ key: a.clave, category: "BYMA", priority: 58, text: a.texto, symbol: a.ticker });
+  } catch (error) {
+    console.error("[ALT_RADAR_AR_AVISOS]", error instanceof Error ? error.message : error);
   }
 
   // Arkham big trades, only when the owner saved a key (one request, no database).

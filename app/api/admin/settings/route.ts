@@ -6,11 +6,12 @@ import {
   deleteSecret,
   encryptionStrength,
   getSecret,
+  guardarAjuste,
   hasClaimCode,
   setSecret,
   type SecretName,
 } from "@/lib/app-settings";
-import { GROQ_BASE, isGroqKey } from "@/lib/ai-brains";
+import { AJUSTE_MODELO_GEMINI, GEMINI_BASE, GROQ_BASE, isGeminiKey, isGroqKey, modeloGemini } from "@/lib/ai-brains";
 import { ARKHAM_URL } from "@/lib/arkham-ballenas";
 import { readProbe } from "@/lib/ai-probe";
 import { getCookie, getSessionUser, SESSION_COOKIE } from "@/lib/auth";
@@ -30,10 +31,11 @@ export async function GET(request: NextRequest) {
   const user = await who(request);
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   const admin = await adminUserId(env.DB);
-  const [telegram, ai, groq, cmc, arkham, probe] = await Promise.all([
+  const [telegram, ai, groq, gemini, cmc, arkham, probe] = await Promise.all([
     getSecret(env.DB, env, "telegram_bot_token"),
     getSecret(env.DB, env, "anthropic_api_key"),
     getSecret(env.DB, env, "groq_api_key"),
+    getSecret(env.DB, env, "gemini_api_key"),
     getSecret(env.DB, env, "cmc_api_key"),
     getSecret(env.DB, env, "arkham_api_key"),
     readProbe(env.DB).catch(() => null),
@@ -46,6 +48,7 @@ export async function GET(request: NextRequest) {
       telegram: { configured: Boolean(telegram.value), source: telegram.source },
       ai: { configured: Boolean(ai.value), source: ai.source },
       groq: { configured: Boolean(groq.value), source: groq.source },
+      gemini: { configured: Boolean(gemini.value), source: gemini.source },
       cmc: { configured: Boolean(cmc.value), source: cmc.source },
       arkham: { configured: Boolean(arkham.value), source: arkham.source },
       freeAi: probe ? { ok: probe.ok, at: probe.at, ms: probe.ms, model: probe.model, error: probe.error ?? null } : null,
@@ -70,7 +73,7 @@ export async function PUT(request: NextRequest) {
   const user = await who(request);
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   if ((await adminUserId(env.DB)) !== user.id) return NextResponse.json({ error: "SÓLO ADMINISTRADOR" }, { status: 403 });
-  const body = ((await request.json().catch(() => ({}))) ?? {}) as { telegramToken?: string; anthropicKey?: string; groqKey?: string; cmcKey?: string; arkhamKey?: string };
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { telegramToken?: string; anthropicKey?: string; groqKey?: string; geminiKey?: string; cmcKey?: string; arkhamKey?: string };
   const results: Record<string, string> = {};
 
   const telegramToken = body.telegramToken?.trim();
@@ -118,6 +121,24 @@ export async function PUT(request: NextRequest) {
       }
     }
   }
+  // Gemini's free key (Google AI Studio, no card): another free brain after Groq (lib/ai-brains.ts). The model list picks the
+  // newest Flash the key can use, and it is saved as a plain setting (it is not a secret).
+  const geminiKey = body.geminiKey?.trim();
+  if (geminiKey) {
+    if (!isGeminiKey(geminiKey)) results.gemini = "NO PARECE UNA CLAVE DE GEMINI (empieza con AIza)";
+    else {
+      const r = await fetch(`${GEMINI_BASE}/models`, { headers: { Authorization: `Bearer ${geminiKey}` }, signal: AbortSignal.timeout(10_000) }).catch(() => null);
+      if (!r) results.gemini = "NO SE PUDO VERIFICAR: sin respuesta de Google";
+      else if (r.status === 400 || r.status === 401 || r.status === 403) results.gemini = "CLAVE INVÁLIDA: Google la rechazó";
+      else if (!r.ok) results.gemini = `NO SE PUDO VERIFICAR (HTTP ${r.status})`;
+      else {
+        const modelo = modeloGemini(await r.json().catch(() => null));
+        await setSecret(env.DB, env, "gemini_api_key", geminiKey);
+        await guardarAjuste(env.DB, AJUSTE_MODELO_GEMINI, modelo);
+        results.gemini = `OK · clave verificada (${modelo})`;
+      }
+    }
+  }
   // CoinMarketCap's free key: dominance and global capitalisation from the server (app/api/market-structure).
   const cmcKey = body.cmcKey?.trim();
   if (cmcKey) {
@@ -159,7 +180,7 @@ export async function DELETE(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "SESIÓN REQUERIDA" }, { status: 401 });
   if ((await adminUserId(env.DB)) !== user.id) return NextResponse.json({ error: "SÓLO ADMINISTRADOR" }, { status: 403 });
   const which = request.nextUrl.searchParams.get("which");
-  const name: SecretName | null = which === "telegram" ? "telegram_bot_token" : which === "ai" ? "anthropic_api_key" : which === "groq" ? "groq_api_key" : which === "cmc" ? "cmc_api_key" : which === "arkham" ? "arkham_api_key" : null;
+  const name: SecretName | null = which === "telegram" ? "telegram_bot_token" : which === "ai" ? "anthropic_api_key" : which === "groq" ? "groq_api_key" : which === "gemini" ? "gemini_api_key" : which === "cmc" ? "cmc_api_key" : which === "arkham" ? "arkham_api_key" : null;
   if (!name) return NextResponse.json({ error: "¿CUÁL?" }, { status: 400 });
   await deleteSecret(env.DB, name);
   return NextResponse.json({ ok: true });

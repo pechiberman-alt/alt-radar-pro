@@ -12,6 +12,7 @@ type Status = {
   telegram: { configured: boolean; source: "cloudflare" | "app" | null };
   ai: { configured: boolean; source: "cloudflare" | "app" | null };
   groq?: { configured: boolean; source: "cloudflare" | "app" | null };
+  gemini?: { configured: boolean; source: "cloudflare" | "app" | null };
   cmc?: { configured: boolean; source: "cloudflare" | "app" | null };
   arkham?: { configured: boolean; source: "cloudflare" | "app" | null };
   freeAi?: { ok: boolean; at: number; ms: number; model: string; error: string | null } | null;
@@ -41,6 +42,7 @@ export default function SettingsDesk() {
   const [telegramToken, setTelegramToken] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
   const [groqKey, setGroqKey] = useState("");
+  const [geminiKey, setGeminiKey] = useState("");
   const [cmcKey, setCmcKey] = useState("");
   const [arkhamKey, setArkhamKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -84,13 +86,13 @@ export default function SettingsDesk() {
   };
 
   const save = async () => {
-    if (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !cmcKey.trim() && !arkhamKey.trim()) return;
+    if (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !geminiKey.trim() && !cmcKey.trim() && !arkhamKey.trim()) return;
     setBusy(true);
     setResults({});
     const r = await fetch("/api/admin/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ telegramToken, anthropicKey, groqKey, cmcKey, arkhamKey }),
+      body: JSON.stringify({ telegramToken, anthropicKey, groqKey, geminiKey, cmcKey, arkhamKey }),
     }).catch(() => null);
     const d = (await r?.json().catch(() => ({}))) as { results?: Record<string, string>; error?: string } | undefined;
     setResults(d?.results ?? { error: d?.error ?? "No se pudo guardar." });
@@ -98,13 +100,14 @@ export default function SettingsDesk() {
     setTelegramToken("");
     setAnthropicKey("");
     setGroqKey("");
+    setGeminiKey("");
     setCmcKey("");
     setArkhamKey("");
     setBusy(false);
     await load();
   };
 
-  const remove = async (which: "telegram" | "ai" | "groq" | "cmc" | "arkham") => {
+  const remove = async (which: "telegram" | "ai" | "groq" | "gemini" | "cmc" | "arkham") => {
     await fetch(`/api/admin/settings?which=${which}`, { method: "DELETE" }).catch(() => undefined);
     await load();
   };
@@ -163,6 +166,13 @@ export default function SettingsDesk() {
                 {status.groq.source === "app" && <button onClick={() => remove("groq")}>BORRAR</button>}
               </div>
             )}
+            {status.gemini && (
+              <div className={status.gemini.configured ? "on" : ""}>
+                <span>IA GRATIS · GEMINI</span>
+                <b>{sourceLabel(status.gemini)}</b>
+                {status.gemini.source === "app" && <button onClick={() => remove("gemini")}>BORRAR</button>}
+              </div>
+            )}
             {status.cmc && (
               <div className={status.cmc.configured ? "on" : ""}>
                 <span>DATOS · COINMARKETCAP</span>
@@ -202,6 +212,10 @@ export default function SettingsDesk() {
             <input type="password" value={groqKey} onChange={(e) => setGroqKey(e.target.value)} placeholder="gsk_…" autoComplete="off" />
           </label>
           <label className="set-field">
+            <span>Clave gratis de Gemini, opcional (aistudio.google.com → Get API key, sin tarjeta): más respuestas de IA gratis por día. En el plan gratis Google puede usar las preguntas y los datos de mercado que se le mandan para mejorar sus productos; nunca tus claves.</span>
+            <input type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} placeholder="AIza…" autoComplete="off" />
+          </label>
+          <label className="set-field">
             <span>Clave gratis de CoinMarketCap, opcional (coinmarketcap.com/api → plan Basic): dominancia de BTC, USDT y capitalización desde el servidor</span>
             <input type="password" value={cmcKey} onChange={(e) => setCmcKey(e.target.value)} placeholder="xxxxxxxx-xxxx-…" autoComplete="off" />
           </label>
@@ -209,13 +223,13 @@ export default function SettingsDesk() {
             <span>Clave de Arkham, opcional (intel.arkm.com → API): alertas de Telegram con transferencias on-chain de 5 M de dólares o más</span>
             <input type="password" value={arkhamKey} onChange={(e) => setArkhamKey(e.target.value)} placeholder="clave de la API de Arkham" autoComplete="off" />
           </label>
-          <button className="set-save" onClick={save} disabled={busy || (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !cmcKey.trim() && !arkhamKey.trim())}>
+          <button className="set-save" onClick={save} disabled={busy || (!telegramToken.trim() && !anthropicKey.trim() && !groqKey.trim() && !geminiKey.trim() && !cmcKey.trim() && !arkhamKey.trim())}>
             {busy ? "VERIFICANDO…" : "VERIFICAR Y GUARDAR"}
           </button>
 
           {Object.entries(results).map(([k, v]) => (
             <p key={k} className={`set-result ${v.startsWith("OK") ? "ok" : "bad"}`}>
-              {k === "telegram" ? "Telegram" : k === "ai" ? "IA" : k === "groq" ? "Groq" : k === "cmc" ? "CoinMarketCap" : k === "arkham" ? "Arkham" : "Error"}: {v}
+              {k === "telegram" ? "Telegram" : k === "ai" ? "IA" : k === "groq" ? "Groq" : k === "gemini" ? "Gemini" : k === "cmc" ? "CoinMarketCap" : k === "arkham" ? "Arkham" : "Error"}: {v}
             </p>
           ))}
 

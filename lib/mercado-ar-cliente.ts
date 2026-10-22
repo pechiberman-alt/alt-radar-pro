@@ -6,7 +6,7 @@
  * Nada de esto se guarda en el navegador ni pide historial en intervalos.
  */
 import { INDICE_EEUU, INDICE_MERVAL, PAPELES_AR, estadoSerie, type EstadoSerie, type PapelAr, type SerieAr } from "./mercado-ar.ts";
-import { pizarraAr } from "./pizarra-activos.ts";
+import { entradaMentesAr, pizarraAr } from "./pizarra-activos.ts";
 import type { Deliberacion } from "./pizarra.ts";
 import type { Razonamiento } from "./mentes-metodo.ts";
 import { consenso, leerMentes, percentiles, rendimiento, sma, volatilidadAnual, type Consenso, type LecturaMente } from "./mentes-inversoras.ts";
@@ -158,20 +158,18 @@ export async function leerPapel(papel: PapelAr, u?: Universo): Promise<LecturaPa
   const pcts = percentiles(tickers.map((t) => uni.rend6m.get(t) ?? null));
   const k = tickers.indexOf(papel.ticker);
   const fuerza = k >= 0 && tickers.length >= 10 ? pcts[k] : null;
-  // Los CEDEARs se leen técnicamente sobre la acción de afuera en dólares (la tendencia de la empresa, sin el dólar local).
-  const tecnica = papel.tipo === "CEDEAR" && subyacente?.serie?.velas.length ? subyacente : serie;
-  const entradaMentes = {
-    simbolo: papel.ticker,
-    velas: velasDe(tecnica),
-    moneda: tecnica.serie?.meta.moneda ?? null,
-    precioUsd: subyacente?.serie?.velas.at(-1)?.close ?? null,
+  const entradaMentes = entradaMentesAr({
+    papel,
+    velasPapel: velasDe(serie),
+    monedaPapel: serie.serie?.meta.moneda ?? null,
+    velasAfuera: subyacente?.serie?.velas ?? null,
+    monedaAfuera: subyacente?.serie?.meta.moneda ?? null,
     fund: fund?.fund ?? null,
-    sinFund: papel.tipo === "ACCION" ? "no hay una fuente gratis de balances de empresas argentinas en formato de datos (la CNV publica PDF)" : (fund?.error ?? null),
+    fundError: fund?.error ?? null,
     fuerzaRelativa: fuerza,
     mercadoAlcista: uni.mercado[papel.tipo],
-    mercadoNombre: papel.tipo === "ACCION" ? "el Merval" : "el S&P 500 (SPY)",
     volMediana: uni.volMediana[papel.tipo],
-  };
+  });
   const mentes = leerMentes(entradaMentes);
   const velasPapel = velasDe(serie);
   const agentes = estudiarPapel(papel.ticker, velasPapel);

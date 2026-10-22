@@ -45,7 +45,7 @@ base Cloudflare D1, bot de Telegram, crons del Worker. Producción: https://alt-
   en USD: solo para precio y estructura, siempre diciendo la fuente (`venue`). Nunca para alertas de volumen ni para XAU/XAG.
 
 ## IA de JARVIS y del ANALISTA
-- Cascada (`lib/ai-cascade.ts`): Claude (25 por usuario y día, se paga) → Groq si hay clave gratis → Workers AI (Qwen3, hasta
+- Cascada (`lib/ai-cascade.ts`): Claude (25 por usuario y día, se paga) → Groq si hay clave gratis → Gemini Flash si hay clave gratis → Workers AI (Qwen3, hasta
   3.500 neuronas/día) → motor local del navegador (`lib/jarvis-local.ts`, sin límite). La respuesta dice qué cerebro habló.
 - Las 10.000 neuronas gratis por día se reparten con la voz premium (2.200 caracteres ≈ 6.000). Subir una obliga a bajar la otra.
 - Memoria por usuario (`lib/jarvis-memory.ts`): solo lo que la persona pidió recordar; va en cada pregunta.

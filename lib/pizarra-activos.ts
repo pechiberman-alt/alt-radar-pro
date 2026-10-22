@@ -15,10 +15,48 @@ import type { DeskSnapshot } from "./jarvis-desk-data.ts";
 import { deliberar, vocesDeAgentes, vocesDeConsejo, vocesDeMentes, vozEstructura, vozFib, vozRiesgo, type Deliberacion, type Direccion, type PlanComun } from "./pizarra.ts";
 import type { SwingCandle } from "./swing-entries.ts";
 import type { Intervencion } from "./mercado-ar-ranking.ts";
+import type { PapelAr } from "./mercado-ar.ts";
+import type { Fundamentales } from "./fundamentales-sec.ts";
+import { resumenGrupo } from "./agentes-mente.ts";
+import type { Estadistica } from "./registro.ts";
+import type { Voz } from "./pizarra.ts";
 
 export type PizarraActivo = { razon: Razonamiento[]; deliberacion: Deliberacion };
 
 // ── Acciones y CEDEARs de BYMA ──
+
+export const SIN_BALANCES_AR = "no hay una fuente gratis de balances de empresas argentinas en formato de datos (la CNV publica PDF)";
+
+/**
+ * La entrada de las mentes para un papel de BYMA, igual en el navegador y en el servidor: los CEDEARs se leen técnicamente
+ * sobre la acción de afuera en dólares (la tendencia de la empresa, sin el dólar local) y su PER con ese precio.
+ */
+export function entradaMentesAr(x: {
+  papel: PapelAr;
+  velasPapel: SwingCandle[];
+  monedaPapel: string | null;
+  velasAfuera: SwingCandle[] | null;
+  monedaAfuera: string | null;
+  fund: Fundamentales | null;
+  fundError: string | null;
+  fuerzaRelativa: number | null;
+  mercadoAlcista: boolean | null;
+  volMediana: number | null;
+}): EntradaMentes {
+  const afuera = x.papel.tipo === "CEDEAR" && x.velasAfuera?.length ? x.velasAfuera : null;
+  return {
+    simbolo: x.papel.ticker,
+    velas: afuera ?? x.velasPapel,
+    moneda: afuera ? x.monedaAfuera : x.monedaPapel,
+    precioUsd: x.velasAfuera?.at(-1)?.close ?? null,
+    fund: x.fund,
+    sinFund: x.papel.tipo === "ACCION" ? SIN_BALANCES_AR : x.fundError,
+    fuerzaRelativa: x.fuerzaRelativa,
+    mercadoAlcista: x.mercadoAlcista,
+    mercadoNombre: x.papel.tipo === "ACCION" ? "el Merval" : "el S&P 500 (SPY)",
+    volMediana: x.volMediana,
+  };
+}
 
 export type EntradaPizarraAr = {
   ticker: string;
@@ -57,6 +95,36 @@ export function pizarraAr(e: EntradaPizarraAr): PizarraActivo {
 
 // ── Criptomonedas ──
 
+/** Lo mínimo de un escritorio de la oficina que necesita la pizarra (lib/oficina.ts, Escritorio, lo cumple). */
+export type EscritorioLite = { id: string; agente: string; abiertas: { symbol: string; lado: string; detectada: number }[]; total: Estadistica };
+
+const fechaCorta = (t: number) => new Date(t).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/**
+ * Los agentes de papel del servidor que tienen una posición abierta en este activo, como voces: su lado y su registro (con
+ * muestra). Operan con velas de 4 h de Kraken, otra serie que la de la mesa: se dice. Los que no tienen nada abierto no opinan.
+ */
+export function vocesDeOficina(escritorios: EscritorioLite[], symbol: string): Voz[] {
+  const out: Voz[] = [];
+  for (const e of escritorios) {
+    const a = e.abiertas.filter((x) => x.symbol === symbol).sort((x, y) => y.detectada - x.detectada)[0];
+    if (!a) continue;
+    const lado = a.lado === "SHORT" ? "CORTO" : "LARGO";
+    out.push({
+      id: `OFICINA:${e.id}`,
+      nombre: e.agente,
+      familia: "AGENTE",
+      lado,
+      motivo: `Abierto en ${lado === "LARGO" ? "largo" : "corto"} desde el ${fechaCorta(a.detectada)} (velas de 4 h de Kraken). Su registro: ${resumenGrupo(e.total)}.`,
+      veto: false,
+      muestra: e.total.cerradas,
+      falta: null,
+      cambiaria: "Cierra cuando toca su stop o su objetivo: la regla es fija.",
+    });
+  }
+  return out;
+}
+
 const planDeLaMesa = (p: Plan | null): PlanComun | null => (p ? { entrada: p.entrada, stop: p.stop, tp1: p.tp[0].price, tp2: p.tp[1].price, tp3: p.tp[2].price, fuente: "Mesa de JARVIS" } : null);
 
 /**
@@ -64,7 +132,7 @@ const planDeLaMesa = (p: Plan | null): PlanComun | null => (p ? { entrada: p.ent
  * lado, se discute el largo (con el plan alcista si lo hay). Las mentes de precio leen las velas diarias; las de valor se
  * abstienen: un criptoactivo no tiene balances.
  */
-export function pizarraCripto(entry: { decision: DeskDecision | null; snapshot: DeskSnapshot }): PizarraActivo {
+export function pizarraCripto(entry: { decision: DeskDecision | null; snapshot: DeskSnapshot }, oficina: EscritorioLite[] = []): PizarraActivo {
   const { decision, snapshot } = entry;
   const velas = snapshot.candles.d1 ?? [];
   const razon = razonarMentes(
@@ -78,6 +146,7 @@ export function pizarraCripto(entry: { decision: DeskDecision | null; snapshot: 
     ...vocesDeMentes(razon, direccion),
     ...(velas.length ? [vozEstructura(estructura(velas), direccion)] : []),
     ...(decision ? vocesDeConsejo({ votos: council(decision).votos, compuertas: gates(decision) }) : []),
+    ...vocesDeOficina(oficina, snapshot.symbol),
     ...(decision?.riesgo ? [] : [vozRiesgo(plan, direccion)]),
   ];
   return { razon, deliberacion: deliberar({ activo: snapshot.symbol.replace(/USDT$/, ""), direccion, voces, plan }) };

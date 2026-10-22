@@ -4,16 +4,16 @@
 > Lectura estática: los imports armados en tiempo de ejecución no aparecen.
 > Para no leer el repo entero: `npm run arana -- --buscar <tema>`, `--regla <tema>`, `--archivo <ruta>`, `--ruta <archivo>`, `--objetivo <nombre>`, `--pendientes`, `--tablas`, `--secretos`, `--cambios`, `--check`.
 
-- Archivos: 736 · objetivos: 21 · sin objetivo: 0
-- Tablas D1: 56 · secretos: 5 · variables de entorno: 25 · rutas /api: 62 · hosts: 63
+- Archivos: 742 · objetivos: 21 · sin objetivo: 0
+- Tablas D1: 59 · secretos: 6 · variables de entorno: 25 · rutas /api: 62 · hosts: 64
 - Código de navegador: 79 archivos con "use client" que alcanzan 251 · problemas: 0
-- Lib sin prueba directa: 29 de 244
+- Lib sin prueba directa: 32 de 248
 
 ## Objetivos
 
-### jarvis — JARVIS, la IA propia del software (92)
+### jarvis — JARVIS, la IA propia del software (94)
 Texto: asistente de voz y análisis dentro de la app, con su núcleo 24/7 en el servidor: cascada de cerebros, memoria por persona, lectura horaria (MENTE), analista de cada activo, voz neural y manos libres.
-Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía. · Cargar la clave gratis de Groq en CONFIGURACIÓN: hace más rápida a MENTE (sin ella usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
+Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 en desarrollo y 15 en validación); correr backtests suma muestra. Ninguna variante aprobada todavía. · Cargar una clave gratis de Gemini (aistudio.google.com) o de Groq en CONFIGURACIÓN: más respuestas gratis y MENTE más rápida (sin ellas usa Workers AI). · Mesa: la clave gratis de CoinMarketCap es opcional (CONFIGURACIÓN); TradingView no tiene API pública de datos (solo widgets y webhooks). /api/market/derivatives?symbol=BTCUSDT dice qué exchange contestó. · Escáner del mercado: el primer escaneo real, con Binance y desde el navegador de la persona, está sin confirmar (se probó con una Binance simulada): mirar si aparece un 429 o un 418 y cuánto tarda. · El núcleo del servidor (lib/jarvis-core.ts) sigue leyendo 20 monedas cada 15 minutos: ampliarlo cuesta filas leídas de D1 (5 millones por día) y CPU del Worker; el resto del mercado lo cubre el escáner del navegador. · Reglas v2: lo que las confirma de verdad es el papel hacia adelante, con su muestra (menos de 15 operaciones es muestra mínima). Las 10 monedas medidas son grandes y de hoy (sesgo de supervivencia), sin deslizamiento ni financiamiento.
 - `app/api/analyst/ai/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/alert/route.ts` — exporta: dynamic, POST
 - `app/api/jarvis/chat/route.ts` — exporta: dynamic, GET, POST, DELETE
@@ -41,7 +41,8 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `lib/ai-analyst-server.ts` — The Anthropic call and the daily quota, shared by the app's ANALISTA and the Telegram bot.
 - `lib/ai-analyst.ts` — AI mode for the ANALISTA panel: Claude, instructed with ALT RADAR's own methodology and fed the live snapshot on every question.
 - `lib/ai-brains.ts` — JARVIS's brains, in the order they answer a free question:
-- `lib/ai-cascade.ts` — La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el cupo de la persona), después por Groq (si hay clave gratis) y después por el modelo gratis de
+- `lib/ai-cascade.ts` — La cascada de cerebros de JARVIS y del ANALISTA: una pregunta pasa por Claude (con el cupo de la persona), después por Groq y Gemini (si hay clave gratis) y después por el modelo g
+- `lib/ai-gemini-server.ts` — La clave de Gemini y el modelo elegido al guardarla (lib/ai-brains.ts), leídos en el Worker: el navegador nunca toca secretos.
 - `lib/ai-numbers.ts` — Numbers for the AIs, already written the Argentine way ("82.920", "11,066", "0,7042", "-2,99").
 - `lib/ai-probe.ts` — Once per deploy, the minute cron asks the free brain (Cloudflare Workers AI) a one-word question and keeps what happened, so the settings screen — and whoever deployed — can see th
 - `lib/assistant/index.ts` — Deterministic terminal assistant.
@@ -105,6 +106,7 @@ Pendiente: Laboratorio en sombra: con poco papel cerrado no evoluciona (pide 15 
 - `scripts/investigacion/simulador.ts` — Simulador rápido de la mesa sobre lecturas precalculadas (ver precalcular.ts).
 - `scripts/investigacion/smc-busqueda.ts` — La búsqueda del gatillo y la configuración del agente de liquidez (lib/smc-liquidez.ts): zonas FVG y OB de la temporalidad alta, con toma de liquidez, IFVG y breaker, en 1 h, 4 h y
 - `scripts/investigacion/util.ts` — Datos y escalas de tiempo de la investigación de la mesa.
+- `tests/ai-gemini.test.ts` — Pruebas del cerebro gratis de Gemini (lib/ai-brains.ts): reconocer la clave, elegir el Flash más nuevo de la lista de modelos de la cuenta (sin variantes lite, imagen o vista previ
 - `tests/ia-respuesta.test.ts` — Pruebas de lib/ia-respuesta.ts: qué se pregunta, la respuesta directa con el dato, el prompt de persona, la limpieza (razonamiento oculto y markdown) y el control de que la IA cont
 
 ### honestidad — Nunca inventar: probabilidades, precios, noticias (0)
@@ -529,9 +531,9 @@ Texto: el laboratorio multiagente en simulación. Junta lo que ya existe (especi
 - `tests/sobreajuste.test.ts` — Tests de la auditoría de sobreajuste (lib/sobreajuste.ts): normal y su inversa, momentos, PSR, DSR con el máximo esperado por azar, y Reality Check / SPA: sin ventaja no tienen que
 - `tests/universos.test.ts` — Pruebas de los universos de monedas (lib/universos.ts): que no se diga que un universo se puede medir cuando no hay velas descargadas, que las monedas con datos sean exactamente la
 
-### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (25)
+### mercado-ar — Mercado argentino: acciones y CEDEARs de BYMA, con mentes inversoras y agentes (29)
 Texto: acciones del panel líder y CEDEARs con ruedas diarias de Yahoo Finance (con demora), dentro del panel MERCADO AR y del MAPA (el buscador del mapa encuentra papeles de BYMA y muestra su vista). Las MENTES (Buffett, Graham, Lynch, crecimiento al estilo Musk, Tudor Jones, Darvas, O'Neil, Templeton, Dalio) y los agentes del laboratorio leen cada papel y todo el panel. Balances de SEC EDGAR para los CEDEARs de empresas de EE. UU.
-Pendiente: Señales AR en el registro unificado (resolverlas con ruedas diarias en el servidor). · Balances de empresas argentinas si aparece una fuente gratis en datos. · Lecturas de agentes en el mapa de footprint cripto.
+Pendiente: Pizarra de cripto en el servidor (con el núcleo de JARVIS) para registrar sus decisiones sin depender de que alguien abra la pantalla. · Balances de empresas argentinas si aparece una fuente gratis en datos. · Lecturas de agentes en el mapa de footprint cripto.
 - `app/api/mercado-ar/fundamentales/route.ts` — Balances anuales de la empresa de afuera de un CEDEAR, de SEC EDGAR, para las mentes de valor (Buffett, Graham, Lynch, crecimiento).
 - `app/api/mercado-ar/lote/route.ts` — Varias series de MERCADO AR en un solo pedido (hasta 12), en formato compacto (lib/mercado-ar-lote.ts): el panel entero llega en unos pocos pedidos en lugar de cien.
 - `app/api/mercado-ar/route.ts` — Velas diarias de una acción argentina o un CEDEAR (y de su acción de afuera), de Yahoo Finance, para el panel MERCADO AR.
@@ -541,6 +543,9 @@ Pendiente: Señales AR en el registro unificado (resolverlas con ruedas diarias 
 - `app/mercado-ar.css` — MERCADO AR: panel, escáner de agentes y mentes, y la vista de un papel en el MAPA.
 - `app/pizarra-panel.tsx` — La PIZARRA a la vista (lib/pizarra.ts): para un activo, quién está a favor, quién en contra, quién espera y quién se abstiene (y por qué), dónde discrepan las familias, qué habría
 - `app/sala-mentes.tsx` — La sala de las MENTES (lib/mentes-inversoras.ts): los nueve agentes inspirados en Buffett, Graham, Lynch, Musk, Tudor Jones, Darvas, O'Neil, Templeton y Dalio en sus escritorios.
+- `lib/ar-senales-db.ts` — La base de las señales de BYMA del servidor (lib/ar-senales.ts): una tabla global con índice por papel y estado (las abiertas) y por fuente y fecha (el registro), el estado de cada
+- `lib/ar-senales-run.ts` — La corrida del cron de las señales de BYMA (lib/ar-senales.ts): al papel de turno le trae sus ruedas (la misma caché que la app), la acción de afuera si es CEDEAR, el índice de ref
+- `lib/ar-senales.ts` — Las señales de BYMA en el servidor (PLAN_AR_1): una vez por rueda, con el mercado cerrado, cada papel del panel se lee con lo mismo que en la app (agentes de lib/mercado-ar-agentes
 - `lib/fundamentales-sec.ts` — Los balances de las empresas de afuera que hay detrás de los CEDEARs, de SEC EDGAR (XBRL, gratis y oficial): ingresos, ganancia neta, BPA diluido, patrimonio, pasivo y activo/pasiv
 - `lib/mentes-inversoras.ts` — Las MENTES: agentes que leen un papel con las reglas públicas de inversores famosos (Buffett, Graham, Lynch, la prédica de crecimiento de Musk, Paul Tudor Jones, Darvas, O'Neil, Te
 - `lib/mentes-metodo.ts` — El MÉTODO de cada mente: no solo qué criterios cumple un papel (lib/mentes-inversoras.ts) sino en qué orden se hace las preguntas la persona que inspira la lente, qué la frena de p
@@ -552,6 +557,7 @@ Pendiente: Señales AR en el registro unificado (resolverlas con ruedas diarias 
 - `lib/mercado-ar-ranking.ts` — Las listas que arma MERCADO AR con todo el panel leído: las mejores compras según Fibonacci (precio dentro de la zona 0,618–0,786 o cerca, con su plan y lo que pasó antes en ese pa
 - `lib/mercado-ar-tecnico.ts` — El análisis técnico de un papel de BYMA con ruedas diarias, con los mismos motores del mapa cripto: zona de compra de Fibonacci (retroceso 0,618–0,786 de la última pierna alcista,
 - `lib/mercado-ar.ts` — El mercado argentino en la terminal: acciones del panel líder de BYMA y CEDEARs, con velas DIARIAS de Yahoo Finance (BYMA llega con demora; Yahoo dice cuántos minutos en `exchangeD
+- `tests/ar-senales.test.ts` — Pruebas de las señales de BYMA del servidor (lib/ar-senales.ts): el turno (un papel por minuto, días hábiles, 21 UTC), que solo entra la rueda del día, las entradas de agentes y de
 - `tests/mentes-ar.test.ts` — Pruebas de las MENTES (lib/mentes-inversoras.ts), los balances de SEC (lib/fundamentales-sec.ts), los agentes sobre ruedas de BYMA (lib/mercado-ar-agentes.ts) y el mapa de un papel
 - `tests/mentes-metodo.test.ts` — Pruebas del método de cada mente (lib/mentes-metodo.ts): el orden de sus preguntas, sus vetos, su plan y que, sin balances o con un criptoactivo, las lentes de valor se abstengan e
 - `tests/mercado-ar-ranking.test.ts` — Pruebas de las listas de MERCADO AR (lib/mercado-ar-ranking.ts: mejores compras Fibonacci, señales con mentes y el guion de la reunión) y del formato compacto de los lotes (lib/mer
@@ -561,7 +567,7 @@ Pendiente: Señales AR en el registro unificado (resolverlas con ruedas diarias 
 ### terminal-unificada — Un contexto común para todos los agentes, con la calidad de cada dato (7)
 Texto: la plataforma unificada (docs/terminal-unificada.md): un solo contexto de mercado que leen todos los agentes, con fuente, mercado (Spot o Futures), hora, temporalidad, unidad, método y estado de calidad de cada dato. Se construye sobre la foto de la mesa de JARVIS y los motores de order flow que ya existen, sin un sistema paralelo. Se trabaja en la rama feature/pro-terminal-visual-refresh.
 Pendiente: Fase C: que la mesa de JARVIS, la araña y los agentes lean el contexto común y se abstengan con su motivo; footprint, CVD por operación y libro dentro del contexto. · Unificar las dos implementaciones de footprint (unidades y desequilibrio). · Registro auditable de cada decisión (la pizarra ya calcula su huella; falta guardarla en el registro unificado) con el id del contexto, los agentes consultados y el veto; motor de day trading; riesgo agregado por correlación; deslizamiento con el libro. · Fase F: rediseño visual, celular primero.
-- `app/pizarra-cripto.tsx` — La pizarra (lib/pizarra.ts) de una criptomoneda: las mentes de precio (las de valor se abstienen: no hay balances), la estructura y la mesa de JARVIS con sus compuertas, deliberand
+- `app/pizarra-cripto.tsx` — La pizarra (lib/pizarra.ts) de una criptomoneda: las mentes de precio (las de valor se abstienen: no hay balances), la estructura, la mesa de JARVIS con sus compuertas y los agente
 - `docs/terminal-unificada.md` — ALT RADAR PRO — plataforma unificada: auditoría y primer incremento
 - `lib/contexto-comun.ts` — El contexto común de la terminal (docs/terminal-unificada.md, fase B): la forma en que un dato llega a cualquier agente, con su fuente, su mercado (Spot o Futures), la hora del dat
 - `lib/pizarra-activos.ts` — Arma la pizarra (lib/pizarra.ts) de un activo concreto con todo lo que ya se leyó de él: para una acción o un CEDEAR de BYMA, las nueve mentes con su método, los agentes que dispar
@@ -832,6 +838,9 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `ai_usage` — crea: lib/ai-analyst-server.ts · usa: lib/ai-analyst-server.ts, tests/ai-brains.test.ts · sin índice visible en el código
 - `app_settings` — crea: lib/app-settings.ts, tests/suscripcion-db.test.ts · usa: lib/app-settings.ts, tests/app-settings.test.ts, tests/binance-account.test.ts, tests/suscripcion-db.test.ts · sin índice visible en el código
 - `aprendizaje_diario` — crea: lib/aprendizaje-diario-db.ts · usa: lib/aprendizaje-diario-db.ts · sin índice visible en el código
+- `ar_avisos` — crea: lib/ar-senales-db.ts · usa: lib/ar-senales-db.ts · índices: ar_avisos_at
+- `ar_estado` — crea: lib/ar-senales-db.ts · usa: lib/ar-senales-db.ts · sin índice visible en el código
+- `ar_senales` — crea: lib/ar-senales-db.ts · usa: lib/ar-senales-db.ts · índices: ar_senales_abiertas, ar_senales_fuente
 - `arana_ultimo` — crea: lib/arana-ultimo-db.ts · usa: lib/arana-ultimo-db.ts · sin índice visible en el código
 - `auth_intentos` — crea: lib/auth-limites.ts · usa: lib/auth-limites.ts · sin índice visible en el código
 - `automation_state` — crea: db/schema.ts, lib/automation.ts, tests/signal-plan-db.test.ts (+1) · usa: app/api/signals/route.ts, lib/automation.ts, lib/scalping-automation.ts, lib/signal-plan-db.ts, tests/signal-plan-db.test.ts, tests/telegram-signals.test.ts · sin índice visible en el código
@@ -886,6 +895,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `anthropic_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
 - `arkham_api_key` (secreto) — lee: app/api/admin/settings/route.ts, worker/index.ts · guarda: app/api/admin/settings/route.ts
 - `cmc_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/market-structure/route.ts · guarda: app/api/admin/settings/route.ts
+- `gemini_api_key` (secreto) — lee: app/api/admin/settings/route.ts, lib/ai-gemini-server.ts · guarda: app/api/admin/settings/route.ts
 - `groq_api_key` (secreto) — lee: app/api/admin/settings/route.ts, app/api/analyst/ai/route.ts, lib/jarvis-mind-db.ts, lib/telegram-ai-server.ts · guarda: app/api/admin/settings/route.ts
 - `telegram_bot_token` (secreto) — lee: app/api/admin/cobros/route.ts, app/api/admin/settings/route.ts, app/api/alerts/prebreak/route.ts, app/api/jarvis/alert/route.ts (+6) · guarda: app/api/admin/settings/route.ts
 - variable `ALT_RADAR_DATOS` — en: scripts/investigacion/util.ts
@@ -1025,6 +1035,7 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 - `feeds.content.dowjones.io` — lib/news-intelligence.ts
 - `feeds.skynews.com` — lib/news-intelligence.ts
 - `futures.kraken.com` — lib/market-providers.ts
+- `generativelanguage.googleapis.com` — lib/ai-brains.ts
 - `github.com` — scripts/ia-editor.mjs, tests/herramientas.test.ts
 - `news.un.org` — lib/news-intelligence.ts
 - `nextjs.org` — next-env.d.ts
@@ -1052,4 +1063,4 @@ Texto: la app que se ve y se usa, pensada primero para el celular (mobile first)
 
 ## Lib sin prueba directa
 
-- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/mapa-agentes-db.ts`, `lib/mapa-memoria.ts`, `lib/market-brain.ts`, `lib/mercado-ar-cliente.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`
+- `lib/account-events.ts`, `lib/agente-st-run.ts`, `lib/ai-gemini-server.ts`, `lib/ar-senales-db.ts`, `lib/ar-senales-run.ts`, `lib/arana-ultimo-db.ts`, `lib/automation.ts`, `lib/binance-futures.ts`, `lib/bot-journal-db.ts`, `lib/brain-security.ts`, `lib/flujo-run.ts`, `lib/futures-log-db.ts`, `lib/jarvis-world.ts`, `lib/klines-history.ts`, `lib/liquidity-archive.ts`, `lib/liquidity-history.ts`, `lib/mapa-agentes-db.ts`, `lib/mapa-memoria.ts`, `lib/market-brain.ts`, `lib/mercado-ar-cliente.ts`, `lib/news-intelligence.ts`, `lib/oficina-db.ts`, `lib/oficina-run.ts`, `lib/registro-run.ts`, `lib/scalping-automation.ts`, `lib/scalping-engine.ts`, `lib/signal-ledger.ts`, `lib/signal-plan-record.ts`, `lib/spot-plan-client.ts`, `lib/squeeze.ts`, `lib/telegram-server.ts`, `lib/visible-interval.ts`

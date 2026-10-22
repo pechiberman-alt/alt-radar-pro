@@ -90,14 +90,13 @@ export const WORKSPACE_SECTIONS: WorkspaceSection[] = [
 ];
 
 /**
- * ESSENTIAL: what someone needs on day one — the market at a glance, the
- * robot's signals, the liquidity map, coins rising on their own, alerts, their
- * own journal and settings. The other panels are real tools, but a second
- * step: with 33 sections always listed, the first impression was a wall.
- * They live under AVANZADO, one tap away, and opening any of them from
- * elsewhere in the app turns AVANZADO on by itself.
+ * ESSENTIAL: what someone needs on day one — the market at a glance, JARVIS, the robot's signals, the liquidity map,
+ * Argentine stocks, alerts, their own journal and settings. The other panels are real tools, but a second step: with 33
+ * sections always listed, the first impression was a wall, and with ten it still was. They live under AVANZADO, one tap
+ * away, and opening any of them from elsewhere in the app (the tutorial too) turns AVANZADO on by itself. POR ROMPER and
+ * SUBEN SOLAS moved there in October 2026.
  */
-export const ESSENTIAL_IDS = new Set(["resumen", "jarvis-trading", "inteligencia", "liquidaciones", "mercado-ar", "rompe", "desacople", "alertas", "diario", "configuracion"]);
+export const ESSENTIAL_IDS = new Set(["resumen", "jarvis-trading", "inteligencia", "liquidaciones", "mercado-ar", "alertas", "diario", "configuracion"]);
 const ADVANCED_KEY = "alt-radar-pro:workspace:advanced:v1";
 const ADVANCED_EVENT = "alt-radar:advanced";
 

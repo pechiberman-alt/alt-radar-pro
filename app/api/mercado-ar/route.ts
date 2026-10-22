@@ -6,8 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { SIMBOLOS_PERMITIDOS } from "@/lib/mercado-ar";
-import { bajarSerieAr, type ResultadoAr } from "@/lib/mercado-ar-fuente";
-import { cached } from "@/lib/upstream-cache";
+import { serieArCacheada } from "@/lib/mercado-ar-fuente";
 
 export const dynamic = "force-dynamic";
 
@@ -16,24 +15,14 @@ export async function GET(request: Request) {
   if (!SIMBOLOS_PERMITIDOS.has(simbolo)) {
     return NextResponse.json({ error: "Ese símbolo no está en la lista de acciones y CEDEARs." }, { status: 400 });
   }
-  let ultimoError: string | null = null;
-  const r = await cached<ResultadoAr>(
-    `mercado-ar:${simbolo}`,
-    15 * 60_000,
-    async () => {
-      const x = await bajarSerieAr(simbolo);
-      ultimoError = x.error;
-      return x.serie ? x : null;
-    },
-    3 * 86_400_000,
-  );
+  const c = await serieArCacheada(simbolo);
   return NextResponse.json(
     {
       simbolo,
-      serie: r.value?.serie ?? null,
-      fuente: r.value?.fuente ?? null,
-      edadSeg: Math.round(r.ageMs / 1000),
-      error: r.value ? null : (ultimoError ?? "la fuente no respondió"),
+      serie: c.resultado?.serie ?? null,
+      fuente: c.resultado?.fuente ?? null,
+      edadSeg: Math.round(c.edadMs / 1000),
+      error: c.error,
     },
     { headers: { "Cache-Control": "no-store" } },
   );
